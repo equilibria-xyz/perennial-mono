@@ -1,0 +1,487 @@
+import { MockContract } from '@ethereum-waffle/mock-contract'
+import { utils } from 'ethers'
+import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
+import { expect } from 'chai'
+import HRE, { waffle } from 'hardhat'
+
+import { impersonate } from '../../testutil'
+
+import {
+  Collateral,
+  Collateral__factory,
+  Controller__factory,
+  IERC20Metadata__factory,
+  Product__factory,
+} from '../../../types/generated'
+
+const { ethers } = HRE
+
+describe('Collateral', () => {
+  let owner: SignerWithAddress
+  let user: SignerWithAddress
+  let userB: SignerWithAddress
+  let treasuryA: SignerWithAddress
+  let treasuryB: SignerWithAddress
+  let notProduct: SignerWithAddress
+  let controller: MockContract
+  let token: MockContract
+  let product: MockContract
+  let productSigner: SignerWithAddress
+
+  let collateral: Collateral
+
+  beforeEach(async () => {
+    ;[owner, user, userB, treasuryA, treasuryB, notProduct] = await ethers.getSigners()
+
+    token = await waffle.deployMockContract(owner, IERC20Metadata__factory.abi)
+    await token.mock.decimals.returns(18)
+
+    product = await waffle.deployMockContract(owner, Product__factory.abi)
+    productSigner = await impersonate.impersonateWithBalance(product.address, utils.parseEther('10'))
+
+    controller = await waffle.deployMockContract(owner, Controller__factory.abi)
+    await controller.mock['paused()'].withArgs().returns(false)
+    await controller.mock['paused(address)'].withArgs(product.address).returns(false)
+    await controller.mock['paused(address)'].withArgs(notProduct.address).returns(false)
+    await controller.mock.liquidationFee.withArgs().returns(utils.parseEther('0.5'))
+    await controller.mock.minCollateral.withArgs().returns(0)
+    await controller.mock.isProduct.withArgs(product.address).returns(true)
+    await controller.mock.isProduct.withArgs(notProduct.address).returns(false)
+
+    collateral = await new Collateral__factory(owner).deploy(token.address)
+    await collateral.initialize(controller.address)
+  })
+
+  describe('#initialize', async () => {
+    it('initialize with the correct variables set', async () => {
+      expect(await collateral.controller()).to.equal(controller.address)
+      expect(await collateral.token()).to.equal(token.address)
+    })
+
+    it('reverts if already initialized', async () => {
+      await expect(collateral.initialize(controller.address)).to.be.revertedWith(
+        'UInitializableAlreadyInitializedError(1)',
+      )
+    })
+
+    it('reverts if controller is zero address', async () => {
+      const collateralFresh = await new Collateral__factory(owner).deploy(token.address)
+      await expect(collateralFresh.initialize(ethers.constants.AddressZero)).to.be.revertedWith(
+        'InvalidControllerError()',
+      )
+    })
+  })
+
+  describe('#depositTo', async () => {
+    it('deposits to the user account', async () => {
+      await token.mock.transferFrom.withArgs(owner.address, collateral.address, 100).returns(true)
+      await expect(collateral.connect(owner).depositTo(user.address, product.address, 100))
+        .to.emit(collateral, 'Deposit')
+        .withArgs(user.address, product.address, 100)
+
+      expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(100)
+      expect(await collateral['collateral(address)'](product.address)).to.equal(100)
+    })
+
+    it('reverts if paused', async () => {
+      await controller.mock['paused(address)'].withArgs(product.address).returns(true)
+      await expect(collateral.connect(owner).depositTo(user.address, product.address, 100)).to.be.revertedWith(
+        'PausedError()',
+      )
+    })
+
+    it('reverts if zero address', async () => {
+      await expect(
+        collateral.connect(owner).depositTo(ethers.constants.AddressZero, product.address, 100),
+      ).to.be.revertedWith(`CollateralZeroAddressError()`)
+    })
+
+    it('reverts if not product', async () => {
+      await expect(collateral.connect(owner).depositTo(user.address, notProduct.address, 100)).to.be.revertedWith(
+        `NotProductError("${notProduct.address}")`,
+      )
+    })
+
+    it('reverts if below limit', async () => {
+      await controller.mock.minCollateral.withArgs().returns(100)
+      await token.mock.transferFrom.withArgs(owner.address, collateral.address, 80).returns(true)
+
+      await expect(collateral.connect(owner).depositTo(user.address, product.address, 80)).to.be.revertedWith(
+        'CollateralUnderLimitError()',
+      )
+    })
+
+    describe('multiple users per product', async () => {
+      beforeEach(async () => {
+        await token.mock.transferFrom.withArgs(owner.address, collateral.address, 100).returns(true)
+        await collateral.connect(owner).depositTo(user.address, product.address, 100)
+      })
+
+      it('adds to both totals', async () => {
+        await expect(collateral.connect(owner).depositTo(userB.address, product.address, 100))
+          .to.emit(collateral, 'Deposit')
+          .withArgs(userB.address, product.address, 100)
+
+        expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(100)
+        expect(await collateral['collateral(address,address)'](userB.address, product.address)).to.equal(100)
+        expect(await collateral['collateral(address)'](product.address)).to.equal(200)
+      })
+    })
+  })
+
+  describe('#withdrawTo', async () => {
+    beforeEach(async () => {
+      // Mock settle calls
+      await product.mock.settle.returns()
+      await product.mock.settleAccount.withArgs(user.address).returns()
+      await product.mock.settleAccount.withArgs(userB.address).returns()
+
+      // Mock maintenance calls
+      await product.mock.maintenance.withArgs(user.address).returns(0)
+      await product.mock.maintenanceNext.withArgs(user.address).returns(0)
+      await product.mock.maintenance.withArgs(userB.address).returns(0)
+      await product.mock.maintenanceNext.withArgs(userB.address).returns(0)
+
+      //Pre-fill account
+      await token.mock.transferFrom.withArgs(owner.address, collateral.address, 100).returns(true)
+      await collateral.connect(owner).depositTo(user.address, product.address, 100)
+    })
+
+    it('withdraws from the user account', async () => {
+      await token.mock.transfer.withArgs(owner.address, 80).returns(true)
+      await expect(collateral.connect(user).withdrawTo(owner.address, product.address, 80))
+        .to.emit(collateral, 'Withdrawal')
+        .withArgs(user.address, product.address, 80)
+
+      expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(20)
+      expect(await collateral['collateral(address)'](product.address)).to.equal(20)
+    })
+
+    it('reverts if paused', async () => {
+      await controller.mock['paused(address)'].withArgs(product.address).returns(true)
+      await expect(collateral.connect(user).withdrawTo(user.address, product.address, 80)).to.be.revertedWith(
+        'PausedError()',
+      )
+    })
+
+    it('reverts if zero address', async () => {
+      await expect(
+        collateral.connect(user).withdrawTo(ethers.constants.AddressZero, product.address, 100),
+      ).to.be.revertedWith(`CollateralZeroAddressError()`)
+    })
+
+    it('reverts if not product', async () => {
+      await expect(collateral.connect(user).withdrawTo(user.address, notProduct.address, 100)).to.be.revertedWith(
+        `NotProductError("${notProduct.address}")`,
+      )
+    })
+
+    it('reverts if below limit', async () => {
+      await controller.mock.minCollateral.withArgs().returns(50)
+      await token.mock.transfer.withArgs(user.address, 80).returns(true)
+
+      await expect(collateral.connect(user).withdrawTo(user.address, product.address, 80)).to.be.revertedWith(
+        'CollateralUnderLimitError()',
+      )
+    })
+
+    it('reverts if liquidatable current', async () => {
+      await product.mock.maintenance.withArgs(user.address).returns(50)
+      await product.mock.maintenanceNext.withArgs(user.address).returns(100)
+
+      await token.mock.transfer.withArgs(user.address, 80).returns(true)
+      await expect(collateral.connect(user).withdrawTo(user.address, product.address, 80)).to.be.revertedWith(
+        'CollateralInsufficientCollateralError()',
+      )
+    })
+
+    it('reverts if liquidatable next', async () => {
+      await product.mock.maintenance.withArgs(user.address).returns(100)
+      await product.mock.maintenanceNext.withArgs(user.address).returns(50)
+
+      await token.mock.transfer.withArgs(user.address, 80).returns(true)
+      await expect(collateral.connect(user).withdrawTo(user.address, product.address, 80)).to.be.revertedWith(
+        'CollateralInsufficientCollateralError()',
+      )
+    })
+
+    describe('multiple users per product', async () => {
+      beforeEach(async () => {
+        await token.mock.transferFrom.withArgs(owner.address, collateral.address, 100).returns(true)
+        await collateral.connect(owner).depositTo(userB.address, product.address, 100)
+        await token.mock.transfer.withArgs(owner.address, 80).returns(true)
+        await collateral.connect(user).withdrawTo(owner.address, product.address, 80)
+      })
+
+      it('subtracts from both totals', async () => {
+        await expect(collateral.connect(userB).withdrawTo(owner.address, product.address, 80))
+          .to.emit(collateral, 'Withdrawal')
+          .withArgs(userB.address, product.address, 80)
+
+        expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(20)
+        expect(await collateral['collateral(address,address)'](userB.address, product.address)).to.equal(20)
+        expect(await collateral['collateral(address)'](product.address)).to.equal(40)
+      })
+    })
+
+    describe('shortfall', async () => {
+      beforeEach(async () => {
+        await token.mock.transferFrom.withArgs(owner.address, collateral.address, 100).returns(true)
+        await collateral.connect(owner).depositTo(userB.address, product.address, 100)
+
+        await collateral.connect(productSigner).settleAccount(userB.address, -150)
+        await collateral.connect(productSigner).settleAccount(user.address, 150)
+      })
+
+      it('reverts if depleted', async () => {
+        expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(250)
+        expect(await collateral['collateral(address)'](product.address)).to.equal(200)
+        expect(await collateral.shortfall(product.address)).to.equal(50)
+
+        await expect(collateral.connect(user).withdrawTo(user.address, product.address, 250)).to.be.revertedWith('0x11') // underflow
+      })
+    })
+
+    describe('shortfall (multiple)', async () => {
+      beforeEach(async () => {
+        await token.mock.transferFrom.withArgs(owner.address, collateral.address, 100).returns(true)
+        await collateral.connect(owner).depositTo(userB.address, product.address, 100)
+
+        await collateral.connect(productSigner).settleAccount(userB.address, -150)
+        await collateral.connect(productSigner).settleAccount(userB.address, -50)
+        await collateral.connect(productSigner).settleAccount(user.address, 150)
+        await collateral.connect(productSigner).settleAccount(user.address, 50)
+      })
+
+      it('reverts if depleted', async () => {
+        expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(300)
+        expect(await collateral['collateral(address)'](product.address)).to.equal(200)
+        expect(await collateral.shortfall(product.address)).to.equal(100)
+
+        await expect(collateral.connect(user).withdrawTo(user.address, product.address, 300)).to.be.revertedWith('0x11') // underflow
+      })
+    })
+  })
+
+  describe('#settleAccount', async () => {
+    it('credits the account', async () => {
+      await expect(collateral.connect(productSigner).settleAccount(user.address, 101))
+        .to.emit(collateral, 'AccountSettle')
+        .withArgs(product.address, user.address, 101, 0)
+      expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(101)
+      expect(await collateral['collateral(address)'](product.address)).to.equal(0)
+    })
+
+    context('negative credit', async () => {
+      it('doesnt create a shortfall', async () => {
+        await token.mock.transferFrom.withArgs(owner.address, collateral.address, 100).returns(true)
+        await collateral.depositTo(user.address, product.address, 100)
+
+        await expect(collateral.connect(productSigner).settleAccount(user.address, -99))
+          .to.emit(collateral, 'AccountSettle')
+          .withArgs(product.address, user.address, -99, 0)
+
+        expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(1)
+        expect(await collateral['collateral(address)'](product.address)).to.equal(100)
+        expect(await collateral.shortfall(product.address)).to.equal(0)
+      })
+
+      it('creates a shortfall', async () => {
+        await token.mock.transferFrom.withArgs(owner.address, collateral.address, 100).returns(true)
+        await collateral.depositTo(user.address, product.address, 100)
+
+        await expect(collateral.connect(productSigner).settleAccount(user.address, -101))
+          .to.emit(collateral, 'AccountSettle')
+          .withArgs(product.address, user.address, -101, 1)
+
+        expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(0)
+        expect(await collateral['collateral(address)'](product.address)).to.equal(100)
+        expect(await collateral.shortfall(product.address)).to.equal(1)
+      })
+    })
+
+    it('reverts if not product', async () => {
+      await controller.mock.isProduct.withArgs(user.address).returns(false)
+
+      await expect(collateral.connect(user).settleAccount(user.address, 101)).to.be.revertedWith(
+        `NotProductError("${user.address}")`,
+      )
+    })
+  })
+
+  describe('#settleProduct', async () => {
+    beforeEach(async () => {
+      await token.mock.transferFrom.withArgs(owner.address, collateral.address, 100).returns(true)
+      await collateral.depositTo(user.address, product.address, 100)
+
+      await controller.mock['treasury()'].returns(treasuryA.address)
+      await controller.mock['treasury(address)'].withArgs(product.address).returns(treasuryB.address)
+      await controller.mock.protocolFee.returns(utils.parseEther('0.1'))
+    })
+
+    it('settles the product fee', async () => {
+      await expect(collateral.connect(productSigner).settleProduct(90))
+        .to.emit(collateral, 'ProductSettle')
+        .withArgs(product.address, 9, 81)
+
+      expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(100)
+
+      expect(await collateral['collateral(address)'](product.address)).to.equal(10)
+      expect(await collateral.shortfall(product.address)).to.equal(0)
+      expect(await collateral.fees(treasuryA.address)).to.equal(9)
+      expect(await collateral.fees(treasuryB.address)).to.equal(81)
+    })
+
+    it('reverts if product shortfall', async () => {
+      await expect(collateral.connect(productSigner).settleProduct(110)).to.be.revertedWith(`0x11`)
+    })
+
+    it('reverts if not product', async () => {
+      await controller.mock.isProduct.withArgs(user.address).returns(false)
+
+      await expect(collateral.connect(user).settleProduct(90)).to.be.revertedWith(`NotProductError("${user.address}")`)
+    })
+  })
+
+  describe('#liquidate', async () => {
+    beforeEach(async () => {
+      // Setup the with 100 underlying collateral
+      await token.mock.transferFrom.withArgs(owner.address, collateral.address, 100).returns(true)
+      await collateral.depositTo(user.address, product.address, 100)
+
+      // Mock settle calls
+      await product.mock.settle.returns()
+      await product.mock.settleAccount.withArgs(user.address).returns()
+    })
+
+    context('user not liquidatable', async () => {
+      it('reverts without liquidating', async () => {
+        await product.mock.maintenance.withArgs(user.address).returns(10)
+
+        expect(await collateral.liquidatable(user.address, product.address)).to.equal(false)
+
+        await expect(collateral.liquidate(user.address, product.address)).to.be.revertedWith(
+          'CollateralCantLiquidate(10, 100)',
+        )
+      })
+    })
+
+    context('user liquidatable', async () => {
+      it('liquidates the user', async () => {
+        await product.mock.maintenance.withArgs(user.address).returns(101)
+        await product.mock.closeAll.withArgs(user.address).returns()
+        await token.mock.transfer.withArgs(owner.address, 50).returns(true)
+
+        expect(await collateral.liquidatable(user.address, product.address)).to.equal(true)
+
+        await expect(collateral.liquidate(user.address, product.address))
+          .to.emit(collateral, 'Liquidation')
+          .withArgs(user.address, product.address, owner.address, 50)
+
+        expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(50)
+        expect(await collateral['collateral(address)'](product.address)).to.equal(50)
+      })
+
+      it('limits fee to total collateral', async () => {
+        await product.mock.maintenance.withArgs(user.address).returns(210)
+        await product.mock.closeAll.withArgs(user.address).returns()
+        await token.mock.transfer.withArgs(owner.address, 100).returns(true)
+
+        expect(await collateral.liquidatable(user.address, product.address)).to.equal(true)
+
+        await expect(collateral.liquidate(user.address, product.address))
+          .to.emit(collateral, 'Liquidation')
+          .withArgs(user.address, product.address, owner.address, 100)
+
+        expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(0)
+        expect(await collateral['collateral(address)'](product.address)).to.equal(0)
+      })
+
+      it('reverts if paused', async () => {
+        await controller.mock['paused(address)'].withArgs(product.address).returns(true)
+        await expect(collateral.liquidate(user.address, product.address)).to.be.revertedWith('PausedError()')
+      })
+
+      it('reverts if not product', async () => {
+        await expect(collateral.liquidate(user.address, notProduct.address)).to.be.revertedWith(
+          `NotProductError("${notProduct.address}")`,
+        )
+      })
+    })
+  })
+
+  describe('#liquidatableNext', async () => {
+    beforeEach(async () => {
+      await token.mock.transferFrom.withArgs(owner.address, collateral.address, 100).returns(true)
+      await collateral.depositTo(user.address, product.address, 100)
+    })
+
+    it('returns true', async () => {
+      await product.mock.maintenanceNext.withArgs(user.address).returns(101)
+
+      expect(await collateral.liquidatableNext(user.address, product.address)).to.equal(true)
+    })
+
+    it('returns false', async () => {
+      await product.mock.maintenanceNext.withArgs(user.address).returns(99)
+
+      expect(await collateral.liquidatableNext(user.address, product.address)).to.equal(false)
+    })
+  })
+
+  describe('#resolveShortfall', async () => {
+    beforeEach(async () => {
+      await collateral.connect(productSigner).settleAccount(user.address, -100)
+    })
+
+    it('pays off the shortfall', async () => {
+      await token.mock.transferFrom.withArgs(user.address, collateral.address, 90).returns(true)
+
+      await expect(collateral.connect(user).resolveShortfall(product.address, 90))
+        .to.emit(collateral, 'ShortfallResolution')
+        .withArgs(product.address, 90)
+
+      expect(await collateral['collateral(address)'](product.address)).to.equal(90)
+      expect(await collateral.shortfall(product.address)).to.equal(10)
+    })
+
+    it('reverts if paused', async () => {
+      await controller.mock['paused(address)'].withArgs(product.address).returns(true)
+      await expect(collateral.connect(user).resolveShortfall(product.address, 90)).to.be.revertedWith('PausedError()')
+    })
+  })
+
+  describe('#claimFee', async () => {
+    beforeEach(async () => {
+      await token.mock.transferFrom.withArgs(owner.address, collateral.address, 100).returns(true)
+      await collateral.depositTo(user.address, product.address, 100)
+
+      await controller.mock['treasury()'].returns(treasuryA.address)
+      await controller.mock['treasury(address)'].withArgs(product.address).returns(treasuryB.address)
+      await controller.mock.protocolFee.returns(utils.parseEther('0.1'))
+
+      await collateral.connect(productSigner).settleProduct(90)
+    })
+
+    it('claims fee', async () => {
+      await token.mock.transfer.withArgs(treasuryA.address, 9).returns(true)
+      await token.mock.transfer.withArgs(treasuryB.address, 81).returns(true)
+
+      await expect(collateral.connect(treasuryA).claimFee())
+        .to.emit(collateral, 'FeeClaim')
+        .withArgs(treasuryA.address, 9)
+
+      await expect(collateral.connect(treasuryB).claimFee())
+        .to.emit(collateral, 'FeeClaim')
+        .withArgs(treasuryB.address, 81)
+
+      expect(await collateral.fees(treasuryA.address)).to.equal(0)
+      expect(await collateral.fees(treasuryB.address)).to.equal(0)
+    })
+
+    it('reverts if paused', async () => {
+      await controller.mock['paused()'].withArgs().returns(true)
+      await expect(collateral.connect(treasuryB).claimFee()).to.be.revertedWith('PausedError()')
+    })
+  })
+})

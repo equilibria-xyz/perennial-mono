@@ -1,0 +1,33 @@
+{
+  "name": "@equilibria/perennial",
+  "version": "0.1.3",
+  "description": "",
+  "main": "index.js",
+  "private": true,
+  "scripts": {
+    "build": "yarn compile",
+    "compile": "hardhat compile",
+    "deploy": "hardhat deploy",
+    "verify": "hardhat etherscan-verify",
+    "gasReport": "REPORT_GAS=true yarn test:integration",
+    "test": "hardhat test test/unit/**/*",
+    "test:integration": "FORK_ENABLED=true FORK_BLOCK_NUMBER=14325080 hardhat test test/integration/*",
+    "coverage": "hardhat coverage --testfiles 'test/unit/**/*'",
+    "coverage:integration": "FORK_ENABLED=true FORK_BLOCK_NUMBER=14325080 hardhat coverage --testfiles 'test/integration/*'",
+    "lint": "eslint --fix --ext '.ts,.js' ./ && solhint 'contracts/**/*.sol' --fix",
+    "format": "prettier -w .",
+    "postinstall": "yarn build",
+    "prepare": "husky install",
+    "clean": "rm -rf cache artifacts types/generated",
+    "node:fork:kovan": "HARDHAT_DEPLOY_FORK=kovan FORK_NETWORK=kovan FORK_ENABLED=true hardhat node"
+  },
+  "author": "",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@chainlink/contracts": "^0.3.1",
+    "@equilibria/emptyset-batcher": "0.0.2",
+    "@ethersproject/abstract-provider": "^5",
+    "@ethersproject/abstract-signer": "^5",
+    "lodash": "^4.17.15"
+  }
+}

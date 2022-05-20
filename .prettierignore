@@ -1,0 +1,6 @@
+artifacts
+cache
+node_modules
+types/generated
+coverage
+coverage.json
