@@ -7,6 +7,9 @@
   "workspaces": [
     "packages/*"
   ],
+  "scripts": {
+    "prepare": "husky install"
+  },
   "devDependencies": {
     "@codechecks/client": "^0.1.10",
     "@defi-wonderland/smock": "^2.0.7",
