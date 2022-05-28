@@ -2,7 +2,7 @@ import { task } from 'hardhat/config'
 
 import { config as dotenvConfig } from 'dotenv'
 import { resolve } from 'path'
-dotenvConfig({ path: resolve(__dirname, './.env') })
+dotenvConfig({ path: resolve(__dirname, '../../.env') })
 
 import { HardhatUserConfig } from 'hardhat/types'
 import { NetworkUserConfig } from 'hardhat/types'
