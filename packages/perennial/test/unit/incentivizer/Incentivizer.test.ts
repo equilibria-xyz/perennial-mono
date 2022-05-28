@@ -1,5 +1,5 @@
 import { MockContract } from '@ethereum-waffle/mock-contract'
-import { utils } from 'ethers'
+import { BigNumberish, utils } from 'ethers'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { expect } from 'chai'
 import HRE, { waffle } from 'hardhat'
@@ -16,6 +16,7 @@ import {
   IERC20Metadata__factory,
 } from '../../../types/generated'
 import { currentBlockTimestamp, increase } from '../../testutil/time'
+import { expectProgramInfoEq, ProgramInfo } from '../../testutil/types'
 
 const { ethers } = HRE
 
@@ -23,6 +24,7 @@ const MINUTE = 60
 const HOUR = 60 * MINUTE
 const DAY = 24 * HOUR
 const YEAR = 365 * DAY
+const PRODUCT_COORDINATOR_ID = 1
 
 describe('Incentivizer', () => {
   let user: SignerWithAddress
@@ -30,22 +32,31 @@ describe('Incentivizer', () => {
   let treasury: SignerWithAddress
   let productOwner: SignerWithAddress
   let productTreasury: SignerWithAddress
+  let productOwnerB: SignerWithAddress
+  let productTreasuryB: SignerWithAddress
   let controllerSigner: SignerWithAddress
   let productSigner: SignerWithAddress
+  let productSignerB: SignerWithAddress
   let controller: MockContract
   let collateral: MockContract
   let productProvider: MockContract
+  let productProviderB: MockContract
   let token: MockContract
   let product: MockContract
+  let productB: MockContract
 
   let incentivizer: Incentivizer
 
   beforeEach(async () => {
-    ;[user, owner, treasury, productOwner, productTreasury] = await ethers.getSigners()
+    ;[user, owner, treasury, productOwner, productTreasury, productOwnerB, productTreasuryB] = await ethers.getSigners()
     productProvider = await waffle.deployMockContract(owner, IProductProvider__factory.abi)
+    productProviderB = await waffle.deployMockContract(owner, IProductProvider__factory.abi)
     product = await waffle.deployMockContract(owner, Product__factory.abi)
+    productB = await waffle.deployMockContract(owner, Product__factory.abi)
     productSigner = await impersonate.impersonateWithBalance(product.address, utils.parseEther('10'))
+    productSignerB = await impersonate.impersonateWithBalance(productB.address, utils.parseEther('10'))
     await product.mock.productProvider.withArgs().returns(productProvider.address)
+    await productB.mock.productProvider.withArgs().returns(productProviderB.address)
 
     token = await waffle.deployMockContract(owner, IERC20Metadata__factory.abi)
     await token.mock.decimals.withArgs().returns(18)
@@ -61,12 +72,19 @@ describe('Incentivizer', () => {
     await controller.mock.collateral.withArgs().returns(collateral.address)
     await controller.mock.incentivizer.withArgs().returns(incentivizer.address)
     await controller.mock.isProduct.withArgs(product.address).returns(true)
-    await controller.mock['owner()'].withArgs().returns(owner.address)
+    await controller.mock.isProduct.withArgs(productB.address).returns(true)
     await controller.mock['treasury()'].withArgs().returns(treasury.address)
-    await controller.mock['owner(address)'].withArgs(product.address).returns(productOwner.address)
-    await controller.mock['treasury(address)'].withArgs(product.address).returns(productTreasury.address)
+    await controller.mock['owner(uint256)'].withArgs(0).returns(owner.address)
+    await controller.mock['treasury(uint256)'].withArgs(0).returns(treasury.address)
+    await controller.mock['owner(uint256)'].withArgs(PRODUCT_COORDINATOR_ID).returns(productOwner.address)
+    await controller.mock['treasury(uint256)'].withArgs(PRODUCT_COORDINATOR_ID).returns(productTreasury.address)
+    await controller.mock['owner(uint256)'].withArgs(2).returns(productOwnerB.address)
+    await controller.mock['treasury(uint256)'].withArgs(2).returns(productTreasuryB.address)
     await controller.mock['paused()'].withArgs().returns(false)
     await controller.mock['paused(address)'].withArgs(product.address).returns(false)
+    await controller.mock['paused(address)'].withArgs(productB.address).returns(false)
+    await controller.mock.coordinatorFor.withArgs(product.address).returns(PRODUCT_COORDINATOR_ID)
+    await controller.mock.coordinatorFor.withArgs(productB.address).returns(2)
     await controller.mock.incentivizationFee.withArgs().returns(0)
     await controller.mock.programsPerProduct.withArgs().returns(2)
   })
@@ -96,67 +114,46 @@ describe('Incentivizer', () => {
         .withArgs(productOwner.address, incentivizer.address, utils.parseEther('10000'))
         .returns(true)
 
-      const now = await currentBlockTimestamp()
+      const EXPECTED_PROGRAM_ID = 0
+      const NOW = await currentBlockTimestamp()
 
-      const returnValue = await incentivizer.connect(productOwner).callStatic.create({
-        product: product.address,
+      const PROGRAM_INFO: ProgramInfo = {
+        coordinatorId: PRODUCT_COORDINATOR_ID,
         token: token.address,
         amount: {
           maker: utils.parseEther('8000'),
           taker: utils.parseEther('2000'),
         },
-        start: now + HOUR,
+        start: NOW + HOUR,
         duration: 30 * DAY,
-        grace: 7 * DAY,
-      })
+      }
 
-      await expect(
-        incentivizer.connect(productOwner).create({
-          product: product.address,
-          token: token.address,
-          amount: {
-            maker: utils.parseEther('8000'),
-            taker: utils.parseEther('2000'),
-          },
-          start: now + HOUR,
-          duration: 30 * DAY,
-          grace: 7 * DAY,
-        }),
-      )
+      const returnValue = await incentivizer.connect(productOwner).callStatic.create(product.address, PROGRAM_INFO)
+      await expect(incentivizer.connect(productOwner).create(product.address, PROGRAM_INFO))
         .to.emit(incentivizer, 'ProgramCreated')
         .withArgs(
-          0,
           product.address,
-          token.address,
-          utils.parseEther('8000'),
-          utils.parseEther('2000'),
-          now + HOUR,
-          30 * DAY,
-          7 * DAY,
+          0,
+          PROGRAM_INFO.coordinatorId,
+          PROGRAM_INFO.token,
+          PROGRAM_INFO.amount.maker,
+          PROGRAM_INFO.amount.taker,
+          PROGRAM_INFO.start,
+          PROGRAM_INFO.duration,
           0,
         )
 
-      const PROGRAM_ID = 0
-      expect(returnValue).to.equal(PROGRAM_ID)
+      expect(returnValue).to.equal(EXPECTED_PROGRAM_ID)
+      expectProgramInfoEq(await incentivizer.programInfos(product.address, EXPECTED_PROGRAM_ID), PROGRAM_INFO)
 
-      const program = await incentivizer.programInfos(PROGRAM_ID)
-      expect(program.start).to.equal(now + HOUR)
-      expect(program.duration).to.equal(30 * DAY)
-      expect(program.grace).to.equal(7 * DAY)
-      expect(program.product).to.equal(product.address)
-      expect(program.token).to.equal(token.address)
-      expect(program.amount.maker).to.equal(utils.parseEther('8000'))
-      expect(program.amount.taker).to.equal(utils.parseEther('2000'))
+      expect(await incentivizer.count(product.address)).to.equal(1)
+      expect(await incentivizer.active(product.address)).to.equal(1)
+      expect(await incentivizer.available(product.address, EXPECTED_PROGRAM_ID)).to.equal(utils.parseEther('10000'))
+      expect(await incentivizer.versionStarted(product.address, EXPECTED_PROGRAM_ID)).to.equal(0)
+      expect(await incentivizer.versionComplete(product.address, EXPECTED_PROGRAM_ID)).to.equal(0)
 
-      expect(await incentivizer.available(PROGRAM_ID)).to.equal(utils.parseEther('10000'))
-      expect(await incentivizer.closed(PROGRAM_ID)).to.equal(false)
-      expect(await incentivizer.versionComplete(PROGRAM_ID)).to.equal(0)
-
-      expect(await incentivizer.programsForLength(product.address)).to.equal(1)
-      expect(await incentivizer.programsForAt(product.address, 0)).to.equal(0)
-
-      expect(await incentivizer.owner(PROGRAM_ID)).to.equal(productOwner.address)
-      expect(await incentivizer.treasury(PROGRAM_ID)).to.equal(productTreasury.address)
+      expect(await incentivizer.owner(product.address, EXPECTED_PROGRAM_ID)).to.equal(productOwner.address)
+      expect(await incentivizer.treasury(product.address, EXPECTED_PROGRAM_ID)).to.equal(productTreasury.address)
     })
 
     it('protocol owner can create program', async () => {
@@ -164,137 +161,106 @@ describe('Incentivizer', () => {
         .withArgs(owner.address, incentivizer.address, utils.parseEther('10000'))
         .returns(true)
 
-      const now = await currentBlockTimestamp()
+      const EXPECTED_PROGRAM_ID = 0
+      const NOW = await currentBlockTimestamp()
 
-      const returnValue = await incentivizer.connect(owner).callStatic.create({
-        product: product.address,
+      const PROGRAM_INFO: ProgramInfo = {
+        coordinatorId: 0,
         token: token.address,
         amount: {
           maker: utils.parseEther('8000'),
           taker: utils.parseEther('2000'),
         },
-        start: now + HOUR,
+        start: NOW + HOUR,
         duration: 30 * DAY,
-        grace: 7 * DAY,
-      })
+      }
 
-      await expect(
-        incentivizer.connect(owner).create({
-          product: product.address,
-          token: token.address,
-          amount: {
-            maker: utils.parseEther('8000'),
-            taker: utils.parseEther('2000'),
-          },
-          start: now + HOUR,
-          duration: 30 * DAY,
-          grace: 7 * DAY,
-        }),
-      )
+      const returnValue = await incentivizer.connect(owner).callStatic.create(product.address, PROGRAM_INFO)
+      await expect(incentivizer.connect(owner).create(product.address, PROGRAM_INFO))
         .to.emit(incentivizer, 'ProgramCreated')
         .withArgs(
-          0,
           product.address,
-          token.address,
-          utils.parseEther('8000'),
-          utils.parseEther('2000'),
-          now + HOUR,
-          30 * DAY,
-          7 * DAY,
+          0,
+          PROGRAM_INFO.coordinatorId,
+          PROGRAM_INFO.token,
+          PROGRAM_INFO.amount.maker,
+          PROGRAM_INFO.amount.taker,
+          PROGRAM_INFO.start,
+          PROGRAM_INFO.duration,
           0,
         )
 
-      const PROGRAM_ID = 0
-      expect(returnValue).to.equal(PROGRAM_ID)
+      expect(returnValue).to.equal(EXPECTED_PROGRAM_ID)
+      expectProgramInfoEq(await incentivizer.programInfos(product.address, EXPECTED_PROGRAM_ID), PROGRAM_INFO)
 
-      const program = await incentivizer.programInfos(PROGRAM_ID)
-      expect(program.start).to.equal(now + HOUR)
-      expect(program.duration).to.equal(30 * DAY)
-      expect(program.grace).to.equal(7 * DAY)
-      expect(program.product).to.equal(product.address)
-      expect(program.token).to.equal(token.address)
-      expect(program.amount.maker).to.equal(utils.parseEther('8000'))
-      expect(program.amount.taker).to.equal(utils.parseEther('2000'))
+      expect(await incentivizer.count(product.address)).to.equal(1)
+      expect(await incentivizer.active(product.address)).to.equal(1)
+      expect(await incentivizer.available(product.address, EXPECTED_PROGRAM_ID)).to.equal(utils.parseEther('10000'))
+      expect(await incentivizer.versionStarted(product.address, EXPECTED_PROGRAM_ID)).to.equal(0)
+      expect(await incentivizer.versionComplete(product.address, EXPECTED_PROGRAM_ID)).to.equal(0)
 
-      expect(await incentivizer.available(PROGRAM_ID)).to.equal(utils.parseEther('10000'))
-      expect(await incentivizer.closed(PROGRAM_ID)).to.equal(false)
-      expect(await incentivizer.versionComplete(PROGRAM_ID)).to.equal(0)
-
-      expect(await incentivizer.programsForLength(product.address)).to.equal(1)
-      expect(await incentivizer.programsForAt(product.address, 0)).to.equal(0)
-
-      expect(await incentivizer.owner(PROGRAM_ID)).to.equal(owner.address)
-      expect(await incentivizer.treasury(PROGRAM_ID)).to.equal(treasury.address)
+      expect(await incentivizer.owner(product.address, EXPECTED_PROGRAM_ID)).to.equal(owner.address)
+      expect(await incentivizer.treasury(product.address, EXPECTED_PROGRAM_ID)).to.equal(treasury.address)
     })
 
-    it('product owner can create program with fee', async () => {
-      await controller.mock.incentivizationFee.withArgs().returns(utils.parseEther('0.01'))
-
+    it('can create program with fee', async () => {
       await token.mock.transferFrom
-        .withArgs(productOwner.address, incentivizer.address, utils.parseEther('10000'))
+        .withArgs(owner.address, incentivizer.address, utils.parseEther('10000'))
         .returns(true)
 
-      const now = await currentBlockTimestamp()
+      await controller.mock.incentivizationFee.withArgs().returns(utils.parseEther('0.01'))
 
-      const returnValue = await incentivizer.connect(productOwner).callStatic.create({
-        product: product.address,
+      const EXPECTED_PROGRAM_ID = 0
+      const NOW = await currentBlockTimestamp()
+
+      const PROGRAM_INFO: ProgramInfo = {
+        coordinatorId: 0,
         token: token.address,
         amount: {
           maker: utils.parseEther('8000'),
           taker: utils.parseEther('2000'),
         },
-        start: now + HOUR,
+        start: NOW + HOUR,
         duration: 30 * DAY,
-        grace: 7 * DAY,
-      })
+      }
 
-      await expect(
-        incentivizer.connect(productOwner).create({
-          product: product.address,
-          token: token.address,
-          amount: {
-            maker: utils.parseEther('8000'),
-            taker: utils.parseEther('2000'),
-          },
-          start: now + HOUR,
-          duration: 30 * DAY,
-          grace: 7 * DAY,
-        }),
-      )
+      const PROGRAM_INFO_WITH_FEE: ProgramInfo = {
+        coordinatorId: 0,
+        token: token.address,
+        amount: {
+          maker: utils.parseEther('7920'),
+          taker: utils.parseEther('1980'),
+        },
+        start: NOW + HOUR,
+        duration: 30 * DAY,
+      }
+
+      const returnValue = await incentivizer.connect(owner).callStatic.create(product.address, PROGRAM_INFO)
+      await expect(incentivizer.connect(owner).create(product.address, PROGRAM_INFO))
         .to.emit(incentivizer, 'ProgramCreated')
         .withArgs(
-          0,
           product.address,
-          token.address,
-          utils.parseEther('7920'),
-          utils.parseEther('1980'),
-          now + HOUR,
-          30 * DAY,
-          7 * DAY,
+          0,
+          PROGRAM_INFO_WITH_FEE.coordinatorId,
+          PROGRAM_INFO_WITH_FEE.token,
+          PROGRAM_INFO_WITH_FEE.amount.maker,
+          PROGRAM_INFO_WITH_FEE.amount.taker,
+          PROGRAM_INFO_WITH_FEE.start,
+          PROGRAM_INFO_WITH_FEE.duration,
           utils.parseEther('100'),
         )
 
-      const PROGRAM_ID = 0
-      expect(returnValue).to.equal(PROGRAM_ID)
+      expect(returnValue).to.equal(EXPECTED_PROGRAM_ID)
+      expectProgramInfoEq(await incentivizer.programInfos(product.address, EXPECTED_PROGRAM_ID), PROGRAM_INFO_WITH_FEE)
 
-      const program = await incentivizer.programInfos(PROGRAM_ID)
-      expect(program.start).to.equal(now + HOUR)
-      expect(program.duration).to.equal(30 * DAY)
-      expect(program.grace).to.equal(7 * DAY)
-      expect(program.product).to.equal(product.address)
-      expect(program.token).to.equal(token.address)
-      expect(program.amount.maker).to.equal(utils.parseEther('7920'))
-      expect(program.amount.taker).to.equal(utils.parseEther('1980'))
+      expect(await incentivizer.count(product.address)).to.equal(1)
+      expect(await incentivizer.active(product.address)).to.equal(1)
+      expect(await incentivizer.available(product.address, EXPECTED_PROGRAM_ID)).to.equal(utils.parseEther('9900'))
+      expect(await incentivizer.versionStarted(product.address, EXPECTED_PROGRAM_ID)).to.equal(0)
+      expect(await incentivizer.versionComplete(product.address, EXPECTED_PROGRAM_ID)).to.equal(0)
 
-      expect(await incentivizer.available(PROGRAM_ID)).to.equal(utils.parseEther('9900'))
-      expect(await incentivizer.closed(PROGRAM_ID)).to.equal(false)
-      expect(await incentivizer.versionComplete(PROGRAM_ID)).to.equal(0)
-
-      expect(await incentivizer.programsForLength(product.address)).to.equal(1)
-      expect(await incentivizer.programsForAt(product.address, 0)).to.equal(0)
-
-      expect(await incentivizer.owner(PROGRAM_ID)).to.equal(productOwner.address)
-      expect(await incentivizer.treasury(PROGRAM_ID)).to.equal(productTreasury.address)
+      expect(await incentivizer.owner(product.address, EXPECTED_PROGRAM_ID)).to.equal(owner.address)
+      expect(await incentivizer.treasury(product.address, EXPECTED_PROGRAM_ID)).to.equal(treasury.address)
 
       expect(await incentivizer.fees(token.address)).to.equal(utils.parseEther('100'))
     })
@@ -302,21 +268,22 @@ describe('Incentivizer', () => {
     it('reverts if not product', async () => {
       await controller.mock.isProduct.withArgs(product.address).returns(false)
 
-      const now = await currentBlockTimestamp()
+      const NOW = await currentBlockTimestamp()
 
-      await expect(
-        incentivizer.connect(owner).create({
-          product: product.address,
-          token: token.address,
-          amount: {
-            maker: utils.parseEther('8000'),
-            taker: utils.parseEther('2000'),
-          },
-          start: now + HOUR,
-          duration: 30 * DAY,
-          grace: 7 * DAY,
-        }),
-      ).to.be.revertedWith(`NotProductError("${product.address}")`)
+      const PROGRAM_INFO: ProgramInfo = {
+        coordinatorId: 0,
+        token: token.address,
+        amount: {
+          maker: utils.parseEther('8000'),
+          taker: utils.parseEther('2000'),
+        },
+        start: NOW + HOUR,
+        duration: 30 * DAY,
+      }
+
+      await expect(incentivizer.connect(owner).create(product.address, PROGRAM_INFO)).to.be.revertedWith(
+        `NotProductError("${product.address}")`,
+      )
     })
 
     it('reverts if too many programs', async () => {
@@ -324,171 +291,163 @@ describe('Incentivizer', () => {
         .withArgs(owner.address, incentivizer.address, utils.parseEther('10000'))
         .returns(true)
 
-      const now = await currentBlockTimestamp()
+      const NOW = await currentBlockTimestamp()
 
-      await incentivizer.connect(owner).create({
-        product: product.address,
+      const PROGRAM_INFO: ProgramInfo = {
+        coordinatorId: 0,
         token: token.address,
         amount: {
           maker: utils.parseEther('8000'),
           taker: utils.parseEther('2000'),
         },
-        start: now + HOUR,
+        start: NOW + HOUR,
         duration: 30 * DAY,
-        grace: 7 * DAY,
-      })
-      await incentivizer.connect(owner).create({
-        product: product.address,
-        token: token.address,
-        amount: {
-          maker: utils.parseEther('8000'),
-          taker: utils.parseEther('2000'),
-        },
-        start: now + HOUR,
-        duration: 30 * DAY,
-        grace: 7 * DAY,
-      })
+      }
 
-      await expect(
-        incentivizer.connect(owner).create({
-          product: product.address,
-          token: token.address,
-          amount: {
-            maker: utils.parseEther('8000'),
-            taker: utils.parseEther('2000'),
-          },
-          start: now + HOUR,
-          duration: 30 * DAY,
-          grace: 7 * DAY,
-        }),
-      ).to.be.revertedWith(`IncentivizerTooManyProgramsError()`)
+      await incentivizer.connect(owner).create(product.address, PROGRAM_INFO)
+      await incentivizer.connect(owner).create(product.address, PROGRAM_INFO)
+
+      expect(await incentivizer.count(product.address)).to.equal(2)
+      expect(await incentivizer.active(product.address)).to.equal(2)
+
+      await expect(incentivizer.connect(owner).create(product.address, PROGRAM_INFO)).to.be.revertedWith(
+        `IncentivizerTooManyProgramsError()`,
+      )
     })
 
     it('reverts if not owner', async () => {
-      const now = await currentBlockTimestamp()
+      const NOW = await currentBlockTimestamp()
 
-      await expect(
-        incentivizer.connect(user).create({
-          product: product.address,
-          token: token.address,
-          amount: {
-            maker: utils.parseEther('8000'),
-            taker: utils.parseEther('2000'),
-          },
-          start: now + HOUR,
-          duration: 30 * DAY,
-          grace: 7 * DAY,
-        }),
-      ).to.be.revertedWith(`NotProductOwnerError("${product.address}")`)
+      const PROGRAM_INFO: ProgramInfo = {
+        coordinatorId: 0,
+        token: token.address,
+        amount: {
+          maker: utils.parseEther('8000'),
+          taker: utils.parseEther('2000'),
+        },
+        start: NOW + HOUR,
+        duration: 30 * DAY,
+      }
+
+      await expect(incentivizer.connect(user).create(product.address, PROGRAM_INFO)).to.be.revertedWith(
+        `NotOwnerError(0)`,
+      )
+    })
+
+    it('reverts if not product owner', async () => {
+      const NOW = await currentBlockTimestamp()
+
+      const PROGRAM_INFO: ProgramInfo = {
+        coordinatorId: PRODUCT_COORDINATOR_ID,
+        token: token.address,
+        amount: {
+          maker: utils.parseEther('8000'),
+          taker: utils.parseEther('2000'),
+        },
+        start: NOW + HOUR,
+        duration: 30 * DAY,
+      }
+
+      await expect(incentivizer.connect(owner).create(product.address, PROGRAM_INFO)).to.be.revertedWith(
+        `NotOwnerError(1)`,
+      )
+    })
+
+    it('reverts if not coordinator', async () => {
+      const NOW = await currentBlockTimestamp()
+
+      const PROGRAM_INFO: ProgramInfo = {
+        coordinatorId: 2,
+        token: token.address,
+        amount: {
+          maker: utils.parseEther('8000'),
+          taker: utils.parseEther('2000'),
+        },
+        start: NOW + HOUR,
+        duration: 30 * DAY,
+      }
+
+      await expect(incentivizer.connect(productOwnerB).create(product.address, PROGRAM_INFO)).to.be.revertedWith(
+        `IncentivizerNotAllowedError("${product.address}")`,
+      )
     })
 
     it('reverts if already started', async () => {
-      const now = await currentBlockTimestamp()
+      const NOW = await currentBlockTimestamp()
 
-      await expect(
-        incentivizer.connect(owner).create({
-          product: product.address,
-          token: token.address,
-          amount: {
-            maker: utils.parseEther('8000'),
-            taker: utils.parseEther('2000'),
-          },
-          start: now - HOUR,
-          duration: 30 * DAY,
-          grace: 7 * DAY,
-        }),
-      ).to.be.revertedWith(`ProgramAlreadyStartedError()`)
+      const PROGRAM_INFO: ProgramInfo = {
+        coordinatorId: 0,
+        token: token.address,
+        amount: {
+          maker: utils.parseEther('8000'),
+          taker: utils.parseEther('2000'),
+        },
+        start: NOW - HOUR,
+        duration: 30 * DAY,
+      }
+
+      await expect(incentivizer.connect(owner).create(product.address, PROGRAM_INFO)).to.be.revertedWith(
+        `ProgramInvalidStartError()`,
+      )
     })
 
     it('reverts if too short duration', async () => {
-      const now = await currentBlockTimestamp()
+      const NOW = await currentBlockTimestamp()
 
-      await expect(
-        incentivizer.connect(owner).create({
-          product: product.address,
-          token: token.address,
-          amount: {
-            maker: utils.parseEther('8000'),
-            taker: utils.parseEther('2000'),
-          },
-          start: now + HOUR,
-          duration: 12 * HOUR,
-          grace: 7 * DAY,
-        }),
-      ).to.be.revertedWith(`ProgramInvalidDurationError()`)
+      const PROGRAM_INFO: ProgramInfo = {
+        coordinatorId: 0,
+        token: token.address,
+        amount: {
+          maker: utils.parseEther('8000'),
+          taker: utils.parseEther('2000'),
+        },
+        start: NOW + HOUR,
+        duration: 12 * HOUR,
+      }
+
+      await expect(incentivizer.connect(owner).create(product.address, PROGRAM_INFO)).to.be.revertedWith(
+        `ProgramInvalidDurationError()`,
+      )
     })
 
     it('reverts if too long duration', async () => {
-      const now = await currentBlockTimestamp()
+      const NOW = await currentBlockTimestamp()
 
-      await expect(
-        incentivizer.connect(owner).create({
-          product: product.address,
-          token: token.address,
-          amount: {
-            maker: utils.parseEther('8000'),
-            taker: utils.parseEther('2000'),
-          },
-          start: now + HOUR,
-          duration: 4 * YEAR,
-          grace: 7 * DAY,
-        }),
-      ).to.be.revertedWith(`ProgramInvalidDurationError()`)
-    })
+      const PROGRAM_INFO: ProgramInfo = {
+        coordinatorId: 0,
+        token: token.address,
+        amount: {
+          maker: utils.parseEther('8000'),
+          taker: utils.parseEther('2000'),
+        },
+        start: NOW + HOUR,
+        duration: 4 * YEAR,
+      }
 
-    it('reverts if too short grace', async () => {
-      const now = await currentBlockTimestamp()
-
-      await expect(
-        incentivizer.connect(owner).create({
-          product: product.address,
-          token: token.address,
-          amount: {
-            maker: utils.parseEther('8000'),
-            taker: utils.parseEther('2000'),
-          },
-          start: now + HOUR,
-          duration: 30 * DAY,
-          grace: 3 * DAY,
-        }),
-      ).to.be.revertedWith(`ProgramInvalidGraceError()`)
-    })
-
-    it('reverts if too long grace', async () => {
-      const now = await currentBlockTimestamp()
-
-      await expect(
-        incentivizer.connect(owner).create({
-          product: product.address,
-          token: token.address,
-          amount: {
-            maker: utils.parseEther('8000'),
-            taker: utils.parseEther('2000'),
-          },
-          start: now + HOUR,
-          duration: 30 * DAY,
-          grace: 90 * DAY,
-        }),
-      ).to.be.revertedWith(`ProgramInvalidGraceError()`)
+      await expect(incentivizer.connect(owner).create(product.address, PROGRAM_INFO)).to.be.revertedWith(
+        `ProgramInvalidDurationError()`,
+      )
     })
 
     it('reverts if paused', async () => {
       await controller.mock['paused(address)'].withArgs(product.address).returns(true)
-      const now = await currentBlockTimestamp()
 
-      await expect(
-        incentivizer.connect(owner).create({
-          product: product.address,
-          token: token.address,
-          amount: {
-            maker: utils.parseEther('8000'),
-            taker: utils.parseEther('2000'),
-          },
-          start: now + HOUR,
-          duration: 30 * DAY,
-          grace: 7 * DAY,
-        }),
-      ).to.be.revertedWith(`PausedError()`)
+      const NOW = await currentBlockTimestamp()
+
+      const PROGRAM_INFO: ProgramInfo = {
+        coordinatorId: 0,
+        token: token.address,
+        amount: {
+          maker: utils.parseEther('8000'),
+          taker: utils.parseEther('2000'),
+        },
+        start: NOW + HOUR,
+        duration: 30 * DAY,
+      }
+
+      await expect(incentivizer.connect(owner).create(product.address, PROGRAM_INFO)).to.be.revertedWith(
+        `PausedError()`,
+      )
     })
   })
 
@@ -501,150 +460,559 @@ describe('Incentivizer', () => {
         .withArgs(productOwner.address, incentivizer.address, utils.parseEther('20000'))
         .returns(true)
 
-      const now = await currentBlockTimestamp()
+      const NOW = await currentBlockTimestamp()
 
-      await incentivizer.connect(productOwner).create({
-        product: product.address,
+      const PROGRAM_INFO_1: ProgramInfo = {
+        coordinatorId: PRODUCT_COORDINATOR_ID,
         token: token.address,
         amount: {
           maker: utils.parseEther('8000'),
           taker: utils.parseEther('2000'),
         },
-        start: now + HOUR,
+        start: NOW + HOUR,
         duration: 30 * DAY,
-        grace: 7 * DAY,
-      })
+      }
 
-      await incentivizer.connect(productOwner).create({
-        product: product.address,
+      const PROGRAM_INFO_2: ProgramInfo = {
+        coordinatorId: PRODUCT_COORDINATOR_ID,
         token: token.address,
         amount: {
           maker: utils.parseEther('16000'),
           taker: utils.parseEther('4000'),
         },
-        start: now + HOUR,
+        start: NOW + 4 * HOUR,
         duration: 60 * DAY,
-        grace: 7 * DAY,
+      }
+
+      await incentivizer.connect(productOwner).create(product.address, PROGRAM_INFO_1)
+      await incentivizer.connect(productOwner).create(product.address, PROGRAM_INFO_2)
+    })
+
+    it('correctly starts neither program', async () => {
+      const now = await currentBlockTimestamp()
+      const LATEST_VERSION = 12
+
+      await product.mock.latestVersion.withArgs().returns(LATEST_VERSION)
+
+      await expect(
+        incentivizer.connect(productSigner).sync({
+          price: utils.parseEther('1'),
+          timestamp: now,
+          version: LATEST_VERSION + 1,
+        }),
+      )
+
+      expect(await incentivizer.count(product.address)).to.equal(2)
+      expect(await incentivizer.active(product.address)).to.equal(2)
+      expect(await incentivizer.versionStarted(product.address, 0)).to.equal(0)
+      expect(await incentivizer.versionComplete(product.address, 0)).to.equal(0)
+      expect(await incentivizer.versionStarted(product.address, 1)).to.equal(0)
+      expect(await incentivizer.versionComplete(product.address, 1)).to.equal(0)
+    })
+
+    it('correctly starts first program', async () => {
+      await increase(2 * HOUR)
+
+      const now = await currentBlockTimestamp()
+      const LATEST_VERSION = 13
+
+      await product.mock.latestVersion.withArgs().returns(LATEST_VERSION)
+
+      await expect(
+        incentivizer.connect(productSigner).sync({
+          price: utils.parseEther('1'),
+          timestamp: now,
+          version: LATEST_VERSION + 1,
+        }),
+      )
+        .to.emit(incentivizer, 'ProgramStarted')
+        .withArgs(product.address, 0, LATEST_VERSION + 1)
+
+      expect(await incentivizer.count(product.address)).to.equal(2)
+      expect(await incentivizer.active(product.address)).to.equal(2)
+      expect(await incentivizer.versionStarted(product.address, 0)).to.equal(LATEST_VERSION + 1)
+      expect(await incentivizer.versionComplete(product.address, 0)).to.equal(0)
+      expect(await incentivizer.versionStarted(product.address, 1)).to.equal(0)
+      expect(await incentivizer.versionComplete(product.address, 1)).to.equal(0)
+    })
+
+    it('correctly starts both programs', async () => {
+      await increase(12 * HOUR)
+
+      const now = await currentBlockTimestamp()
+      const LATEST_VERSION = 15
+
+      await product.mock.latestVersion.withArgs().returns(LATEST_VERSION)
+
+      await expect(
+        incentivizer.connect(productSigner).sync({
+          price: utils.parseEther('1'),
+          timestamp: now,
+          version: LATEST_VERSION + 1,
+        }),
+      )
+        .to.emit(incentivizer, 'ProgramStarted')
+        .withArgs(product.address, 0, LATEST_VERSION + 1)
+        .to.emit(incentivizer, 'ProgramStarted')
+        .withArgs(product.address, 1, LATEST_VERSION + 1)
+
+      expect(await incentivizer.count(product.address)).to.equal(2)
+      expect(await incentivizer.active(product.address)).to.equal(2)
+      expect(await incentivizer.versionStarted(product.address, 0)).to.equal(LATEST_VERSION + 1)
+      expect(await incentivizer.versionComplete(product.address, 0)).to.equal(0)
+      expect(await incentivizer.versionStarted(product.address, 1)).to.equal(LATEST_VERSION + 1)
+      expect(await incentivizer.versionComplete(product.address, 1)).to.equal(0)
+    })
+
+    context('no start', async () => {
+      it('correctly completes neither program', async () => {
+        await increase(29 * DAY)
+
+        const now = await currentBlockTimestamp()
+        const LATEST_VERSION = 19
+
+        await product.mock.latestVersion.withArgs().returns(LATEST_VERSION)
+
+        await expect(
+          incentivizer.connect(productSigner).sync({
+            price: utils.parseEther('1'),
+            timestamp: now,
+            version: LATEST_VERSION + 1,
+          }),
+        )
+          .to.emit(incentivizer, 'ProgramStarted')
+          .withArgs(product.address, 0, LATEST_VERSION + 1)
+          .to.emit(incentivizer, 'ProgramStarted')
+          .withArgs(product.address, 1, LATEST_VERSION + 1)
+
+        expect(await incentivizer.count(product.address)).to.equal(2)
+        expect(await incentivizer.active(product.address)).to.equal(2)
+        expect(await incentivizer.versionStarted(product.address, 0)).to.equal(LATEST_VERSION + 1)
+        expect(await incentivizer.versionComplete(product.address, 0)).to.equal(0)
+        expect(await incentivizer.versionStarted(product.address, 1)).to.equal(LATEST_VERSION + 1)
+        expect(await incentivizer.versionComplete(product.address, 1)).to.equal(0)
+      })
+
+      it('correctly completes first program', async () => {
+        await increase(31 * DAY)
+
+        const NOW = await currentBlockTimestamp()
+        const LATEST_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: NOW - 2 * DAY,
+          version: 23,
+        }
+
+        const CURRENT_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: NOW,
+          version: LATEST_ORACLE_VERSION.version + 1,
+        }
+
+        await product.mock.latestVersion.withArgs().returns(LATEST_ORACLE_VERSION.version)
+
+        await token.mock.transfer.withArgs(productTreasury.address, utils.parseEther('10000')).returns(true)
+
+        await productProvider.mock.atVersion.withArgs(CURRENT_ORACLE_VERSION.version).returns(CURRENT_ORACLE_VERSION)
+
+        await expect(incentivizer.connect(productSigner).sync(CURRENT_ORACLE_VERSION))
+          .to.emit(incentivizer, 'ProgramStarted')
+          .withArgs(product.address, 0, CURRENT_ORACLE_VERSION.version)
+          .to.emit(incentivizer, 'ProgramStarted')
+          .withArgs(product.address, 1, CURRENT_ORACLE_VERSION.version)
+          .to.emit(incentivizer, 'ProgramComplete')
+          .withArgs(product.address, 0, CURRENT_ORACLE_VERSION.version)
+
+        expect(await incentivizer.count(product.address)).to.equal(2)
+        expect(await incentivizer.active(product.address)).to.equal(1)
+        expect(await incentivizer.versionStarted(product.address, 0)).to.equal(CURRENT_ORACLE_VERSION.version)
+        expect(await incentivizer.versionComplete(product.address, 0)).to.equal(CURRENT_ORACLE_VERSION.version)
+        expect(await incentivizer.versionStarted(product.address, 1)).to.equal(CURRENT_ORACLE_VERSION.version)
+        expect(await incentivizer.versionComplete(product.address, 1)).to.equal(0)
+      })
+
+      it('correctly completes first program later', async () => {
+        await increase(31 * DAY)
+
+        const NOW = await currentBlockTimestamp()
+        const LATEST_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: NOW - 2 * DAY,
+          version: 23,
+        }
+
+        const CURRENT_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: NOW,
+          version: LATEST_ORACLE_VERSION.version + 10,
+        }
+
+        await product.mock.latestVersion.withArgs().returns(LATEST_ORACLE_VERSION.version)
+
+        await token.mock.transfer.withArgs(productTreasury.address, utils.parseEther('10000')).returns(true)
+
+        await productProvider.mock.atVersion.withArgs(CURRENT_ORACLE_VERSION.version).returns(CURRENT_ORACLE_VERSION)
+
+        await expect(incentivizer.connect(productSigner).sync(CURRENT_ORACLE_VERSION))
+          .to.emit(incentivizer, 'ProgramStarted')
+          .withArgs(product.address, 0, CURRENT_ORACLE_VERSION.version)
+          .to.emit(incentivizer, 'ProgramStarted')
+          .withArgs(product.address, 1, CURRENT_ORACLE_VERSION.version)
+          .to.emit(incentivizer, 'ProgramComplete')
+          .withArgs(product.address, 0, CURRENT_ORACLE_VERSION.version)
+
+        expect(await incentivizer.count(product.address)).to.equal(2)
+        expect(await incentivizer.active(product.address)).to.equal(1)
+        expect(await incentivizer.versionStarted(product.address, 0)).to.equal(CURRENT_ORACLE_VERSION.version)
+        expect(await incentivizer.versionComplete(product.address, 0)).to.equal(CURRENT_ORACLE_VERSION.version)
+        expect(await incentivizer.versionStarted(product.address, 1)).to.equal(CURRENT_ORACLE_VERSION.version)
+        expect(await incentivizer.versionComplete(product.address, 1)).to.equal(0)
+      })
+
+      it('correctly completes both programs', async () => {
+        await increase(61 * DAY)
+
+        const NOW = await currentBlockTimestamp()
+        const LATEST_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: NOW - 32 * DAY,
+          version: 46,
+        }
+
+        const CURRENT_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: NOW,
+          version: LATEST_ORACLE_VERSION.version + 1,
+        }
+
+        await product.mock.latestVersion.withArgs().returns(LATEST_ORACLE_VERSION.version)
+
+        await token.mock.transfer.withArgs(productTreasury.address, utils.parseEther('10000')).returns(true)
+        await token.mock.transfer.withArgs(productTreasury.address, utils.parseEther('20000')).returns(true)
+
+        await productProvider.mock.atVersion.withArgs(CURRENT_ORACLE_VERSION.version).returns(CURRENT_ORACLE_VERSION)
+
+        await expect(incentivizer.connect(productSigner).sync(CURRENT_ORACLE_VERSION))
+          .to.emit(incentivizer, 'ProgramStarted')
+          .withArgs(product.address, 0, CURRENT_ORACLE_VERSION.version)
+          .to.emit(incentivizer, 'ProgramStarted')
+          .withArgs(product.address, 1, CURRENT_ORACLE_VERSION.version)
+          .to.emit(incentivizer, 'ProgramComplete')
+          .withArgs(product.address, 0, CURRENT_ORACLE_VERSION.version)
+          .to.emit(incentivizer, 'ProgramComplete')
+          .withArgs(product.address, 1, CURRENT_ORACLE_VERSION.version)
+
+        expect(await incentivizer.count(product.address)).to.equal(2)
+        expect(await incentivizer.active(product.address)).to.equal(0)
+        expect(await incentivizer.versionStarted(product.address, 0)).to.equal(CURRENT_ORACLE_VERSION.version)
+        expect(await incentivizer.versionComplete(product.address, 0)).to.equal(CURRENT_ORACLE_VERSION.version)
+        expect(await incentivizer.versionStarted(product.address, 1)).to.equal(CURRENT_ORACLE_VERSION.version)
+        expect(await incentivizer.versionComplete(product.address, 1)).to.equal(CURRENT_ORACLE_VERSION.version)
+      })
+
+      it('doesnt recomplete program', async () => {
+        await increase(31 * DAY)
+
+        let NOW = await currentBlockTimestamp()
+        const PRE_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: NOW - 2 * DAY,
+          version: 23,
+        }
+
+        const STARTED_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: NOW,
+          version: PRE_ORACLE_VERSION.version + 1,
+        }
+
+        await product.mock.latestVersion.withArgs().returns(PRE_ORACLE_VERSION.version)
+
+        await token.mock.transfer.withArgs(productTreasury.address, utils.parseEther('10000')).returns(true)
+
+        await productProvider.mock.atVersion.withArgs(STARTED_ORACLE_VERSION.version).returns(STARTED_ORACLE_VERSION)
+
+        await incentivizer.connect(productSigner).sync(STARTED_ORACLE_VERSION)
+
+        await increase(30 * DAY)
+
+        NOW = await currentBlockTimestamp()
+        const LATEST_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: NOW - 2 * DAY,
+          version: 46,
+        }
+
+        const CURRENT_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: NOW,
+          version: LATEST_ORACLE_VERSION.version + 1,
+        }
+
+        await product.mock.latestVersion.withArgs().returns(LATEST_ORACLE_VERSION.version)
+
+        const EXPECTED_REFUND_AMOUNT = utils
+          .parseEther('20000')
+          .mul(60 * DAY - (LATEST_ORACLE_VERSION.timestamp - STARTED_ORACLE_VERSION.timestamp))
+          .div(60 * DAY)
+
+        await token.mock.transfer.withArgs(productTreasury.address, EXPECTED_REFUND_AMOUNT).returns(true)
+
+        await productProvider.mock.atVersion.withArgs(LATEST_ORACLE_VERSION.version).returns(LATEST_ORACLE_VERSION)
+
+        await expect(incentivizer.connect(productSigner).sync(CURRENT_ORACLE_VERSION))
+          .to.emit(incentivizer, 'ProgramComplete')
+          .withArgs(product.address, 1, LATEST_ORACLE_VERSION.version)
+
+        expect(await incentivizer.count(product.address)).to.equal(2)
+        expect(await incentivizer.active(product.address)).to.equal(0)
+        expect(await incentivizer.versionStarted(product.address, 0)).to.equal(STARTED_ORACLE_VERSION.version)
+        expect(await incentivizer.versionComplete(product.address, 0)).to.equal(STARTED_ORACLE_VERSION.version)
+        expect(await incentivizer.versionStarted(product.address, 1)).to.equal(STARTED_ORACLE_VERSION.version)
+        expect(await incentivizer.versionComplete(product.address, 1)).to.equal(LATEST_ORACLE_VERSION.version)
       })
     })
 
-    it('correctly completes neither program', async () => {
-      await increase(29 * DAY)
+    context('start first', async () => {
+      let STARTED_ORACLE_VERSION: {
+        price: BigNumberish
+        timestamp: number
+        version: number
+      }
 
-      const now = await currentBlockTimestamp()
-      const LATEST_VERSION = 19
+      beforeEach(async () => {
+        await increase(12 * HOUR)
 
-      await product.mock.latestVersion.withArgs().returns(LATEST_VERSION)
-
-      await expect(
-        incentivizer.connect(productSigner).sync({
+        const NOW = await currentBlockTimestamp()
+        STARTED_ORACLE_VERSION = {
           price: utils.parseEther('1'),
-          timestamp: now,
-          version: LATEST_VERSION + 1,
-        }),
-      )
+          timestamp: NOW,
+          version: 15,
+        }
 
-      expect(await incentivizer.versionComplete(0)).to.equal(0)
-      expect(await incentivizer.versionComplete(1)).to.equal(0)
-    })
+        await product.mock.latestVersion.withArgs().returns(STARTED_ORACLE_VERSION.version)
 
-    it('correctly completes first program', async () => {
-      await increase(31 * DAY)
-
-      const now = await currentBlockTimestamp()
-      const LATEST_VERSION = 23
-
-      await product.mock.latestVersion.withArgs().returns(LATEST_VERSION)
-
-      await expect(
-        incentivizer.connect(productSigner).sync({
-          price: utils.parseEther('1'),
-          timestamp: now,
-          version: LATEST_VERSION + 1,
-        }),
-      )
-        .to.emit(incentivizer, 'ProgramCompleted')
-        .withArgs(0, LATEST_VERSION)
-
-      expect(await incentivizer.versionComplete(0)).to.equal(LATEST_VERSION)
-      expect(await incentivizer.versionComplete(1)).to.equal(0)
-    })
-
-    it('correctly completes first program later', async () => {
-      await increase(31 * DAY)
-
-      const now = await currentBlockTimestamp()
-      const LATEST_VERSION = 23
-
-      await product.mock.latestVersion.withArgs().returns(LATEST_VERSION)
-
-      await expect(
-        incentivizer.connect(productSigner).sync({
-          price: utils.parseEther('1'),
-          timestamp: now,
-          version: LATEST_VERSION + 10,
-        }),
-      )
-        .to.emit(incentivizer, 'ProgramCompleted')
-        .withArgs(0, LATEST_VERSION)
-
-      expect(await incentivizer.versionComplete(0)).to.equal(LATEST_VERSION)
-      expect(await incentivizer.versionComplete(1)).to.equal(0)
-    })
-
-    it('correctly completes both programs', async () => {
-      await increase(61 * DAY)
-
-      const now = await currentBlockTimestamp()
-      const LATEST_VERSION = 46
-
-      await product.mock.latestVersion.withArgs().returns(LATEST_VERSION)
-
-      await expect(
-        incentivizer.connect(productSigner).sync({
-          price: utils.parseEther('1'),
-          timestamp: now,
-          version: LATEST_VERSION + 1,
-        }),
-      )
-        .to.emit(incentivizer, 'ProgramCompleted')
-        .withArgs(0, LATEST_VERSION)
-        .to.emit(incentivizer, 'ProgramCompleted')
-        .withArgs(1, LATEST_VERSION)
-
-      expect(await incentivizer.versionComplete(0)).to.equal(LATEST_VERSION)
-      expect(await incentivizer.versionComplete(1)).to.equal(LATEST_VERSION)
-    })
-
-    it('doesnt recomplete program', async () => {
-      await increase(31 * DAY)
-
-      let now = await currentBlockTimestamp()
-      await product.mock.latestVersion.withArgs().returns(23)
-
-      await incentivizer.connect(productSigner).sync({
-        price: utils.parseEther('1'),
-        timestamp: now,
-        version: 23 + 1,
+        await incentivizer.connect(productSigner).sync(STARTED_ORACLE_VERSION)
       })
 
-      await increase(31 * DAY)
+      it('correctly completes neither program', async () => {
+        await increase(29 * DAY)
 
-      now = await currentBlockTimestamp()
-      await product.mock.latestVersion.withArgs().returns(46)
+        const now = await currentBlockTimestamp()
+        const LATEST_VERSION = 19
 
-      await expect(
-        incentivizer.connect(productSigner).sync({
+        await product.mock.latestVersion.withArgs().returns(LATEST_VERSION)
+
+        await expect(
+          incentivizer.connect(productSigner).sync({
+            price: utils.parseEther('1'),
+            timestamp: now,
+            version: LATEST_VERSION + 1,
+          }),
+        )
+
+        expect(await incentivizer.count(product.address)).to.equal(2)
+        expect(await incentivizer.active(product.address)).to.equal(2)
+        expect(await incentivizer.versionStarted(product.address, 0)).to.equal(STARTED_ORACLE_VERSION.version)
+        expect(await incentivizer.versionComplete(product.address, 0)).to.equal(0)
+        expect(await incentivizer.versionStarted(product.address, 1)).to.equal(STARTED_ORACLE_VERSION.version)
+        expect(await incentivizer.versionComplete(product.address, 1)).to.equal(0)
+      })
+
+      it('correctly completes first program', async () => {
+        await increase(31 * DAY)
+
+        const NOW = await currentBlockTimestamp()
+        const LATEST_ORACLE_VERSION = {
           price: utils.parseEther('1'),
-          timestamp: now,
-          version: 46 + 1,
-        }),
-      )
-        .to.emit(incentivizer, 'ProgramCompleted')
-        .withArgs(1, 46)
+          timestamp: NOW - 2 * DAY,
+          version: 23,
+        }
 
-      expect(await incentivizer.versionComplete(0)).to.equal(23)
-      expect(await incentivizer.versionComplete(1)).to.equal(46)
+        const CURRENT_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: NOW,
+          version: LATEST_ORACLE_VERSION.version + 1,
+        }
+
+        await product.mock.latestVersion.withArgs().returns(LATEST_ORACLE_VERSION.version)
+
+        const EXPECTED_REFUND_AMOUNT = utils
+          .parseEther('10000')
+          .mul(30 * DAY - (LATEST_ORACLE_VERSION.timestamp - STARTED_ORACLE_VERSION.timestamp))
+          .div(30 * DAY)
+
+        await token.mock.transfer.withArgs(productTreasury.address, EXPECTED_REFUND_AMOUNT).returns(true)
+
+        await productProvider.mock.atVersion.withArgs(STARTED_ORACLE_VERSION.version).returns(STARTED_ORACLE_VERSION)
+        await productProvider.mock.atVersion.withArgs(LATEST_ORACLE_VERSION.version).returns(LATEST_ORACLE_VERSION)
+
+        await expect(incentivizer.connect(productSigner).sync(CURRENT_ORACLE_VERSION))
+          .to.emit(incentivizer, 'ProgramComplete')
+          .withArgs(product.address, 0, LATEST_ORACLE_VERSION.version)
+
+        expect(await incentivizer.count(product.address)).to.equal(2)
+        expect(await incentivizer.active(product.address)).to.equal(1)
+        expect(await incentivizer.versionStarted(product.address, 0)).to.equal(STARTED_ORACLE_VERSION.version)
+        expect(await incentivizer.versionComplete(product.address, 0)).to.equal(LATEST_ORACLE_VERSION.version)
+        expect(await incentivizer.versionStarted(product.address, 1)).to.equal(STARTED_ORACLE_VERSION.version)
+        expect(await incentivizer.versionComplete(product.address, 1)).to.equal(0)
+      })
+
+      it('correctly completes first program later', async () => {
+        await increase(31 * DAY)
+
+        const NOW = await currentBlockTimestamp()
+        const LATEST_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: NOW - 2 * DAY,
+          version: 23,
+        }
+
+        const CURRENT_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: NOW,
+          version: LATEST_ORACLE_VERSION.version + 10,
+        }
+
+        await product.mock.latestVersion.withArgs().returns(LATEST_ORACLE_VERSION.version)
+
+        const EXPECTED_REFUND_AMOUNT = utils
+          .parseEther('10000')
+          .mul(30 * DAY - (LATEST_ORACLE_VERSION.timestamp - STARTED_ORACLE_VERSION.timestamp))
+          .div(30 * DAY)
+
+        await token.mock.transfer.withArgs(productTreasury.address, EXPECTED_REFUND_AMOUNT).returns(true)
+
+        await productProvider.mock.atVersion.withArgs(STARTED_ORACLE_VERSION.version).returns(STARTED_ORACLE_VERSION)
+        await productProvider.mock.atVersion.withArgs(LATEST_ORACLE_VERSION.version).returns(LATEST_ORACLE_VERSION)
+
+        await expect(incentivizer.connect(productSigner).sync(CURRENT_ORACLE_VERSION))
+          .to.emit(incentivizer, 'ProgramComplete')
+          .withArgs(product.address, 0, LATEST_ORACLE_VERSION.version)
+
+        expect(await incentivizer.count(product.address)).to.equal(2)
+        expect(await incentivizer.active(product.address)).to.equal(1)
+        expect(await incentivizer.versionStarted(product.address, 0)).to.equal(STARTED_ORACLE_VERSION.version)
+        expect(await incentivizer.versionComplete(product.address, 0)).to.equal(LATEST_ORACLE_VERSION.version)
+        expect(await incentivizer.versionStarted(product.address, 1)).to.equal(STARTED_ORACLE_VERSION.version)
+        expect(await incentivizer.versionComplete(product.address, 1)).to.equal(0)
+      })
+
+      it('correctly completes both programs', async () => {
+        await increase(61 * DAY)
+
+        const NOW = await currentBlockTimestamp()
+        const LATEST_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: NOW - 32 * DAY,
+          version: 46,
+        }
+
+        const CURRENT_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: NOW,
+          version: LATEST_ORACLE_VERSION.version + 1,
+        }
+
+        await product.mock.latestVersion.withArgs().returns(LATEST_ORACLE_VERSION.version)
+
+        const EXPECTED_REFUND_AMOUNT = utils
+          .parseEther('10000')
+          .mul(30 * DAY - (LATEST_ORACLE_VERSION.timestamp - STARTED_ORACLE_VERSION.timestamp))
+          .div(30 * DAY)
+        const EXPECTED_REFUND_AMOUNT_2 = utils
+          .parseEther('20000')
+          .mul(60 * DAY - (LATEST_ORACLE_VERSION.timestamp - STARTED_ORACLE_VERSION.timestamp))
+          .div(60 * DAY)
+
+        await token.mock.transfer.withArgs(productTreasury.address, EXPECTED_REFUND_AMOUNT).returns(true)
+        await token.mock.transfer.withArgs(productTreasury.address, EXPECTED_REFUND_AMOUNT_2).returns(true)
+
+        await productProvider.mock.atVersion.withArgs(STARTED_ORACLE_VERSION.version).returns(STARTED_ORACLE_VERSION)
+        await productProvider.mock.atVersion.withArgs(LATEST_ORACLE_VERSION.version).returns(LATEST_ORACLE_VERSION)
+
+        await expect(incentivizer.connect(productSigner).sync(CURRENT_ORACLE_VERSION))
+          .to.emit(incentivizer, 'ProgramComplete')
+          .withArgs(product.address, 0, LATEST_ORACLE_VERSION.version)
+          .to.emit(incentivizer, 'ProgramComplete')
+          .withArgs(product.address, 1, LATEST_ORACLE_VERSION.version)
+
+        expect(await incentivizer.count(product.address)).to.equal(2)
+        expect(await incentivizer.active(product.address)).to.equal(0)
+        expect(await incentivizer.versionStarted(product.address, 0)).to.equal(STARTED_ORACLE_VERSION.version)
+        expect(await incentivizer.versionComplete(product.address, 0)).to.equal(LATEST_ORACLE_VERSION.version)
+        expect(await incentivizer.versionStarted(product.address, 1)).to.equal(STARTED_ORACLE_VERSION.version)
+        expect(await incentivizer.versionComplete(product.address, 1)).to.equal(LATEST_ORACLE_VERSION.version)
+      })
+
+      it('doesnt recomplete program', async () => {
+        await increase(31 * DAY)
+
+        let NOW = await currentBlockTimestamp()
+        let LATEST_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: NOW - 2 * DAY,
+          version: 23,
+        }
+
+        let CURRENT_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: NOW,
+          version: LATEST_ORACLE_VERSION.version + 1,
+        }
+
+        await product.mock.latestVersion.withArgs().returns(LATEST_ORACLE_VERSION.version)
+
+        let EXPECTED_REFUND_AMOUNT = utils
+          .parseEther('10000')
+          .mul(30 * DAY - (LATEST_ORACLE_VERSION.timestamp - STARTED_ORACLE_VERSION.timestamp))
+          .div(30 * DAY)
+
+        await token.mock.transfer.withArgs(productTreasury.address, EXPECTED_REFUND_AMOUNT).returns(true)
+
+        await productProvider.mock.atVersion.withArgs(STARTED_ORACLE_VERSION.version).returns(STARTED_ORACLE_VERSION)
+        await productProvider.mock.atVersion.withArgs(LATEST_ORACLE_VERSION.version).returns(LATEST_ORACLE_VERSION)
+
+        await incentivizer.connect(productSigner).sync(CURRENT_ORACLE_VERSION)
+
+        await increase(30 * DAY)
+
+        NOW = await currentBlockTimestamp()
+        LATEST_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: NOW - 2 * DAY,
+          version: 46,
+        }
+
+        CURRENT_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: NOW,
+          version: LATEST_ORACLE_VERSION.version + 1,
+        }
+
+        await product.mock.latestVersion.withArgs().returns(LATEST_ORACLE_VERSION.version)
+
+        EXPECTED_REFUND_AMOUNT = utils
+          .parseEther('20000')
+          .mul(60 * DAY - (LATEST_ORACLE_VERSION.timestamp - STARTED_ORACLE_VERSION.timestamp))
+          .div(60 * DAY)
+
+        await token.mock.transfer.withArgs(productTreasury.address, EXPECTED_REFUND_AMOUNT).returns(true)
+
+        await productProvider.mock.atVersion.withArgs(LATEST_ORACLE_VERSION.version).returns(LATEST_ORACLE_VERSION)
+
+        await expect(incentivizer.connect(productSigner).sync(CURRENT_ORACLE_VERSION))
+          .to.emit(incentivizer, 'ProgramComplete')
+          .withArgs(product.address, 1, LATEST_ORACLE_VERSION.version)
+
+        expect(await incentivizer.count(product.address)).to.equal(2)
+        expect(await incentivizer.active(product.address)).to.equal(0)
+        expect(await incentivizer.versionStarted(product.address, 0)).to.equal(STARTED_ORACLE_VERSION.version)
+        expect(await incentivizer.versionComplete(product.address, 0)).to.equal(23)
+        expect(await incentivizer.versionStarted(product.address, 1)).to.equal(STARTED_ORACLE_VERSION.version)
+        expect(await incentivizer.versionComplete(product.address, 1)).to.equal(LATEST_ORACLE_VERSION.version)
+      })
     })
 
     it('reverts if not product', async () => {
@@ -672,8 +1040,8 @@ describe('Incentivizer', () => {
 
       const now = await currentBlockTimestamp()
 
-      await incentivizer.connect(productOwner).create({
-        product: product.address,
+      await incentivizer.connect(productOwner).create(product.address, {
+        coordinatorId: PRODUCT_COORDINATOR_ID,
         token: token.address,
         amount: {
           maker: utils.parseEther('8000'),
@@ -681,11 +1049,10 @@ describe('Incentivizer', () => {
         },
         start: now + HOUR,
         duration: 30 * DAY,
-        grace: 7 * DAY,
       })
 
-      await incentivizer.connect(productOwner).create({
-        product: product.address,
+      await incentivizer.connect(productOwner).create(product.address, {
+        coordinatorId: PRODUCT_COORDINATOR_ID,
         token: token.address,
         amount: {
           maker: utils.parseEther('16000'),
@@ -693,729 +1060,960 @@ describe('Incentivizer', () => {
         },
         start: now + HOUR,
         duration: 60 * DAY,
-        grace: 7 * DAY,
       })
     })
 
-    context('first sync', async () => {
-      beforeEach(async () => {
-        await increase(2 * HOUR)
-      })
-
-      it('all empty', async () => {
-        const now = await currentBlockTimestamp()
-        const LATEST_USER_VERSION = 23
-        const SHARE_DELTA = { maker: 0, taker: 0 }
-        const TO_ORACLE_VERSION = {
+    context('before start', async () => {
+      it('settles correct amount (maker position)', async () => {
+        const NOW = await currentBlockTimestamp()
+        const LATEST_USER_VERSION = 0
+        const CURRENT_ORACLE_VERSION = {
           price: utils.parseEther('1'),
-          timestamp: now,
-          version: LATEST_USER_VERSION,
+          timestamp: NOW,
+          version: 23,
         }
-
-        await incentivizer.connect(productSigner).syncAccount(user.address, SHARE_DELTA, TO_ORACLE_VERSION)
-
-        expect(await incentivizer.available(0)).to.equal(utils.parseEther('10000'))
-        expect(await incentivizer.settled(user.address, 0)).to.equal(0)
-        expect(await incentivizer.latestVersion(user.address, 0)).to.equal(23)
-        expect(await incentivizer.unclaimed(user.address, 0)).to.equal(0)
-
-        expect(await incentivizer.available(1)).to.equal(utils.parseEther('20000'))
-        expect(await incentivizer.settled(user.address, 1)).to.equal(0)
-        expect(await incentivizer.latestVersion(user.address, 1)).to.equal(23)
-        expect(await incentivizer.unclaimed(user.address, 1)).to.equal(0)
-      })
-
-      it('share change no position', async () => {
-        const now = await currentBlockTimestamp()
-        const LATEST_USER_VERSION = 23
-        const SHARE_DELTA = { maker: utils.parseEther('180'), taker: utils.parseEther('360') }
-        const TO_ORACLE_VERSION = {
-          price: utils.parseEther('1'),
-          timestamp: now,
-          version: LATEST_USER_VERSION,
-        }
-
-        await incentivizer.connect(productSigner).syncAccount(user.address, SHARE_DELTA, TO_ORACLE_VERSION)
-
-        expect(await incentivizer.available(0)).to.equal(utils.parseEther('10000'))
-        expect(await incentivizer.settled(user.address, 0)).to.equal(0)
-        expect(await incentivizer.latestVersion(user.address, 0)).to.equal(23)
-        expect(await incentivizer.unclaimed(user.address, 0)).to.equal(0)
-
-        expect(await incentivizer.available(1)).to.equal(utils.parseEther('20000'))
-        expect(await incentivizer.settled(user.address, 1)).to.equal(0)
-        expect(await incentivizer.latestVersion(user.address, 1)).to.equal(23)
-        expect(await incentivizer.unclaimed(user.address, 1)).to.equal(0)
-      })
-
-      it('share change maker position', async () => {
-        const now = await currentBlockTimestamp()
-        const LATEST_USER_VERSION = 23
-        const SHARE_DELTA = { maker: utils.parseEther('180'), taker: utils.parseEther('360') }
-        const TO_ORACLE_VERSION = {
-          price: utils.parseEther('1'),
-          timestamp: now,
-          version: LATEST_USER_VERSION,
-        }
-
-        await incentivizer.connect(productSigner).syncAccount(user.address, SHARE_DELTA, TO_ORACLE_VERSION)
-
-        expect(await incentivizer.available(0)).to.equal(utils.parseEther('10000'))
-        expect(await incentivizer.settled(user.address, 0)).to.equal(0)
-        expect(await incentivizer.latestVersion(user.address, 0)).to.equal(23)
-        expect(await incentivizer.unclaimed(user.address, 0)).to.equal(0)
-
-        expect(await incentivizer.available(1)).to.equal(utils.parseEther('20000'))
-        expect(await incentivizer.settled(user.address, 1)).to.equal(0)
-        expect(await incentivizer.latestVersion(user.address, 1)).to.equal(23)
-        expect(await incentivizer.unclaimed(user.address, 1)).to.equal(0)
-      })
-
-      it('share change taker position', async () => {
-        const now = await currentBlockTimestamp()
-        const LATEST_USER_VERSION = 23
-        const SHARE_DELTA = { maker: utils.parseEther('180'), taker: utils.parseEther('360') }
-        const TO_ORACLE_VERSION = {
-          price: utils.parseEther('1'),
-          timestamp: now,
-          version: LATEST_USER_VERSION,
-        }
-
-        await incentivizer.connect(productSigner).syncAccount(user.address, SHARE_DELTA, TO_ORACLE_VERSION)
-
-        expect(await incentivizer.available(0)).to.equal(utils.parseEther('10000'))
-        expect(await incentivizer.settled(user.address, 0)).to.equal(0)
-        expect(await incentivizer.latestVersion(user.address, 0)).to.equal(23)
-        expect(await incentivizer.unclaimed(user.address, 0)).to.equal(0)
-
-        expect(await incentivizer.available(1)).to.equal(utils.parseEther('20000'))
-        expect(await incentivizer.settled(user.address, 1)).to.equal(0)
-        expect(await incentivizer.latestVersion(user.address, 1)).to.equal(23)
-        expect(await incentivizer.unclaimed(user.address, 1)).to.equal(0)
-      })
-    })
-
-    context('second sync', async () => {
-      beforeEach(async () => {
-        await increase(2 * HOUR)
-
-        const now = await currentBlockTimestamp()
-        const LATEST_USER_VERSION = 17
-        const SHARE_DELTA = { maker: 0, taker: 0 }
-        const TO_ORACLE_VERSION = {
-          price: utils.parseEther('1'),
-          timestamp: now,
-          version: LATEST_USER_VERSION,
-        }
-
-        await incentivizer.connect(productSigner).syncAccount(user.address, SHARE_DELTA, TO_ORACLE_VERSION)
-
-        await increase(2 * HOUR)
-      })
-
-      it('all empty', async () => {
-        const now = await currentBlockTimestamp()
-        const LATEST_USER_VERSION = 23
-        const SHARE_DELTA = { maker: 0, taker: 0 }
-        const TO_ORACLE_VERSION = {
-          price: utils.parseEther('1'),
-          timestamp: now,
-          version: LATEST_USER_VERSION,
-        }
-
-        await incentivizer.connect(productSigner).syncAccount(user.address, SHARE_DELTA, TO_ORACLE_VERSION)
-
-        expect(await incentivizer.available(0)).to.equal(utils.parseEther('10000'))
-        expect(await incentivizer.settled(user.address, 0)).to.equal(0)
-        expect(await incentivizer.latestVersion(user.address, 0)).to.equal(23)
-        expect(await incentivizer.unclaimed(user.address, 0)).to.equal(0)
-
-        expect(await incentivizer.available(1)).to.equal(utils.parseEther('20000'))
-        expect(await incentivizer.settled(user.address, 1)).to.equal(0)
-        expect(await incentivizer.latestVersion(user.address, 1)).to.equal(23)
-        expect(await incentivizer.unclaimed(user.address, 1)).to.equal(0)
-      })
-
-      it('share change no position', async () => {
-        const now = await currentBlockTimestamp()
-        const LATEST_USER_VERSION = 23
-        const SHARE_DELTA = { maker: 0, taker: 0 }
-        const TO_ORACLE_VERSION = {
-          price: utils.parseEther('1'),
-          timestamp: now,
-          version: LATEST_USER_VERSION,
-        }
-
-        await incentivizer.connect(productSigner).syncAccount(user.address, SHARE_DELTA, TO_ORACLE_VERSION)
-
-        expect(await incentivizer.available(0)).to.equal(utils.parseEther('10000'))
-        expect(await incentivizer.settled(user.address, 0)).to.equal(0)
-        expect(await incentivizer.latestVersion(user.address, 0)).to.equal(23)
-        expect(await incentivizer.unclaimed(user.address, 0)).to.equal(0)
-
-        expect(await incentivizer.available(1)).to.equal(utils.parseEther('20000'))
-        expect(await incentivizer.settled(user.address, 1)).to.equal(0)
-        expect(await incentivizer.latestVersion(user.address, 1)).to.equal(23)
-        expect(await incentivizer.unclaimed(user.address, 1)).to.equal(0)
-      })
-
-      it('share change maker position', async () => {
-        // reward pre second * share delta * position
-        // 8000 * 10^18 / (60 * 60 * 24 * 30) * 180 * 10 = 5555555555555555555
-        const EXPECTED_REWARD = ethers.BigNumber.from('5555555555555554200')
-
-        const now = await currentBlockTimestamp()
-        const LATEST_USER_VERSION = 23
-        const SHARE_DELTA = { maker: utils.parseEther('1800'), taker: 0 }
-        const TO_ORACLE_VERSION = {
-          price: utils.parseEther('1'),
-          timestamp: now,
-          version: LATEST_USER_VERSION,
-        }
-
-        await incentivizer.connect(productSigner).syncAccount(user.address, SHARE_DELTA, TO_ORACLE_VERSION)
-
-        expect(await incentivizer.available(0)).to.equal(utils.parseEther('10000').sub(EXPECTED_REWARD))
-        expect(await incentivizer.settled(user.address, 0)).to.equal(EXPECTED_REWARD)
-        expect(await incentivizer.latestVersion(user.address, 0)).to.equal(23)
-        expect(await incentivizer.unclaimed(user.address, 0)).to.equal(EXPECTED_REWARD)
-
-        expect(await incentivizer.available(1)).to.equal(utils.parseEther('20000').sub(EXPECTED_REWARD))
-        expect(await incentivizer.settled(user.address, 1)).to.equal(EXPECTED_REWARD)
-        expect(await incentivizer.latestVersion(user.address, 1)).to.equal(23)
-        expect(await incentivizer.unclaimed(user.address, 1)).to.equal(EXPECTED_REWARD)
-      })
-
-      it('share change taker position', async () => {
-        // reward pre second * share delta * position
-        // 2000 * 10^18 / (60 * 60 * 24 * 30) * 360 * 5 = 1388888888888888888
-        const EXPECTED_REWARD = ethers.BigNumber.from('1388888888888887200')
-
-        const now = await currentBlockTimestamp()
-        const LATEST_USER_VERSION = 23
-        const SHARE_DELTA = { maker: 0, taker: utils.parseEther('1800') }
-        const TO_ORACLE_VERSION = {
-          price: utils.parseEther('1'),
-          timestamp: now,
-          version: LATEST_USER_VERSION,
-        }
-
-        await incentivizer.connect(productSigner).syncAccount(user.address, SHARE_DELTA, TO_ORACLE_VERSION)
-
-        expect(await incentivizer.available(0)).to.equal(utils.parseEther('10000').sub(EXPECTED_REWARD))
-        expect(await incentivizer.settled(user.address, 0)).to.equal(EXPECTED_REWARD)
-        expect(await incentivizer.latestVersion(user.address, 0)).to.equal(23)
-        expect(await incentivizer.unclaimed(user.address, 0)).to.equal(EXPECTED_REWARD)
-
-        expect(await incentivizer.available(1)).to.equal(utils.parseEther('20000').sub(EXPECTED_REWARD))
-        expect(await incentivizer.settled(user.address, 1)).to.equal(EXPECTED_REWARD)
-        expect(await incentivizer.latestVersion(user.address, 1)).to.equal(23)
-        expect(await incentivizer.unclaimed(user.address, 1)).to.equal(EXPECTED_REWARD)
-      })
-    })
-
-    context('already complete', async () => {
-      beforeEach(async () => {
-        await increase(2 * HOUR)
-
-        let now = await currentBlockTimestamp()
-        const LATEST_USER_VERSION = 17
-        const SHARE_DELTA = { maker: 0, taker: 0 }
-        const TO_ORACLE_VERSION = {
-          price: utils.parseEther('1'),
-          timestamp: now,
-          version: LATEST_USER_VERSION,
-        }
-
-        await incentivizer.connect(productSigner).syncAccount(user.address, SHARE_DELTA, TO_ORACLE_VERSION)
-
-        await increase(61 * DAY)
-
-        now = await currentBlockTimestamp()
-        const LATEST_VERSION = 46
-        await product.mock.latestVersion.withArgs().returns(LATEST_VERSION)
-
-        await incentivizer.connect(productSigner).sync({
-          price: utils.parseEther('1'),
-          timestamp: now,
-          version: LATEST_VERSION + 1,
-        })
-
-        await increase(2 * HOUR)
-      })
-
-      it('all empty', async () => {
-        const now = await currentBlockTimestamp()
-        const LATEST_USER_VERSION = 49
-        const VERSION_COMPLETE = 46
-        const SHARE_DELTA = { maker: 0, taker: 0 }
-        const TO_ORACLE_VERSION = {
-          price: utils.parseEther('1'),
-          timestamp: now,
-          version: LATEST_USER_VERSION,
-        }
-
-        await productProvider.mock.atVersion.withArgs(VERSION_COMPLETE).returns({
-          price: utils.parseEther('1'),
-          timestamp: now,
-          version: LATEST_USER_VERSION,
-        })
-
-        await incentivizer.connect(productSigner).syncAccount(user.address, SHARE_DELTA, TO_ORACLE_VERSION)
-
-        expect(await incentivizer.available(0)).to.equal(utils.parseEther('10000'))
-        expect(await incentivizer.settled(user.address, 0)).to.equal(0)
-        expect(await incentivizer.latestVersion(user.address, 0)).to.equal(VERSION_COMPLETE)
-        expect(await incentivizer.unclaimed(user.address, 0)).to.equal(0)
-
-        expect(await incentivizer.available(1)).to.equal(utils.parseEther('20000'))
-        expect(await incentivizer.settled(user.address, 1)).to.equal(0)
-        expect(await incentivizer.latestVersion(user.address, 1)).to.equal(VERSION_COMPLETE)
-        expect(await incentivizer.unclaimed(user.address, 1)).to.equal(0)
-      })
-
-      it('share change no position', async () => {
-        const now = await currentBlockTimestamp()
-        const LATEST_USER_VERSION = 49
-        const VERSION_COMPLETE = 46
-        const SHARE_DELTA = { maker: 0, taker: 0 }
-        const TO_ORACLE_VERSION = {
-          price: utils.parseEther('1'),
-          timestamp: now,
-          version: LATEST_USER_VERSION,
-        }
-
-        await productProvider.mock.atVersion.withArgs(VERSION_COMPLETE).returns({
-          price: utils.parseEther('1'),
-          timestamp: now,
-          version: LATEST_USER_VERSION,
-        })
-
-        await incentivizer.connect(productSigner).syncAccount(user.address, SHARE_DELTA, TO_ORACLE_VERSION)
-
-        expect(await incentivizer.available(0)).to.equal(utils.parseEther('10000'))
-        expect(await incentivizer.settled(user.address, 0)).to.equal(0)
-        expect(await incentivizer.latestVersion(user.address, 0)).to.equal(VERSION_COMPLETE)
-        expect(await incentivizer.unclaimed(user.address, 0)).to.equal(0)
-
-        expect(await incentivizer.available(1)).to.equal(utils.parseEther('20000'))
-        expect(await incentivizer.settled(user.address, 1)).to.equal(0)
-        expect(await incentivizer.latestVersion(user.address, 1)).to.equal(VERSION_COMPLETE)
-        expect(await incentivizer.unclaimed(user.address, 1)).to.equal(0)
-      })
-
-      it('share change maker position', async () => {
-        // reward pre second * share delta * position
-        // 8000 * 10^18 / (60 * 60 * 24 * 30) * 180 * 10 = 5555555555555555555
-        const EXPECTED_REWARD = ethers.BigNumber.from('5555555555555554200')
-
-        const now = await currentBlockTimestamp()
-        const LATEST_USER_VERSION = 49
-        const VERSION_COMPLETE = 46
-        const SHARE_DELTA = { maker: utils.parseEther('1800'), taker: 0 }
-        const TO_ORACLE_VERSION = {
-          price: utils.parseEther('1'),
-          timestamp: now,
-          version: LATEST_USER_VERSION,
-        }
-
-        await productProvider.mock.atVersion.withArgs(VERSION_COMPLETE).returns({
-          price: utils.parseEther('1'),
-          timestamp: now,
-          version: LATEST_USER_VERSION,
-        })
-
-        await incentivizer.connect(productSigner).syncAccount(user.address, SHARE_DELTA, TO_ORACLE_VERSION)
-
-        expect(await incentivizer.available(0)).to.equal(utils.parseEther('10000').sub(EXPECTED_REWARD))
-        expect(await incentivizer.settled(user.address, 0)).to.equal(EXPECTED_REWARD)
-        expect(await incentivizer.latestVersion(user.address, 0)).to.equal(VERSION_COMPLETE)
-        expect(await incentivizer.unclaimed(user.address, 0)).to.equal(EXPECTED_REWARD)
-
-        expect(await incentivizer.available(1)).to.equal(utils.parseEther('20000').sub(EXPECTED_REWARD))
-        expect(await incentivizer.settled(user.address, 1)).to.equal(EXPECTED_REWARD)
-        expect(await incentivizer.latestVersion(user.address, 1)).to.equal(VERSION_COMPLETE)
-        expect(await incentivizer.unclaimed(user.address, 1)).to.equal(EXPECTED_REWARD)
-      })
-
-      it('share change taker position', async () => {
-        // reward pre second * share delta * position
-        // 2000 * 10^18 / (60 * 60 * 24 * 30) * 360 * 5 = 1388888888888888888
-        const EXPECTED_REWARD = ethers.BigNumber.from('1388888888888887200')
-
-        const now = await currentBlockTimestamp()
-        const LATEST_USER_VERSION = 49
-        const VERSION_COMPLETE = 46
-        const SHARE_DELTA = { maker: 0, taker: utils.parseEther('1800') }
-        const TO_ORACLE_VERSION = {
-          price: utils.parseEther('1'),
-          timestamp: now,
-          version: LATEST_USER_VERSION,
-        }
-
-        await productProvider.mock.atVersion.withArgs(VERSION_COMPLETE).returns({
-          price: utils.parseEther('1'),
-          timestamp: now,
-          version: LATEST_USER_VERSION,
-        })
-
-        await incentivizer.connect(productSigner).syncAccount(user.address, SHARE_DELTA, TO_ORACLE_VERSION)
-
-        expect(await incentivizer.available(0)).to.equal(utils.parseEther('10000').sub(EXPECTED_REWARD))
-        expect(await incentivizer.settled(user.address, 0)).to.equal(EXPECTED_REWARD)
-        expect(await incentivizer.latestVersion(user.address, 0)).to.equal(VERSION_COMPLETE)
-        expect(await incentivizer.unclaimed(user.address, 0)).to.equal(EXPECTED_REWARD)
-
-        expect(await incentivizer.available(1)).to.equal(utils.parseEther('20000').sub(EXPECTED_REWARD))
-        expect(await incentivizer.settled(user.address, 1)).to.equal(EXPECTED_REWARD)
-        expect(await incentivizer.latestVersion(user.address, 1)).to.equal(VERSION_COMPLETE)
-        expect(await incentivizer.unclaimed(user.address, 1)).to.equal(EXPECTED_REWARD)
-      })
-    })
-
-    context('not yet complete', async () => {
-      beforeEach(async () => {
-        await increase(2 * HOUR)
-
-        let now = await currentBlockTimestamp()
-        const LATEST_USER_VERSION = 17
-        const SHARE_DELTA = { maker: 0, taker: 0 }
-        const TO_ORACLE_VERSION = {
-          price: utils.parseEther('1'),
-          timestamp: now,
-          version: LATEST_USER_VERSION,
-        }
-
-        await incentivizer.connect(productSigner).syncAccount(user.address, SHARE_DELTA, TO_ORACLE_VERSION)
-
-        await increase(61 * DAY)
-
-        now = await currentBlockTimestamp()
-        const LATEST_VERSION = 46
-        await product.mock.latestVersion.withArgs().returns(LATEST_VERSION)
-
-        await incentivizer.connect(productSigner).sync({
-          price: utils.parseEther('1'),
-          timestamp: now,
-          version: LATEST_VERSION + 1,
-        })
-
-        await increase(2 * HOUR)
-      })
-
-      it('all empty', async () => {
-        const now = await currentBlockTimestamp()
-        const LATEST_USER_VERSION = 43
-        const SHARE_DELTA = { maker: 0, taker: 0 }
-        const TO_ORACLE_VERSION = {
-          price: utils.parseEther('1'),
-          timestamp: now,
-          version: LATEST_USER_VERSION,
-        }
-
-        await incentivizer.connect(productSigner).syncAccount(user.address, SHARE_DELTA, TO_ORACLE_VERSION)
-
-        expect(await incentivizer.available(0)).to.equal(utils.parseEther('10000'))
-        expect(await incentivizer.settled(user.address, 0)).to.equal(0)
-        expect(await incentivizer.latestVersion(user.address, 0)).to.equal(LATEST_USER_VERSION)
-        expect(await incentivizer.unclaimed(user.address, 0)).to.equal(0)
-
-        expect(await incentivizer.available(1)).to.equal(utils.parseEther('20000'))
-        expect(await incentivizer.settled(user.address, 1)).to.equal(0)
-        expect(await incentivizer.latestVersion(user.address, 1)).to.equal(LATEST_USER_VERSION)
-        expect(await incentivizer.unclaimed(user.address, 1)).to.equal(0)
-      })
-
-      it('share change no position', async () => {
-        const now = await currentBlockTimestamp()
-        const LATEST_USER_VERSION = 43
-        const SHARE_DELTA = { maker: 0, taker: 0 }
-        const TO_ORACLE_VERSION = {
-          price: utils.parseEther('1'),
-          timestamp: now,
-          version: LATEST_USER_VERSION,
-        }
-
-        await incentivizer.connect(productSigner).syncAccount(user.address, SHARE_DELTA, TO_ORACLE_VERSION)
-
-        expect(await incentivizer.available(0)).to.equal(utils.parseEther('10000'))
-        expect(await incentivizer.settled(user.address, 0)).to.equal(0)
-        expect(await incentivizer.latestVersion(user.address, 0)).to.equal(LATEST_USER_VERSION)
-        expect(await incentivizer.unclaimed(user.address, 0)).to.equal(0)
-
-        expect(await incentivizer.available(1)).to.equal(utils.parseEther('20000'))
-        expect(await incentivizer.settled(user.address, 1)).to.equal(0)
-        expect(await incentivizer.latestVersion(user.address, 1)).to.equal(LATEST_USER_VERSION)
-        expect(await incentivizer.unclaimed(user.address, 1)).to.equal(0)
-      })
-
-      it('share change maker position', async () => {
-        // reward pre second * share delta * position
-        // 8000 * 10^18 / (60 * 60 * 24 * 30) * 180 * 10 = 5555555555555555555
-        const EXPECTED_REWARD = ethers.BigNumber.from('5555555555555554200')
-
-        const now = await currentBlockTimestamp()
-        const LATEST_USER_VERSION = 43
-        const SHARE_DELTA = { maker: utils.parseEther('1800'), taker: 0 }
-        const TO_ORACLE_VERSION = {
-          price: utils.parseEther('1'),
-          timestamp: now,
-          version: LATEST_USER_VERSION,
-        }
-
-        await incentivizer.connect(productSigner).syncAccount(user.address, SHARE_DELTA, TO_ORACLE_VERSION)
-
-        expect(await incentivizer.available(0)).to.equal(utils.parseEther('10000').sub(EXPECTED_REWARD))
-        expect(await incentivizer.settled(user.address, 0)).to.equal(EXPECTED_REWARD)
-        expect(await incentivizer.latestVersion(user.address, 0)).to.equal(LATEST_USER_VERSION)
-        expect(await incentivizer.unclaimed(user.address, 0)).to.equal(EXPECTED_REWARD)
-
-        expect(await incentivizer.available(1)).to.equal(utils.parseEther('20000').sub(EXPECTED_REWARD))
-        expect(await incentivizer.settled(user.address, 1)).to.equal(EXPECTED_REWARD)
-        expect(await incentivizer.latestVersion(user.address, 1)).to.equal(LATEST_USER_VERSION)
-        expect(await incentivizer.unclaimed(user.address, 1)).to.equal(EXPECTED_REWARD)
-      })
-
-      it('share change taker position', async () => {
-        // reward pre second * share delta * position
-        // 2000 * 10^18 / (60 * 60 * 24 * 30) * 360 * 5 = 1388888888888888888
-        const EXPECTED_REWARD = ethers.BigNumber.from('1388888888888887200')
-
-        const now = await currentBlockTimestamp()
-        const LATEST_USER_VERSION = 43
-        const SHARE_DELTA = { maker: 0, taker: utils.parseEther('1800') }
-        const TO_ORACLE_VERSION = {
-          price: utils.parseEther('1'),
-          timestamp: now,
-          version: LATEST_USER_VERSION,
-        }
-
-        await incentivizer.connect(productSigner).syncAccount(user.address, SHARE_DELTA, TO_ORACLE_VERSION)
-
-        expect(await incentivizer.available(0)).to.equal(utils.parseEther('10000').sub(EXPECTED_REWARD))
-        expect(await incentivizer.settled(user.address, 0)).to.equal(EXPECTED_REWARD)
-        expect(await incentivizer.latestVersion(user.address, 0)).to.equal(LATEST_USER_VERSION)
-        expect(await incentivizer.unclaimed(user.address, 0)).to.equal(EXPECTED_REWARD)
-
-        expect(await incentivizer.available(1)).to.equal(utils.parseEther('20000').sub(EXPECTED_REWARD))
-        expect(await incentivizer.settled(user.address, 1)).to.equal(EXPECTED_REWARD)
-        expect(await incentivizer.latestVersion(user.address, 1)).to.equal(LATEST_USER_VERSION)
-        expect(await incentivizer.unclaimed(user.address, 1)).to.equal(EXPECTED_REWARD)
-      })
-    })
-
-    context('closed', async () => {
-      beforeEach(async () => {
-        await increase(2 * HOUR)
-
-        let now = await currentBlockTimestamp()
-        const LATEST_USER_VERSION = 17
-        const SHARE_DELTA = { maker: 0, taker: 0 }
-        const TO_ORACLE_VERSION = {
-          price: utils.parseEther('1'),
-          timestamp: now,
-          version: LATEST_USER_VERSION,
-        }
-
-        await incentivizer.connect(productSigner).syncAccount(user.address, SHARE_DELTA, TO_ORACLE_VERSION)
-
-        await increase(61 * DAY)
-
-        now = await currentBlockTimestamp()
-        const LATEST_VERSION = 46
-
-        await product.mock.latestVersion.withArgs().returns(LATEST_VERSION)
-        await productProvider.mock.atVersion.withArgs(LATEST_VERSION).returns({
-          price: utils.parseEther('1'),
-          timestamp: now,
-          version: LATEST_VERSION,
-        })
-
-        await incentivizer.connect(productSigner).sync({
-          price: utils.parseEther('1'),
-          timestamp: now,
-          version: LATEST_VERSION + 1,
-        })
-
-        await increase(8 * DAY)
-
-        await token.mock.transfer.withArgs(productTreasury.address, utils.parseEther('10000')).returns(true)
-        await token.mock.transfer.withArgs(productTreasury.address, utils.parseEther('20000')).returns(true)
-
-        await incentivizer.connect(productSigner).close(0)
-        await incentivizer.connect(productSigner).close(1)
-      })
-
-      it('unclaimed is wiped', async () => {
-        const now = await currentBlockTimestamp()
-        const LATEST_USER_VERSION = 43
-        const LATEST_USER_VERSION_PREVIOUS = 17
-        const POSITION = { maker: utils.parseEther('10'), taker: 0 }
-        const SHARE = { maker: utils.parseEther('180'), taker: utils.parseEther('360') }
-        const SHARE_PREVIOUS = { maker: 0, taker: 0 }
 
         await product.mock['latestVersion(address)'].withArgs(user.address).returns(LATEST_USER_VERSION)
-        await product.mock.position.withArgs(user.address).returns(POSITION)
-        await product.mock.shareAtVersion.withArgs(LATEST_USER_VERSION).returns(SHARE)
-        await product.mock.shareAtVersion.withArgs(LATEST_USER_VERSION_PREVIOUS).returns(SHARE_PREVIOUS)
-        await productProvider.mock.atVersion.withArgs(LATEST_USER_VERSION).returns({
-          price: utils.parseEther('1'),
-          timestamp: now,
-          version: LATEST_USER_VERSION,
-        }) // or version complete
-
-        expect(await incentivizer.unclaimed(user.address, 0)).to.equal(0)
-      })
-    })
-
-    context('not started', async () => {
-      it('latest version is not set', async () => {
-        const now = await currentBlockTimestamp()
-
-        const LATEST_USER_VERSION = 23
-        const SHARE_DELTA = { maker: 0, taker: 0 }
-        const TO_ORACLE_VERSION = {
-          price: utils.parseEther('1'),
-          timestamp: now,
-          version: LATEST_USER_VERSION,
-        }
-
-        await incentivizer.connect(productSigner).syncAccount(user.address, SHARE_DELTA, TO_ORACLE_VERSION)
-
-        expect(await incentivizer.available(0)).to.equal(utils.parseEther('10000'))
-        expect(await incentivizer.settled(user.address, 0)).to.equal(0)
-        expect(await incentivizer.latestVersion(user.address, 0)).to.equal(0)
-        expect(await incentivizer.unclaimed(user.address, 0)).to.equal(0)
-
-        expect(await incentivizer.available(1)).to.equal(utils.parseEther('20000'))
-        expect(await incentivizer.settled(user.address, 1)).to.equal(0)
-        expect(await incentivizer.latestVersion(user.address, 1)).to.equal(0)
-        expect(await incentivizer.unclaimed(user.address, 1)).to.equal(0)
-      })
-    })
-
-    context('invalid', async () => {
-      it('unclaimed is zero', async () => {
-        const now = await currentBlockTimestamp()
-
-        const LATEST_USER_VERSION = 23
-        const LATEST_USER_VERSION_PREVIOUS = 0
-        const POSITION = { maker: 0, taker: 0 }
-        const SHARE = { maker: 0, taker: 0 }
-        const SHARE_PREVIOUS = { maker: 0, taker: 0 }
-
-        await product.mock['latestVersion(address)'].withArgs(user.address).returns(LATEST_USER_VERSION)
-        await product.mock.position.withArgs(user.address).returns(POSITION)
-        await product.mock.shareAtVersion.withArgs(LATEST_USER_VERSION).returns(SHARE)
-        await product.mock.shareAtVersion.withArgs(LATEST_USER_VERSION_PREVIOUS).returns(SHARE_PREVIOUS)
-        await productProvider.mock.atVersion.withArgs(LATEST_USER_VERSION).returns({
-          price: utils.parseEther('1'),
-          timestamp: now,
-          version: LATEST_USER_VERSION,
+        await product.mock['position(address)'].withArgs(user.address).returns({
+          maker: utils.parseEther('10'),
+          taker: utils.parseEther('0'),
+        })
+        await product.mock.shareAtVersion.withArgs(0).returns({
+          maker: utils.parseEther('0'),
+          taker: utils.parseEther('0'),
+        })
+        await product.mock.shareAtVersion.withArgs(CURRENT_ORACLE_VERSION.version).returns({
+          maker: utils.parseEther('180'),
+          taker: utils.parseEther('360'),
         })
 
-        expect(await incentivizer.unclaimed(user.address, 2)).to.equal(0)
+        await incentivizer.connect(productSigner).syncAccount(user.address, CURRENT_ORACLE_VERSION)
+
+        expect(await incentivizer.available(product.address, 0)).to.equal(utils.parseEther('10000'))
+        expect(await incentivizer.unclaimed(product.address, user.address, 0)).to.equal(0)
+
+        expect(await incentivizer.available(product.address, 1)).to.equal(utils.parseEther('20000'))
+        expect(await incentivizer.unclaimed(product.address, user.address, 1)).to.equal(0)
       })
+
+      it('settles correct amount (taker position)', async () => {
+        const NOW = await currentBlockTimestamp()
+        const LATEST_USER_VERSION = 0
+        const CURRENT_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: NOW,
+          version: 23,
+        }
+
+        await product.mock['latestVersion(address)'].withArgs(user.address).returns(LATEST_USER_VERSION)
+        await product.mock['position(address)'].withArgs(user.address).returns({
+          maker: utils.parseEther('0'),
+          taker: utils.parseEther('20'),
+        })
+        await product.mock.shareAtVersion.withArgs(0).returns({
+          maker: utils.parseEther('0'),
+          taker: utils.parseEther('0'),
+        })
+        await product.mock.shareAtVersion.withArgs(CURRENT_ORACLE_VERSION.version).returns({
+          maker: utils.parseEther('180'),
+          taker: utils.parseEther('360'),
+        })
+
+        await incentivizer.connect(productSigner).syncAccount(user.address, CURRENT_ORACLE_VERSION)
+
+        expect(await incentivizer.available(product.address, 0)).to.equal(utils.parseEther('10000'))
+        expect(await incentivizer.unclaimed(product.address, user.address, 0)).to.equal(0)
+
+        expect(await incentivizer.available(product.address, 1)).to.equal(utils.parseEther('20000'))
+        expect(await incentivizer.unclaimed(product.address, user.address, 1)).to.equal(0)
+      })
+    })
+
+    context('over start', async () => {
+      let START_ORACLE_VERSION: {
+        version: BigNumberish
+        timestamp: BigNumberish
+        price: BigNumberish
+      }
+
+      beforeEach(async () => {
+        await increase(2 * HOUR)
+        START_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: await currentBlockTimestamp(),
+          version: 17,
+        }
+        await incentivizer.connect(productSigner).sync(START_ORACLE_VERSION)
+      })
+
+      it('settles correct amount (maker position)', async () => {
+        const LATEST_USER_VERSION = 0
+        const CURRENT_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: await currentBlockTimestamp(),
+          version: 23,
+        }
+
+        await product.mock['latestVersion(address)'].withArgs(user.address).returns(LATEST_USER_VERSION)
+        await product.mock['position(address)'].withArgs(user.address).returns({
+          maker: utils.parseEther('10'),
+          taker: utils.parseEther('0'),
+        })
+        await product.mock.shareAtVersion.withArgs(START_ORACLE_VERSION.version).returns({
+          maker: utils.parseEther('180'),
+          taker: utils.parseEther('360'),
+        })
+        await product.mock.shareAtVersion.withArgs(CURRENT_ORACLE_VERSION.version).returns({
+          maker: utils.parseEther('360'),
+          taker: utils.parseEther('720'),
+        })
+
+        await incentivizer.connect(productSigner).syncAccount(user.address, CURRENT_ORACLE_VERSION)
+
+        // reward pre second * share delta * position
+        // 8000 * 10^18 / (60 * 60 * 24 * 30) * 180 * 10 = 5555555555555555555
+        const EXPECTED_REWARD_0 = ethers.BigNumber.from('5555555555555554200')
+        // 16000 * 10^18 / (60 * 60 * 24 * 60) * 180 * 10 = 5555555555555555555
+        const EXPECTED_REWARD_1 = ethers.BigNumber.from('5555555555555554200')
+
+        expect(await incentivizer.available(product.address, 0)).to.equal(
+          utils.parseEther('10000').sub(EXPECTED_REWARD_0),
+        )
+        expect(await incentivizer.unclaimed(product.address, user.address, 0)).to.equal(EXPECTED_REWARD_0)
+
+        expect(await incentivizer.available(product.address, 1)).to.equal(
+          utils.parseEther('20000').sub(EXPECTED_REWARD_1),
+        )
+        expect(await incentivizer.unclaimed(product.address, user.address, 1)).to.equal(EXPECTED_REWARD_1)
+      })
+
+      it('settles correct amount (taker position)', async () => {
+        const LATEST_USER_VERSION = 0
+        const CURRENT_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: await currentBlockTimestamp(),
+          version: 23,
+        }
+
+        await product.mock['latestVersion(address)'].withArgs(user.address).returns(LATEST_USER_VERSION)
+        await product.mock['position(address)'].withArgs(user.address).returns({
+          maker: utils.parseEther('0'),
+          taker: utils.parseEther('20'),
+        })
+        await product.mock.shareAtVersion.withArgs(START_ORACLE_VERSION.version).returns({
+          maker: utils.parseEther('180'),
+          taker: utils.parseEther('360'),
+        })
+        await product.mock.shareAtVersion.withArgs(CURRENT_ORACLE_VERSION.version).returns({
+          maker: utils.parseEther('360'),
+          taker: utils.parseEther('720'),
+        })
+
+        await incentivizer.connect(productSigner).syncAccount(user.address, CURRENT_ORACLE_VERSION)
+
+        // reward pre second * share delta * position
+        // 2000 * 10^18 / (60 * 60 * 24 * 30) * 360 * 20 = 5555555555555555555
+        const EXPECTED_REWARD_0 = ethers.BigNumber.from('5555555555555548800')
+        // 4000 * 10^18 / (60 * 60 * 24 * 60) * 360 * 20 = 5555555555555555555
+        const EXPECTED_REWARD_1 = ethers.BigNumber.from('5555555555555548800')
+
+        expect(await incentivizer.available(product.address, 0)).to.equal(
+          utils.parseEther('10000').sub(EXPECTED_REWARD_0),
+        )
+        expect(await incentivizer.unclaimed(product.address, user.address, 0)).to.equal(EXPECTED_REWARD_0)
+
+        expect(await incentivizer.available(product.address, 1)).to.equal(
+          utils.parseEther('20000').sub(EXPECTED_REWARD_1),
+        )
+        expect(await incentivizer.unclaimed(product.address, user.address, 1)).to.equal(EXPECTED_REWARD_1)
+      })
+    })
+
+    context('running', async () => {
+      let START_ORACLE_VERSION: {
+        version: BigNumberish
+        timestamp: BigNumberish
+        price: BigNumberish
+      }
+
+      beforeEach(async () => {
+        await increase(2 * HOUR)
+        START_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: await currentBlockTimestamp(),
+          version: 17,
+        }
+        await incentivizer.connect(productSigner).sync(START_ORACLE_VERSION)
+      })
+
+      it('settles correct amount (maker position)', async () => {
+        const LATEST_USER_VERSION = 20
+        const CURRENT_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: await currentBlockTimestamp(),
+          version: 23,
+        }
+
+        await product.mock['latestVersion(address)'].withArgs(user.address).returns(LATEST_USER_VERSION)
+        await product.mock['position(address)'].withArgs(user.address).returns({
+          maker: utils.parseEther('10'),
+          taker: utils.parseEther('0'),
+        })
+        await product.mock.shareAtVersion.withArgs(LATEST_USER_VERSION).returns({
+          maker: utils.parseEther('180'),
+          taker: utils.parseEther('360'),
+        })
+        await product.mock.shareAtVersion.withArgs(CURRENT_ORACLE_VERSION.version).returns({
+          maker: utils.parseEther('360'),
+          taker: utils.parseEther('720'),
+        })
+
+        await incentivizer.connect(productSigner).syncAccount(user.address, CURRENT_ORACLE_VERSION)
+
+        // reward pre second * share delta * position
+        // 8000 * 10^18 / (60 * 60 * 24 * 30) * 180 * 10 = 5555555555555555555
+        const EXPECTED_REWARD_0 = ethers.BigNumber.from('5555555555555554200')
+        // 16000 * 10^18 / (60 * 60 * 24 * 60) * 180 * 10 = 5555555555555555555
+        const EXPECTED_REWARD_1 = ethers.BigNumber.from('5555555555555554200')
+
+        expect(await incentivizer.available(product.address, 0)).to.equal(
+          utils.parseEther('10000').sub(EXPECTED_REWARD_0),
+        )
+        expect(await incentivizer.unclaimed(product.address, user.address, 0)).to.equal(EXPECTED_REWARD_0)
+
+        expect(await incentivizer.available(product.address, 1)).to.equal(
+          utils.parseEther('20000').sub(EXPECTED_REWARD_1),
+        )
+        expect(await incentivizer.unclaimed(product.address, user.address, 1)).to.equal(EXPECTED_REWARD_1)
+      })
+
+      it('settles correct amount (taker position)', async () => {
+        const LATEST_USER_VERSION = 20
+        const CURRENT_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: await currentBlockTimestamp(),
+          version: 23,
+        }
+
+        await product.mock['latestVersion(address)'].withArgs(user.address).returns(LATEST_USER_VERSION)
+        await product.mock['position(address)'].withArgs(user.address).returns({
+          maker: utils.parseEther('0'),
+          taker: utils.parseEther('20'),
+        })
+        await product.mock.shareAtVersion.withArgs(LATEST_USER_VERSION).returns({
+          maker: utils.parseEther('180'),
+          taker: utils.parseEther('360'),
+        })
+        await product.mock.shareAtVersion.withArgs(CURRENT_ORACLE_VERSION.version).returns({
+          maker: utils.parseEther('360'),
+          taker: utils.parseEther('720'),
+        })
+
+        await incentivizer.connect(productSigner).syncAccount(user.address, CURRENT_ORACLE_VERSION)
+
+        // reward pre second * share delta * position
+        // 2000 * 10^18 / (60 * 60 * 24 * 30) * 360 * 20 = 5555555555555555555
+        const EXPECTED_REWARD_0 = ethers.BigNumber.from('5555555555555548800')
+        // 4000 * 10^18 / (60 * 60 * 24 * 60) * 360 * 20 = 5555555555555555555
+        const EXPECTED_REWARD_1 = ethers.BigNumber.from('5555555555555548800')
+
+        expect(await incentivizer.available(product.address, 0)).to.equal(
+          utils.parseEther('10000').sub(EXPECTED_REWARD_0),
+        )
+        expect(await incentivizer.unclaimed(product.address, user.address, 0)).to.equal(EXPECTED_REWARD_0)
+
+        expect(await incentivizer.available(product.address, 1)).to.equal(
+          utils.parseEther('20000').sub(EXPECTED_REWARD_1),
+        )
+        expect(await incentivizer.unclaimed(product.address, user.address, 1)).to.equal(EXPECTED_REWARD_1)
+      })
+    })
+
+    context('over complete', async () => {
+      let START_ORACLE_VERSION: {
+        version: number
+        timestamp: number
+        price: BigNumberish
+      }
+
+      let COMPLETE_ORACLE_VERSION: {
+        version: number
+        timestamp: number
+        price: BigNumberish
+      }
+
+      let REFUND_AMOUNT_0: BigNumberish
+      let REFUND_AMOUNT_1: BigNumberish
+
+      beforeEach(async () => {
+        await increase(2 * HOUR)
+        START_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: await currentBlockTimestamp(),
+          version: 17,
+        }
+        await incentivizer.connect(productSigner).sync(START_ORACLE_VERSION)
+
+        await increase(60 * DAY)
+        COMPLETE_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: (await currentBlockTimestamp()) - 31 * DAY,
+          version: 66,
+        }
+
+        REFUND_AMOUNT_0 = utils
+          .parseEther('10000')
+          .mul(30 * DAY - (COMPLETE_ORACLE_VERSION.timestamp - START_ORACLE_VERSION.timestamp))
+          .div(30 * DAY)
+        REFUND_AMOUNT_1 = utils
+          .parseEther('20000')
+          .mul(60 * DAY - (COMPLETE_ORACLE_VERSION.timestamp - START_ORACLE_VERSION.timestamp))
+          .div(60 * DAY)
+        await product.mock['latestVersion()'].withArgs().returns(COMPLETE_ORACLE_VERSION.version)
+        await productProvider.mock.atVersion.withArgs(START_ORACLE_VERSION.version).returns(START_ORACLE_VERSION)
+        await productProvider.mock.atVersion.withArgs(COMPLETE_ORACLE_VERSION.version).returns(COMPLETE_ORACLE_VERSION)
+        await token.mock.transfer.withArgs(productTreasury.address, REFUND_AMOUNT_0).returns(true)
+        await token.mock.transfer.withArgs(productTreasury.address, REFUND_AMOUNT_1).returns(true)
+        const POST_COMPLETE_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: await currentBlockTimestamp(),
+          version: 68,
+        }
+        await incentivizer.connect(productSigner).sync(POST_COMPLETE_ORACLE_VERSION)
+      })
+
+      it('settles correct amount (maker position)', async () => {
+        const LATEST_USER_VERSION = 60
+        const CURRENT_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: await currentBlockTimestamp(),
+          version: 70,
+        }
+
+        await product.mock['latestVersion(address)'].withArgs(user.address).returns(LATEST_USER_VERSION)
+        await product.mock['position(address)'].withArgs(user.address).returns({
+          maker: utils.parseEther('10'),
+          taker: utils.parseEther('0'),
+        })
+        await product.mock.shareAtVersion.withArgs(LATEST_USER_VERSION).returns({
+          maker: utils.parseEther('180'),
+          taker: utils.parseEther('360'),
+        })
+        await product.mock.shareAtVersion.withArgs(COMPLETE_ORACLE_VERSION.version).returns({
+          maker: utils.parseEther('360'),
+          taker: utils.parseEther('720'),
+        })
+
+        await incentivizer.connect(productSigner).syncAccount(user.address, CURRENT_ORACLE_VERSION)
+
+        // reward pre second * share delta * position
+        // 8000 * 10^18 / (60 * 60 * 24 * 30) * 180 * 10 = 5555555555555555555
+        const EXPECTED_REWARD_0 = ethers.BigNumber.from('5555555555555554200')
+        // 16000 * 10^18 / (60 * 60 * 24 * 60) * 180 * 10 = 5555555555555555555
+        const EXPECTED_REWARD_1 = ethers.BigNumber.from('5555555555555554200')
+
+        expect(await incentivizer.available(product.address, 0)).to.equal(
+          utils.parseEther('10000').sub(REFUND_AMOUNT_0).sub(EXPECTED_REWARD_0),
+        )
+        expect(await incentivizer.unclaimed(product.address, user.address, 0)).to.equal(EXPECTED_REWARD_0)
+
+        expect(await incentivizer.available(product.address, 1)).to.equal(
+          utils.parseEther('20000').sub(REFUND_AMOUNT_1).sub(EXPECTED_REWARD_1),
+        )
+        expect(await incentivizer.unclaimed(product.address, user.address, 1)).to.equal(EXPECTED_REWARD_1)
+      })
+
+      it('settles correct amount (taker position)', async () => {
+        const LATEST_USER_VERSION = 60
+        const CURRENT_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: await currentBlockTimestamp(),
+          version: 70,
+        }
+
+        await product.mock['latestVersion(address)'].withArgs(user.address).returns(LATEST_USER_VERSION)
+        await product.mock['position(address)'].withArgs(user.address).returns({
+          maker: utils.parseEther('0'),
+          taker: utils.parseEther('20'),
+        })
+        await product.mock.shareAtVersion.withArgs(LATEST_USER_VERSION).returns({
+          maker: utils.parseEther('180'),
+          taker: utils.parseEther('360'),
+        })
+        await product.mock.shareAtVersion.withArgs(COMPLETE_ORACLE_VERSION.version).returns({
+          maker: utils.parseEther('360'),
+          taker: utils.parseEther('720'),
+        })
+
+        await incentivizer.connect(productSigner).syncAccount(user.address, CURRENT_ORACLE_VERSION)
+
+        // reward pre second * share delta * position
+        // 2000 * 10^18 / (60 * 60 * 24 * 30) * 360 * 20 = 5555555555555555555
+        const EXPECTED_REWARD_0 = ethers.BigNumber.from('5555555555555548800')
+        // 4000 * 10^18 / (60 * 60 * 24 * 60) * 360 * 20 = 5555555555555555555
+        const EXPECTED_REWARD_1 = ethers.BigNumber.from('5555555555555548800')
+
+        expect(await incentivizer.available(product.address, 0)).to.equal(
+          utils.parseEther('10000').sub(REFUND_AMOUNT_0).sub(EXPECTED_REWARD_0),
+        )
+        expect(await incentivizer.unclaimed(product.address, user.address, 0)).to.equal(EXPECTED_REWARD_0)
+
+        expect(await incentivizer.available(product.address, 1)).to.equal(
+          utils.parseEther('20000').sub(REFUND_AMOUNT_1).sub(EXPECTED_REWARD_1),
+        )
+        expect(await incentivizer.unclaimed(product.address, user.address, 1)).to.equal(EXPECTED_REWARD_1)
+      })
+    })
+
+    context('complete', async () => {
+      let START_ORACLE_VERSION: {
+        version: number
+        timestamp: number
+        price: BigNumberish
+      }
+
+      let COMPLETE_ORACLE_VERSION: {
+        version: number
+        timestamp: number
+        price: BigNumberish
+      }
+
+      let REFUND_AMOUNT_0: BigNumberish
+      let REFUND_AMOUNT_1: BigNumberish
+
+      beforeEach(async () => {
+        await increase(2 * HOUR)
+        START_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: await currentBlockTimestamp(),
+          version: 17,
+        }
+        await incentivizer.connect(productSigner).sync(START_ORACLE_VERSION)
+
+        await increase(60 * DAY)
+        COMPLETE_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: (await currentBlockTimestamp()) - 31 * DAY,
+          version: 66,
+        }
+
+        REFUND_AMOUNT_0 = utils
+          .parseEther('10000')
+          .mul(30 * DAY - (COMPLETE_ORACLE_VERSION.timestamp - START_ORACLE_VERSION.timestamp))
+          .div(30 * DAY)
+        REFUND_AMOUNT_1 = utils
+          .parseEther('20000')
+          .mul(60 * DAY - (COMPLETE_ORACLE_VERSION.timestamp - START_ORACLE_VERSION.timestamp))
+          .div(60 * DAY)
+        await product.mock['latestVersion()'].withArgs().returns(COMPLETE_ORACLE_VERSION.version)
+        await productProvider.mock.atVersion.withArgs(START_ORACLE_VERSION.version).returns(START_ORACLE_VERSION)
+        await productProvider.mock.atVersion.withArgs(COMPLETE_ORACLE_VERSION.version).returns(COMPLETE_ORACLE_VERSION)
+        await token.mock.transfer.withArgs(productTreasury.address, REFUND_AMOUNT_0).returns(true)
+        await token.mock.transfer.withArgs(productTreasury.address, REFUND_AMOUNT_1).returns(true)
+        const POST_COMPLETE_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: await currentBlockTimestamp(),
+          version: 68,
+        }
+        await incentivizer.connect(productSigner).sync(POST_COMPLETE_ORACLE_VERSION)
+      })
+
+      it('settles correct amount (maker position)', async () => {
+        const LATEST_USER_VERSION = 70
+        const CURRENT_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: await currentBlockTimestamp(),
+          version: 80,
+        }
+
+        await product.mock['latestVersion(address)'].withArgs(user.address).returns(LATEST_USER_VERSION)
+        await product.mock['position(address)'].withArgs(user.address).returns({
+          maker: utils.parseEther('10'),
+          taker: utils.parseEther('0'),
+        })
+        await product.mock.shareAtVersion.withArgs(COMPLETE_ORACLE_VERSION.version).returns({
+          maker: utils.parseEther('360'),
+          taker: utils.parseEther('720'),
+        })
+
+        await incentivizer.connect(productSigner).syncAccount(user.address, CURRENT_ORACLE_VERSION)
+
+        expect(await incentivizer.available(product.address, 0)).to.equal(
+          utils.parseEther('10000').sub(REFUND_AMOUNT_0),
+        )
+        expect(await incentivizer.unclaimed(product.address, user.address, 0)).to.equal(0)
+
+        expect(await incentivizer.available(product.address, 1)).to.equal(
+          utils.parseEther('20000').sub(REFUND_AMOUNT_1),
+        )
+        expect(await incentivizer.unclaimed(product.address, user.address, 1)).to.equal(0)
+      })
+
+      it('settles correct amount (taker position)', async () => {
+        const LATEST_USER_VERSION = 70
+        const CURRENT_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: await currentBlockTimestamp(),
+          version: 80,
+        }
+
+        await product.mock['latestVersion(address)'].withArgs(user.address).returns(LATEST_USER_VERSION)
+        await product.mock['position(address)'].withArgs(user.address).returns({
+          maker: utils.parseEther('0'),
+          taker: utils.parseEther('20'),
+        })
+        await product.mock.shareAtVersion.withArgs(COMPLETE_ORACLE_VERSION.version).returns({
+          maker: utils.parseEther('360'),
+          taker: utils.parseEther('720'),
+        })
+
+        await incentivizer.connect(productSigner).syncAccount(user.address, CURRENT_ORACLE_VERSION)
+
+        expect(await incentivizer.available(product.address, 0)).to.equal(
+          utils.parseEther('10000').sub(REFUND_AMOUNT_0),
+        )
+        expect(await incentivizer.unclaimed(product.address, user.address, 0)).to.equal(0)
+
+        expect(await incentivizer.available(product.address, 1)).to.equal(
+          utils.parseEther('20000').sub(REFUND_AMOUNT_1),
+        )
+        expect(await incentivizer.unclaimed(product.address, user.address, 1)).to.equal(0)
+      })
+    })
+
+    context('over start and complete', async () => {
+      let START_ORACLE_VERSION: {
+        version: number
+        timestamp: number
+        price: BigNumberish
+      }
+
+      let COMPLETE_ORACLE_VERSION: {
+        version: number
+        timestamp: number
+        price: BigNumberish
+      }
+
+      let REFUND_AMOUNT_0: BigNumberish
+      let REFUND_AMOUNT_1: BigNumberish
+
+      beforeEach(async () => {
+        await increase(2 * HOUR)
+        START_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: await currentBlockTimestamp(),
+          version: 17,
+        }
+        await incentivizer.connect(productSigner).sync(START_ORACLE_VERSION)
+
+        await increase(60 * DAY)
+        COMPLETE_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: (await currentBlockTimestamp()) - 31 * DAY,
+          version: 66,
+        }
+
+        REFUND_AMOUNT_0 = utils
+          .parseEther('10000')
+          .mul(30 * DAY - (COMPLETE_ORACLE_VERSION.timestamp - START_ORACLE_VERSION.timestamp))
+          .div(30 * DAY)
+        REFUND_AMOUNT_1 = utils
+          .parseEther('20000')
+          .mul(60 * DAY - (COMPLETE_ORACLE_VERSION.timestamp - START_ORACLE_VERSION.timestamp))
+          .div(60 * DAY)
+        await product.mock['latestVersion()'].withArgs().returns(COMPLETE_ORACLE_VERSION.version)
+        await productProvider.mock.atVersion.withArgs(START_ORACLE_VERSION.version).returns(START_ORACLE_VERSION)
+        await productProvider.mock.atVersion.withArgs(COMPLETE_ORACLE_VERSION.version).returns(COMPLETE_ORACLE_VERSION)
+        await token.mock.transfer.withArgs(productTreasury.address, REFUND_AMOUNT_0).returns(true)
+        await token.mock.transfer.withArgs(productTreasury.address, REFUND_AMOUNT_1).returns(true)
+        const POST_COMPLETE_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: await currentBlockTimestamp(),
+          version: 68,
+        }
+        await incentivizer.connect(productSigner).sync(POST_COMPLETE_ORACLE_VERSION)
+      })
+
+      it('settles correct amount (maker position)', async () => {
+        const LATEST_USER_VERSION = 15
+        const CURRENT_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: await currentBlockTimestamp(),
+          version: 70,
+        }
+
+        await product.mock['latestVersion(address)'].withArgs(user.address).returns(LATEST_USER_VERSION)
+        await product.mock['position(address)'].withArgs(user.address).returns({
+          maker: utils.parseEther('10'),
+          taker: utils.parseEther('0'),
+        })
+        await product.mock.shareAtVersion.withArgs(START_ORACLE_VERSION.version).returns({
+          maker: utils.parseEther('180'),
+          taker: utils.parseEther('360'),
+        })
+        await product.mock.shareAtVersion.withArgs(COMPLETE_ORACLE_VERSION.version).returns({
+          maker: utils.parseEther('360'),
+          taker: utils.parseEther('720'),
+        })
+
+        await incentivizer.connect(productSigner).syncAccount(user.address, CURRENT_ORACLE_VERSION)
+
+        // reward pre second * share delta * position
+        // 8000 * 10^18 / (60 * 60 * 24 * 30) * 180 * 10 = 5555555555555555555
+        const EXPECTED_REWARD_0 = ethers.BigNumber.from('5555555555555554200')
+        // 16000 * 10^18 / (60 * 60 * 24 * 60) * 180 * 10 = 5555555555555555555
+        const EXPECTED_REWARD_1 = ethers.BigNumber.from('5555555555555554200')
+
+        expect(await incentivizer.available(product.address, 0)).to.equal(
+          utils.parseEther('10000').sub(REFUND_AMOUNT_0).sub(EXPECTED_REWARD_0),
+        )
+        expect(await incentivizer.unclaimed(product.address, user.address, 0)).to.equal(EXPECTED_REWARD_0)
+
+        expect(await incentivizer.available(product.address, 1)).to.equal(
+          utils.parseEther('20000').sub(REFUND_AMOUNT_1).sub(EXPECTED_REWARD_1),
+        )
+        expect(await incentivizer.unclaimed(product.address, user.address, 1)).to.equal(EXPECTED_REWARD_1)
+      })
+
+      it('settles correct amount (taker position)', async () => {
+        const LATEST_USER_VERSION = 15
+        const CURRENT_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: await currentBlockTimestamp(),
+          version: 70,
+        }
+
+        await product.mock['latestVersion(address)'].withArgs(user.address).returns(LATEST_USER_VERSION)
+        await product.mock['position(address)'].withArgs(user.address).returns({
+          maker: utils.parseEther('0'),
+          taker: utils.parseEther('20'),
+        })
+        await product.mock.shareAtVersion.withArgs(START_ORACLE_VERSION.version).returns({
+          maker: utils.parseEther('180'),
+          taker: utils.parseEther('360'),
+        })
+        await product.mock.shareAtVersion.withArgs(COMPLETE_ORACLE_VERSION.version).returns({
+          maker: utils.parseEther('360'),
+          taker: utils.parseEther('720'),
+        })
+
+        await incentivizer.connect(productSigner).syncAccount(user.address, CURRENT_ORACLE_VERSION)
+
+        // reward pre second * share delta * position
+        // 2000 * 10^18 / (60 * 60 * 24 * 30) * 360 * 20 = 5555555555555555555
+        const EXPECTED_REWARD_0 = ethers.BigNumber.from('5555555555555548800')
+        // 4000 * 10^18 / (60 * 60 * 24 * 60) * 360 * 20 = 5555555555555555555
+        const EXPECTED_REWARD_1 = ethers.BigNumber.from('5555555555555548800')
+
+        expect(await incentivizer.available(product.address, 0)).to.equal(
+          utils.parseEther('10000').sub(REFUND_AMOUNT_0).sub(EXPECTED_REWARD_0),
+        )
+        expect(await incentivizer.unclaimed(product.address, user.address, 0)).to.equal(EXPECTED_REWARD_0)
+
+        expect(await incentivizer.available(product.address, 1)).to.equal(
+          utils.parseEther('20000').sub(REFUND_AMOUNT_1).sub(EXPECTED_REWARD_1),
+        )
+        expect(await incentivizer.unclaimed(product.address, user.address, 1)).to.equal(EXPECTED_REWARD_1)
+      })
+
+      it('settles correctly when user version is before versionComplete', async () => {
+        const LATEST_USER_VERSION = 15
+        const SETTLE_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: await currentBlockTimestamp(),
+          version: 50,
+        }
+        const CURRENT_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: await currentBlockTimestamp(),
+          version: 70,
+        }
+
+        await product.mock['latestVersion(address)'].withArgs(user.address).returns(LATEST_USER_VERSION)
+        await product.mock['position(address)'].withArgs(user.address).returns({
+          maker: utils.parseEther('10'),
+          taker: utils.parseEther('0'),
+        })
+        await product.mock.shareAtVersion.withArgs(START_ORACLE_VERSION.version).returns({
+          maker: utils.parseEther('180'),
+          taker: utils.parseEther('360'),
+        })
+        await product.mock.shareAtVersion.withArgs(SETTLE_ORACLE_VERSION.version).returns({
+          maker: utils.parseEther('180'),
+          taker: utils.parseEther('360'),
+        })
+        await product.mock.shareAtVersion.withArgs(COMPLETE_ORACLE_VERSION.version).returns({
+          maker: utils.parseEther('360'),
+          taker: utils.parseEther('720'),
+        })
+
+        // Sync from a -> b (b before versionComplete)
+        await incentivizer.connect(productSigner).syncAccount(user.address, SETTLE_ORACLE_VERSION)
+        await product.mock['latestVersion(address)'].withArgs(user.address).returns(SETTLE_ORACLE_VERSION.version)
+
+        // Sync from b -> c (c after versionComplete)
+        await incentivizer.connect(productSigner).syncAccount(user.address, CURRENT_ORACLE_VERSION)
+
+        // reward pre second * share delta * position
+        // 8000 * 10^18 / (60 * 60 * 24 * 30) * 180 * 10 = 5555555555555555555
+        const EXPECTED_REWARD_0 = ethers.BigNumber.from('5555555555555554200')
+        // 16000 * 10^18 / (60 * 60 * 24 * 60) * 180 * 10 = 5555555555555555555
+        const EXPECTED_REWARD_1 = ethers.BigNumber.from('5555555555555554200')
+
+        expect(await incentivizer.available(product.address, 0)).to.equal(
+          utils.parseEther('10000').sub(REFUND_AMOUNT_0).sub(EXPECTED_REWARD_0),
+        )
+        expect(await incentivizer.unclaimed(product.address, user.address, 0)).to.equal(EXPECTED_REWARD_0)
+
+        expect(await incentivizer.available(product.address, 1)).to.equal(
+          utils.parseEther('20000').sub(REFUND_AMOUNT_1).sub(EXPECTED_REWARD_1),
+        )
+        expect(await incentivizer.unclaimed(product.address, user.address, 1)).to.equal(EXPECTED_REWARD_1)
+      })
+    })
+
+    it('returns zero for invalid program', async () => {
+      expect(await incentivizer.unclaimed(product.address, user.address, 17)).to.equal(0)
     })
 
     it('reverts if not product', async () => {
       await controller.mock.isProduct.withArgs(user.address).returns(false)
 
       await expect(
-        incentivizer
-          .connect(user)
-          .syncAccount(user.address, { maker: 0, taker: 0 }, { price: 0, timestamp: 0, version: 0 }),
+        incentivizer.connect(user).syncAccount(user.address, { price: 0, timestamp: 0, version: 0 }),
       ).to.be.revertedWith(`NotProductError("${user.address}")`)
     })
   })
 
-  describe('#end', async () => {
+  describe('#complete', async () => {
     beforeEach(async () => {
       await token.mock.transferFrom
         .withArgs(productOwner.address, incentivizer.address, utils.parseEther('10000'))
         .returns(true)
 
-      let now = await currentBlockTimestamp()
+      const NOW = await currentBlockTimestamp()
 
-      await incentivizer.connect(productOwner).create({
-        product: product.address,
+      await incentivizer.connect(productOwner).create(product.address, {
+        coordinatorId: PRODUCT_COORDINATOR_ID,
         token: token.address,
         amount: {
           maker: utils.parseEther('8000'),
           taker: utils.parseEther('2000'),
         },
-        start: now + HOUR,
+        start: NOW + HOUR,
         duration: 30 * DAY,
-        grace: 7 * DAY,
+      })
+    })
+
+    context('no start first', async () => {
+      it('completes correctly after before time', async () => {
+        const NOW = await currentBlockTimestamp()
+        const LATEST_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: NOW - 2 * DAY,
+          version: 23,
+        }
+
+        const CURRENT_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: NOW,
+          version: LATEST_ORACLE_VERSION.version + 10,
+        }
+
+        await product.mock.latestVersion.withArgs().returns(LATEST_ORACLE_VERSION.version)
+        await productProvider.mock.currentVersion.withArgs().returns(CURRENT_ORACLE_VERSION)
+
+        await token.mock.transfer.withArgs(productTreasury.address, utils.parseEther('10000')).returns(true)
+
+        await productProvider.mock.atVersion.withArgs(CURRENT_ORACLE_VERSION.version).returns(CURRENT_ORACLE_VERSION)
+
+        await expect(incentivizer.connect(productOwner).complete(product.address, 0))
+          .to.emit(incentivizer, 'ProgramStarted')
+          .withArgs(product.address, 0, CURRENT_ORACLE_VERSION.version)
+          .to.emit(incentivizer, 'ProgramComplete')
+          .withArgs(product.address, 0, CURRENT_ORACLE_VERSION.version)
+
+        expect(await incentivizer.count(product.address)).to.equal(1)
+        expect(await incentivizer.active(product.address)).to.equal(0)
+        expect(await incentivizer.versionStarted(product.address, 0)).to.equal(CURRENT_ORACLE_VERSION.version)
+        expect(await incentivizer.versionComplete(product.address, 0)).to.equal(CURRENT_ORACLE_VERSION.version)
       })
 
-      await increase(2 * HOUR)
+      it('completes correctly after start time', async () => {
+        await increase(DAY)
 
-      now = await currentBlockTimestamp()
-      const LATEST_USER_VERSION = 17
-      const SHARE_DELTA = { maker: 0, taker: 0 }
-      const TO_ORACLE_VERSION = {
-        price: utils.parseEther('1'),
-        timestamp: now,
-        version: LATEST_USER_VERSION,
+        const NOW = await currentBlockTimestamp()
+        const LATEST_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: NOW - 2 * DAY,
+          version: 23,
+        }
+
+        const CURRENT_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: NOW,
+          version: LATEST_ORACLE_VERSION.version + 10,
+        }
+
+        await product.mock.latestVersion.withArgs().returns(LATEST_ORACLE_VERSION.version)
+        await productProvider.mock.currentVersion.withArgs().returns(CURRENT_ORACLE_VERSION)
+
+        await token.mock.transfer.withArgs(productTreasury.address, utils.parseEther('10000')).returns(true)
+
+        await productProvider.mock.atVersion.withArgs(CURRENT_ORACLE_VERSION.version).returns(CURRENT_ORACLE_VERSION)
+
+        await expect(incentivizer.connect(productOwner).complete(product.address, 0))
+          .to.emit(incentivizer, 'ProgramStarted')
+          .withArgs(product.address, 0, CURRENT_ORACLE_VERSION.version)
+          .to.emit(incentivizer, 'ProgramComplete')
+          .withArgs(product.address, 0, CURRENT_ORACLE_VERSION.version)
+
+        expect(await incentivizer.count(product.address)).to.equal(1)
+        expect(await incentivizer.active(product.address)).to.equal(0)
+        expect(await incentivizer.versionStarted(product.address, 0)).to.equal(CURRENT_ORACLE_VERSION.version)
+        expect(await incentivizer.versionComplete(product.address, 0)).to.equal(CURRENT_ORACLE_VERSION.version)
+      })
+    })
+
+    context('start first', async () => {
+      let STARTED_ORACLE_VERSION: {
+        price: BigNumberish
+        timestamp: number
+        version: number
       }
 
-      await incentivizer.connect(productSigner).syncAccount(user.address, SHARE_DELTA, TO_ORACLE_VERSION)
+      beforeEach(async () => {
+        await increase(12 * HOUR)
 
-      await increase(16 * DAY)
+        const NOW = await currentBlockTimestamp()
+        STARTED_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: NOW,
+          version: 15,
+        }
 
-      now = await currentBlockTimestamp()
-      const LATEST_VERSION = 23
+        await product.mock.latestVersion.withArgs().returns(STARTED_ORACLE_VERSION.version)
 
-      await product.mock.latestVersion.withArgs().returns(LATEST_VERSION)
-      await productProvider.mock.atVersion.withArgs(LATEST_VERSION).returns({
-        price: utils.parseEther('1'),
-        timestamp: now,
-        version: LATEST_VERSION,
+        await incentivizer.connect(productSigner).sync(STARTED_ORACLE_VERSION)
       })
 
-      await incentivizer.connect(productSigner).sync({
-        price: utils.parseEther('1'),
-        timestamp: now,
-        version: LATEST_VERSION + 1,
+      it('completes correctly', async () => {
+        await increase(16 * DAY)
+
+        const NOW = await currentBlockTimestamp()
+        const LATEST_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: NOW - 2 * DAY,
+          version: 23,
+        }
+
+        const CURRENT_ORACLE_VERSION = {
+          price: utils.parseEther('1'),
+          timestamp: NOW,
+          version: LATEST_ORACLE_VERSION.version + 10,
+        }
+
+        await product.mock.latestVersion.withArgs().returns(LATEST_ORACLE_VERSION.version)
+        await productProvider.mock.currentVersion.withArgs().returns(CURRENT_ORACLE_VERSION)
+
+        const EXPECTED_REFUND_AMOUNT = utils
+          .parseEther('10000')
+          .mul(30 * DAY - (LATEST_ORACLE_VERSION.timestamp - STARTED_ORACLE_VERSION.timestamp))
+          .div(30 * DAY)
+
+        await token.mock.transfer.withArgs(productTreasury.address, EXPECTED_REFUND_AMOUNT).returns(true)
+
+        await productProvider.mock.atVersion.withArgs(STARTED_ORACLE_VERSION.version).returns(STARTED_ORACLE_VERSION)
+        await productProvider.mock.atVersion.withArgs(LATEST_ORACLE_VERSION.version).returns(LATEST_ORACLE_VERSION)
+
+        await expect(incentivizer.connect(productOwner).complete(product.address, 0))
+          .to.emit(incentivizer, 'ProgramComplete')
+          .withArgs(product.address, 0, LATEST_ORACLE_VERSION.version)
+
+        expect(await incentivizer.count(product.address)).to.equal(1)
+        expect(await incentivizer.active(product.address)).to.equal(0)
+        expect(await incentivizer.versionStarted(product.address, 0)).to.equal(STARTED_ORACLE_VERSION.version)
+        expect(await incentivizer.versionComplete(product.address, 0)).to.equal(LATEST_ORACLE_VERSION.version)
       })
     })
 
-    it('ends correctly', async () => {
-      await expect(incentivizer.connect(productOwner).end(0)).to.emit(incentivizer, 'ProgramCompleted').withArgs(0, 23)
+    it('doesnt update if already complete', async () => {
+      await increase(12 * HOUR)
 
-      expect(await incentivizer.closed(0)).to.equal(false)
-      expect(await incentivizer.versionComplete(0)).to.equal(23)
-    })
+      let NOW = await currentBlockTimestamp()
+      const STARTED_ORACLE_VERSION = {
+        price: utils.parseEther('1'),
+        timestamp: NOW,
+        version: 15,
+      }
 
-    it('closable early after ending early', async () => {
-      await incentivizer.connect(productOwner).end(0)
+      await product.mock.latestVersion.withArgs().returns(STARTED_ORACLE_VERSION.version)
+      await incentivizer.connect(productSigner).sync(STARTED_ORACLE_VERSION)
 
-      await increase(8 * DAY)
+      await increase(31 * DAY)
 
-      await token.mock.transfer.withArgs(productTreasury.address, utils.parseEther('10000')).returns(true)
+      NOW = await currentBlockTimestamp()
+      const LATEST_ORACLE_VERSION = {
+        price: utils.parseEther('1'),
+        timestamp: NOW - 2 * DAY,
+        version: 23,
+      }
 
-      await expect(incentivizer.connect(productSigner).close(0))
-        .to.emit(incentivizer, 'ProgramClosed')
-        .withArgs(0, utils.parseEther('10000'))
+      const CURRENT_ORACLE_VERSION = {
+        price: utils.parseEther('1'),
+        timestamp: NOW,
+        version: LATEST_ORACLE_VERSION.version + 10,
+      }
 
-      expect(await incentivizer.available(0)).to.equal(0)
-      expect(await incentivizer.closed(0)).to.equal(true)
-      expect(await incentivizer.versionComplete(0)).to.equal(23)
-      expect(await incentivizer.programsForLength(product.address)).to.equal(0)
+      await product.mock.latestVersion.withArgs().returns(LATEST_ORACLE_VERSION.version)
+
+      const EXPECTED_REFUND_AMOUNT = utils
+        .parseEther('10000')
+        .mul(30 * DAY - (LATEST_ORACLE_VERSION.timestamp - STARTED_ORACLE_VERSION.timestamp))
+        .div(30 * DAY)
+
+      await token.mock.transfer.withArgs(productTreasury.address, EXPECTED_REFUND_AMOUNT).returns(true)
+
+      await productProvider.mock.atVersion.withArgs(STARTED_ORACLE_VERSION.version).returns(STARTED_ORACLE_VERSION)
+      await productProvider.mock.atVersion.withArgs(LATEST_ORACLE_VERSION.version).returns(LATEST_ORACLE_VERSION)
+
+      await incentivizer.connect(productSigner).sync(CURRENT_ORACLE_VERSION)
+
+      await increase(31 * DAY)
+
+      NOW = await currentBlockTimestamp()
+      const NEW_ORACLE_VERSION = {
+        price: utils.parseEther('1'),
+        timestamp: NOW,
+        version: CURRENT_ORACLE_VERSION.version + 10,
+      }
+
+      await product.mock.latestVersion.withArgs().returns(CURRENT_ORACLE_VERSION.version)
+      await productProvider.mock.currentVersion.withArgs().returns(NEW_ORACLE_VERSION)
+
+      await incentivizer.connect(productOwner).complete(product.address, 0)
+
+      expect(await incentivizer.count(product.address)).to.equal(1)
+      expect(await incentivizer.active(product.address)).to.equal(0)
+      expect(await incentivizer.versionStarted(product.address, 0)).to.equal(STARTED_ORACLE_VERSION.version)
+      expect(await incentivizer.versionComplete(product.address, 0)).to.equal(LATEST_ORACLE_VERSION.version)
     })
 
     it('reverts if not valid program', async () => {
-      await expect(incentivizer.connect(productSigner).end(1)).to.be.revertedWith(`IncentivizerInvalidProgramError(1)`)
+      await expect(incentivizer.connect(productOwner).complete(product.address, 1)).to.be.revertedWith(
+        `IncentivizerInvalidProgramError("${product.address}", 1)`,
+      )
     })
 
     it('reverts if not owner', async () => {
-      await expect(incentivizer.connect(user).end(0)).to.be.revertedWith(`IncentivizerNotProgramOwnerError(0)`)
+      await expect(incentivizer.connect(user).complete(product.address, 0)).to.be.revertedWith(
+        `IncentivizerNotProgramOwnerError("${product.address}", 0)`,
+      )
     })
 
     it('reverts if paused', async () => {
       await controller.mock['paused(address)'].withArgs(product.address).returns(true)
-      await expect(incentivizer.connect(productOwner).end(0)).to.be.revertedWith(`IncentivizerProgramPausedError(0)`)
+      await expect(incentivizer.connect(productOwner).complete(product.address, 0)).to.be.revertedWith(`PausedError()`)
     })
   })
 
@@ -1425,17 +2023,24 @@ describe('Incentivizer', () => {
     const EXPECTED_REWARD = ethers.BigNumber.from('5555555555555554200')
 
     beforeEach(async () => {
+      // Setup programs
       await token.mock.transferFrom
         .withArgs(productOwner.address, incentivizer.address, utils.parseEther('10000'))
         .returns(true)
       await token.mock.transferFrom
         .withArgs(productOwner.address, incentivizer.address, utils.parseEther('20000'))
         .returns(true)
+      await token.mock.transferFrom
+        .withArgs(productOwnerB.address, incentivizer.address, utils.parseEther('10000'))
+        .returns(true)
+      await token.mock.transferFrom
+        .withArgs(productOwnerB.address, incentivizer.address, utils.parseEther('20000'))
+        .returns(true)
 
-      let now = await currentBlockTimestamp()
+      const now = await currentBlockTimestamp()
 
-      await incentivizer.connect(productOwner).create({
-        product: product.address,
+      await incentivizer.connect(productOwner).create(product.address, {
+        coordinatorId: PRODUCT_COORDINATOR_ID,
         token: token.address,
         amount: {
           maker: utils.parseEther('8000'),
@@ -1443,11 +2048,10 @@ describe('Incentivizer', () => {
         },
         start: now + HOUR,
         duration: 30 * DAY,
-        grace: 7 * DAY,
       })
 
-      await incentivizer.connect(productOwner).create({
-        product: product.address,
+      await incentivizer.connect(productOwner).create(product.address, {
+        coordinatorId: PRODUCT_COORDINATOR_ID,
         token: token.address,
         amount: {
           maker: utils.parseEther('16000'),
@@ -1455,82 +2059,150 @@ describe('Incentivizer', () => {
         },
         start: now + HOUR,
         duration: 60 * DAY,
-        grace: 7 * DAY,
       })
 
+      await incentivizer.connect(productOwnerB).create(productB.address, {
+        coordinatorId: 2,
+        token: token.address,
+        amount: {
+          maker: utils.parseEther('8000'),
+          taker: utils.parseEther('2000'),
+        },
+        start: now + HOUR,
+        duration: 30 * DAY,
+      })
+
+      await incentivizer.connect(productOwnerB).create(productB.address, {
+        coordinatorId: 2,
+        token: token.address,
+        amount: {
+          maker: utils.parseEther('16000'),
+          taker: utils.parseEther('4000'),
+        },
+        start: now + HOUR,
+        duration: 60 * DAY,
+      })
+
+      // Sync global
       await increase(2 * HOUR)
 
-      now = await currentBlockTimestamp()
-      let LATEST_USER_VERSION = 17
-      let SHARE_DELTA = { maker: utils.parseEther('0'), taker: utils.parseEther('0') }
-      let TO_ORACLE_VERSION = {
+      const START_ORACLE_VERSION = {
         price: utils.parseEther('1'),
-        timestamp: now,
-        version: LATEST_USER_VERSION,
+        timestamp: await currentBlockTimestamp(),
+        version: 17,
+      }
+      await incentivizer.connect(productSigner).sync(START_ORACLE_VERSION)
+      await incentivizer.connect(productSignerB).sync(START_ORACLE_VERSION)
+
+      // Sync account
+      const LATEST_USER_VERSION = 20
+      const CURRENT_ORACLE_VERSION = {
+        price: utils.parseEther('1'),
+        timestamp: await currentBlockTimestamp(),
+        version: 23,
       }
 
-      await incentivizer.connect(productSigner).syncAccount(user.address, SHARE_DELTA, TO_ORACLE_VERSION)
+      await product.mock['latestVersion(address)'].withArgs(user.address).returns(LATEST_USER_VERSION)
+      await product.mock['position(address)'].withArgs(user.address).returns({
+        maker: utils.parseEther('10'),
+        taker: utils.parseEther('0'),
+      })
+      await product.mock.shareAtVersion.withArgs(LATEST_USER_VERSION).returns({
+        maker: utils.parseEther('180'),
+        taker: utils.parseEther('360'),
+      })
+      await product.mock.shareAtVersion.withArgs(CURRENT_ORACLE_VERSION.version).returns({
+        maker: utils.parseEther('360'),
+        taker: utils.parseEther('720'),
+      })
+      await incentivizer.connect(productSigner).syncAccount(user.address, CURRENT_ORACLE_VERSION)
 
-      await increase(2 * HOUR)
+      await productB.mock['latestVersion(address)'].withArgs(user.address).returns(LATEST_USER_VERSION)
+      await productB.mock['position(address)'].withArgs(user.address).returns({
+        maker: utils.parseEther('10'),
+        taker: utils.parseEther('0'),
+      })
+      await productB.mock.shareAtVersion.withArgs(LATEST_USER_VERSION).returns({
+        maker: utils.parseEther('180'),
+        taker: utils.parseEther('360'),
+      })
+      await productB.mock.shareAtVersion.withArgs(CURRENT_ORACLE_VERSION.version).returns({
+        maker: utils.parseEther('360'),
+        taker: utils.parseEther('720'),
+      })
+      await incentivizer.connect(productSignerB).syncAccount(user.address, CURRENT_ORACLE_VERSION)
+    })
 
-      // reward pre second * share delta * position
-      // 8000 * 10^18 / (60 * 60 * 24 * 30) * 180 * 10 = 5555555555555555555
-      const EXPECTED_REWARD = ethers.BigNumber.from('5555555555555554200')
-
-      now = await currentBlockTimestamp()
-      LATEST_USER_VERSION = 23
-      SHARE_DELTA = { maker: utils.parseEther('1800'), taker: utils.parseEther('0') }
-      TO_ORACLE_VERSION = {
-        price: utils.parseEther('1'),
-        timestamp: now,
-        version: LATEST_USER_VERSION,
-      }
-
-      await incentivizer.connect(productSigner).syncAccount(user.address, SHARE_DELTA, TO_ORACLE_VERSION)
-
-      await token.mock.transfer.withArgs(user.address, EXPECTED_REWARD).returns(true)
-      await product.mock.settle.withArgs().returns()
+    it('claims individual product', async () => {
       await product.mock.settleAccount.withArgs(user.address).returns()
-    })
+      await token.mock.transfer.withArgs(user.address, EXPECTED_REWARD).returns(true)
 
-    it('claims individual programs', async () => {
-      await incentivizer.connect(user)['claim(uint256)'](0)
-      await incentivizer.connect(user)['claim(uint256)'](1)
-
-      expect(await incentivizer.settled(user.address, 0)).to.equal(0)
-      expect(await incentivizer.unclaimed(user.address, 0)).to.equal(0)
-      expect(await incentivizer.settled(user.address, 1)).to.equal(0)
-      expect(await incentivizer.unclaimed(user.address, 1)).to.equal(0)
-    })
-
-    it('claims product', async () => {
-      await expect(incentivizer.connect(user)['claim(address)'](product.address))
+      await expect(incentivizer.connect(user)['claim(address,uint256[])'](product.address, [0, 1]))
         .to.emit(incentivizer, 'Claim')
-        .withArgs(user.address, 0, EXPECTED_REWARD)
+        .withArgs(product.address, user.address, 0, EXPECTED_REWARD)
         .to.emit(incentivizer, 'Claim')
-        .withArgs(user.address, 1, EXPECTED_REWARD)
+        .withArgs(product.address, user.address, 1, EXPECTED_REWARD)
 
-      expect(await incentivizer.settled(user.address, 0)).to.equal(0)
-      expect(await incentivizer.unclaimed(user.address, 0)).to.equal(0)
-      expect(await incentivizer.settled(user.address, 1)).to.equal(0)
-      expect(await incentivizer.unclaimed(user.address, 1)).to.equal(0)
+      expect(await incentivizer.unclaimed(product.address, user.address, 0)).to.equal(0)
+      expect(await incentivizer.unclaimed(product.address, user.address, 1)).to.equal(0)
     })
 
-    it('reverts if not valid program', async () => {
-      await expect(incentivizer.connect(user)['claim(uint256)'](2)).to.be.revertedWith(
-        `IncentivizerInvalidProgramError(2)`,
+    it('claims individual products', async () => {
+      await product.mock.settleAccount.withArgs(user.address).returns()
+      await productB.mock.settleAccount.withArgs(user.address).returns()
+      await token.mock.transfer.withArgs(user.address, EXPECTED_REWARD).returns(true)
+
+      await expect(
+        incentivizer.connect(user)['claim(address[],uint256[][])'](
+          [product.address, productB.address],
+          [
+            [0, 1],
+            [0, 1],
+          ],
+        ),
+      )
+        .to.emit(incentivizer, 'Claim')
+        .withArgs(product.address, user.address, 0, EXPECTED_REWARD)
+        .to.emit(incentivizer, 'Claim')
+        .withArgs(product.address, user.address, 1, EXPECTED_REWARD)
+        .to.emit(incentivizer, 'Claim')
+        .withArgs(productB.address, user.address, 0, EXPECTED_REWARD)
+        .to.emit(incentivizer, 'Claim')
+        .withArgs(productB.address, user.address, 1, EXPECTED_REWARD)
+
+      expect(await incentivizer.unclaimed(product.address, user.address, 0)).to.equal(0)
+      expect(await incentivizer.unclaimed(product.address, user.address, 1)).to.equal(0)
+      expect(await incentivizer.unclaimed(productB.address, user.address, 0)).to.equal(0)
+      expect(await incentivizer.unclaimed(productB.address, user.address, 1)).to.equal(0)
+    })
+
+    it('reverts if not valid product', async () => {
+      await controller.mock['isProduct(address)'].withArgs(user.address).returns(false)
+      await expect(incentivizer.connect(user)['claim(address,uint256[])'](user.address, [2])).to.be.revertedWith(
+        `NotProductError("${user.address}")`,
       )
     })
 
-    it('reverts if paused (product)', async () => {
-      await controller.mock['paused(address)'].withArgs(product.address).returns(true)
-      await expect(incentivizer.connect(user)['claim(address)'](product.address)).to.be.revertedWith(`PausedError()`)
+    it('reverts if not valid program (single)', async () => {
+      await product.mock.settleAccount.withArgs(user.address).returns()
+
+      await expect(incentivizer.connect(user)['claim(address,uint256[])'](product.address, [2])).to.be.revertedWith(
+        `IncentivizerInvalidProgramError("${product.address}", 2)`,
+      )
     })
 
-    it('reverts if paused (program)', async () => {
+    it('reverts if not valid program (multiple)', async () => {
+      await product.mock.settleAccount.withArgs(user.address).returns()
+
+      await expect(
+        incentivizer.connect(user)['claim(address[],uint256[][])']([product.address, productB.address], [[2], [1]]),
+      ).to.be.revertedWith(`IncentivizerInvalidProgramError("${product.address}", 2)`)
+    })
+
+    it('reverts if paused', async () => {
       await controller.mock['paused(address)'].withArgs(product.address).returns(true)
-      await expect(incentivizer.connect(user)['claim(uint256)'](0)).to.be.revertedWith(
-        `IncentivizerProgramPausedError(0)`,
+      await expect(incentivizer.connect(user)['claim(address,uint256[])'](product.address, [1])).to.be.revertedWith(
+        `PausedError()`,
       )
     })
   })
@@ -1548,8 +2220,8 @@ describe('Incentivizer', () => {
 
       const now = await currentBlockTimestamp()
 
-      await incentivizer.connect(productOwner).create({
-        product: product.address,
+      await incentivizer.connect(productOwner).create(product.address, {
+        coordinatorId: PRODUCT_COORDINATOR_ID,
         token: token.address,
         amount: {
           maker: utils.parseEther('8000'),
@@ -1557,11 +2229,10 @@ describe('Incentivizer', () => {
         },
         start: now + HOUR,
         duration: 30 * DAY,
-        grace: 7 * DAY,
       })
 
-      await incentivizer.connect(productOwner).create({
-        product: product.address,
+      await incentivizer.connect(productOwner).create(product.address, {
+        coordinatorId: PRODUCT_COORDINATOR_ID,
         token: token.address,
         amount: {
           maker: utils.parseEther('16000'),
@@ -1569,7 +2240,6 @@ describe('Incentivizer', () => {
         },
         start: now + HOUR,
         duration: 60 * DAY,
-        grace: 7 * DAY,
       })
     })
 
@@ -1585,114 +2255,13 @@ describe('Incentivizer', () => {
 
     it('skips claim if zero', async () => {
       await incentivizer.connect(user).claimFee([product.address])
+
+      expect(await incentivizer.fees(product.address)).to.equal(0)
     })
 
     it('reverts if paused (protocol)', async () => {
       await controller.mock['paused()'].withArgs().returns(true)
       await expect(incentivizer.connect(user).claimFee([token.address])).to.be.revertedWith(`PausedError()`)
-    })
-  })
-
-  describe('#close', async () => {
-    beforeEach(async () => {
-      await token.mock.transferFrom
-        .withArgs(productOwner.address, incentivizer.address, utils.parseEther('10000'))
-        .returns(true)
-
-      let now = await currentBlockTimestamp()
-
-      await incentivizer.connect(productOwner).create({
-        product: product.address,
-        token: token.address,
-        amount: {
-          maker: utils.parseEther('8000'),
-          taker: utils.parseEther('2000'),
-        },
-        start: now + HOUR,
-        duration: 30 * DAY,
-        grace: 7 * DAY,
-      })
-
-      await increase(2 * HOUR)
-
-      now = await currentBlockTimestamp()
-      const LATEST_USER_VERSION = 17
-      const SHARE_DELTA = { maker: 0, taker: 0 }
-      const TO_ORACLE_VERSION = {
-        price: utils.parseEther('1'),
-        timestamp: now,
-        version: LATEST_USER_VERSION,
-      }
-
-      await incentivizer.connect(productSigner).syncAccount(user.address, SHARE_DELTA, TO_ORACLE_VERSION)
-
-      await increase(31 * DAY)
-
-      const LATEST_VERSION = 46
-
-      await product.mock.latestVersion.withArgs().returns(LATEST_VERSION)
-      await productProvider.mock.atVersion.withArgs(LATEST_VERSION).returns({
-        price: utils.parseEther('1'),
-        timestamp: now,
-        version: LATEST_VERSION,
-      })
-    })
-
-    it('closes correctly', async () => {
-      const now = await currentBlockTimestamp()
-      const LATEST_VERSION = 46
-
-      await incentivizer.connect(productSigner).sync({
-        price: utils.parseEther('1'),
-        timestamp: now,
-        version: LATEST_VERSION + 1,
-      })
-
-      await increase(8 * DAY)
-
-      await token.mock.transfer.withArgs(productTreasury.address, utils.parseEther('10000')).returns(true)
-
-      await expect(incentivizer.connect(productSigner).close(0))
-        .to.emit(incentivizer, 'ProgramClosed')
-        .withArgs(0, utils.parseEther('10000'))
-
-      expect(await incentivizer.available(0)).to.equal(0)
-      expect(await incentivizer.closed(0)).to.equal(true)
-      expect(await incentivizer.programsForLength(product.address)).to.equal(0)
-    })
-
-    it('completes if uncompleted', async () => {
-      await increase(8 * DAY)
-
-      await token.mock.transfer.withArgs(productTreasury.address, utils.parseEther('10000')).returns(true)
-
-      await expect(incentivizer.connect(productSigner).close(0))
-        .to.emit(incentivizer, 'ProgramClosed')
-        .withArgs(0, utils.parseEther('10000'))
-        .to.emit(incentivizer, 'ProgramCompleted')
-        .withArgs(0, 46)
-
-      expect(await incentivizer.available(0)).to.equal(0)
-      expect(await incentivizer.closed(0)).to.equal(true)
-      expect(await incentivizer.versionComplete(0)).to.equal(46)
-      expect(await incentivizer.programsForLength(product.address)).to.equal(0)
-    })
-
-    it('reverts when too early', async () => {
-      await expect(incentivizer.connect(productSigner).close(0)).to.be.revertedWith(
-        `IncentivizerProgramNotClosableError()`,
-      )
-    })
-
-    it('reverts if not valid program', async () => {
-      await expect(incentivizer.connect(productSigner).close(1)).to.be.revertedWith(
-        `IncentivizerInvalidProgramError(1)`,
-      )
-    })
-
-    it('reverts if paused', async () => {
-      await controller.mock['paused(address)'].withArgs(product.address).returns(true)
-      await expect(incentivizer.connect(productSigner).close(0)).to.be.revertedWith(`IncentivizerProgramPausedError(0)`)
     })
   })
 })

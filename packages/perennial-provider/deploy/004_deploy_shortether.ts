@@ -38,18 +38,17 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     autoMine: true,
   })
 
-  // TODO: opyn initial values (use ETH mapping)
   const initData = ShortEther__factory.createInterface().encodeFunctionData('initialize', [
     (await get('ChainlinkOracle_ETH')).address,
     ethers.utils.parseEther('0.30'),
     ethers.utils.parseEther('0.10'),
     0,
     0,
-    ethers.utils.parseEther('1'),
+    ethers.utils.parseEther('2500'),
     {
-      minRate: 0,
-      maxRate: ethers.utils.parseEther('5.00'),
-      targetRate: ethers.utils.parseEther('0.80'),
+      minRate: ethers.utils.parseEther('-1.50'),
+      maxRate: ethers.utils.parseEther('1.50'),
+      targetRate: ethers.utils.parseEther('-0.25'),
       targetUtilization: ethers.utils.parseEther('0.80'),
     },
   ])

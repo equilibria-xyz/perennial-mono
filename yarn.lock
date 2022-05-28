@@ -99,10 +99,10 @@
   resolved "https://registry.yarnpkg.com/@equilibria/emptyset-batcher/-/emptyset-batcher-0.0.2.tgz#5406fb5cfa9755a8809d23919d11cc8b9be2b4fe"
   integrity sha512-JaAJvNOASq1UirBr8dHVLkO3XLIrPvuyve2cG+35iB7tu1FK0B1sVjt6RdOGVgGYdNo9mmMgufTXgZnzYtaHow==
 
-"@equilibria/root@0.1.3":
-  version "0.1.3"
-  resolved "https://registry.yarnpkg.com/@equilibria/root/-/root-0.1.3.tgz#9d0b85d33ab184f4b8859be74048b87047ece698"
-  integrity sha512-Wy7zjQeBGwYVSoerz6seb/G+/Zjta8GhLFvGGwxxLxF1T+6weDmXBOtoxGSFj5WXx9epouRN+ibRbZZEpL1Kjw==
+"@equilibria/root@0.1.4":
+  version "0.1.4"
+  resolved "https://registry.yarnpkg.com/@equilibria/root/-/root-0.1.4.tgz#17cfa16b5fce66a9e83a4074790acaf22b5b5148"
+  integrity sha512-vMcf00XF6wvm0sqeksQL1MiuzvhijvOnibG5Gx9dDmXNh0F27W0kpvnxm6GonuN7dxcACiKWmmI1dL+AZ++8Fw==
 
 "@eslint/eslintrc@^0.4.3":
   version "0.4.3"

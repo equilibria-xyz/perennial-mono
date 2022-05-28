@@ -99,8 +99,8 @@ describe('Controller', () => {
 
   describe('#createCoordinator', async () => {
     it('creates the coordinator', async () => {
-      const returnValue = await controller.connect(coordinatorOwner).callStatic.createCoordinator()
-      await expect(controller.connect(coordinatorOwner).createCoordinator())
+      const returnValue = await controller.connect(owner).callStatic.createCoordinator(coordinatorOwner.address)
+      await expect(controller.connect(owner).createCoordinator(coordinatorOwner.address))
         .to.emit(controller, 'CoordinatorCreated')
         .withArgs(1, coordinatorOwner.address)
 
@@ -118,11 +118,17 @@ describe('Controller', () => {
       expect(await controller['pauser(uint256)'](1)).to.equal(coordinatorOwner.address)
       expect(await controller['paused(uint256)'](1)).to.equal(false)
     })
+
+    it('reverts if not protocol owner', async () => {
+      await expect(controller.connect(coordinatorOwner).createCoordinator(coordinatorOwner.address)).to.be.revertedWith(
+        'ControllerNotOwnerError(0)',
+      )
+    })
   })
 
   describe('#updateCoordinatorPendingOwner', async () => {
     beforeEach(async () => {
-      await controller.connect(coordinatorOwner).createCoordinator()
+      await controller.connect(owner).createCoordinator(coordinatorOwner.address)
     })
 
     it('updates the coordinator pending owner', async () => {
@@ -185,7 +191,7 @@ describe('Controller', () => {
 
   describe('#acceptCoordinatorOwner', async () => {
     beforeEach(async () => {
-      await controller.connect(coordinatorOwner).createCoordinator()
+      await controller.connect(owner).createCoordinator(coordinatorOwner.address)
     })
 
     it('updates the coordinator owner', async () => {
@@ -270,7 +276,7 @@ describe('Controller', () => {
 
   describe('#updateCoordinatorTreasury', async () => {
     beforeEach(async () => {
-      await controller.connect(coordinatorOwner).createCoordinator()
+      await controller.connect(owner).createCoordinator(coordinatorOwner.address)
     })
 
     it('updates the coordinator treasury', async () => {
@@ -331,7 +337,7 @@ describe('Controller', () => {
 
   describe('#updateCoordinatorPauser', async () => {
     beforeEach(async () => {
-      await controller.connect(coordinatorOwner).createCoordinator()
+      await controller.connect(owner).createCoordinator(coordinatorOwner.address)
     })
 
     it('updates the coordinator pauser', async () => {
@@ -392,7 +398,7 @@ describe('Controller', () => {
 
   describe('#updateCoordinatorPaused', async () => {
     beforeEach(async () => {
-      await controller.connect(coordinatorOwner).createCoordinator()
+      await controller.connect(owner).createCoordinator(coordinatorOwner.address)
     })
 
     context('from owner', async () => {
@@ -517,17 +523,14 @@ describe('Controller', () => {
 
   describe('#createProduct', async () => {
     beforeEach(async () => {
-      await controller.connect(coordinatorOwner).createCoordinator()
+      await controller.connect(owner).createCoordinator(coordinatorOwner.address)
       await controller.connect(coordinatorOwner).updateCoordinatorTreasury(1, coordinatorTreasury.address)
       await controller.connect(coordinatorOwner).updateCoordinatorPauser(1, coordinatorPauser.address)
     })
 
     it('creates the product', async () => {
-      await controller.updateAllowed(1, true)
-      const productAddress = await controller
-        .connect(coordinatorOwner)
-        .callStatic.createProduct(1, productProvider.address)
-      await expect(controller.connect(coordinatorOwner).createProduct(1, productProvider.address))
+      const productAddress = await controller.connect(owner).callStatic.createProduct(1, productProvider.address)
+      await expect(controller.connect(owner).createProduct(1, productProvider.address))
         .to.emit(controller, 'ProductCreated')
         .withArgs(productAddress, productProvider.address)
 
@@ -538,11 +541,8 @@ describe('Controller', () => {
       expect(await controller.isProduct(productAddress)).to.equal(true)
       expect(await controller['owner(address)'](productAddress)).to.equal(coordinatorOwner.address)
       expect(await controller['treasury(address)'](productAddress)).to.equal(coordinatorTreasury.address)
-    })
-
-    it('creates the product if globally allowed', async () => {
-      await controller.updateAllowed(0, true)
-      await controller.connect(coordinatorOwner).createProduct(1, productProvider.address)
+      expect(await controller['pauser(address)'](productAddress)).to.equal(coordinatorPauser.address)
+      expect(await controller['paused(address)'](productAddress)).to.equal(false)
     })
 
     it('reverts if zero coordinator', async () => {
@@ -551,10 +551,18 @@ describe('Controller', () => {
       )
     })
 
-    it('reverts if not whitelisted', async () => {
+    it('reverts if not protocol owner', async () => {
       await expect(controller.connect(coordinatorOwner).createProduct(1, productProvider.address)).to.be.revertedWith(
-        'ControllerNotAllowedError()',
+        'ControllerNotOwnerError(0)',
       )
+    })
+
+    it('returns paused correctly', async () => {
+      const productAddress = await controller.connect(owner).callStatic.createProduct(1, productProvider.address)
+      await controller.connect(owner).createProduct(1, productProvider.address)
+
+      await controller.connect(coordinatorPauser).updateCoordinatorPaused(1, true)
+      expect(await controller['paused(address)'](productAddress)).to.equal(true)
     })
   })
 
@@ -740,18 +748,6 @@ describe('Controller', () => {
       await expect(controller.connect(user).updateProgramsPerProduct(3)).to.be.revertedWith(
         `ControllerNotOwnerError(0)`,
       )
-    })
-  })
-
-  describe('#updateAllowed', async () => {
-    it('updates the collateral address', async () => {
-      await expect(controller.updateAllowed(1, true)).to.emit(controller, 'AllowedUpdated').withArgs(1, true)
-
-      expect(await controller.allowed(1)).to.equal(true)
-    })
-
-    it('reverts if not owner', async () => {
-      await expect(controller.connect(user).updateAllowed(1, true)).to.be.revertedWith('ControllerNotOwnerError(0)')
     })
   })
 })

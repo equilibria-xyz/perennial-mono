@@ -1,14 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.13;
+pragma solidity 0.8.14;
 
 import "../../../interfaces/types/PrePosition.sol";
 import "../../../interfaces/types/PackedPosition.sol";
 
 //// @dev VersionedPosition type
 struct VersionedPosition {
-    /// @dev Latest synced oracle version
-    uint256 latestVersion;
-
     /// @dev Mapping of global position at each version
     mapping(uint256 => PackedPosition) _positionAtVersion;
 
@@ -32,14 +29,6 @@ library VersionedPositionLib {
      * @notice Returns the current global position
      * @return Current global position
      */
-    function position(VersionedPosition storage self) internal view returns (Position memory) {
-        return positionAtVersion(self, self.latestVersion);
-    }
-
-    /**
-     * @notice Returns the current global position
-     * @return Current global position
-     */
     function positionAtVersion(VersionedPosition storage self, uint256 oracleVersion) internal view returns (Position memory) {
         return self._positionAtVersion[oracleVersion].unpack();
     }
@@ -48,19 +37,20 @@ library VersionedPositionLib {
      * @notice Settled the global position to oracle version `toOracleVersion`
      * @param self The struct to operate on
      * @param provider The parameter provider of the product
-     * @param toOracleVersion The oracle version to accumulate to
+     * @param latestVersion The latest settled oracle version
+     * @param toOracleVersion The oracle version to settle to
      * @return positionFee The fee accrued from opening or closing a new position
      */
     function settle(
         VersionedPosition storage self,
         IProductProvider provider,
+        uint256 latestVersion,
         IOracleProvider.OracleVersion memory toOracleVersion
     ) internal returns (UFixed18) {
         (Position memory newPosition, UFixed18 positionFee, bool settled) =
-            position(self).settled(self.pre, provider, toOracleVersion);
+            positionAtVersion(self, latestVersion).settled(self.pre, provider, toOracleVersion);
 
         self._positionAtVersion[toOracleVersion.version] = newPosition.pack();
-        self.latestVersion = toOracleVersion.version;
         if (settled) delete self.pre;
 
         return positionFee;

@@ -10,6 +10,7 @@ import {
   IProduct,
   IProductProvider,
   IController,
+  IIncentivizer,
 } from '../../../types/generated'
 import { expectPositionEq, expectPrePositionEq } from '../../testutil/types'
 
@@ -24,6 +25,7 @@ describe('PerennialLens', () => {
   let product: FakeContract<IProduct>
   let productProvider: FakeContract<IProductProvider>
   let controller: FakeContract<IController>
+  let incentivizer: FakeContract<IIncentivizer>
   let lens: PerennialLens
 
   beforeEach(async () => {
@@ -33,8 +35,10 @@ describe('PerennialLens', () => {
     product = await smock.fake<IProduct>('IProduct')
     productProvider = await smock.fake<IProductProvider>('IProductProvider')
     controller = await smock.fake<IController>('IController')
+    incentivizer = await smock.fake<IIncentivizer>('IIncentivizer')
 
     controller.collateral.returns(collateral.address)
+    controller.incentivizer.returns(incentivizer.address)
     product.productProvider.returns(productProvider.address)
 
     lens = await new PerennialLens__factory(user).deploy(controller.address)
@@ -65,7 +69,6 @@ describe('PerennialLens', () => {
     it('returns the user collateral amount after settle', async () => {
       collateral['collateral(address,address)'].whenCalledWith(user.address, product.address).returns(100)
       expect(await lens.callStatic['collateral(address,address)'](user.address, product.address)).to.equal(100)
-      expect(product.settle).to.have.been.calledOnce
       expect(product.settleAccount).to.have.been.calledOnceWith(user.address)
     })
   })
@@ -91,7 +94,6 @@ describe('PerennialLens', () => {
       product.maintenance.whenCalledWith(user.address).returns(10)
       product.maintenanceNext.whenCalledWith(user.address).returns(8)
       expect(await lens.callStatic.maintenance(user.address, product.address)).to.equal(10)
-      expect(product.settle).to.have.been.calledOnce
       expect(product.settleAccount).to.have.been.calledOnceWith(user.address)
     })
 
@@ -99,7 +101,6 @@ describe('PerennialLens', () => {
       product.maintenance.whenCalledWith(user.address).returns(10)
       product.maintenanceNext.whenCalledWith(user.address).returns(15)
       expect(await lens.callStatic.maintenance(user.address, product.address)).to.equal(15)
-      expect(product.settle).to.have.been.calledOnce
       expect(product.settleAccount).to.have.been.calledOnceWith(user.address)
     })
   })
@@ -108,7 +109,6 @@ describe('PerennialLens', () => {
     it('returns whether or not the user is liquidatable after settle', async () => {
       collateral.liquidatable.whenCalledWith(user.address, product.address).returns(true)
       expect(await lens.callStatic.liquidatable(user.address, product.address)).to.equal(true)
-      expect(product.settle).to.have.been.calledOnce
       expect(product.settleAccount).to.have.been.calledOnceWith(user.address)
     })
   })
@@ -122,7 +122,6 @@ describe('PerennialLens', () => {
       }
       product['pre(address)'].whenCalledWith(user.address).returns(pos)
       expectPrePositionEq(await lens.callStatic['pre(address,address)'](user.address, product.address), pos)
-      expect(product.settle).to.have.been.calledOnce
       expect(product.settleAccount).to.have.been.calledOnceWith(user.address)
     })
   })
@@ -147,7 +146,6 @@ describe('PerennialLens', () => {
         maker: 100,
         taker: 200,
       })
-      expect(product.settle).to.have.been.calledOnce
       expect(product.settleAccount).to.have.been.calledOnceWith(user.address)
     })
   })
@@ -176,7 +174,6 @@ describe('PerennialLens', () => {
       const userPosition = await lens.callStatic.userPosition(user.address, product.address)
       expectPrePositionEq(userPosition[0], pos)
       expectPositionEq(userPosition[1], { maker: 100, taker: 200 })
-      expect(product.settle).to.have.been.calledOnce
       expect(product.settleAccount).to.have.been.calledOnceWith(user.address)
     })
   })
@@ -211,7 +208,6 @@ describe('PerennialLens', () => {
         maker: 78900,
         taker: 0,
       })
-      expect(product.settle).to.have.been.calledOnce
       expect(product.settleAccount).to.have.been.calledOnceWith(user.address)
     })
   })
@@ -281,12 +277,11 @@ describe('PerennialLens', () => {
       expect(
         await lens.callStatic.maintenanceRequired(user.address, product.address, ethers.utils.parseEther('123')),
       ).to.equal(48523)
-      expect(product.settle).to.have.been.calledOnce
       expect(product.settleAccount).to.have.been.calledOnceWith(user.address)
     })
   })
 
-  describe('#fees(product)', () => {
+  describe('#fees(address)', () => {
     it('returns the protocol and product fees', async () => {
       controller['treasury()'].returns(protocolTreasury.address)
       controller['treasury(address)'].whenCalledWith(product.address).returns(productTreasury.address)
@@ -300,7 +295,7 @@ describe('PerennialLens', () => {
     })
   })
 
-  describe('#fees(product[],account)', () => {
+  describe('#fees(address[],account)', () => {
     it('returns the total fees after settling all products', async () => {
       const product2 = await smock.fake<IProduct>('IProduct')
       collateral.fees.whenCalledWith(user.address).returns(ethers.utils.parseEther('12345'))
@@ -309,6 +304,60 @@ describe('PerennialLens', () => {
       expect(fees).to.equal(ethers.utils.parseEther('12345'))
       expect(product.settle).to.have.been.calledOnce
       expect(product2.settle).to.have.been.calledOnce
+    })
+  })
+
+  describe('#unclaimedIncentiveRewards(address,address)', () => {
+    it('returns the tokens and amounts of unclaimed rewards for all programs', async () => {
+      const addr0 = '0xdbbffbdeed3fe14741f32e6d746dd68758f01cad'
+      const addr1 = '0xa0134dc26517db8a7cbb13da1c428a6022f04f92'
+      incentivizer.count.whenCalledWith(product.address).returns(2)
+
+      incentivizer.programInfos
+        .whenCalledWith(product.address, 0)
+        .returns({ token: addr0, amount: { maker: 100, taker: 200 }, start: 1, duration: 2, coordinatorId: 0 })
+      incentivizer.programInfos
+        .whenCalledWith(product.address, 1)
+        .returns({ token: addr1, amount: { maker: 100, taker: 200 }, start: 1, duration: 2, coordinatorId: 0 })
+
+      incentivizer.unclaimed.whenCalledWith(product.address, user.address, 0).returns(ethers.utils.parseEther('123'))
+      incentivizer.unclaimed.whenCalledWith(product.address, user.address, 1).returns(ethers.utils.parseEther('456'))
+
+      const unclaimed = await lens.callStatic['unclaimedIncentiveRewards(address,address)'](
+        user.address,
+        product.address,
+      )
+      expect(unclaimed.tokens[0].toLowerCase()).to.equal(addr0)
+      expect(unclaimed.amounts[0]).to.equal(ethers.utils.parseEther('123'))
+      expect(unclaimed.tokens[1].toLowerCase()).to.equal(addr1)
+      expect(unclaimed.amounts[1]).to.equal(ethers.utils.parseEther('456'))
+    })
+  })
+
+  describe('#unclaimedIncentiveRewards(address,address,uint256[])', () => {
+    it('returns the tokens and amounts of unclaimed rewards for passed in program IDs', async () => {
+      const addr0 = '0xdbbffbdeed3fe14741f32e6d746dd68758f01cad'
+      const addr1 = '0xa0134dc26517db8a7cbb13da1c428a6022f04f92'
+
+      incentivizer.programInfos
+        .whenCalledWith(product.address, 1)
+        .returns({ token: addr0, amount: { maker: 100, taker: 200 }, start: 1, duration: 2, coordinatorId: 0 })
+      incentivizer.programInfos
+        .whenCalledWith(product.address, 2)
+        .returns({ token: addr1, amount: { maker: 100, taker: 200 }, start: 1, duration: 2, coordinatorId: 0 })
+
+      incentivizer.unclaimed.whenCalledWith(product.address, user.address, 1).returns(ethers.utils.parseEther('123'))
+      incentivizer.unclaimed.whenCalledWith(product.address, user.address, 2).returns(ethers.utils.parseEther('456'))
+
+      const unclaimed = await lens.callStatic['unclaimedIncentiveRewards(address,address,uint256[])'](
+        user.address,
+        product.address,
+        [1, 2],
+      )
+      expect(unclaimed.tokens[0].toLowerCase()).to.equal(addr0)
+      expect(unclaimed.amounts[0]).to.equal(ethers.utils.parseEther('123'))
+      expect(unclaimed.tokens[1].toLowerCase()).to.equal(addr1)
+      expect(unclaimed.amounts[1]).to.equal(ethers.utils.parseEther('456'))
     })
   })
 })

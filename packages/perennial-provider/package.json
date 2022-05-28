@@ -1,6 +1,6 @@
 {
   "name": "@equilibria/perennial-provider",
-  "version": "0.1.2",
+  "version": "0.1.4",
   "description": "Library for Perennial product providers",
   "main": "index.js",
   "private": true,
@@ -24,6 +24,6 @@
   "author": "",
   "license": "APACHE-2.0",
   "devDependencies": {
-    "@equilibria/perennial": "0.1.3"
+    "@equilibria/perennial": "0.1.4"
   }
 }

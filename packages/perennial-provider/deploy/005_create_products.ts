@@ -41,13 +41,9 @@ async function createOrReuseProduct(
   if (productAddress == null) {
     process.stdout.write(`creating product "${providerName}"... `)
 
-    productAddress = await controller.callStatic.createProduct(
-      EXAMPLE_COORDINATOR_ID,
-      (
-        await get(providerName)
-      ).address,
-    )
-    await (await controller.createProduct(EXAMPLE_COORDINATOR_ID, (await get(providerName)).address)).wait(2)
+    const providerAddress = (await get(`${providerName}_Proxy`)).address
+    productAddress = await controller.callStatic.createProduct(EXAMPLE_COORDINATOR_ID, providerAddress)
+    await (await controller.createProduct(EXAMPLE_COORDINATOR_ID, providerAddress)).wait(2)
     save(`Product_${providerName}`, { abi: IProduct__factory.abi, address: productAddress as Address })
 
     process.stdout.write(`deployed at ${productAddress}\n`)

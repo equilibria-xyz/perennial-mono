@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.13;
+pragma solidity 0.8.14;
 
 import "@equilibria/root/curve/unstructured/UJumpRateUtilizationCurveProvider.sol";
 import "../oracle/UOracleProvider.sol";
 import "../product/UProductProvider.sol";
 
 contract ShortEther is UJumpRateUtilizationCurveProvider, UOracleProvider, UProductProvider {
-    string public name = "Short Ether";
-    string public symbol = "SETH";
+    string public constant name = "Short Ether";
+    string public constant symbol = "SETH";
 
     function initialize(
         IOracleProvider oracle_,

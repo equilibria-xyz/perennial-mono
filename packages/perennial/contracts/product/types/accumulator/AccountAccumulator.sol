@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.13;
+pragma solidity 0.8.14;
 
 import "../../../interfaces/types/Accumulator.sol";
 import "../position/AccountPosition.sol";
@@ -24,20 +24,16 @@ library AccountAccumulatorLib {
      * @param position Pointer to global position
      * @param versionTo Oracle version to sync account to
      * @return value The value accumulated sync last sync
-     * @return share The share accumulated sync last sync
      */
     function syncTo(
         AccountAccumulator storage self,
         VersionedAccumulator storage global,
         AccountPosition storage position,
         uint256 versionTo
-    ) internal returns (Accumulator memory value, Accumulator memory share) {
+    ) internal returns (Accumulator memory value) {
         Accumulator memory valueAccumulated = global.valueAtVersion(versionTo)
             .sub(global.valueAtVersion(self.latestVersion));
-        Accumulator memory shareAccumulated = global.shareAtVersion(versionTo)
-            .sub(global.shareAtVersion(self.latestVersion));
         value = position.position.mul(valueAccumulated);
-        share = position.position.mul(shareAccumulated);
         self.latestVersion = versionTo;
     }
 }

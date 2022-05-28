@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.13;
+pragma solidity 0.8.14;
 
 import "@equilibria/root/curve/unstructured/UJumpRateUtilizationCurveProvider.sol";
 import "../oracle/XOracleProvider.sol";
 import "../product/UProductProvider.sol";
 
 contract Squeeth is UJumpRateUtilizationCurveProvider, XOracleProvider, UProductProvider {
-    string public name = "milli-Squeeth";
-    string public symbol = "mSQTH";
+    string public constant name = "milli-Squeeth";
+    string public constant symbol = "mSQTH";
 
     // solhint-disable-next-line no-empty-blocks
     constructor(IOracleProvider oracle_) XOracleProvider(oracle_) { }

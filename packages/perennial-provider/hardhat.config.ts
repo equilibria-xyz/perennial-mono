@@ -90,7 +90,7 @@ const config: HardhatUserConfig = {
   solidity: {
     compilers: [
       {
-        version: '0.8.13',
+        version: '0.8.14',
         settings: {
           optimizer: {
             enabled: false,
@@ -141,6 +141,7 @@ const config: HardhatUserConfig = {
   external: {
     contracts: [{ artifacts: 'external/contracts' }],
     deployments: {
+      kovan: ['external/deployments/kovan'],
       mainnet: ['external/deployments/mainnet'],
       hardhat: [FORK_ENABLED ? 'external/deployments/mainnet' : ''],
     },

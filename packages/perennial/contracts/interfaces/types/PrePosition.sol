@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.13;
+pragma solidity ^0.8.13;
 
 import "./Position.sol";
 import "./ProductProvider.sol";
@@ -52,7 +52,7 @@ library PrePositionLib {
     function openMake(PrePosition storage self, uint256 currentVersion, UFixed18 amount) internal {
         self.openPosition.maker = self.openPosition.maker.add(amount);
         self.oracleVersion = currentVersion;
-        netMake(self);
+        _netMake(self);
     }
 
     /**
@@ -65,7 +65,7 @@ library PrePositionLib {
     function closeMake(PrePosition storage self, uint256 currentVersion, UFixed18 amount) internal {
         self.closePosition.maker = self.closePosition.maker.add(amount);
         self.oracleVersion = currentVersion;
-        netMake(self);
+        _netMake(self);
     }
 
     /**
@@ -78,7 +78,7 @@ library PrePositionLib {
     function openTake(PrePosition storage self, uint256 currentVersion, UFixed18 amount) internal {
         self.openPosition.taker = self.openPosition.taker.add(amount);
         self.oracleVersion = currentVersion;
-        netTake(self);
+        _netTake(self);
     }
 
     /**
@@ -91,14 +91,14 @@ library PrePositionLib {
     function closeTake(PrePosition storage self, uint256 currentVersion, UFixed18 amount) internal {
         self.closePosition.taker = self.closePosition.taker.add(amount);
         self.oracleVersion = currentVersion;
-        netTake(self);
+        _netTake(self);
     }
 
     /**
      * @notice Nets out the open and close on the maker side of the position delta
      * @param self The struct to operate on
      */
-    function netMake(PrePosition storage self) private {
+    function _netMake(PrePosition storage self) private {
         if (self.openPosition.maker.gt(self.closePosition.maker)) {
             self.openPosition.maker = self.openPosition.maker.sub(self.closePosition.maker);
             self.closePosition.maker = UFixed18Lib.ZERO;
@@ -112,7 +112,7 @@ library PrePositionLib {
      * @notice Nets out the open and close on the taker side of the position delta
      * @param self The struct to operate on
      */
-    function netTake(PrePosition storage self) private {
+    function _netTake(PrePosition storage self) private {
         if (self.openPosition.taker.gt(self.closePosition.taker)) {
             self.openPosition.taker = self.openPosition.taker.sub(self.closePosition.taker);
             self.closePosition.taker = UFixed18Lib.ZERO;
@@ -161,7 +161,6 @@ library PrePositionLib {
     /**
      * @notice Computes the next oracle version to settle
      * @dev - If there is no pending-settlement position delta, returns the current oracle version
-     *      - If the pending-settlement position delta is not yet ready to be settled, returns the current oracle version
      *      - Otherwise returns the oracle version at which the pending-settlement position delta can be first settled
      *
      *      Corresponds to point (b) in the Position settlement flow
@@ -169,11 +168,8 @@ library PrePositionLib {
      * @param currentVersion The current oracle version index
      * @return Next oracle version to settle
      */
-    function oracleVersionToSettle(PrePosition storage self, uint256 currentVersion) internal view returns (uint256) {
-        uint256 next = self.oracleVersion + 1;
-
-        if (next == 1) return currentVersion;             // no pre position
-        if (next > currentVersion) return currentVersion; // pre in future
-        return next;                                      // settle pre
+    function settleVersion(PrePosition storage self, uint256 currentVersion) internal view returns (uint256) {
+        uint256 _oracleVersion = self.oracleVersion;
+        return _oracleVersion == 0 ? currentVersion : _oracleVersion + 1;
     }
 }

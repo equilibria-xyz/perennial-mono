@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.13;
+pragma solidity ^0.8.13;
 
 import "@equilibria/root/token/types/Token18.sol";
 import "../IProduct.sol";
@@ -7,6 +7,9 @@ import "./Position.sol";
 import "./Accumulator.sol";
 
 struct ProgramInfo {
+    /// @dev Coordinator for this program
+    uint256 coordinatorId;
+
     /// @dev Amount of total maker and taker rewards
     Position amount;
 
@@ -16,12 +19,6 @@ struct ProgramInfo {
     /// @dev duration of the program (in seconds)
     uint256 duration;
 
-    /// @dev grace period the program where funds can still be claimed (in seconds)
-    uint256 grace;
-
-    /// @dev Product market contract to be incentivized
-    IProduct product;
-
     /// @dev Reward ERC20 token contract
     Token18 token;
 }
@@ -30,38 +27,33 @@ using ProgramInfoLib for ProgramInfo global;
 library ProgramInfoLib {
     uint256 private constant MIN_DURATION = 1 days;
     uint256 private constant MAX_DURATION = 2 * 365 days;
-    uint256 private constant MIN_GRACE = 7 days;
-    uint256 private constant MAX_GRACE = 30 days;
 
-    error ProgramAlreadyStartedError();
+    error ProgramInvalidStartError();
     error ProgramInvalidDurationError();
-    error ProgramInvalidGraceError();
 
     /**
      * @notice Validates and creates a new Program
-     * @param fee Global Incentivizer fee
-     * @param info Un-sanitized static program information
-     * @return programInfo Validated static program information with fee excluded
-     * @return programFee Fee amount for the program
+     * @dev Reverts for invalid programInfos
+     * @param programInfo Un-sanitized static program information
      */
-    function create(UFixed18 fee, ProgramInfo memory info)
-    internal view returns (ProgramInfo memory programInfo, UFixed18 programFee) {
-        if (isStarted(info, block.timestamp)) revert ProgramAlreadyStartedError();
-        if (info.duration < MIN_DURATION || info.duration > MAX_DURATION) revert ProgramInvalidDurationError();
-        if (info.grace < MIN_GRACE || info.grace > MAX_GRACE) revert ProgramInvalidGraceError();
+    function validate(ProgramInfo memory programInfo) internal view {
+        if (isStarted(programInfo, block.timestamp)) revert ProgramInvalidStartError();
+        if (programInfo.duration < MIN_DURATION || programInfo.duration > MAX_DURATION) revert ProgramInvalidDurationError();
+    }
 
-        Position memory amountAfterFee = info.amount.mul(UFixed18Lib.ONE.sub(fee));
-
-        programInfo = ProgramInfo({
-            start: info.start,
-            duration: info.duration,
-            grace: info.grace,
-
-            product: info.product,
-            token: info.token,
-            amount: amountAfterFee
-        });
-        programFee = info.amount.sub(amountAfterFee).sum();
+    /**
+     * @notice Computes a new program info with the fee taken out of the amount
+     * @param programInfo Original program info
+     * @param incentivizationFee The incentivization fee
+     * @return New program info
+     * @return Fee amount
+     */
+    function deductFee(ProgramInfo memory programInfo, UFixed18 incentivizationFee)
+    internal pure returns (ProgramInfo memory, UFixed18) {
+        Position memory newProgramAmount = programInfo.amount.mul(UFixed18Lib.ONE.sub(incentivizationFee));
+        UFixed18 programFeeAmount = programInfo.amount.sub(newProgramAmount).sum();
+        programInfo.amount = newProgramAmount;
+        return (programInfo, programFeeAmount);
     }
 
     /**

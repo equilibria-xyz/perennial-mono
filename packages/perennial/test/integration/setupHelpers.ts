@@ -30,11 +30,10 @@ import {
   ERC20PresetMinterPauser__factory,
 } from '../../types/generated'
 import { CHAINLINK_CUSTOM_CURRENCIES, ChainlinkContext } from './chainlinkHelpers'
-
 const { config, deployments, ethers } = HRE
 
 export const INITIAL_PHASE_ID = 1
-export const INITIAL_AGGREGATOR_ROUND_ID = 20100
+export const INITIAL_AGGREGATOR_ROUND_ID = 10000
 export const INITIAL_VERSION = 2472 // registry's phase 1 starts at aggregatorRoundID 7528
 export const DSU_HOLDER = '0x0B663CeaCEF01f2f88EB7451C70Aa069f19dB997'
 export const USDC_HOLDER = '0x0A59649758aa4d66E25f08Dd01271e891fe52199'
@@ -164,17 +163,60 @@ export async function deployProtocol(): Promise<InstanceVars> {
   }
 }
 
-export async function createProduct(instanceVars: InstanceVars): Promise<Product> {
+export async function createCoordinator(instanceVars: InstanceVars): Promise<Product> {
   const { owner, controller, treasuryB, productProvider } = instanceVars
 
-  await controller.createCoordinator()
+  await controller.callStatic.createProduct(1, productProvider.address)
+  await controller.createCoordinator(owner.address)
   await controller.updateCoordinatorTreasury(1, treasuryB.address)
-  await controller.updateAllowed(1, true)
 
   const productAddress = await controller.callStatic.createProduct(1, productProvider.address)
   await controller.createProduct(1, productProvider.address)
 
   return Product__factory.connect(productAddress, owner)
+}
+
+export async function createProduct(instanceVars: InstanceVars): Promise<Product> {
+  const { owner, controller, treasuryB, productProvider } = instanceVars
+
+  await controller.createCoordinator(owner.address)
+  await controller.updateCoordinatorTreasury(1, treasuryB.address)
+
+  const productAddress = await controller.callStatic.createProduct(1, productProvider.address)
+  await controller.createProduct(1, productProvider.address)
+
+  return Product__factory.connect(productAddress, owner)
+}
+
+export async function createIncentiveProgram(
+  instanceVars: InstanceVars,
+  product: Product,
+  nonProtocol = false,
+  amount = { maker: utils.parseEther('8000'), taker: utils.parseEther('2000') },
+): Promise<BigNumber> {
+  const { controller, owner, userC, incentivizer, incentiveToken } = instanceVars
+  let programOwner = owner
+  let coordinatorId = 0
+  if (nonProtocol) {
+    programOwner = userC
+    coordinatorId = 1
+    await controller.updateCoordinatorPendingOwner(1, userC.address)
+    await controller.connect(userC).acceptCoordinatorOwner(1)
+  }
+  await incentiveToken.mint(programOwner.address, amount.maker.add(amount.taker))
+  await incentiveToken.connect(programOwner).approve(incentivizer.address, amount.maker.add(amount.taker))
+  const programInfo = {
+    coordinatorId,
+    token: incentiveToken.address,
+    amount,
+    start: (await time.currentBlockTimestamp()) + 60 * 60,
+    duration: 60 * 60 * 24 * 30 * 12 * 1.5,
+  }
+  const returnValue = await incentivizer.connect(programOwner).callStatic.create(product.address, programInfo)
+
+  await incentivizer.connect(programOwner).create(product.address, programInfo)
+  await time.increase(60 * 60 + 1)
+  return returnValue
 }
 
 export async function depositTo(

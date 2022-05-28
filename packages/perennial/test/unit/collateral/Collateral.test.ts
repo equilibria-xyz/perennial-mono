@@ -132,7 +132,6 @@ describe('Collateral', () => {
   describe('#withdrawTo', async () => {
     beforeEach(async () => {
       // Mock settle calls
-      await product.mock.settle.returns()
       await product.mock.settleAccount.withArgs(user.address).returns()
       await product.mock.settleAccount.withArgs(userB.address).returns()
 
@@ -350,7 +349,6 @@ describe('Collateral', () => {
       await collateral.depositTo(user.address, product.address, 100)
 
       // Mock settle calls
-      await product.mock.settle.returns()
       await product.mock.settleAccount.withArgs(user.address).returns()
     })
 

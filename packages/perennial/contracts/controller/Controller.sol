@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.13;
+pragma solidity 0.8.14;
 
 import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
@@ -25,15 +25,6 @@ contract Controller is IController, UInitializable {
     AddressStorage private constant _productBeacon = AddressStorage.wrap(keccak256("equilibria.perennial.Controller.productBeacon"));
     function productBeacon() public view returns (IBeacon) { return IBeacon(_productBeacon.read()); }
 
-    /// @dev List of product coordinators
-    Coordinator[] private _coordinators;
-
-    /// @dev Mapping of the coordinator for each  product
-    mapping(IProduct => uint256) public coordinatorFor;
-
-    /// @dev Whether a specific coordinator is allowed to create a new product
-    mapping(uint256 => bool) public allowed;
-
     /// @dev Percent of collected fees that go to the protocol treasury vs the product treasury
     UFixed18Storage private constant _protocolFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.Controller.protocolFee"));
     function protocolFee() public view returns (UFixed18) { return _protocolFee.read(); }
@@ -58,6 +49,12 @@ contract Controller is IController, UInitializable {
     Uint256Storage private constant _programsPerProduct = Uint256Storage.wrap(keccak256("equilibria.perennial.Controller.programsPerProduct"));
     function programsPerProduct() public view returns (uint256) { return _programsPerProduct.read(); }
 
+    /// @dev List of product coordinators
+    Coordinator[] private _coordinators;
+
+    /// @dev Mapping of the coordinator for each  product
+    mapping(IProduct => uint256) public coordinatorFor;
+
     /**
      * @notice Initializes the contract state
      * @dev Must be called atomically as part of the upgradeable proxy deployment to
@@ -71,7 +68,7 @@ contract Controller is IController, UInitializable {
         IIncentivizer incentivizer_,
         IBeacon productBeacon_
     ) external initializer(1) {
-        createCoordinator();
+        _createCoordinator(msg.sender);
 
         updateCollateral(collateral_);
         updateIncentivizer(incentivizer_);
@@ -80,21 +77,32 @@ contract Controller is IController, UInitializable {
 
     /**
      * @notice Creates a new coordinator with `msg.sender` as the owner
-     * @dev `treasury` and `pauser` initialize as the 0-address, defaulting to the `owner`
+     * @dev Can only be called by the protocol owner
+     * @param coordinatorOwner The owner address of the new coordinator
      * @return New coordinator ID
      */
-    function createCoordinator() public returns (uint256) {
+    function createCoordinator(address coordinatorOwner) external onlyOwner(0) returns (uint256) {
+        return _createCoordinator(coordinatorOwner);
+    }
+
+    /**
+     * @notice Creates a new coordinator with `msg.sender` as the owner
+     * @dev `treasury` and `pauser` initialize as the 0-address, defaulting to the `owner`
+     * @param coordinatorOwner The owner address of the new coordinator
+     * @return New coordinator ID
+     */
+    function _createCoordinator(address coordinatorOwner) private returns (uint256) {
         uint256 coordinatorId = _coordinators.length;
 
         _coordinators.push(Coordinator({
             pendingOwner: address(0),
-            owner: msg.sender,
+            owner: coordinatorOwner,
             treasury: address(0),
             pauser: address(0),
             paused: false
         }));
 
-        emit CoordinatorCreated(coordinatorId, msg.sender);
+        emit CoordinatorCreated(coordinatorId, coordinatorOwner);
 
         return coordinatorId;
     }
@@ -161,14 +169,13 @@ contract Controller is IController, UInitializable {
 
     /**
      * @notice Creates a new product market with `provider`
-     * @dev Coordinator caller must be allowed
+     * @dev Can only be called by the protocol owner
      * @param coordinatorId Coordinator that will own the product
      * @param provider Provider that will service the market
      * @return New product contract address
      */
-    function createProduct(uint256 coordinatorId, IProductProvider provider) external onlyOwner(coordinatorId) returns (IProduct) {
+    function createProduct(uint256 coordinatorId, IProductProvider provider) external onlyOwner(0) returns (IProduct) {
         if (coordinatorId == 0) revert ControllerNoZeroCoordinatorError();
-        if (!allowed[0] && !allowed[coordinatorId]) revert ControllerNotAllowedError();
 
         BeaconProxy newProductProxy = new BeaconProxy(address(productBeacon()), abi.encodeCall(IProduct.initialize, provider));
         IProduct newProduct = IProduct(address(newProductProxy));
@@ -265,16 +272,6 @@ contract Controller is IController, UInitializable {
     function updateProgramsPerProduct(uint256 newProgramsPerProduct) public onlyOwner(0) {
         _programsPerProduct.store(newProgramsPerProduct);
         emit ProgramsPerProductUpdated(newProgramsPerProduct);
-    }
-
-    /**
-     * @notice Updates whether `coordinatorId` is allowed to create new products
-     * @param coordinatorId Coordinator to update
-     * @param newAllowed New allowed status for `coordinatorId`
-     */
-    function updateAllowed(uint256 coordinatorId, bool newAllowed) external onlyOwner(0) {
-        allowed[coordinatorId] = newAllowed;
-        emit AllowedUpdated(coordinatorId, newAllowed);
     }
 
     /**

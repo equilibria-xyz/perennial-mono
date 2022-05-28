@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.13;
+pragma solidity 0.8.14;
 
 import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@equilibria/root/control/unstructured/UReentrancyGuard.sol";
@@ -261,7 +261,6 @@ contract Collateral is ICollateral, UInitializable, UControllerProvider, UReentr
 
     /// @dev Helper to fully settle an account's state
     modifier settleForAccount(address account, IProduct product) {
-        product.settle();
         product.settleAccount(account);
 
         _;

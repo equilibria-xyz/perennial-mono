@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.13;
+pragma solidity 0.8.14;
 
 import "../../../interfaces/types/PrePosition.sol";
 
@@ -46,7 +46,7 @@ library AccountPositionLib {
      */
     function maintenance(AccountPosition storage self, IProductProvider provider) internal view returns (UFixed18) {
         if (self.liquidation) return UFixed18Lib.ZERO;
-        return maintenanceInternal(self.position, provider);
+        return _maintenance(self.position, provider);
     }
 
     /**
@@ -57,7 +57,7 @@ library AccountPositionLib {
      * @return Next maintenance requirement for the account
      */
     function maintenanceNext(AccountPosition storage self, IProductProvider provider) internal view returns (UFixed18) {
-        return maintenanceInternal(self.position.next(self.pre), provider);
+        return _maintenance(self.position.next(self.pre), provider);
     }
 
     /**
@@ -67,7 +67,7 @@ library AccountPositionLib {
      * @param provider The parameter provider of the product
      * @return Next maintenance requirement for the account
      */
-    function maintenanceInternal(Position memory position, IProductProvider provider) private view returns (UFixed18) {
+    function _maintenance(Position memory position, IProductProvider provider) private view returns (UFixed18) {
         Fixed18 oraclePrice = provider.currentVersion().price;
         UFixed18 notionalMax = Fixed18Lib.from(position.max()).mul(oraclePrice).abs();
         return notionalMax.mul(provider.maintenance());

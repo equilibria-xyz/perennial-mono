@@ -14,7 +14,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   // Load
 
   const controller: IController = IController__factory.connect((await get('Controller_Proxy')).address, deployerSigner)
-  const nextControllerId = await controller.callStatic.createCoordinator()
+  const nextControllerId = await controller.callStatic.createCoordinator(deployerSigner.address)
 
   // Checks
 
@@ -27,18 +27,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   if (nextControllerId.eq(EXAMPLE_COORDINATOR_ID)) {
     process.stdout.write('creating example coordinator... ')
-    await (await controller.createCoordinator()).wait(2)
+    await (await controller.createCoordinator(deployerSigner.address)).wait(2)
     process.stdout.write('complete.\n')
   } else {
     console.log('example controller already created.')
-  }
-
-  if (await controller.allowed(EXAMPLE_COORDINATOR_ID)) {
-    console.log('example controller already allowed.')
-  } else {
-    process.stdout.write('allowing example coordinator... ')
-    await (await controller.updateAllowed(EXAMPLE_COORDINATOR_ID, true)).wait(2)
-    process.stdout.write('complete.\n')
   }
 }
 

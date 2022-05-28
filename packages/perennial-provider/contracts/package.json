@@ -1,7 +1,7 @@
 {
   "name": "@equilibria/perennial-provider",
   "description": "Library for Perennial product providers",
-  "version": "0.1.2",
+  "version": "0.1.4",
   "files": [
     "/oracle/**/*.sol",
     "/product/**/*.sol"

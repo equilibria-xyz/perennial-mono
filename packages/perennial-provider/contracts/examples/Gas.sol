@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.13;
+pragma solidity 0.8.14;
 
 import "@equilibria/root/curve/immutable/XJumpRateUtilizationCurveProvider.sol";
 import "../oracle/XOracleProvider.sol";
 import "../product/XProductProvider.sol";
 
 contract Gas is XJumpRateUtilizationCurveProvider, XOracleProvider, XProductProvider {
-    string public name = "Gas Price Index";
-    string public symbol = "GAS";
+    string public constant name = "Gas Price Index";
+    string public constant symbol = "GAS";
 
     // solhint-disable-next-line no-empty-blocks
     constructor(

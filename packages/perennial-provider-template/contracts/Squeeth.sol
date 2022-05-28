@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.13;
+pragma solidity ^0.8.13;
 
 import "@equilibria/root/curve/unstructured/UJumpRateUtilizationCurveProvider.sol";
 import "@equilibria/perennial-provider/contracts/oracle/XOracleProvider.sol";

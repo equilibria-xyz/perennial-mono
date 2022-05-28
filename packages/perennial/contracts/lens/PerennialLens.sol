@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.13;
+pragma solidity 0.8.14;
 
 import "../interfaces/IProduct.sol";
 import "../interfaces/ICollateral.sol";
@@ -7,11 +7,6 @@ import "../interfaces/IController.sol";
 import "../interfaces/IOracleProvider.sol";
 
 contract PerennialLens {
-    struct UnclaimedIncentiveReward {
-        Token18 token;
-        UFixed18 amount;
-    }
-
     IController public immutable controller;
 
     constructor(IController _controller) {
@@ -136,22 +131,29 @@ contract PerennialLens {
         return product.productProvider().currentVersion();
     }
 
-    function unclaimedIncentiveRewards(address account, IProduct product, uint programId)
-    external settleAccount(account, product) returns (UFixed18) {
-        return controller.incentivizer().unclaimed(account, programId);
+    function unclaimedIncentiveRewards(address account, IProduct product)
+    external settleAccount(account, product) returns (Token18[] memory tokens, UFixed18[] memory amounts) {
+        IIncentivizer incentivizer = controller.incentivizer();
+
+        uint programsLength = incentivizer.count(product);
+        tokens = new Token18[](programsLength);
+        amounts = new UFixed18[](programsLength);
+        for (uint256 i = 0; i < programsLength; i++) {
+            ProgramInfo memory programInfo = incentivizer.programInfos(product, i);
+            tokens[i] = programInfo.token;
+            amounts[i] = incentivizer.unclaimed(product, account, i);
+        }
     }
 
-    function unclaimedIncentiveRewards(address account, IProduct product)
-    external settleAccount(account, product) returns (UnclaimedIncentiveReward[] memory unclaimedRewards) {
+    function unclaimedIncentiveRewards(address account, IProduct product, uint256[] calldata programIds)
+    external settleAccount(account, product) returns (Token18[] memory tokens, UFixed18[] memory amounts) {
         IIncentivizer incentivizer = controller.incentivizer();
-        uint256 programCount = incentivizer.programsForLength(product);
-        for (uint256 i = 0; i < programCount; i++) {
-            uint programId = incentivizer.programsForAt(product, i);
-            ProgramInfo memory programInfo = incentivizer.programInfos(programId);
-            unclaimedRewards[i] = UnclaimedIncentiveReward(
-                programInfo.token,
-                incentivizer.unclaimed(account, programId)
-            );
+        tokens = new Token18[](programIds.length);
+        amounts = new UFixed18[](programIds.length);
+        for (uint256 i = 0; i < programIds.length; i++) {
+            ProgramInfo memory programInfo = incentivizer.programInfos(product, programIds[i]);
+            tokens[i] = programInfo.token;
+            amounts[i] = incentivizer.unclaimed(product, account, programIds[i]);
         }
     }
 
@@ -163,7 +165,6 @@ contract PerennialLens {
     }
 
     modifier settleAccount(address account, IProduct product) {
-        product.settle();
         product.settleAccount(account);
         _;
     }

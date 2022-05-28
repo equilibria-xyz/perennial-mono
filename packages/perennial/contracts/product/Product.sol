@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.13;
+pragma solidity 0.8.14;
 
 import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@equilibria/root/control/unstructured/UReentrancyGuard.sol";
@@ -70,7 +70,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
         IOracleProvider.OracleVersion memory latestOracleVersion = _provider.atVersion(_latestVersion);
 
         // Get settle oracle version
-        uint256 _settleVersion = _position.pre.oracleVersionToSettle(currentOracleVersion.version);
+        uint256 _settleVersion = _position.pre.settleVersion(currentOracleVersion.version);
         IOracleProvider.OracleVersion memory settleOracleVersion = _settleVersion == currentOracleVersion.version ?
             currentOracleVersion : // if b == c, don't re-call provider for oracle version
             _provider.atVersion(_settleVersion);
@@ -80,19 +80,19 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
         UFixed18 accumulatedFee;
 
         // value a->b
-        accumulatedFee = accumulatedFee.add(_accumulator.accumulate(_position, _controller, _provider, latestOracleVersion, settleOracleVersion));
+        accumulatedFee = accumulatedFee.add(_accumulator.accumulate(_controller, _provider, _position, latestOracleVersion, settleOracleVersion));
 
         // position a->b
-        accumulatedFee = accumulatedFee.add(_position.settle(_provider, settleOracleVersion));
+        accumulatedFee = accumulatedFee.add(_position.settle(_provider, _latestVersion, settleOracleVersion));
 
         // short-circuit from a->c if b == c
         if (settleOracleVersion.version != currentOracleVersion.version) {
 
             // value b->c
-            accumulatedFee = accumulatedFee.add(_accumulator.accumulate(_position, _controller, _provider, settleOracleVersion, currentOracleVersion));
+            accumulatedFee = accumulatedFee.add(_accumulator.accumulate(_controller, _provider, _position, settleOracleVersion, currentOracleVersion));
 
-            // position b->c (stamp c, does not settle pre position)
-            _position.settle(_provider, currentOracleVersion);
+            // position b->c (every accumulator version needs a position stamp)
+            _position.settle(_provider, settleOracleVersion.version, currentOracleVersion);
         }
 
         // settle collateral
@@ -106,8 +106,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
      * @param account Account to settle
      */
     function settleAccount(address account) external nonReentrant notPausedProduct(IProduct(this)) {
-        IOracleProvider.OracleVersion memory currentOracleVersion = productProvider.currentVersion();
-
+        IOracleProvider.OracleVersion memory currentOracleVersion = settleInternal();
         settleAccountInternal(account, currentOracleVersion);
     }
 
@@ -131,43 +130,32 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
         if (latestVersion(account) == currentOracleVersion.version) return; // short circuit entirely if a == c
 
         // Get settle oracle version
-        uint256 _settleVersion = _positions[account].pre.oracleVersionToSettle(currentOracleVersion.version);
+        uint256 _settleVersion = _positions[account].pre.settleVersion(currentOracleVersion.version);
         IOracleProvider.OracleVersion memory settleOracleVersion = _settleVersion == currentOracleVersion.version ?
             currentOracleVersion : // if b == c, don't re-call provider for oracle version
             _provider.atVersion(_settleVersion);
 
         // initialize
-        Accumulator memory _valueAccumulator;
-        Accumulator memory _shareAccumulator;
+        Fixed18 accumulated;
+
+        // sync incentivizer before accumulator
+        _controller.incentivizer().syncAccount(account, settleOracleVersion);
 
         // value a->b
-        (_valueAccumulator, _shareAccumulator) = _accumulators[account]
-            .syncTo(_accumulator, _positions[account], settleOracleVersion.version);
-        Fixed18 accumulated = _valueAccumulator.sum();
-        // sync incentivizer before position update
-        _controller.incentivizer().syncAccount(
-            account,
-            _shareAccumulator,
-            settleOracleVersion
-        );
+        accumulated = accumulated.add(
+            _accumulators[account].syncTo(_accumulator, _positions[account], settleOracleVersion.version).sum());
 
         // position a->b
         accumulated = accumulated.sub(Fixed18Lib.from(_positions[account].settle(_provider, settleOracleVersion)));
 
         // short-circuit if a->c
         if (settleOracleVersion.version != currentOracleVersion.version) {
+            // sync incentivizer before accumulator
+            _controller.incentivizer().syncAccount(account, currentOracleVersion);
 
             // value b->c
-            Accumulator memory _nextShareAccumulator;
-            (_valueAccumulator, _nextShareAccumulator) = _accumulators[account]
-                .syncTo(_accumulator, _positions[account], currentOracleVersion.version);
-            accumulated = accumulated.add(_valueAccumulator.sum());
-
-            _controller.incentivizer().syncAccount(
-                account,
-                _nextShareAccumulator.add(_shareAccumulator),
-                currentOracleVersion
-            );
+            accumulated = accumulated.add(
+                _accumulators[account].syncTo(_accumulator, _positions[account], currentOracleVersion.version).sum());
         }
 
         // settle collateral
@@ -347,7 +335,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
      * @return Latest settled oracle version of the product
      */
     function latestVersion() public view returns (uint256) {
-        return _position.latestVersion;
+        return _accumulator.latestVersion;
     }
 
     /**
@@ -356,7 +344,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
      * @param oracleVersion Oracle version to return for
      * @return Global position at oracle version
      */
-    function positionAtVersion(uint256 oracleVersion) external view returns (Position memory) {
+    function positionAtVersion(uint256 oracleVersion) public view returns (Position memory) {
         return _position.positionAtVersion(oracleVersion);
     }
 
@@ -401,7 +389,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
     modifier makerInvariant {
         _;
 
-        Position memory next = _position.position().next(_position.pre);
+        Position memory next = positionAtVersion(latestVersion()).next(_position.pre);
 
         if (next.maker.gt(productProvider.makerLimit())) revert ProductMakerOverLimitError();
     }
@@ -410,7 +398,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
     modifier takerInvariant {
         _;
 
-        Position memory next = _position.position().next(_position.pre);
+        Position memory next = positionAtVersion(latestVersion()).next(_position.pre);
         UFixed18 socializationFactor = next.socializationFactor();
 
         if (socializationFactor.lt(UFixed18Lib.ONE)) revert ProductInsufficientLiquidityError(socializationFactor);

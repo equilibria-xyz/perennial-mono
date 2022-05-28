@@ -68,6 +68,15 @@ export class ChainlinkContext {
     this.feedRegistry.getRoundData.whenCalledWith(this.base, this.quote, this.latestRoundId).returns(modifiedData)
   }
 
+  public async nextWithTimestampModification(timestampFn: (timestamp: BigNumber) => BigNumber): Promise<void> {
+    this.latestRoundId = await this.feedRegistryExternal.getNextRoundId(this.base, this.quote, this.latestRoundId)
+    const latestData = await this.feedRegistryExternal.getRoundData(this.base, this.quote, this.latestRoundId)
+    const modifiedData = [latestData[0], latestData[1], latestData[2], timestampFn(latestData[3]), latestData[4]]
+    this.feedRegistry.latestRoundData.reset()
+    this.feedRegistry.latestRoundData.whenCalledWith(this.base, this.quote).returns(modifiedData)
+    this.feedRegistry.getRoundData.whenCalledWith(this.base, this.quote, this.latestRoundId).returns(modifiedData)
+  }
+
   public static buildRoundId(phaseId: number, aggregatorRoundId: number): BigNumber {
     return BigNumber.from(16).pow(16).mul(phaseId).add(aggregatorRoundId)
   }

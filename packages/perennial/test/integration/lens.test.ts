@@ -2,7 +2,7 @@ import { expect } from 'chai'
 import 'hardhat'
 import { utils } from 'ethers'
 
-import { InstanceVars, deployProtocol, createProduct, depositTo } from './setupHelpers'
+import { InstanceVars, deployProtocol, createProduct, depositTo, createIncentiveProgram } from './setupHelpers'
 import { expectPositionEq, expectPrePositionEq } from '../testutil/types'
 
 const SECONDS_IN_YEAR = 60 * 60 * 24 * 365
@@ -17,12 +17,13 @@ describe('Lens', () => {
 
   it('returns correct lens values', async () => {
     const POSITION = utils.parseEther('0.0001')
-    const { user, userB, collateral, chainlink, lens, controller, treasuryA } = instanceVars
+    const { user, userB, collateral, chainlink, lens, controller, treasuryA, incentiveToken } = instanceVars
 
     expect(await lens.callStatic.controller()).to.equal(controller.address)
     // Setup fees
     controller.updateProtocolFee(utils.parseEther('0.25'))
     const product = await createProduct(instanceVars)
+    await createIncentiveProgram(instanceVars, product)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
     await product.connect(user).openMake(POSITION)
@@ -169,5 +170,20 @@ describe('Lens', () => {
     expect(await lens.callStatic['fees(address,address[])'](treasuryA.address, [product.address])).to.equal(
       '4127179883640059',
     )
+
+    // Incentive Program Rewards are updated
+    let incentiveRewards = await lens.callStatic['unclaimedIncentiveRewards(address,address)'](
+      user.address,
+      product.address,
+    )
+    expect(incentiveRewards.tokens[0].toLowerCase()).to.equal(incentiveToken.address.toLowerCase())
+    expect(incentiveRewards.amounts[0]).to.equal(0) // TODO: figure out how to get a non-zero number here
+    incentiveRewards = await lens.callStatic['unclaimedIncentiveRewards(address,address,uint256[])'](
+      user.address,
+      product.address,
+      [0],
+    )
+    expect(incentiveRewards.tokens[0].toLowerCase()).to.equal(incentiveToken.address.toLowerCase())
+    expect(incentiveRewards.amounts[0]).to.equal(0) // TODO: figure out how to get a non-zero number here
   })
 })

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.13;
+pragma solidity 0.8.14;
 
 import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@equilibria/root/storage/UStorage.sol";
@@ -15,7 +15,7 @@ import "../interfaces/IProduct.sol";
  */
 abstract contract UControllerProvider is UInitializable {
     error AlreadyInitializedError();
-    error NotOwnerError();
+    error NotOwnerError(uint256 coordinatorId);
     error NotProductError(IProduct product);
     error NotCollateralError();
     error NotProductOwnerError(IProduct product);
@@ -57,9 +57,9 @@ abstract contract UControllerProvider is UInitializable {
         _;
     }
 
-    /// @dev Only allow the protocol owner contract to call
-    modifier onlyOwner() {
-        if (msg.sender != controller().owner()) revert NotOwnerError();
+    /// @dev Only allow the protocol owner to call
+    modifier onlyOwner(uint256 coordinatorId) {
+        if (msg.sender != controller().owner(coordinatorId)) revert NotOwnerError(coordinatorId);
 
         _;
     }

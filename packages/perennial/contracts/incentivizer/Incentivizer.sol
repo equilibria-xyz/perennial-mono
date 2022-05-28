@@ -1,27 +1,20 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.13;
+pragma solidity 0.8.14;
 
 import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@equilibria/root/control/unstructured/UReentrancyGuard.sol";
-import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import "../interfaces/types/Position.sol";
-import "../interfaces/types/Accumulator.sol";
 import "../interfaces/IIncentivizer.sol";
 import "../interfaces/IController.sol";
 import "../controller/UControllerProvider.sol";
-import "./types/Program.sol";
+import "./types/ProductManager.sol";
 
+/**
+ * @title Incentivizer
+ * @notice Manages logic and state for all incentive programs in the protocol.
+ */
 contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, UReentrancyGuard {
-    using EnumerableSet for EnumerableSet.UintSet;
-
-    /// @dev Static program state
-    ProgramInfo[] private _programInfos;
-
-    /// @dev Dynamic program state
-    mapping(uint256 => Program) private _programs;
-
-    /// @dev Mapping of all programs for each product
-    mapping(IProduct => EnumerableSet.UintSet) private _registry;
+    /// @dev Product management state
+    mapping(IProduct => ProductManager) private _products;
 
     /// @dev Fees that have been collected, but remain unclaimed
     mapping(Token18 => UFixed18) public fees;
@@ -40,190 +33,168 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
     /**
      * @notice Creates a new incentive program
      * @dev Must be called as the product or protocol owner
-     * @param info Parameters for the new program
-     * @return new program's ID
+     * @param product The product to create the new program on
+     * @param programInfo Parameters for the new program
+     * @return programId New program's ID
      */
-    function create(ProgramInfo calldata info)
+    function create(IProduct product, ProgramInfo calldata programInfo)
     external
     nonReentrant
-    notPausedProduct(info.product)
-    isProduct(info.product)
-    returns (uint256) {
+    isProduct(product)
+    notPausedProduct(product)
+    onlyOwner(programInfo.coordinatorId)
+    returns (uint256 programId) {
         IController _controller = controller();
-        bool protocolOwned = msg.sender == _controller.owner();
 
-        if (programsForLength(info.product) >= _controller.programsPerProduct()) revert IncentivizerTooManyProgramsError();
-        if (!protocolOwned && msg.sender != _controller.owner(info.product))
-            revert NotProductOwnerError(info.product);
+        // Validate
+        if (programInfo.coordinatorId != 0 && programInfo.coordinatorId != _controller.coordinatorFor(product))
+            revert IncentivizerNotAllowedError(product);
+        if (active(product) >= _controller.programsPerProduct())
+            revert IncentivizerTooManyProgramsError();
+        ProgramInfoLib.validate(programInfo);
 
-        uint256 programId = _programInfos.length;
-        UFixed18 incentivizationFee = _controller.incentivizationFee();
-        (ProgramInfo memory programInfo, UFixed18 programFee) = ProgramInfoLib.create(incentivizationFee, info);
+        // Take fee
+        (ProgramInfo memory newProgramInfo, UFixed18 programFeeAmount) = ProgramInfoLib.deductFee(programInfo, _controller.incentivizationFee());
+        fees[newProgramInfo.token] = fees[newProgramInfo.token].add(programFeeAmount);
 
-        _programInfos.push(programInfo);
-        _programs[programId].initialize(programInfo, protocolOwned);
-        _registry[info.product].add(programId);
-        fees[info.token] = fees[info.token].add(programFee);
+        // Register program
+        programId = _products[product].register(newProgramInfo);
 
-        info.token.pull(msg.sender, info.amount.sum());
+        // Charge creator
+        newProgramInfo.token.pull(msg.sender, programInfo.amount.sum());
 
         emit ProgramCreated(
+            product,
             programId,
-            programInfo.product,
-            programInfo.token,
-            programInfo.amount.maker,
-            programInfo.amount.taker,
-            programInfo.start,
-            programInfo.duration,
-            programInfo.grace,
-            programFee
+            newProgramInfo.coordinatorId,
+            newProgramInfo.token,
+            newProgramInfo.amount.maker,
+            newProgramInfo.amount.taker,
+            newProgramInfo.start,
+            newProgramInfo.duration,
+            programFeeAmount
         );
-
-        return programId;
     }
 
     /**
      * @notice Completes an in-progress program early
      * @dev Must be called as the program owner
-     * @param programId Program to end
+     * @param product Product that the program is running on
+     * @param programId Program to complete early
      */
-    function end(uint256 programId)
+    function complete(IProduct product, uint256 programId)
     external
     nonReentrant
-    validProgram(programId)
-    notPausedProgram(programId)
-    onlyProgramOwner(programId)
+    isProgram(product, programId)
+    notPausedProduct(product)
+    onlyProgramOwner(product, programId)
     {
-        completeInternal(programId);
+        ProductManagerLib.SyncResult memory syncResult = _products[product].complete(product, programId);
+        _handleSyncResult(product, syncResult);
     }
 
     /**
-     * @notice Closes a program, returning all unclaimed rewards
-     * @param programId Program to end
-     */
-    function close(uint256 programId)
-    external
-    nonReentrant
-    validProgram(programId)
-    notPausedProgram(programId)
-    {
-        Program storage program = _programs[programId];
-        ProgramInfo storage programInfo = _programInfos[programId];
-
-        if (!program.canClose(programInfo, block.timestamp)) revert IncentivizerProgramNotClosableError();
-
-        // complete if not yet completed
-        if (program.versionComplete == 0) {
-            completeInternal(programId);
-        }
-
-        // close
-        UFixed18 amountToReturn = _programs[programId].close();
-        programInfo.token.push(treasury(programId), amountToReturn);
-        _registry[programInfo.product].remove(programId);
-
-        emit ProgramClosed(programId, amountToReturn);
-    }
-
-    /**
-     * @notice Completes any in-progress programs that newly completable
+     * @notice Starts and completes programs as they become available
      * @dev Called every settle() from each product
+     * @param currentOracleVersion The preloaded current oracle version
      */
     function sync(IOracleProvider.OracleVersion memory currentOracleVersion) external onlyProduct {
         IProduct product = IProduct(msg.sender);
-        uint256 programCount = programsForLength(product);
 
-        for (uint256 i; i < programCount; i++) {
-            uint256 programId = programsForAt(product, i);
-
-            if (_programs[programId].versionComplete != 0) continue;
-            if (!_programInfos[programId].isComplete(currentOracleVersion.timestamp)) continue;
-
-            completeInternal(programId);
+        ProductManagerLib.SyncResult[] memory syncResults = _products[product].sync(product, currentOracleVersion);
+        for (uint256 i = 0; i < syncResults.length; i++) {
+            _handleSyncResult(product, syncResults[i]);
         }
     }
 
     /**
-     * @notice Completes a program
-     * @dev Internal helper
-     * @param programId Program to complete
+     * @notice Handles refunding and event emitting on program start and completion
+     * @param product Product that the program is running on
+     * @param syncResult The data from the sync event to handle
      */
-    function completeInternal(uint256 programId) private {
-        uint256 version = _programInfos[programId].product.latestVersion();
-        _programs[programId].complete(version);
-
-        emit ProgramCompleted(programId, version);
+    function _handleSyncResult(IProduct product, ProductManagerLib.SyncResult memory syncResult) private {
+        uint256 programId = syncResult.programId;
+        if (!syncResult.refundAmount.isZero())
+            _products[product].token(programId).push(treasury(product, programId), syncResult.refundAmount);
+        if (syncResult.versionStarted != 0)
+            emit ProgramStarted(product, programId, syncResult.versionStarted);
+        if (syncResult.versionComplete != 0)
+            emit ProgramComplete(product, programId, syncResult.versionComplete);
     }
 
     /**
      * @notice Settles unsettled balance for `account`
      * @dev Called immediately proceeding a position update in the corresponding product
      * @param account Account to sync
-     * @param userShareDelta User's change in share
-     * @param currentOracleVersion Current oracle version
+     * @param currentOracleVersion The preloaded current oracle version
      */
     function syncAccount(
         address account,
-        Accumulator memory userShareDelta,
         IOracleProvider.OracleVersion memory currentOracleVersion
     ) external onlyProduct {
         IProduct product = IProduct(msg.sender);
-
-        uint256 programCount = programsForLength(product);
-
-        for (uint256 i; i < programCount; i++) {
-            uint256 programId = programsForAt(product, i);
-            _programs[programId].settle(_programInfos[programId], account, userShareDelta, currentOracleVersion);
-        }
+        _products[product].syncAccount(product, account, currentOracleVersion);
     }
 
     /**
      * @notice Claims all of `msg.sender`'s rewards for `product` programs
      * @param product Product to claim rewards for
+     * @param programIds Programs to claim rewards for
      */
-    function claim(IProduct product) external nonReentrant notPausedProduct(product) isProduct(product) {
-        // settle product markets
-        product.settle();
-        product.settleAccount(msg.sender);
-
-        // claim
-        uint256 programCount = programsForLength(product);
-        for (uint256 i; i < programCount; i++) {
-            claimInternal(msg.sender, programsForAt(product, i));
-        }
+    function claim(IProduct product, uint256[] calldata programIds)
+    external
+    nonReentrant
+    {
+        _claimProduct(product, programIds);
     }
 
     /**
      * @notice Claims all of `msg.sender`'s rewards for a specific program
-     * @param programId Program to claim rewards for
+     * @param products Products to claim rewards for
+     * @param programIds Programs to claim rewards for
      */
-    function claim(uint256 programId) external nonReentrant validProgram(programId) notPausedProgram(programId) {
-        IProduct product = _programInfos[programId].product;
-
-        // settle product markets
-        product.settle();
-        product.settleAccount(msg.sender);
-
-        // claim
-        claimInternal(msg.sender, programId);
+    function claim(IProduct[] calldata products, uint256[][] calldata programIds)
+    external
+    nonReentrant
+    {
+        uint256 productCount = products.length;
+        for (uint256 i; i < productCount; i++) {
+            _claimProduct(products[i], programIds[i]);
+        }
     }
 
     /**
-     * @notice Claims all of `account`'s rewards for a specific program
-     * @dev Internal helper, assumes account has already been product-settled prior to calling
-     * @param account Account to claim rewards for
+     * @notice Claims all of `msg.sender`'s rewards for `product` programs
+     * @dev Internal helper with validation checks
+     * @param product Product to claim rewards for
+     * @param programIds Programs to claim rewards for
+     */
+    function _claimProduct(IProduct product, uint256[] memory programIds)
+    private
+    isProduct(product)
+    notPausedProduct(product)
+    settleForAccount(msg.sender, product)
+    {
+        uint256 programCount = programIds.length;
+        for (uint256 i; i < programCount; i++) {
+            _claimProgram(product, programIds[i]);
+        }
+    }
+
+    /**
+     * @notice Claims all of `msg.sender`'s rewards for `programId` on `product`
+     * @dev Internal helper with validation checks
+     * @param product Product to claim rewards for
      * @param programId Program to claim rewards for
      */
-    function claimInternal(address account, uint256 programId) private {
-        Program storage program = _programs[programId];
-        ProgramInfo memory programInfo = _programInfos[programId];
-
-        // program.settle(programInfo, account);
-        UFixed18 claimedAmount = program.claim(account);
-
-        programInfo.token.push(account, claimedAmount);
-
-        emit Claim(account, programId, claimedAmount);
+    function _claimProgram(IProduct product, uint256 programId)
+    private
+    isProgram(product, programId)
+    {
+        ProductManager storage productManager = _products[product];
+        UFixed18 claimAmount = productManager.claim(msg.sender, programId);
+        productManager.token(programId).push(msg.sender, claimAmount);
+        emit Claim(product, msg.sender, programId, claimAmount);
     }
 
     /**
@@ -244,140 +215,111 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
     }
 
     /**
+     * @notice Returns the quantity of active programs for a given product
+     * @param product Product to check for
+     * @return Number of active programs
+     */
+    function active(IProduct product) public view returns (uint256) {
+        return _products[product].active();
+    }
+
+    /**
+     * @notice Returns the quantity of programs for a given product
+     * @param product Product to check for
+     * @return Number of programs (inactive or active)
+     */
+    function count(IProduct product) external view returns (uint256) {
+        return _products[product].programInfos.length;
+    }
+
+    /**
      * @notice Returns program info for program `programId`
+     * @param product Product to return for
      * @param programId Program to return for
      * @return Program info
      */
-    function programInfos(uint256 programId) external view returns (ProgramInfo memory) {
-        return _programInfos[programId];
+    function programInfos(IProduct product, uint256 programId) external view returns (ProgramInfo memory) {
+        return _products[product].programInfos[programId];
     }
 
     /**
      * @notice Returns `account`'s total unclaimed rewards for a specific program
+     * @param product Product to return for
      * @param account Account to return for
      * @param programId Program to return for
      * @return `account`'s total unclaimed rewards for `programId`
      */
-    function unclaimed(address account, uint256 programId) external view returns (UFixed18) {
-        if (programId >= _programInfos.length) return (UFixed18Lib.ZERO);
-
-        return _programs[programId].unclaimed(account);
-    }
-
-    /**
-     * @notice Returns `account`'s latest synced version for a specific program
-     * @param account Account to return for
-     * @param programId Program to return for
-     * @return `account`'s latest synced version for `programId`
-     */
-    function latestVersion(address account, uint256 programId) external view returns (uint256) {
-        return _programs[programId].latestVersion[account];
-    }
-
-    /**
-     * @notice Returns `account`'s settled rewards for a specific program
-     * @param account Account to return for
-     * @param programId Program to return for
-     * @return `account`'s settled rewards for `programId`
-     */
-    function settled(address account, uint256 programId) external view returns (UFixed18) {
-        return _programs[programId].settled[account];
+    function unclaimed(IProduct product, address account, uint256 programId) external view returns (UFixed18) {
+        return _products[product].unclaimed(account, programId);
     }
 
     /**
      * @notice Returns available rewards for a specific program
+     * @param product Product to return for
      * @param programId Program to return for
      * @return Available rewards for `programId`
      */
-    function available(uint256 programId) external view returns (UFixed18) {
-        return _programs[programId].available;
+    function available(IProduct product, uint256 programId) external view returns (UFixed18) {
+        return _products[product].programs[programId].available;
+    }
+
+    /**
+     * @notice Returns the version started for a specific program
+     * @param product Product to return for
+     * @param programId Program to return for
+     * @return The version started for `programId`
+     */
+    function versionStarted(IProduct product, uint256 programId) external view returns (uint256) {
+        return _products[product].programs[programId].versionStarted;
     }
 
     /**
      * @notice Returns the version completed for a specific program
+     * @param product Product to return for
      * @param programId Program to return for
      * @return The version completed for `programId`
      */
-    function versionComplete(uint256 programId) external view returns (uint256) {
-        return _programs[programId].versionComplete;
-    }
-
-    /**
-     * @notice Returns whether closed for a specific program
-     * @param programId Program to return for
-     * @return whether closed for `programId`
-     */
-    function closed(uint256 programId) external view returns (bool) {
-        return _programs[programId].closed;
-    }
-
-    /**
-     * @notice Returns quantity of programs for a specific product
-     * @param product Product to return for
-     * @return Quantity of programs for `product`
-     */
-    function programsForLength(IProduct product) public view returns (uint256) {
-        return _registry[product].length();
-    }
-
-    /**
-     * @notice Returns the program at index `index` for a specific product
-     * @param product Product to return for
-     * @param index Index to return for
-     * @return The program at index `index` for `product`
-     */
-    function programsForAt(IProduct product, uint256 index) public view returns (uint256) {
-        return _registry[product].at(index);
+    function versionComplete(IProduct product, uint256 programId) external view returns (uint256) {
+        return _products[product].programs[programId].versionComplete;
     }
 
     /**
      * @notice Returns the owner of a specific program
+     * @param product Product to return for
      * @param programId Program to return for
      * @return The owner of `programId`
      */
-    function owner(uint256 programId) public view returns (address) {
-        Program storage program = _programs[programId];
-        ProgramInfo storage programInfo = _programInfos[programId];
-        return program.protocolOwned ? controller().owner() : controller().owner(programInfo.product);
+    function owner(IProduct product, uint256 programId) public view returns (address) {
+        return controller().owner(_products[product].programInfos[programId].coordinatorId);
     }
 
     /**
      * @notice Returns the treasury of a specific program
+     * @param product Product to return for
      * @param programId Program to return for
      * @return The treasury of `programId`
      */
-    function treasury(uint256 programId) public view returns (address) {
-        Program storage program = _programs[programId];
-        ProgramInfo storage programInfo = _programInfos[programId];
-        return program.protocolOwned ? controller().treasury() : controller().treasury(programInfo.product);
+    function treasury(IProduct product, uint256 programId) public view returns (address) {
+        return controller().treasury(_products[product].programInfos[programId].coordinatorId);
     }
 
-    /**
-     * @notice Returns the paused status of a specific program
-     * @param programId Program to return for
-     * @return The paused status of `programId`
-     */
-    function paused(uint256 programId) public view returns (bool) {
-        return controller().paused(_programInfos[programId].product);
-    }
-
-    /// @dev Only allow the owner of `programId` to call
-    modifier onlyProgramOwner(uint256 programId) {
-        if (msg.sender != owner(programId)) revert IncentivizerNotProgramOwnerError(programId);
+    /// @dev Helper to fully settle an account's state
+    modifier settleForAccount(address account, IProduct product) {
+        product.settleAccount(account);
 
         _;
     }
 
-    /// @dev Only allow when `programId` is not paused
-    modifier notPausedProgram(uint256 programId) {
-        if (paused(programId)) revert IncentivizerProgramPausedError(programId);
+    /// @dev Only allow the owner of `programId` to call
+    modifier onlyProgramOwner(IProduct product, uint256 programId) {
+        if (msg.sender != owner(product, programId)) revert IncentivizerNotProgramOwnerError(product, programId);
 
         _;
     }
 
     /// @dev Only allow a valid `programId`
-    modifier validProgram(uint256 programId) {
-        if (programId >= _programInfos.length) revert IncentivizerInvalidProgramError(programId);
+    modifier isProgram(IProduct product, uint256 programId) {
+        if (!_products[product].valid(programId)) revert IncentivizerInvalidProgramError(product, programId);
 
         _;
     }

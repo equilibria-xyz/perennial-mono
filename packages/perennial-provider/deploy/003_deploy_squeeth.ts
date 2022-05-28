@@ -39,17 +39,16 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     autoMine: true,
   })
 
-  // TODO: opyn initial values
   const initData = Squeeth__factory.createInterface().encodeFunctionData('initialize', [
     ethers.utils.parseEther('0.30'),
     ethers.utils.parseEther('0.10'),
     0,
     0,
-    ethers.utils.parseEther('1'),
+    ethers.utils.parseEther('2500'),
     {
-      minRate: 0,
-      maxRate: ethers.utils.parseEther('5.00'),
-      targetRate: ethers.utils.parseEther('0.80'),
+      minRate: ethers.utils.parseEther('0.04'),
+      maxRate: ethers.utils.parseEther('16.25'),
+      targetRate: ethers.utils.parseEther('1.56'),
       targetUtilization: ethers.utils.parseEther('0.80'),
     },
   ])

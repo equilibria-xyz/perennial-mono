@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.13;
+pragma solidity ^0.8.13;
 
 import "@equilibria/perennial/contracts/interfaces/IProductProvider.sol";
 import "@equilibria/root/curve/UtilizationCurveProvider.sol";

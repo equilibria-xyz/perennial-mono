@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.13;
+pragma solidity ^0.8.13;
 
 import "@equilibria/root/number/types/UFixed18.sol";
 import "@openzeppelin/contracts/proxy/beacon/IBeacon.sol";
@@ -41,13 +41,11 @@ interface IController {
     event CoordinatorTreasuryUpdated(uint256 indexed coordinatorId, address newTreasury);
     event CoordinatorPauserUpdated(uint256 indexed coordinatorId, address pauser);
     event CoordinatorPausedUpdated(uint256 indexed coordinatorId, bool paused);
-    event AllowedUpdated(uint256 indexed coordinatorId, bool allowed);
     event CoordinatorCreated(uint256 indexed coordinatorId, address owner);
     event ProductCreated(IProduct indexed product, IProductProvider provider);
 
     error ControllerAlreadyInitializedError();
     error ControllerNoZeroCoordinatorError();
-    error ControllerNotAllowedError();
     error ControllerNotPauserError(uint256 coordinatorId);
     error ControllerNotOwnerError(uint256 controllerId);
     error ControllerNotPendingOwnerError(uint256 controllerId);
@@ -61,7 +59,6 @@ interface IController {
     function productBeacon() external view returns (IBeacon);
     function coordinators(uint256 collateralId) external view returns (Coordinator memory);
     function coordinatorFor(IProduct product) external view returns (uint256);
-    function allowed(uint256 collateralId) external view returns (bool);
     function protocolFee() external view returns (UFixed18);
     function minFundingFee() external view returns (UFixed18);
     function liquidationFee() external view returns (UFixed18);
@@ -69,7 +66,7 @@ interface IController {
     function minCollateral() external view returns (UFixed18);
     function programsPerProduct() external view returns (uint256);
     function initialize(ICollateral collateral_, IIncentivizer incentivizer_, IBeacon productBeacon_) external;
-    function createCoordinator() external returns (uint256);
+    function createCoordinator(address coordinatorOwner) external returns (uint256);
     function updateCoordinatorPendingOwner(uint256 coordinatorId, address newPendingOwner) external;
     function acceptCoordinatorOwner(uint256 coordinatorId) external;
     function updateCoordinatorTreasury(uint256 coordinatorId, address newTreasury) external;
@@ -85,7 +82,6 @@ interface IController {
     function updateIncentivizationFee(UFixed18 newIncentivizationFee) external;
     function updateMinCollateral(UFixed18 newMinCollateral) external;
     function updateProgramsPerProduct(uint256 newProductsPerProduct) external;
-    function updateAllowed(uint256 coordinatorId, bool newAllowed) external;
     function isProduct(IProduct product) external view returns (bool);
     function owner() external view returns (address);
     function owner(uint256 coordinatorId) external view returns (address);

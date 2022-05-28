@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.13;
+pragma solidity 0.8.14;
 
 import "@equilibria/root/curve/immutable/XJumpRateUtilizationCurveProvider.sol";
 import "../oracle/XOracleProvider.sol";
 import "../product/XProductProvider.sol";
 
 contract LeveragedEther is XJumpRateUtilizationCurveProvider, XOracleProvider, XProductProvider {
-    string public name = "3x Ether";
-    string public symbol = "ETH3x";
+    string public constant name = "3x Ether";
+    string public constant symbol = "ETH3x";
 
     // solhint-disable-next-line no-empty-blocks
     constructor(

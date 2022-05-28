@@ -105,6 +105,7 @@ describe('Liquidate', () => {
     const currB = await collateral['collateral(address,address)'](userB.address, product.address)
     const currC = await collateral['collateral(address,address)'](userC.address, product.address)
     const currD = await collateral['collateral(address,address)'](userD.address, product.address)
+    const totalCurr = currB.add(currC).add(currD)
 
     await chainlink.next()
     await product.settleAccount(userB.address)
@@ -114,8 +115,14 @@ describe('Liquidate', () => {
     const newB = await collateral['collateral(address,address)'](userB.address, product.address)
     const newC = await collateral['collateral(address,address)'](userC.address, product.address)
     const newD = await collateral['collateral(address,address)'](userD.address, product.address)
+    const totalNew = newB.add(newC).add(newD)
 
     // Expect the loss from B to be socialized equally to C and D
-    expect(currB.sub(newB)).to.equal(newC.add(newD).sub(currC).sub(currD))
+    expect(currB.gt(newB)).to.equal(true)
+    expect(currC.lt(newC)).to.equal(true)
+    expect(currD.lt(newD)).to.equal(true)
+
+    expect(totalCurr.gte(totalNew)).to.equal(true)
+    expect(totalCurr).to.closeTo(totalNew, 1)
   }).timeout(120000)
 })
