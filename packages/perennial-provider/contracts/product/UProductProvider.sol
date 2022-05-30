@@ -45,6 +45,7 @@ abstract contract UProductProvider is ProductProvider, UOwnable {
      * @param takerFee_ Initial taker fee value
      * @param makerLimit_ Initial maker limit value
      */
+    // solhint-disable-next-line func-name-mixedcase
     function __UProductProvider__initialize(
         UFixed18 maintenance_,
         UFixed18 fundingFee_,

@@ -14,10 +14,10 @@ import "../interfaces/ICollateral.sol";
  */
 contract Forwarder {
     // @dev USDC stablecoin
-    Token6 public immutable USDC;
+    Token6 public immutable USDC; // solhint-disable-line var-name-mixedcase
 
     // @dev DSU stablecoin
-    Token18 public immutable DSU;
+    Token18 public immutable DSU; // solhint-disable-line var-name-mixedcase
 
     /// @dev Contract that wraps USDC to DSU
     IBatcher public immutable batcher;
