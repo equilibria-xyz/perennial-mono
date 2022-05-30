@@ -3,6 +3,7 @@ pragma solidity 0.8.14;
 
 import "../../interfaces/types/ProgramInfo.sol";
 
+/// @dev Program type
 struct Program {
     /// @dev Mapping of latest rewards settled for each account
     mapping(address => UFixed18) settled;
@@ -18,6 +19,10 @@ struct Program {
 }
 using ProgramLib for Program global;
 
+/**
+ * @title ProgramLib
+ * @notice Library that manages all of the mutable state for a single incentivization program.
+ */
 library ProgramLib {
     /**
      * @notice Initializes the program state

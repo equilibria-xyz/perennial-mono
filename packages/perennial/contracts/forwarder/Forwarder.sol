@@ -13,6 +13,8 @@ import "../interfaces/ICollateral.sol";
  *         in USDC then wrapped as DSU before being deposited.
  */
 contract Forwarder {
+    event WrapAndDeposit(address indexed account, IProduct indexed product, UFixed18 amount);
+
     // @dev USDC stablecoin
     Token6 public immutable USDC;
 
@@ -25,8 +27,13 @@ contract Forwarder {
     /// @dev Contract managing state for collateral accounts in the protocol
     ICollateral public immutable collateral;
 
-    event WrapAndDeposit(address indexed account, IProduct indexed product, UFixed18 amount);
-
+    /**
+     * @notice Initializes the contract state
+     * @param usdc_ The USDC token contract address
+     * @param dsu_ The DSU token contract address
+     * @param batcher_ The USDC-to-DSU batcher contract address
+     * @param collateral_ The perennial collateral contract address
+     */
     constructor(
         Token6 usdc_,
         Token18 dsu_,

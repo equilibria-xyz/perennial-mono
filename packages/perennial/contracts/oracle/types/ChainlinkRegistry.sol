@@ -10,7 +10,7 @@ using ChainlinkRegistryLib for ChainlinkRegistry global;
 
 /**
  * @title ChainlinkRegistryLib
- * @notice Library that manages interfacing with the Chainlink Feed Registry
+ * @notice Library that manages interfacing with the Chainlink Feed Registry.
  */
 library ChainlinkRegistryLib {
     /**
