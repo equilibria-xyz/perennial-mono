@@ -1,0 +1,97 @@
+name: Automated Tests and Linting
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+env:
+  CI: true
+  PARSER_BROKEN: false # set to true if Solidity parsing is currently broken, this will skip Linting and Coverage
+concurrency:
+  group: build-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 16.13
+      - uses: actions/checkout@v3
+      - uses: actions/cache@v3
+        id: cache
+        with:
+          path: |
+            node_modules
+          key: ${{ runner.os }}-node-${{ matrix.node }}-${{ hashFiles('yarn.lock') }}
+      - name: Install
+        run: yarn --frozen-lockfile
+        if: ${{ env.PARSER_BROKEN != 'true' }}
+      - name: lint
+        run: yarn workspaces run lint
+        if: ${{ env.PARSER_BROKEN != 'true' }}
+
+  unit-test:
+    name: Unit Tests w/ Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node }}
+      - uses: actions/checkout@v3
+      - uses: actions/cache@v3
+        id: cache
+        with:
+          path: |
+            node_modules
+          key: ${{ runner.os }}-node-${{ matrix.node }}-${{ hashFiles('yarn.lock') }}
+      - name: Install
+        run: yarn --frozen-lockfile
+      - name: Compile
+        run: yarn workspace @equilibria/perennial run compile
+      - name: Run tests
+        env:
+          MOCHA_REPORTER: dot
+        run: | # for now, just run for perennial
+          yarn workspace @equilibria/perennial run ${{ env.PARSER_BROKEN != 'true' && 'coverage' || 'test' }}
+      - name: Unit Test Code Coverage Report
+        uses: romeovs/lcov-reporter-action@v0.3.1
+        with:
+          title: Unit Test Coverage Report
+          lcov-file: ./packages/perennial/coverage/lcov.info
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+        if: ${{ github.event_name == 'pull_request' && env.PARSER_BROKEN != 'true' }}
+  integration-test:
+    name: Integration Tests w/ Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node }}
+      - uses: actions/checkout@v3
+      - uses: actions/cache@v3
+        id: cache
+        with:
+          path: |
+            node_modules
+          key: ${{ runner.os }}-node-${{ matrix.node }}-${{ hashFiles('yarn.lock') }}
+      - name: Install
+        run: yarn --frozen-lockfile
+      - name: Compile
+        run: yarn workspace @equilibria/perennial run compile
+      - name: Run tests
+        env:
+          MOCHA_REPORTER: dot
+          ALCHEMY_MAINNET: ${{ secrets.ALCHEMY_MAINNET }}
+        run: | # for now, just run for perennial
+          yarn workspace @equilibria/perennial run ${{ env.PARSER_BROKEN != 'true' && 'coverage:integration' || 'test:integration' }}
+      - name: Integration Test Code Coverage Report
+        uses: romeovs/lcov-reporter-action@v0.3.1
+        with:
+          title: Integration Test Coverage Report
+          lcov-file: ./packages/perennial/coverage/lcov.info
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+        if: ${{ github.event_name == 'pull_request' && env.PARSER_BROKEN != 'true' }}
