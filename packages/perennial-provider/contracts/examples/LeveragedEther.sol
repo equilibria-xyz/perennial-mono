@@ -9,7 +9,6 @@ contract LeveragedEther is XJumpRateUtilizationCurveProvider, XOracleProvider, X
     string public constant name = "3x Ether";
     string public constant symbol = "ETH3x";
 
-    // solhint-disable-next-line no-empty-blocks
     constructor(
         IOracleProvider oracle_,
         UFixed18 maintenance_,
@@ -22,7 +21,7 @@ contract LeveragedEther is XJumpRateUtilizationCurveProvider, XOracleProvider, X
     XProductProvider(maintenance_, fundingFee_, makerFee_, takerFee_, makerLimit_)
     XOracleProvider(oracle_)
     XJumpRateUtilizationCurveProvider(utilizationCurve_)
-    { }
+    { } // solhint-disable-line no-empty-blocks
 
     function _payoff(Fixed18 price) internal pure override returns (Fixed18) {
         return Fixed18Lib.from(3).mul(price);

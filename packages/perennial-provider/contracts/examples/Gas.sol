@@ -9,7 +9,6 @@ contract Gas is XJumpRateUtilizationCurveProvider, XOracleProvider, XProductProv
     string public constant name = "Gas Price Index";
     string public constant symbol = "GAS";
 
-    // solhint-disable-next-line no-empty-blocks
     constructor(
         IOracleProvider oracle_,
         UFixed18 maintenance_,
@@ -22,5 +21,5 @@ contract Gas is XJumpRateUtilizationCurveProvider, XOracleProvider, XProductProv
     XProductProvider(maintenance_, fundingFee_, makerFee_, takerFee_, makerLimit_)
     XOracleProvider(oracle_)
     XJumpRateUtilizationCurveProvider(utilizationCurve_)
-    { }
+    { } // solhint-disable-line no-empty-blocks
 }
