@@ -178,12 +178,12 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
     liquidationInvariant
     maintenanceInvariant
     {
-        IOracleProvider.OracleVersion memory currentVersion = productProvider.currentVersion();
+        uint256 _latestVersion = latestVersion();
 
-        _positions[msg.sender].pre.openTake(currentVersion.version, amount);
-        _position.pre.openTake(currentVersion.version, amount);
+        _positions[msg.sender].pre.openTake(_latestVersion, amount);
+        _position.pre.openTake(_latestVersion, amount);
 
-        emit TakeOpened(msg.sender, amount);
+        emit TakeOpened(msg.sender, _latestVersion, amount);
     }
 
     /**
@@ -202,12 +202,12 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
     }
 
     function closeTakeInternal(address account, UFixed18 amount) internal {
-        IOracleProvider.OracleVersion memory currentVersion = productProvider.currentVersion();
+        uint256 _latestVersion = latestVersion();
 
-        _positions[account].pre.closeTake(currentVersion.version, amount);
-        _position.pre.closeTake(currentVersion.version, amount);
+        _positions[account].pre.closeTake(_latestVersion, amount);
+        _position.pre.closeTake(_latestVersion, amount);
 
-        emit TakeClosed(account, amount);
+        emit TakeClosed(account, _latestVersion, amount);
     }
 
     /**
@@ -225,12 +225,12 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
     liquidationInvariant
     maintenanceInvariant
     {
-        IOracleProvider.OracleVersion memory currentVersion = productProvider.currentVersion();
+        uint256 _latestVersion = latestVersion();
 
-        _positions[msg.sender].pre.openMake(currentVersion.version, amount);
-        _position.pre.openMake(currentVersion.version, amount);
+        _positions[msg.sender].pre.openMake(_latestVersion, amount);
+        _position.pre.openMake(_latestVersion, amount);
 
-        emit MakeOpened(msg.sender, amount);
+        emit MakeOpened(msg.sender, _latestVersion, amount);
     }
 
     /**
@@ -250,12 +250,12 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
     }
 
     function closeMakeInternal(address account, UFixed18 amount) internal {
-        IOracleProvider.OracleVersion memory currentVersion = productProvider.currentVersion();
+        uint256 _latestVersion = latestVersion();
 
-        _positions[account].pre.closeMake(currentVersion.version, amount);
-        _position.pre.closeMake(currentVersion.version, amount);
+        _positions[account].pre.closeMake(_latestVersion, amount);
+        _position.pre.closeMake(_latestVersion, amount);
 
-        emit MakeClosed(account, amount);
+        emit MakeClosed(account, _latestVersion, amount);
     }
 
     /**
