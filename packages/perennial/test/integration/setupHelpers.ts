@@ -28,6 +28,9 @@ import {
   IBatcher__factory,
   ERC20PresetMinterPauser,
   ERC20PresetMinterPauser__factory,
+  ProxyAdmin,
+  ProxyAdmin__factory,
+  TransparentUpgradeableProxy__factory,
 } from '../../types/generated'
 import { CHAINLINK_CUSTOM_CURRENCIES, ChainlinkContext } from './chainlinkHelpers'
 const { config, deployments, ethers } = HRE
@@ -47,6 +50,7 @@ export interface InstanceVars {
   userD: SignerWithAddress
   treasuryA: SignerWithAddress
   treasuryB: SignerWithAddress
+  proxyAdmin: ProxyAdmin
   controller: Controller
   productProvider: TestnetProductProvider
   dsu: IERC20Metadata
@@ -65,7 +69,6 @@ export interface InstanceVars {
   incentiveToken: ERC20PresetMinterPauser
 }
 
-//TODO: use proxies for full compatibility test
 export async function deployProtocol(): Promise<InstanceVars> {
   await time.reset(config)
   const [owner, pauser, user, userB, userC, userD, treasuryA, treasuryB] = await ethers.getSigners()
@@ -93,9 +96,31 @@ export async function deployProtocol(): Promise<InstanceVars> {
   const batcher = await IBatcher__factory.connect((await deployments.get('Batcher')).address, owner)
 
   // Deploy protocol contracts
-  const controller = await new Controller__factory(owner).deploy()
-  const incentivizer = await new Incentivizer__factory(owner).deploy()
-  const collateral = await new Collateral__factory(owner).deploy(dsu.address)
+  const proxyAdmin = await new ProxyAdmin__factory(owner).deploy()
+
+  const controllerImpl = await new Controller__factory(owner).deploy()
+  const incentivizerImpl = await new Incentivizer__factory(owner).deploy()
+  const collateralImpl = await new Collateral__factory(owner).deploy(dsu.address)
+
+  const controllerProxy = await new TransparentUpgradeableProxy__factory(owner).deploy(
+    controllerImpl.address,
+    proxyAdmin.address,
+    [],
+  )
+  const incentivizerProxy = await new TransparentUpgradeableProxy__factory(owner).deploy(
+    incentivizerImpl.address,
+    proxyAdmin.address,
+    [],
+  )
+  const collateralProxy = await new TransparentUpgradeableProxy__factory(owner).deploy(
+    collateralImpl.address,
+    proxyAdmin.address,
+    [],
+  )
+
+  const controller = await new Controller__factory(owner).attach(controllerProxy.address)
+  const incentivizer = await new Incentivizer__factory(owner).attach(incentivizerProxy.address)
+  const collateral = await new Collateral__factory(owner).attach(collateralProxy.address)
 
   const productImpl = await new Product__factory(owner).deploy()
   const productBeacon = await new UpgradeableBeacon__factory(owner).deploy(productImpl.address)
@@ -151,6 +176,7 @@ export async function deployProtocol(): Promise<InstanceVars> {
     dsu,
     usdc,
     usdcHolder,
+    proxyAdmin,
     controller,
     productBeacon,
     productImpl,
