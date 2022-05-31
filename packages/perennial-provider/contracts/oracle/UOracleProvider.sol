@@ -22,6 +22,7 @@ abstract contract UOracleProvider is OracleProvider, UOwnable {
      * @notice Initializes the contract state
      * @param initialOracle Initial oracle for the product
      */
+    // solhint-disable-next-line func-name-mixedcase
     function __UOracleProvider__initialize(IOracleProvider initialOracle)
     internal onlyInitializer {
         updateOracle(initialOracle);
