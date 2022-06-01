@@ -1,20 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.14;
 
-import "@equilibria/root/token/types/Token18.sol";
-import "@equilibria/root/token/types/Token6.sol";
-import "@equilibria/root/number/types/UFixed18.sol";
-import "@equilibria/emptyset-batcher/interfaces/IBatcher.sol";
-import "../interfaces/ICollateral.sol";
+import "../interfaces/IForwarder.sol";
 
 /**
  * @title Forwarder
  * @notice Facilitates collateral deposits to the protocol where the amount is supplied
  *         in USDC then wrapped as DSU before being deposited.
  */
-contract Forwarder {
-    event WrapAndDeposit(address indexed account, IProduct indexed product, UFixed18 amount);
-
+contract Forwarder is IForwarder {
     // @dev USDC stablecoin
     Token6 public immutable USDC; // solhint-disable-line var-name-mixedcase
 
@@ -51,7 +45,7 @@ contract Forwarder {
 
     /**
      * @notice Pulls `amount` of USDC from `msg.sender`'s balance, wraps it as DSU,
-               and deposits it as collateral to `account`'s `product` account 
+               and deposits it as collateral to `account`'s `product` account
      * @param account Account to deposit the collateral for
      * @param product Product to credit the collateral to
      * @param amount 18 decimals-normalized stablecoin (USDC, DSU) value of collateral to deposit

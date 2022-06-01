@@ -1,9 +1,13 @@
 {
   "name": "@equilibria/perennial",
   "version": "0.1.4",
-  "description": "",
-  "main": "index.js",
+  "description": "Perennial Protocol Core",
   "private": true,
+  "files": [
+    "contracts/!(test)",
+    "artifacts/contracts/interfaces",
+    "deployments/!(localhost)"
+  ],
   "scripts": {
     "build": "yarn compile",
     "compile": "hardhat compile",
@@ -19,7 +23,8 @@
     "postinstall": "yarn build",
     "prepare": "husky install",
     "clean": "rm -rf cache artifacts types/generated",
-    "node:fork:kovan": "HARDHAT_DEPLOY_FORK=kovan FORK_NETWORK=kovan FORK_ENABLED=true hardhat node"
+    "node:fork:kovan": "HARDHAT_DEPLOY_FORK=kovan FORK_NETWORK=kovan FORK_ENABLED=true hardhat node",
+    "prepack": "yarn build && rm -rf ./artifacts/contracts/**/*.dbg.json"
   },
   "author": "",
   "license": "Apache-2.0",

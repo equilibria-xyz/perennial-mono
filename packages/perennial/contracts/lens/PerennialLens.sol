@@ -1,12 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.14;
 
-import "../interfaces/IProduct.sol";
-import "../interfaces/ICollateral.sol";
-import "../interfaces/IController.sol";
-import "../interfaces/IOracleProvider.sol";
+import "../interfaces/IPerennialLens.sol";
 
-contract PerennialLens {
+contract PerennialLens is IPerennialLens {
     IController public immutable controller;
 
     constructor(IController _controller) {
