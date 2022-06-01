@@ -29,7 +29,7 @@
   "author": "",
   "license": "APACHE-2.0",
   "devDependencies": {
-    "@equilibria/perennial": "0.1.4",
-    "@equilibria/perennial-provider": "0.1.4"
+    "@equilibria/perennial": "0.1.5",
+    "@equilibria/perennial-provider": "0.1.5"
   }
 }

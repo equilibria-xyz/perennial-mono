@@ -1,6 +1,6 @@
 {
   "name": "@equilibria/perennial-provider",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Library for Perennial product providers",
   "private": true,
   "files": [
@@ -28,7 +28,9 @@
   },
   "author": "",
   "license": "APACHE-2.0",
-  "devDependencies": {
-    "@equilibria/perennial": "0.1.4"
+  "dependencies": {
+    "@equilibria/perennial": "0.1.5",
+    "@equilibria/root": "0.1.5",
+    "@openzeppelin/contracts": "4.6.0"
   }
 }

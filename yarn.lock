@@ -30,7 +30,7 @@
     chalk "^2.0.0"
     js-tokens "^4.0.0"
 
-"@chainlink/contracts@^0.3.1":
+"@chainlink/contracts@0.3.1":
   version "0.3.1"
   resolved "https://registry.yarnpkg.com/@chainlink/contracts/-/contracts-0.3.1.tgz#a1a2e1b179a6ce6a9b5b16992f6202918110ef5c"
   integrity sha512-A8DRvmfNCwLS1iduPPj7wNAZJMe9/ZimMhoHhbbBiq+7Vq/HFjiNcdoQ5NinFdXD5aTsoNUGG5pAYKj7YMpm9A==
@@ -94,15 +94,20 @@
   resolved "https://registry.yarnpkg.com/@ensdomains/resolver/-/resolver-0.2.4.tgz#c10fe28bf5efbf49bff4666d909aed0265efbc89"
   integrity sha512-bvaTH34PMCbv6anRa9I/0zjLJgY4EuznbEMgbV77JBCQ9KNC46rzi0avuxpOfu+xDjPEtSFGqVEOr5GlUSGudA==
 
-"@equilibria/emptyset-batcher@0.0.2":
-  version "0.0.2"
-  resolved "https://registry.yarnpkg.com/@equilibria/emptyset-batcher/-/emptyset-batcher-0.0.2.tgz#5406fb5cfa9755a8809d23919d11cc8b9be2b4fe"
-  integrity sha512-JaAJvNOASq1UirBr8dHVLkO3XLIrPvuyve2cG+35iB7tu1FK0B1sVjt6RdOGVgGYdNo9mmMgufTXgZnzYtaHow==
+"@equilibria/emptyset-batcher@0.0.4":
+  version "0.0.4"
+  resolved "https://registry.yarnpkg.com/@equilibria/emptyset-batcher/-/emptyset-batcher-0.0.4.tgz#9d1de051c1fa147b5d44a090a19201dbb234b230"
+  integrity sha512-WTTpUiy6DFh1UWGk+6lM/D/cZMMZLp7Ix3q6H2wsVH4KyqYE2kfqtM1cwYbw8zIQWenrIPJeD8APL2Al77Lohg==
+  dependencies:
+    "@equilibria/root" "0.1.5"
+    "@openzeppelin/contracts" "4.6.0"
 
-"@equilibria/root@0.1.4":
-  version "0.1.4"
-  resolved "https://registry.yarnpkg.com/@equilibria/root/-/root-0.1.4.tgz#17cfa16b5fce66a9e83a4074790acaf22b5b5148"
-  integrity sha512-vMcf00XF6wvm0sqeksQL1MiuzvhijvOnibG5Gx9dDmXNh0F27W0kpvnxm6GonuN7dxcACiKWmmI1dL+AZ++8Fw==
+"@equilibria/root@0.1.5":
+  version "0.1.5"
+  resolved "https://registry.yarnpkg.com/@equilibria/root/-/root-0.1.5.tgz#f9fb606fed2d0f3d7426d37d7bc45f176b26f80e"
+  integrity sha512-K++w/DyJktl58dQe4P78K0dzduQe1CKPU+Z52DsISik99FN7OwdMTQZt1APpJfovfZh0focsHMnTiRpLmIti7Q==
+  dependencies:
+    "@openzeppelin/contracts" "4.6.0"
 
 "@eslint/eslintrc@^0.4.3":
   version "0.4.3"
@@ -1566,10 +1571,10 @@
   dependencies:
     "@octokit/openapi-types" "^11.2.0"
 
-"@openzeppelin/contracts@4.5.0":
-  version "4.5.0"
-  resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-4.5.0.tgz#3fd75d57de172b3743cdfc1206883f56430409cc"
-  integrity sha512-fdkzKPYMjrRiPK6K4y64e6GzULR7R7RwxSigHS8DDp7aWDeoReqsQI+cxHV1UuhAqX69L1lAaWDxenfP+xiqzA==
+"@openzeppelin/contracts@4.6.0":
+  version "4.6.0"
+  resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-4.6.0.tgz#c91cf64bc27f573836dba4122758b4743418c1b3"
+  integrity sha512-8vi4d50NNya/bQqCmaVzvHNmwHvS0OBKb7HNtuNwEE3scXWrP31fKQoGxNMT+KbzmrNZzatE3QK5p2gFONI/hg==
 
 "@resolver-engine/core@^0.3.3":
   version "0.3.3"
