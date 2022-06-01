@@ -8,7 +8,10 @@ import "../interfaces/IPerennialLens.sol";
  * @notice All functions should be called using `callStatic`
  */
 contract PerennialLens is IPerennialLens {
-    /// @dev Protocol controller
+    /**
+     * @notice Protocol controller
+     * @return Protocol controller
+     */
     IController public immutable controller;
 
     /// @param _controller Protocol controller address
@@ -34,8 +37,10 @@ contract PerennialLens is IPerennialLens {
         return product.productProvider().symbol();
     }
 
-    /// @notice Protocol collateral address
-    /// @return Protocol collateral address
+    /**
+     * @notice Protocol collateral address
+     * @return Protocol collateral address
+     */
     function collateral() public view returns (ICollateral) {
         return controller.collateral();
     }
@@ -308,19 +313,33 @@ contract PerennialLens is IPerennialLens {
 
     // TODO: all data for Product, all data for User, batching
 
+    /**
+     * @notice Returns the Product's latest position
+     * @dev Internal function, does not call settle itself
+     * @param product Product address
+     * @return Latest position for the product
+     */
     function latestPosition(IProduct product) internal view returns (Position memory) {
         return product.positionAtVersion(product.latestVersion());
     }
 
+    /**
+     * @notice Returns the Product's latest version
+     * @dev Internal function, does not call settle itself
+     * @param product Product address
+     * @return Latest version for the product
+     */
     function latestVersion(IProduct product) internal view returns (IOracleProvider.OracleVersion memory) {
         return product.productProvider().currentVersion();
     }
 
+    /// @dev Settles the product
     modifier settle(IProduct product) {
         product.settle();
         _;
     }
 
+    /// @dev Settles the product. product.settleAccount also settles the product
     modifier settleAccount(address account, IProduct product) {
         product.settleAccount(account);
         _;
