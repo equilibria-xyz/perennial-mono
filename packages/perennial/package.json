@@ -4,7 +4,7 @@
   "description": "Perennial Protocol Core",
   "private": true,
   "files": [
-    "contracts/!(test)",
+    "contracts/interfaces",
     "artifacts/contracts/interfaces",
     "deployments/!(localhost)"
   ],
