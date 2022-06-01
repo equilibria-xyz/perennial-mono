@@ -2,8 +2,12 @@
   "name": "@equilibria/perennial-provider-template",
   "version": "0.0.1",
   "description": "",
-  "main": "index.js",
   "private": true,
+  "files": [
+    "contracts/interfaces",
+    "artifacts/contracts/interfaces",
+    "deployments/!(localhost)"
+  ],
   "scripts": {
     "build": "yarn compile",
     "compile": "hardhat compile",
@@ -19,7 +23,8 @@
     "postinstall": "yarn build",
     "prepare": "husky install",
     "clean": "rm -rf cache artifacts types/generated",
-    "node:fork:kovan": "HARDHAT_DEPLOY_FORK=kovan FORK_NETWORK=kovan FORK_ENABLED=true hardhat node"
+    "node:fork:kovan": "HARDHAT_DEPLOY_FORK=kovan FORK_NETWORK=kovan FORK_ENABLED=true hardhat node",
+    "prepack": "yarn build && rm -rf ./artifacts/contracts/**/*.dbg.json"
   },
   "author": "",
   "license": "APACHE-2.0",
