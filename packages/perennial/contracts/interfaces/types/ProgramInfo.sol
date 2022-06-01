@@ -6,6 +6,7 @@ import "../IProduct.sol";
 import "./Position.sol";
 import "./Accumulator.sol";
 
+/// @dev ProgramInfo type
 struct ProgramInfo {
     /// @dev Coordinator for this program
     uint256 coordinatorId;
@@ -24,6 +25,11 @@ struct ProgramInfo {
 }
 using ProgramInfoLib for ProgramInfo global;
 
+/**
+ * @title ProgramInfoLib
+ * @notice Library that snapshots the static information for a single program.
+ * @dev This information does not change during the operation of a program.
+ */
 library ProgramInfoLib {
     uint256 private constant MIN_DURATION = 1 days;
     uint256 private constant MAX_DURATION = 2 * 365 days;

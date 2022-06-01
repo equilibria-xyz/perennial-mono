@@ -13,7 +13,7 @@ using ChainlinkRoundLib for ChainlinkRound global;
 
 /**
  * @title ChainlinkRoundLib
- * @notice Library that manages Chainlink round parsing
+ * @notice Library that manages Chainlink round parsing.
  */
 library ChainlinkRoundLib {
     /// @dev Phase ID offset location in the round ID

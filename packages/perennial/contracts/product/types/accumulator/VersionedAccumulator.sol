@@ -32,10 +32,22 @@ using VersionedAccumulatorLib for VersionedAccumulator global;
 library VersionedAccumulatorLib {
     using ProductProviderLib for IProductProvider;
 
+    /**
+     * @notice Returns the stamped value accumulator at `oracleVersion`
+     * @param self The struct to operate on
+     * @param oracleVersion The oracle version to retrieve the value at
+     * @return The stamped value accumulator at the requested version
+     */
     function valueAtVersion(VersionedAccumulator storage self, uint256 oracleVersion) internal view returns (Accumulator memory) {
         return self._valueAtVersion[oracleVersion].unpack();
     }
 
+    /**
+     * @notice Returns the stamped share accumulator at `oracleVersion`
+     * @param self The struct to operate on
+     * @param oracleVersion The oracle version to retrieve the share at
+     * @return The stamped share accumulator at the requested version
+     */
     function shareAtVersion(VersionedAccumulator storage self, uint256 oracleVersion) internal view returns (Accumulator memory) {
         return self._shareAtVersion[oracleVersion].unpack();
     }

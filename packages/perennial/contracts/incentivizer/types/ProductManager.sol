@@ -4,6 +4,7 @@ pragma solidity 0.8.14;
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "./Program.sol";
 
+/// @dev ProductManager type
 struct ProductManager {
     /// @dev Static program state
     ProgramInfo[] programInfos;
@@ -22,6 +23,10 @@ struct ProductManager {
 }
 using ProductManagerLib for ProductManager global;
 
+/**
+ * @title ProductManagerLib
+ * @notice Library that manages each product's incentivization state and logic.
+ */
 library ProductManagerLib {
     using EnumerableSet for EnumerableSet.UintSet;
 
