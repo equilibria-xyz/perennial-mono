@@ -56,7 +56,7 @@ describe('Happy Path', () => {
 
     await expect(product.connect(user).openMake(POSITION))
       .to.emit(product, 'MakeOpened')
-      .withArgs(user.address, POSITION)
+      .withArgs(user.address, INITIAL_VERSION, POSITION)
 
     // Check user is in the correct state
     expect(await product.isClosed(user.address)).to.equal(false)
@@ -114,7 +114,7 @@ describe('Happy Path', () => {
 
     await expect(product.connect(user).openMake(POSITION.div(2)))
       .to.emit(product, 'MakeOpened')
-      .withArgs(user.address, POSITION.div(2))
+      .withArgs(user.address, INITIAL_VERSION, POSITION.div(2))
 
     // Check user is in the correct state
     expect(await product.isClosed(user.address)).to.equal(false)
@@ -172,7 +172,7 @@ describe('Happy Path', () => {
 
     await expect(product.connect(user).closeMake(CLOSE_POSITION))
       .to.emit(product, 'MakeClosed')
-      .withArgs(user.address, CLOSE_POSITION)
+      .withArgs(user.address, INITIAL_VERSION, CLOSE_POSITION)
 
     // User state
     expect(await product.isClosed(user.address)).to.equal(true)
@@ -210,7 +210,7 @@ describe('Happy Path', () => {
 
     await expect(product.connect(user).closeMake(CLOSE_POSITION.div(2)))
       .to.emit(product, 'MakeClosed')
-      .withArgs(user.address, CLOSE_POSITION.div(2))
+      .withArgs(user.address, INITIAL_VERSION, CLOSE_POSITION.div(2))
 
     // User state
     expect(await product.isClosed(user.address)).to.equal(true)
@@ -248,7 +248,7 @@ describe('Happy Path', () => {
     await product.connect(user).openMake(MAKE_POSITION)
     await expect(product.connect(userB).openTake(TAKE_POSITION))
       .to.emit(product, 'TakeOpened')
-      .withArgs(userB.address, TAKE_POSITION)
+      .withArgs(userB.address, INITIAL_VERSION, TAKE_POSITION)
 
     // User State
     expect(await product.isClosed(userB.address)).to.equal(false)
@@ -313,7 +313,7 @@ describe('Happy Path', () => {
 
     await expect(product.connect(userB).openTake(TAKE_POSITION.div(2)))
       .to.emit(product, 'TakeOpened')
-      .withArgs(userB.address, TAKE_POSITION.div(2))
+      .withArgs(userB.address, INITIAL_VERSION, TAKE_POSITION.div(2))
 
     // User State
     expect(await product.isClosed(userB.address)).to.equal(false)
@@ -382,7 +382,7 @@ describe('Happy Path', () => {
 
     await expect(product.connect(userB).closeTake(CLOSE_TAKE_POSITION))
       .to.emit(product, 'TakeClosed')
-      .withArgs(userB.address, CLOSE_TAKE_POSITION)
+      .withArgs(userB.address, INITIAL_VERSION, CLOSE_TAKE_POSITION)
 
     // User State
     expect(await product.isClosed(userB.address)).to.equal(true)
@@ -427,7 +427,7 @@ describe('Happy Path', () => {
 
     await expect(product.connect(userB).closeTake(CLOSE_TAKE_POSITION.div(2)))
       .to.emit(product, 'TakeClosed')
-      .withArgs(userB.address, CLOSE_TAKE_POSITION.div(2))
+      .withArgs(userB.address, INITIAL_VERSION, CLOSE_TAKE_POSITION.div(2))
 
     // User State
     expect(await product.isClosed(userB.address)).to.equal(true)

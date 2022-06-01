@@ -10,10 +10,10 @@ import "./IProductProvider.sol";
 interface IProduct {
     event Settle(uint256 preVersion, uint256 toVersion);
     event AccountSettle(address indexed account, uint256 preVersion, uint256 toVersion);
-    event MakeOpened(address indexed account, UFixed18 amount);
-    event TakeOpened(address indexed account, UFixed18 amount);
-    event MakeClosed(address indexed account, UFixed18 amount);
-    event TakeClosed(address indexed account, UFixed18 amount);
+    event MakeOpened(address indexed account, uint256 version, UFixed18 amount);
+    event TakeOpened(address indexed account, uint256 version, UFixed18 amount);
+    event MakeClosed(address indexed account, uint256 version, UFixed18 amount);
+    event TakeClosed(address indexed account, uint256 version, UFixed18 amount);
 
     error ProductInsufficientLiquidityError(UFixed18 socializationFactor);
     error ProductDoubleSidedError();

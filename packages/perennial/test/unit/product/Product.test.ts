@@ -140,7 +140,7 @@ describe('Product', () => {
       it('opens the position', async () => {
         await expect(product.connect(user).openMake(POSITION))
           .to.emit(product, 'MakeOpened')
-          .withArgs(user.address, POSITION)
+          .withArgs(user.address, 1, POSITION)
 
         expect(await product.isClosed(user.address)).to.equal(false)
         expect(await product.maintenance(user.address)).to.equal(0)
@@ -166,7 +166,7 @@ describe('Product', () => {
       it('opens the position and settles', async () => {
         await expect(product.connect(user).openMake(POSITION))
           .to.emit(product, 'MakeOpened')
-          .withArgs(user.address, POSITION)
+          .withArgs(user.address, 1, POSITION)
 
         await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
         await productProvider.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
@@ -206,7 +206,7 @@ describe('Product', () => {
 
         await expect(product.connect(user).openMake(POSITION))
           .to.emit(product, 'MakeOpened')
-          .withArgs(user.address, POSITION)
+          .withArgs(user.address, 1, POSITION)
 
         expect(await product.isClosed(user.address)).to.equal(false)
         expect(await product.maintenance(user.address)).to.equal(0)
@@ -234,7 +234,7 @@ describe('Product', () => {
 
         await expect(product.connect(user).openMake(POSITION))
           .to.emit(product, 'MakeOpened')
-          .withArgs(user.address, POSITION)
+          .withArgs(user.address, 1, POSITION)
 
         await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
         await productProvider.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
@@ -279,7 +279,7 @@ describe('Product', () => {
 
         await expect(product.connect(user).openMake(POSITION))
           .to.emit(product, 'MakeOpened')
-          .withArgs(user.address, POSITION)
+          .withArgs(user.address, 2, POSITION)
 
         expect(await product.isClosed(user.address)).to.equal(false)
         expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
@@ -315,7 +315,7 @@ describe('Product', () => {
 
         await expect(product.connect(user).openMake(POSITION))
           .to.emit(product, 'MakeOpened')
-          .withArgs(user.address, POSITION)
+          .withArgs(user.address, 2, POSITION)
 
         await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
         await productProvider.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
@@ -353,7 +353,7 @@ describe('Product', () => {
       it('opens the position and settles later', async () => {
         await expect(product.connect(user).openMake(POSITION))
           .to.emit(product, 'MakeOpened')
-          .withArgs(user.address, POSITION)
+          .withArgs(user.address, 1, POSITION)
 
         await productProvider.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
 
@@ -402,7 +402,7 @@ describe('Product', () => {
 
         await expect(product.connect(user).openMake(POSITION))
           .to.emit(product, 'MakeOpened')
-          .withArgs(user.address, POSITION)
+          .withArgs(user.address, 1, POSITION)
 
         await productProvider.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
         await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_2)
@@ -490,7 +490,7 @@ describe('Product', () => {
       it('closes the position partially', async () => {
         await expect(product.connect(user).closeMake(POSITION.div(2)))
           .to.emit(product, 'MakeClosed')
-          .withArgs(user.address, POSITION.div(2))
+          .withArgs(user.address, 1, POSITION.div(2))
 
         expect(await product.isClosed(user.address)).to.equal(false)
         expect(await product.maintenance(user.address)).to.equal(0)
@@ -516,7 +516,7 @@ describe('Product', () => {
       it('closes the position', async () => {
         await expect(product.connect(user).closeMake(POSITION))
           .to.emit(product, 'MakeClosed')
-          .withArgs(user.address, POSITION)
+          .withArgs(user.address, 1, POSITION)
 
         expect(await product.isClosed(user.address)).to.equal(true)
         expect(await product.maintenance(user.address)).to.equal(0)
@@ -553,7 +553,7 @@ describe('Product', () => {
         it('closes the position', async () => {
           await expect(product.connect(user).closeMake(POSITION))
             .to.emit(product, 'MakeClosed')
-            .withArgs(user.address, POSITION)
+            .withArgs(user.address, 2, POSITION)
 
           expect(await product.isClosed(user.address)).to.equal(false)
           expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
@@ -579,7 +579,7 @@ describe('Product', () => {
         it('closes the position and settles', async () => {
           await expect(product.connect(user).closeMake(POSITION))
             .to.emit(product, 'MakeClosed')
-            .withArgs(user.address, POSITION)
+            .withArgs(user.address, 2, POSITION)
 
           await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
           await productProvider.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
@@ -619,7 +619,7 @@ describe('Product', () => {
 
           await expect(product.connect(user).closeMake(POSITION.div(2)))
             .to.emit(product, 'MakeClosed')
-            .withArgs(user.address, POSITION.div(2))
+            .withArgs(user.address, 2, POSITION.div(2))
 
           expect(await product.isClosed(user.address)).to.equal(false)
           expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
@@ -647,7 +647,7 @@ describe('Product', () => {
 
           await expect(product.connect(user).closeMake(POSITION.div(2)))
             .to.emit(product, 'MakeClosed')
-            .withArgs(user.address, POSITION.div(2))
+            .withArgs(user.address, 2, POSITION.div(2))
 
           await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
           await productProvider.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
@@ -692,7 +692,7 @@ describe('Product', () => {
 
           await expect(product.connect(user).closeMake(POSITION.div(2)))
             .to.emit(product, 'MakeClosed')
-            .withArgs(user.address, POSITION.div(2))
+            .withArgs(user.address, 3, POSITION.div(2))
 
           expect(await product.isClosed(user.address)).to.equal(false)
           expect(await product.maintenance(user.address)).to.equal(utils.parseEther('307.5'))
@@ -728,7 +728,7 @@ describe('Product', () => {
 
           await expect(product.connect(user).closeMake(POSITION.div(2)))
             .to.emit(product, 'MakeClosed')
-            .withArgs(user.address, POSITION.div(2))
+            .withArgs(user.address, 3, POSITION.div(2))
 
           await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_4)
           await productProvider.mock.atVersion.withArgs(4).returns(ORACLE_VERSION_4)
@@ -766,7 +766,7 @@ describe('Product', () => {
         it('closes the position and settles later', async () => {
           await expect(product.connect(user).closeMake(POSITION))
             .to.emit(product, 'MakeClosed')
-            .withArgs(user.address, POSITION)
+            .withArgs(user.address, 2, POSITION)
 
           await productProvider.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
           await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_3)
@@ -816,7 +816,7 @@ describe('Product', () => {
 
           await expect(product.connect(user).closeMake(POSITION))
             .to.emit(product, 'MakeClosed')
-            .withArgs(user.address, POSITION)
+            .withArgs(user.address, 2, POSITION)
 
           await productProvider.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
           await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_3)
@@ -889,7 +889,7 @@ describe('Product', () => {
       it('opens the position', async () => {
         await expect(product.connect(user).openTake(POSITION))
           .to.emit(product, 'TakeOpened')
-          .withArgs(user.address, POSITION)
+          .withArgs(user.address, 1, POSITION)
 
         expect(await product.isClosed(user.address)).to.equal(false)
         expect(await product.maintenance(user.address)).to.equal(0)
@@ -915,7 +915,7 @@ describe('Product', () => {
       it('opens the position and settles', async () => {
         await expect(product.connect(user).openTake(POSITION))
           .to.emit(product, 'TakeOpened')
-          .withArgs(user.address, POSITION)
+          .withArgs(user.address, 1, POSITION)
 
         await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
         await productProvider.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
@@ -955,7 +955,7 @@ describe('Product', () => {
 
         await expect(product.connect(user).openTake(POSITION))
           .to.emit(product, 'TakeOpened')
-          .withArgs(user.address, POSITION)
+          .withArgs(user.address, 1, POSITION)
 
         expect(await product.isClosed(user.address)).to.equal(false)
         expect(await product.maintenance(user.address)).to.equal(0)
@@ -983,7 +983,7 @@ describe('Product', () => {
 
         await expect(product.connect(user).openTake(POSITION))
           .to.emit(product, 'TakeOpened')
-          .withArgs(user.address, POSITION)
+          .withArgs(user.address, 1, POSITION)
 
         await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
         await productProvider.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
@@ -1028,7 +1028,7 @@ describe('Product', () => {
 
         await expect(product.connect(user).openTake(POSITION))
           .to.emit(product, 'TakeOpened')
-          .withArgs(user.address, POSITION)
+          .withArgs(user.address, 2, POSITION)
 
         expect(await product.isClosed(user.address)).to.equal(false)
         expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
@@ -1073,7 +1073,7 @@ describe('Product', () => {
 
         await expect(product.connect(user).openTake(POSITION))
           .to.emit(product, 'TakeOpened')
-          .withArgs(user.address, POSITION)
+          .withArgs(user.address, 2, POSITION)
 
         await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
         await productProvider.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
@@ -1128,7 +1128,7 @@ describe('Product', () => {
 
         await expect(product.connect(user).openTake(POSITION))
           .to.emit(product, 'TakeOpened')
-          .withArgs(user.address, POSITION)
+          .withArgs(user.address, 1, POSITION)
 
         await productProvider.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
 
@@ -1192,7 +1192,7 @@ describe('Product', () => {
 
         await expect(product.connect(user).openTake(POSITION))
           .to.emit(product, 'TakeOpened')
-          .withArgs(user.address, POSITION)
+          .withArgs(user.address, 1, POSITION)
 
         await productProvider.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
 
@@ -1270,7 +1270,7 @@ describe('Product', () => {
       it('closes the position partially', async () => {
         await expect(product.connect(user).closeTake(POSITION.div(2)))
           .to.emit(product, 'TakeClosed')
-          .withArgs(user.address, POSITION.div(2))
+          .withArgs(user.address, 1, POSITION.div(2))
 
         expect(await product.isClosed(user.address)).to.equal(false)
         expect(await product.maintenance(user.address)).to.equal(0)
@@ -1296,7 +1296,7 @@ describe('Product', () => {
       it('closes the position', async () => {
         await expect(product.connect(user).closeTake(POSITION))
           .to.emit(product, 'TakeClosed')
-          .withArgs(user.address, POSITION)
+          .withArgs(user.address, 1, POSITION)
 
         expect(await product.isClosed(user.address)).to.equal(true)
         expect(await product.maintenance(user.address)).to.equal(0)
@@ -1335,7 +1335,7 @@ describe('Product', () => {
         it('closes the position', async () => {
           await expect(product.connect(user).closeTake(POSITION))
             .to.emit(product, 'TakeClosed')
-            .withArgs(user.address, POSITION)
+            .withArgs(user.address, 2, POSITION)
 
           expect(await product.isClosed(user.address)).to.equal(false)
           expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
@@ -1370,7 +1370,7 @@ describe('Product', () => {
 
           await expect(product.connect(user).closeTake(POSITION))
             .to.emit(product, 'TakeClosed')
-            .withArgs(user.address, POSITION)
+            .withArgs(user.address, 2, POSITION)
 
           await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
           await productProvider.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
@@ -1416,7 +1416,7 @@ describe('Product', () => {
 
           await expect(product.connect(user).closeTake(POSITION.div(2)))
             .to.emit(product, 'TakeClosed')
-            .withArgs(user.address, POSITION.div(2))
+            .withArgs(user.address, 2, POSITION.div(2))
 
           expect(await product.isClosed(user.address)).to.equal(false)
           expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
@@ -1453,7 +1453,7 @@ describe('Product', () => {
 
           await expect(product.connect(user).closeTake(POSITION.div(2)))
             .to.emit(product, 'TakeClosed')
-            .withArgs(user.address, POSITION.div(2))
+            .withArgs(user.address, 2, POSITION.div(2))
 
           await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
           await productProvider.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
@@ -1513,7 +1513,7 @@ describe('Product', () => {
 
           await expect(product.connect(user).closeTake(POSITION.div(2)))
             .to.emit(product, 'TakeClosed')
-            .withArgs(user.address, POSITION.div(2))
+            .withArgs(user.address, 3, POSITION.div(2))
 
           expect(await product.isClosed(user.address)).to.equal(false)
           expect(await product.maintenance(user.address)).to.equal(utils.parseEther('307.5'))
@@ -1570,7 +1570,7 @@ describe('Product', () => {
 
           await expect(product.connect(user).closeTake(POSITION.div(2)))
             .to.emit(product, 'TakeClosed')
-            .withArgs(user.address, POSITION.div(2))
+            .withArgs(user.address, 3, POSITION.div(2))
 
           await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_4)
           await productProvider.mock.atVersion.withArgs(4).returns(ORACLE_VERSION_4)
@@ -1627,7 +1627,7 @@ describe('Product', () => {
 
           await expect(product.connect(user).closeTake(POSITION))
             .to.emit(product, 'TakeClosed')
-            .withArgs(user.address, POSITION)
+            .withArgs(user.address, 2, POSITION)
 
           await productProvider.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
 
@@ -1689,7 +1689,7 @@ describe('Product', () => {
 
           await expect(product.connect(user).closeTake(POSITION))
             .to.emit(product, 'TakeClosed')
-            .withArgs(user.address, POSITION)
+            .withArgs(user.address, 2, POSITION)
 
           await productProvider.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
 
@@ -2665,7 +2665,7 @@ describe('Product', () => {
       it('opens the position', async () => {
         await expect(product.connect(user).openMake(POSITION))
           .to.emit(product, 'MakeOpened')
-          .withArgs(user.address, POSITION)
+          .withArgs(user.address, 1, POSITION)
 
         expect(await product.isClosed(user.address)).to.equal(false)
         expect(await product.maintenance(user.address)).to.equal(0)
@@ -2691,7 +2691,7 @@ describe('Product', () => {
       it('opens the position and settles', async () => {
         await expect(product.connect(user).openMake(POSITION))
           .to.emit(product, 'MakeOpened')
-          .withArgs(user.address, POSITION)
+          .withArgs(user.address, 1, POSITION)
 
         await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
         await productProvider.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
@@ -2731,7 +2731,7 @@ describe('Product', () => {
 
         await expect(product.connect(user).openMake(POSITION))
           .to.emit(product, 'MakeOpened')
-          .withArgs(user.address, POSITION)
+          .withArgs(user.address, 1, POSITION)
 
         expect(await product.isClosed(user.address)).to.equal(false)
         expect(await product.maintenance(user.address)).to.equal(0)
@@ -2759,7 +2759,7 @@ describe('Product', () => {
 
         await expect(product.connect(user).openMake(POSITION))
           .to.emit(product, 'MakeOpened')
-          .withArgs(user.address, POSITION)
+          .withArgs(user.address, 1, POSITION)
 
         await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
         await productProvider.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
@@ -2804,7 +2804,7 @@ describe('Product', () => {
 
         await expect(product.connect(user).openMake(POSITION))
           .to.emit(product, 'MakeOpened')
-          .withArgs(user.address, POSITION)
+          .withArgs(user.address, 2, POSITION)
 
         expect(await product.isClosed(user.address)).to.equal(false)
         expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
@@ -2840,7 +2840,7 @@ describe('Product', () => {
 
         await expect(product.connect(user).openMake(POSITION))
           .to.emit(product, 'MakeOpened')
-          .withArgs(user.address, POSITION)
+          .withArgs(user.address, 2, POSITION)
 
         await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
         await productProvider.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
@@ -2878,7 +2878,7 @@ describe('Product', () => {
       it('opens the position and settles later', async () => {
         await expect(product.connect(user).openMake(POSITION))
           .to.emit(product, 'MakeOpened')
-          .withArgs(user.address, POSITION)
+          .withArgs(user.address, 1, POSITION)
 
         await productProvider.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
 
@@ -2927,7 +2927,7 @@ describe('Product', () => {
 
         await expect(product.connect(user).openMake(POSITION))
           .to.emit(product, 'MakeOpened')
-          .withArgs(user.address, POSITION)
+          .withArgs(user.address, 1, POSITION)
 
         await productProvider.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
 
@@ -3013,7 +3013,7 @@ describe('Product', () => {
       it('closes the position partially', async () => {
         await expect(product.connect(user).closeMake(POSITION.div(2)))
           .to.emit(product, 'MakeClosed')
-          .withArgs(user.address, POSITION.div(2))
+          .withArgs(user.address, 1, POSITION.div(2))
 
         expect(await product.isClosed(user.address)).to.equal(false)
         expect(await product.maintenance(user.address)).to.equal(0)
@@ -3039,7 +3039,7 @@ describe('Product', () => {
       it('closes the position', async () => {
         await expect(product.connect(user).closeMake(POSITION))
           .to.emit(product, 'MakeClosed')
-          .withArgs(user.address, POSITION)
+          .withArgs(user.address, 1, POSITION)
 
         expect(await product.isClosed(user.address)).to.equal(true)
         expect(await product.maintenance(user.address)).to.equal(0)
@@ -3076,7 +3076,7 @@ describe('Product', () => {
         it('closes the position', async () => {
           await expect(product.connect(user).closeMake(POSITION))
             .to.emit(product, 'MakeClosed')
-            .withArgs(user.address, POSITION)
+            .withArgs(user.address, 2, POSITION)
 
           expect(await product.isClosed(user.address)).to.equal(false)
           expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
@@ -3102,7 +3102,7 @@ describe('Product', () => {
         it('closes the position and settles', async () => {
           await expect(product.connect(user).closeMake(POSITION))
             .to.emit(product, 'MakeClosed')
-            .withArgs(user.address, POSITION)
+            .withArgs(user.address, 2, POSITION)
 
           await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
           await productProvider.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
@@ -3142,7 +3142,7 @@ describe('Product', () => {
 
           await expect(product.connect(user).closeMake(POSITION.div(2)))
             .to.emit(product, 'MakeClosed')
-            .withArgs(user.address, POSITION.div(2))
+            .withArgs(user.address, 2, POSITION.div(2))
 
           expect(await product.isClosed(user.address)).to.equal(false)
           expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
@@ -3170,7 +3170,7 @@ describe('Product', () => {
 
           await expect(product.connect(user).closeMake(POSITION.div(2)))
             .to.emit(product, 'MakeClosed')
-            .withArgs(user.address, POSITION.div(2))
+            .withArgs(user.address, 2, POSITION.div(2))
 
           await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
           await productProvider.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
@@ -3215,7 +3215,7 @@ describe('Product', () => {
 
           await expect(product.connect(user).closeMake(POSITION.div(2)))
             .to.emit(product, 'MakeClosed')
-            .withArgs(user.address, POSITION.div(2))
+            .withArgs(user.address, 3, POSITION.div(2))
 
           expect(await product.isClosed(user.address)).to.equal(false)
           expect(await product.maintenance(user.address)).to.equal(utils.parseEther('307.5'))
@@ -3250,7 +3250,7 @@ describe('Product', () => {
 
           await expect(product.connect(user).closeMake(POSITION.div(2)))
             .to.emit(product, 'MakeClosed')
-            .withArgs(user.address, POSITION.div(2))
+            .withArgs(user.address, 3, POSITION.div(2))
 
           await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_4)
           await productProvider.mock.atVersion.withArgs(4).returns(ORACLE_VERSION_4)
@@ -3288,7 +3288,7 @@ describe('Product', () => {
         it('closes the position and settles later', async () => {
           await expect(product.connect(user).closeMake(POSITION))
             .to.emit(product, 'MakeClosed')
-            .withArgs(user.address, POSITION)
+            .withArgs(user.address, 2, POSITION)
 
           await productProvider.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
 
@@ -3337,7 +3337,7 @@ describe('Product', () => {
 
           await expect(product.connect(user).closeMake(POSITION))
             .to.emit(product, 'MakeClosed')
-            .withArgs(user.address, POSITION)
+            .withArgs(user.address, 2, POSITION)
 
           await productProvider.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
 
@@ -3408,7 +3408,7 @@ describe('Product', () => {
       it('opens the position', async () => {
         await expect(product.connect(user).openTake(POSITION))
           .to.emit(product, 'TakeOpened')
-          .withArgs(user.address, POSITION)
+          .withArgs(user.address, 1, POSITION)
 
         expect(await product.isClosed(user.address)).to.equal(false)
         expect(await product.maintenance(user.address)).to.equal(0)
@@ -3434,7 +3434,7 @@ describe('Product', () => {
       it('opens the position and settles', async () => {
         await expect(product.connect(user).openTake(POSITION))
           .to.emit(product, 'TakeOpened')
-          .withArgs(user.address, POSITION)
+          .withArgs(user.address, 1, POSITION)
 
         await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
         await productProvider.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
@@ -3474,7 +3474,7 @@ describe('Product', () => {
 
         await expect(product.connect(user).openTake(POSITION))
           .to.emit(product, 'TakeOpened')
-          .withArgs(user.address, POSITION)
+          .withArgs(user.address, 1, POSITION)
 
         expect(await product.isClosed(user.address)).to.equal(false)
         expect(await product.maintenance(user.address)).to.equal(0)
@@ -3502,7 +3502,7 @@ describe('Product', () => {
 
         await expect(product.connect(user).openTake(POSITION))
           .to.emit(product, 'TakeOpened')
-          .withArgs(user.address, POSITION)
+          .withArgs(user.address, 1, POSITION)
 
         await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
         await productProvider.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
@@ -3547,7 +3547,7 @@ describe('Product', () => {
 
         await expect(product.connect(user).openTake(POSITION))
           .to.emit(product, 'TakeOpened')
-          .withArgs(user.address, POSITION)
+          .withArgs(user.address, 2, POSITION)
 
         expect(await product.isClosed(user.address)).to.equal(false)
         expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
@@ -3592,7 +3592,7 @@ describe('Product', () => {
 
         await expect(product.connect(user).openTake(POSITION))
           .to.emit(product, 'TakeOpened')
-          .withArgs(user.address, POSITION)
+          .withArgs(user.address, 2, POSITION)
 
         await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
         await productProvider.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
@@ -3647,7 +3647,7 @@ describe('Product', () => {
 
         await expect(product.connect(user).openTake(POSITION))
           .to.emit(product, 'TakeOpened')
-          .withArgs(user.address, POSITION)
+          .withArgs(user.address, 1, POSITION)
 
         await productProvider.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
 
@@ -3711,7 +3711,7 @@ describe('Product', () => {
 
         await expect(product.connect(user).openTake(POSITION))
           .to.emit(product, 'TakeOpened')
-          .withArgs(user.address, POSITION)
+          .withArgs(user.address, 1, POSITION)
 
         await productProvider.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
 
@@ -3797,7 +3797,7 @@ describe('Product', () => {
       it('closes the position partially', async () => {
         await expect(product.connect(user).closeTake(POSITION.div(2)))
           .to.emit(product, 'TakeClosed')
-          .withArgs(user.address, POSITION.div(2))
+          .withArgs(user.address, 1, POSITION.div(2))
 
         expect(await product.isClosed(user.address)).to.equal(false)
         expect(await product.maintenance(user.address)).to.equal(0)
@@ -3823,7 +3823,7 @@ describe('Product', () => {
       it('closes the position', async () => {
         await expect(product.connect(user).closeTake(POSITION))
           .to.emit(product, 'TakeClosed')
-          .withArgs(user.address, POSITION)
+          .withArgs(user.address, 1, POSITION)
 
         expect(await product.isClosed(user.address)).to.equal(true)
         expect(await product.maintenance(user.address)).to.equal(0)
@@ -3861,7 +3861,7 @@ describe('Product', () => {
         it('closes the position', async () => {
           await expect(product.connect(user).closeTake(POSITION))
             .to.emit(product, 'TakeClosed')
-            .withArgs(user.address, POSITION)
+            .withArgs(user.address, 2, POSITION)
 
           expect(await product.isClosed(user.address)).to.equal(false)
           expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
@@ -3896,7 +3896,7 @@ describe('Product', () => {
 
           await expect(product.connect(user).closeTake(POSITION))
             .to.emit(product, 'TakeClosed')
-            .withArgs(user.address, POSITION)
+            .withArgs(user.address, 2, POSITION)
 
           await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
           await productProvider.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
@@ -3942,7 +3942,7 @@ describe('Product', () => {
 
           await expect(product.connect(user).closeTake(POSITION.div(2)))
             .to.emit(product, 'TakeClosed')
-            .withArgs(user.address, POSITION.div(2))
+            .withArgs(user.address, 2, POSITION.div(2))
 
           expect(await product.isClosed(user.address)).to.equal(false)
           expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
@@ -3979,7 +3979,7 @@ describe('Product', () => {
 
           await expect(product.connect(user).closeTake(POSITION.div(2)))
             .to.emit(product, 'TakeClosed')
-            .withArgs(user.address, POSITION.div(2))
+            .withArgs(user.address, 2, POSITION.div(2))
 
           await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
           await productProvider.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
@@ -4039,7 +4039,7 @@ describe('Product', () => {
 
           await expect(product.connect(user).closeTake(POSITION.div(2)))
             .to.emit(product, 'TakeClosed')
-            .withArgs(user.address, POSITION.div(2))
+            .withArgs(user.address, 3, POSITION.div(2))
 
           expect(await product.isClosed(user.address)).to.equal(false)
           expect(await product.maintenance(user.address)).to.equal(utils.parseEther('307.5'))
@@ -4095,7 +4095,7 @@ describe('Product', () => {
 
           await expect(product.connect(user).closeTake(POSITION.div(2)))
             .to.emit(product, 'TakeClosed')
-            .withArgs(user.address, POSITION.div(2))
+            .withArgs(user.address, 3, POSITION.div(2))
 
           await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_4)
           await productProvider.mock.atVersion.withArgs(4).returns(ORACLE_VERSION_4)
@@ -4152,7 +4152,7 @@ describe('Product', () => {
 
           await expect(product.connect(user).closeTake(POSITION))
             .to.emit(product, 'TakeClosed')
-            .withArgs(user.address, POSITION)
+            .withArgs(user.address, 2, POSITION)
 
           await productProvider.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
 
@@ -4214,7 +4214,7 @@ describe('Product', () => {
 
           await expect(product.connect(user).closeTake(POSITION))
             .to.emit(product, 'TakeClosed')
-            .withArgs(user.address, POSITION)
+            .withArgs(user.address, 2, POSITION)
 
           await productProvider.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
 
