@@ -1,6 +1,6 @@
 {
   "name": "@equilibria/perennial",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Perennial Protocol Core",
   "private": true,
   "files": [
@@ -28,9 +28,13 @@
   },
   "author": "",
   "license": "Apache-2.0",
+  "dependencies": {
+    "@chainlink/contracts": "0.3.1",
+    "@equilibria/emptyset-batcher": "0.0.4",
+    "@equilibria/root": "0.1.5",
+    "@openzeppelin/contracts": "4.6.0"
+  },
   "devDependencies": {
-    "@chainlink/contracts": "^0.3.1",
-    "@equilibria/emptyset-batcher": "0.0.2",
     "@ethersproject/abstract-provider": "^5",
     "@ethersproject/abstract-signer": "^5",
     "lodash": "^4.17.15"
