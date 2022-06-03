@@ -2,10 +2,11 @@
   "name": "@equilibria/perennial-provider",
   "version": "0.1.5",
   "description": "Library for Perennial product providers",
-  "private": true,
   "files": [
-    "contracts/interfaces",
-    "artifacts/contracts/interfaces",
+    "contracts/oracle",
+    "contracts/product",
+    "artifacts/contracts/oracle",
+    "artifacts/contracts/product",
     "deployments/!(localhost)"
   ],
   "scripts": {
@@ -21,7 +22,6 @@
     "lint": "eslint --fix --ext '.ts,.js' ./ && solhint 'contracts/**/*.sol' --fix",
     "format": "prettier -w .",
     "postinstall": "yarn build",
-    "prepare": "husky install",
     "clean": "rm -rf cache artifacts types/generated",
     "node:fork:kovan": "HARDHAT_DEPLOY_FORK=kovan FORK_NETWORK=kovan FORK_ENABLED=true hardhat node",
     "prepack": "yarn build && rm -rf ./artifacts/contracts/**/*.dbg.json"
