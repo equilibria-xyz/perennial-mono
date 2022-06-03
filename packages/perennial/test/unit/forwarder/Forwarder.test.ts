@@ -81,5 +81,30 @@ describe('Forwarder', () => {
       expect(batcher.wrap).to.have.been.calledOnceWith(utils.parseEther('10'), forwarder.address)
       expect(collateral.depositTo).to.have.been.calledOnceWith(account.address, product.address, utils.parseEther('10'))
     })
+
+    it('rounds correctly', async () => {
+      usdc.transferFrom.whenCalledWith(user.address, forwarder.address, 1e6).returns(true)
+      batcher.wrap.whenCalledWith(utils.parseEther('0.999999999999'), forwarder.address).returns()
+      collateral.depositTo.whenCalledWith(account.address, product, utils.parseEther('10')).returns()
+
+      await expect(
+        forwarder.connect(user).wrapAndDeposit(
+          account.address,
+          product.address,
+          utils.parseEther('0.999999999999'),
+          { gasLimit: 30e6 }, // https://github.com/defi-wonderland/smock/issues/99
+        ),
+      )
+        .to.emit(forwarder, 'WrapAndDeposit')
+        .withArgs(account.address, product.address, utils.parseEther('0.999999999999'))
+
+      expect(usdc.transferFrom).to.have.been.calledOnceWith(user.address, forwarder.address, 1e6)
+      expect(batcher.wrap).to.have.been.calledOnceWith(utils.parseEther('0.999999999999'), forwarder.address)
+      expect(collateral.depositTo).to.have.been.calledOnceWith(
+        account.address,
+        product.address,
+        utils.parseEther('0.999999999999'),
+      )
+    })
   })
 })
