@@ -1,6 +1,6 @@
 {
   "name": "@equilibria/perennial-provider",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Library for Perennial product providers",
   "files": [
     "contracts/oracle",
@@ -21,7 +21,7 @@
     "coverage:integration": "FORK_ENABLED=true FORK_BLOCK_NUMBER=14325080 hardhat coverage --testfiles 'test/integration/*'",
     "lint": "eslint --fix --ext '.ts,.js' ./ && solhint 'contracts/**/*.sol' --fix",
     "format": "prettier -w .",
-    "postinstall": "yarn build",
+    "prepare": "yarn build",
     "clean": "rm -rf cache artifacts types/generated",
     "node:fork:kovan": "HARDHAT_DEPLOY_FORK=kovan FORK_NETWORK=kovan FORK_ENABLED=true hardhat node",
     "prepack": "yarn build && rm -rf ./artifacts/contracts/**/*.dbg.json"
@@ -29,7 +29,7 @@
   "author": "",
   "license": "APACHE-2.0",
   "dependencies": {
-    "@equilibria/perennial": "0.1.5",
+    "@equilibria/perennial": "0.1.6",
     "@equilibria/root": "0.1.5",
     "@openzeppelin/contracts": "4.6.0"
   }
