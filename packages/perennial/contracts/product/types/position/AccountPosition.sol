@@ -35,7 +35,10 @@ library AccountPositionLib {
     ) internal returns (UFixed18 positionFee) {
         bool settled;
         (self.position, positionFee, settled) = self.position.settled(self.pre, provider, toOracleVersion);
-        if (settled) delete self.pre;
+        if (settled) {
+            delete self.pre;
+            self.liquidation = false;
+        }
     }
 
     /**
