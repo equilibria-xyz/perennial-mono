@@ -443,6 +443,31 @@ describe('Product', () => {
         expect(await product['latestVersion(address)'](user.address)).to.equal(3)
       })
 
+      it('opens the position with settle after liquidation', async () => {
+        await product.connect(user).openMake(POSITION)
+
+        await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
+        await productProvider.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
+        await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
+        await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_2)
+
+        // Liquidate the user
+        await product.connect(collateralSigner).closeAll(user.address)
+        // User can't open a new position yet
+        await expect(product.connect(user).openMake(POSITION)).to.be.revertedWith('ProductInLiquidationError()')
+
+        // Advance version
+        await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
+        await productProvider.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_3)
+        await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
+        await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_3)
+
+        // Liquidation flag is cleared during settle flow
+        await expect(product.connect(user).openMake(POSITION))
+          .to.emit(product, 'MakeOpened')
+          .withArgs(user.address, 3, POSITION)
+      })
+
       it('reverts if oracle not bootstrapped', async () => {
         await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_0)
         await productProvider.mock.atVersion.withArgs(0).returns(ORACLE_VERSION_0)
@@ -1236,6 +1261,31 @@ describe('Product', () => {
           closePosition: { maker: 0, taker: 0 },
         })
         expect(await product['latestVersion(address)'](user.address)).to.equal(3)
+      })
+
+      it('opens the position with settle after liquidation', async () => {
+        await product.connect(user).openTake(POSITION)
+
+        await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
+        await productProvider.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
+        await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
+        await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_2)
+
+        // Liquidate the user
+        await product.connect(collateralSigner).closeAll(user.address)
+        // User can't open a new position yet
+        await expect(product.connect(user).openTake(POSITION)).to.be.revertedWith('ProductInLiquidationError()')
+
+        // Advance version
+        await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
+        await productProvider.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_3)
+        await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
+        await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_3)
+
+        // Liquidation flag is cleared during settle flow
+        await expect(product.connect(user).openTake(POSITION))
+          .to.emit(product, 'TakeOpened')
+          .withArgs(user.address, 3, POSITION)
       })
 
       it('reverts if taker > maker', async () => {
@@ -2967,6 +3017,31 @@ describe('Product', () => {
         expect(await product['latestVersion(address)'](user.address)).to.equal(3)
       })
 
+      it('opens the position with settle after liquidation', async () => {
+        await product.connect(user).openMake(POSITION)
+
+        await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
+        await productProvider.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
+        await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
+        await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_2)
+
+        // Liquidate the user
+        await product.connect(collateralSigner).closeAll(user.address)
+        // User can't open a new position yet
+        await expect(product.connect(user).openMake(POSITION)).to.be.revertedWith('ProductInLiquidationError()')
+
+        // Advance version
+        await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
+        await productProvider.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_3)
+        await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
+        await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_3)
+
+        // Liquidation flag is cleared during settle flow
+        await expect(product.connect(user).openMake(POSITION))
+          .to.emit(product, 'MakeOpened')
+          .withArgs(user.address, 3, POSITION)
+      })
+
       it('reverts if oracle not bootstrapped', async () => {
         await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_0)
         await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_0)
@@ -3755,6 +3830,31 @@ describe('Product', () => {
           closePosition: { maker: 0, taker: 0 },
         })
         expect(await product['latestVersion(address)'](user.address)).to.equal(3)
+      })
+
+      it('opens the position with settle after liquidation', async () => {
+        await product.connect(user).openTake(POSITION)
+
+        await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
+        await productProvider.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
+        await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
+        await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_2)
+
+        // Liquidate the user
+        await product.connect(collateralSigner).closeAll(user.address)
+        // User can't open a new position yet
+        await expect(product.connect(user).openTake(POSITION)).to.be.revertedWith('ProductInLiquidationError()')
+
+        // Advance version
+        await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
+        await productProvider.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_3)
+        await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
+        await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_3)
+
+        // Liquidation flag is cleared during settle flow
+        await expect(product.connect(user).openTake(POSITION))
+          .to.emit(product, 'TakeOpened')
+          .withArgs(user.address, 3, POSITION)
       })
 
       it('reverts if can liquidate', async () => {
