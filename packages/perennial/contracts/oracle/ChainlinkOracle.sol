@@ -12,7 +12,7 @@ import "./types/ChainlinkRegistry.sol";
  * @notice Chainlink implementation of the IOracle interface.
  * @dev One instance per Chainlink price feed should be deployed. Multiple products may use the same
  *      ChainlinkOracle instance if their payoff functions are based on the same underlying oracle.
- *      This implementation only support non-negative prices.
+ *      This implementation only supports non-negative prices.
  */
 contract ChainlinkOracle is IOracleProvider, UOwnable {
     /// @dev Chainlink registry feed address
@@ -44,6 +44,8 @@ contract ChainlinkOracle is IOracleProvider, UOwnable {
         _startingVersionForPhaseId.push(0); // phaseId is 1-indexed, skip index 0
         _startingVersionForPhaseId.push(0); // phaseId is 1-indexed, first phase starts as version 0
         _decimalOffset = SafeCast.toInt256(10 ** registry_.decimals(base, quote));
+
+        __UOwnable__initialize();
     }
 
     /**
