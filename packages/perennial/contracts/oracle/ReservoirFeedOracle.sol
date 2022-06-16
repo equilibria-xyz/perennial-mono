@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.14;
 
-import "@equilibria/root/control/unstructured/UOwnable.sol";
 import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import "../interfaces/IOracleProvider.sol";
@@ -12,7 +11,9 @@ import "../interfaces/IOracleProvider.sol";
  * @dev This is a naive implementation which pushes all validation to the underlying. No staleness checks are possible
         This oracle should not be used for regular Chainlink Data Feeds
  */
-contract ReservoirFeedOracle is IOracleProvider, UOwnable {
+contract ReservoirFeedOracle is IOracleProvider {
+    error InvalidOracleVersion();
+
     /// @dev Chainlink price feed to read from
     AggregatorV3Interface public immutable feed;
 
@@ -21,17 +22,16 @@ contract ReservoirFeedOracle is IOracleProvider, UOwnable {
 
     /**
      * @notice Initializes the contract state
-     * @param feed_ Chainlink price feed
+     * @param feed_ Reservoir price feed
      */
     constructor(AggregatorV3Interface feed_) {
         feed = feed_;
         _decimalOffset = SafeCast.toInt256(10 ** feed_.decimals());
-
-        __UOwnable__initialize();
     }
 
     /**
-     * @notice Checks for a new price. Performs no staleness validation as the underlying oracle does not support this.
+     * @notice Checks for a new price. Does not perform staleness validation as the underlying oracle does not
+                support this.
      * @return The current oracle version after sync
      */
     function sync() external view returns (OracleVersion memory) {
@@ -56,9 +56,8 @@ contract ReservoirFeedOracle is IOracleProvider, UOwnable {
      * @return oracleVersion Oracle version at version `version`
      */
     function atVersion(uint256 version) public view returns (OracleVersion memory oracleVersion) {
-        require(version <= type(uint80).max, "Invalid Oracle Version");
-        uint80 feedVersion = uint80(version) - 1;
-        (uint80 roundId, int256 feedPrice, , uint256 timestamp,) = feed.getRoundData(feedVersion);
+        if (version > type(uint80).max) revert InvalidOracleVersion();
+        (uint80 roundId, int256 feedPrice, , uint256 timestamp,) = feed.getRoundData(uint80(version));
 
         return _buildOracleVersion(roundId, feedPrice, timestamp);
     }
@@ -75,6 +74,6 @@ contract ReservoirFeedOracle is IOracleProvider, UOwnable {
         Fixed18 price = Fixed18Lib.ratio(feedPrice, _decimalOffset);
 
         // The underlying feed uses 0-indexed rounds, add 1 here to offset that
-        return OracleVersion({ version: roundId + 1, timestamp: timestamp, price: price });
+        return OracleVersion({ version: roundId, timestamp: timestamp, price: price });
     }
 }

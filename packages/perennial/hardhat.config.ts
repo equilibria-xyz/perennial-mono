@@ -115,6 +115,7 @@ const config: HardhatUserConfig = {
       '@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol',
       '@openzeppelin/contracts/governance/TimelockController.sol',
       '@openzeppelin/contracts/token/ERC20/presets/ERC20PresetMinterPauser.sol',
+      '@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol',
     ],
   },
   namedAccounts: {

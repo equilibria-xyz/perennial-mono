@@ -2,7 +2,6 @@
 pragma solidity 0.8.14;
 
 import "@chainlink/contracts/src/v0.8/interfaces/FeedRegistryInterface.sol";
-import "@equilibria/root/control/unstructured/UOwnable.sol";
 import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "../interfaces/IOracleProvider.sol";
 import "./types/ChainlinkRegistry.sol";
@@ -14,7 +13,7 @@ import "./types/ChainlinkRegistry.sol";
  *      ChainlinkOracle instance if their payoff functions are based on the same underlying oracle.
  *      This implementation only supports non-negative prices.
  */
-contract ChainlinkOracle is IOracleProvider, UOwnable {
+contract ChainlinkOracle is IOracleProvider {
     /// @dev Chainlink registry feed address
     ChainlinkRegistry public immutable registry;
 
@@ -44,8 +43,6 @@ contract ChainlinkOracle is IOracleProvider, UOwnable {
         _startingVersionForPhaseId.push(0); // phaseId is 1-indexed, skip index 0
         _startingVersionForPhaseId.push(0); // phaseId is 1-indexed, first phase starts as version 0
         _decimalOffset = SafeCast.toInt256(10 ** registry_.decimals(base, quote));
-
-        __UOwnable__initialize();
     }
 
     /**
