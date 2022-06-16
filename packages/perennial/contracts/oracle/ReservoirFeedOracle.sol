@@ -21,16 +21,16 @@ contract ReservoirFeedOracle is IOracleProvider {
     int256 private immutable _decimalOffset;
 
     /// @dev Which underlying round to consider version 0
-    uint80 private immutable _versionZeroRound;
+    uint80 private immutable _versionOffset;
 
     /**
      * @notice Initializes the contract state
      * @param feed_ Reservoir price feed
-     * @param versionZeroRound_ Round to use when requesting data at version 0
+     * @param versionOffset_ Version offset from source round ID
      */
-    constructor(AggregatorV3Interface feed_, uint80 versionZeroRound_) {
+    constructor(AggregatorV3Interface feed_, uint80 versionOffset_) {
         feed = feed_;
-        _versionZeroRound = versionZeroRound_;
+        _versionOffset = versionOffset_;
         _decimalOffset = SafeCast.toInt256(10 ** feed_.decimals());
     }
 
@@ -56,20 +56,22 @@ contract ReservoirFeedOracle is IOracleProvider {
     }
 
     /**
-     * @notice Returns the current oracle version
+     * @notice Returns the oracle version specified
+     * @dev Converts the passed in version to a roundID by adding _versionOffset
      * @param version The version of which to lookup
      * @return oracleVersion Oracle version at version `version`
      */
     function atVersion(uint256 version) public view returns (OracleVersion memory oracleVersion) {
-        if (version > type(uint80).max) revert InvalidOracleVersion();
-        if (version == 0) version = _versionZeroRound;
-        (uint80 roundId, int256 feedPrice, , uint256 timestamp,) = feed.getRoundData(uint80(version));
+        uint256 feedRoundID = version + _versionOffset;
+        if (feedRoundID > type(uint80).max) revert InvalidOracleVersion();
+        (uint80 roundId, int256 feedPrice, , uint256 timestamp,) = feed.getRoundData(uint80(feedRoundID));
 
         return _buildOracleVersion(roundId, feedPrice, timestamp);
     }
 
     /**
      * @notice Builds an oracle version object from a Chainlink round object
+     * @dev Converts the passed in roundID to a version by subtracting _versionOffset
      * @param roundId ReservoirRoundId round to build from
      * @param feedPrice price returns by the oracle
      * @param timestamp round timestamps
@@ -80,6 +82,6 @@ contract ReservoirFeedOracle is IOracleProvider {
         Fixed18 price = Fixed18Lib.ratio(feedPrice, _decimalOffset);
 
         // The underlying feed uses 0-indexed rounds, add 1 here to offset that
-        return OracleVersion({ version: roundId, timestamp: timestamp, price: price });
+        return OracleVersion({ version: roundId - _versionOffset, timestamp: timestamp, price: price });
     }
 }

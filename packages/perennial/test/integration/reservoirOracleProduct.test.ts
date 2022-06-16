@@ -12,7 +12,8 @@ import {
 } from '../../types/generated'
 import { deployments } from 'hardhat'
 
-const INITIAL_VERSION = BigNumber.from('73786976294838209800')
+const VERSION_OFFSET = BigNumber.from('73786976294838209800')
+const INITIAL_VERSION = BigNumber.from(1)
 
 describe('Reservoir Oracle Product', () => {
   let instanceVars: InstanceVars
@@ -26,12 +27,12 @@ describe('Reservoir Oracle Product', () => {
     // Reservoir has not deployed their feed adaptor to mainnet, so for now use Chainlink's DPI feed as a standin
     // TODO(arjun): Update this with Reservoir's mainnet deploy
     const baycUSDCFeed = (await deployments.get('ChainlinkDPIFeed')).address
-    oracleFeed = new DataFeedContext(baycUSDCFeed, INITIAL_VERSION)
+    oracleFeed = new DataFeedContext(baycUSDCFeed, VERSION_OFFSET)
     await oracleFeed.init()
 
     const reservoirOracle = await new ReservoirFeedOracle__factory(owner).deploy(
       oracleFeed.feed.address,
-      INITIAL_VERSION,
+      VERSION_OFFSET,
     )
     baycUSDCProductProvider = await new TestnetProductProvider__factory(owner).deploy(reservoirOracle.address, {
       minRate: 0,
@@ -39,6 +40,8 @@ describe('Reservoir Oracle Product', () => {
       targetRate: utils.parseEther('0.80'),
       targetUtilization: utils.parseEther('0.80'),
     })
+
+    await oracleFeed.next()
   })
 
   it('creates a product', async () => {
