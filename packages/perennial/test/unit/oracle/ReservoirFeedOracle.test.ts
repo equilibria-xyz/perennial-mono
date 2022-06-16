@@ -174,5 +174,9 @@ describe('ReservoirFeedOracle', () => {
       expect(atVersion.timestamp).to.equal(TIMESTAMP_START)
       expect(atVersion.version).to.equal(12)
     })
+
+    it('reverts if reading an invalid version', async () => {
+      await expect(oracle.atVersion(utils.parseEther('10000000000000000'))).to.be.revertedWith('InvalidOracleVersion()')
+    })
   })
 })
