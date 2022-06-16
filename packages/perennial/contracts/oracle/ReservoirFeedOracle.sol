@@ -20,7 +20,7 @@ contract ReservoirFeedOracle is IOracleProvider {
     /// @dev Decimal offset used to normalize chainlink price to 18 decimals
     int256 private immutable _decimalOffset;
 
-    /// @dev Which underlying round to consider version 0
+    /// @dev Which underlying round to consider version 0: version = roundId - _versionOffset
     uint80 private immutable _versionOffset;
 
     /**
@@ -62,6 +62,7 @@ contract ReservoirFeedOracle is IOracleProvider {
      * @return oracleVersion Oracle version at version `version`
      */
     function atVersion(uint256 version) public view returns (OracleVersion memory oracleVersion) {
+        // To convert from version to roundId, we add the versionOffset
         uint256 feedRoundID = version + _versionOffset;
         if (feedRoundID > type(uint80).max) revert InvalidOracleVersion();
         (uint80 roundId, int256 feedPrice, , uint256 timestamp,) = feed.getRoundData(uint80(feedRoundID));
@@ -81,7 +82,7 @@ contract ReservoirFeedOracle is IOracleProvider {
     private view returns (OracleVersion memory) {
         Fixed18 price = Fixed18Lib.ratio(feedPrice, _decimalOffset);
 
-        // The underlying feed uses 0-indexed rounds, add 1 here to offset that
+        // To convert from roundId to version, we subtract the versionOffset
         return OracleVersion({ version: roundId - _versionOffset, timestamp: timestamp, price: price });
     }
 }

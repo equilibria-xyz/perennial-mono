@@ -2,6 +2,7 @@
 pragma solidity 0.8.14;
 
 import "@chainlink/contracts/src/v0.8/interfaces/FeedRegistryInterface.sol";
+import "@equilibria/root/control/unstructured/UOwnable.sol";
 import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "../interfaces/IOracleProvider.sol";
 import "./types/ChainlinkRegistry.sol";
@@ -11,9 +12,9 @@ import "./types/ChainlinkRegistry.sol";
  * @notice Chainlink implementation of the IOracle interface.
  * @dev One instance per Chainlink price feed should be deployed. Multiple products may use the same
  *      ChainlinkOracle instance if their payoff functions are based on the same underlying oracle.
- *      This implementation only supports non-negative prices.
+ *      This implementation only support non-negative prices.
  */
-contract ChainlinkOracle is IOracleProvider {
+contract ChainlinkOracle is IOracleProvider, UOwnable {
     /// @dev Chainlink registry feed address
     ChainlinkRegistry public immutable registry;
 
