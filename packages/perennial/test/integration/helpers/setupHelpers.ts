@@ -2,7 +2,7 @@ import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import HRE from 'hardhat'
 import { BigNumber, utils } from 'ethers'
 
-import { time, impersonate } from '../testutil'
+import { time, impersonate } from '../../testutil'
 import {
   Collateral,
   Controller,
@@ -31,7 +31,7 @@ import {
   ProxyAdmin,
   ProxyAdmin__factory,
   TransparentUpgradeableProxy__factory,
-} from '../../types/generated'
+} from '../../../types/generated'
 import { CHAINLINK_CUSTOM_CURRENCIES, ChainlinkContext } from './chainlinkHelpers'
 const { config, deployments, ethers } = HRE
 

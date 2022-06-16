@@ -7,7 +7,7 @@ import {
   AggregatorV3Interface,
   PassthroughDataFeed,
   PassthroughDataFeed__factory,
-} from '../../types/generated'
+} from '../../../types/generated'
 
 const { ethers } = HRE
 
