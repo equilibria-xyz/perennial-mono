@@ -202,8 +202,14 @@ export async function createCoordinator(instanceVars: InstanceVars): Promise<Pro
   return Product__factory.connect(productAddress, owner)
 }
 
-export async function createProduct(instanceVars: InstanceVars): Promise<Product> {
-  const { owner, controller, treasuryB, productProvider } = instanceVars
+export async function createProduct(
+  instanceVars: InstanceVars,
+  productProvider?: TestnetProductProvider,
+): Promise<Product> {
+  const { owner, controller, treasuryB } = instanceVars
+  if (!productProvider) {
+    productProvider = instanceVars.productProvider
+  }
 
   await controller.createCoordinator(owner.address)
   await controller.updateCoordinatorTreasury(1, treasuryB.address)

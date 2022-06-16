@@ -20,12 +20,17 @@ contract ReservoirFeedOracle is IOracleProvider {
     /// @dev Decimal offset used to normalize chainlink price to 18 decimals
     int256 private immutable _decimalOffset;
 
+    /// @dev Which underlying round to consider version 0
+    uint80 private immutable _versionZeroRound;
+
     /**
      * @notice Initializes the contract state
      * @param feed_ Reservoir price feed
+     * @param versionZeroRound_ Round to use when requesting data at version 0
      */
-    constructor(AggregatorV3Interface feed_) {
+    constructor(AggregatorV3Interface feed_, uint80 versionZeroRound_) {
         feed = feed_;
+        _versionZeroRound = versionZeroRound_;
         _decimalOffset = SafeCast.toInt256(10 ** feed_.decimals());
     }
 
@@ -57,6 +62,7 @@ contract ReservoirFeedOracle is IOracleProvider {
      */
     function atVersion(uint256 version) public view returns (OracleVersion memory oracleVersion) {
         if (version > type(uint80).max) revert InvalidOracleVersion();
+        if (version == 0) version = _versionZeroRound;
         (uint80 roundId, int256 feedPrice, , uint256 timestamp,) = feed.getRoundData(uint80(version));
 
         return _buildOracleVersion(roundId, feedPrice, timestamp);
