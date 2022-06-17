@@ -2,8 +2,8 @@ import { expect } from 'chai'
 import 'hardhat'
 import { utils } from 'ethers'
 
-import { InstanceVars, deployProtocol, createProduct, depositTo, createIncentiveProgram } from './setupHelpers'
-import { expectPositionEq, expectPrePositionEq } from '../testutil/types'
+import { InstanceVars, deployProtocol, createProduct, depositTo, createIncentiveProgram } from '../helpers/setupHelpers'
+import { expectPositionEq, expectPrePositionEq } from '../../testutil/types'
 
 const SECONDS_IN_YEAR = 60 * 60 * 24 * 365
 const SECONDS_IN_DAY = 60 * 60 * 24

@@ -7,7 +7,7 @@ import {
   FeedRegistryInterface,
   PassthroughChainlinkFeed,
   PassthroughChainlinkFeed__factory,
-} from '../../types/generated'
+} from '../../../types/generated'
 
 const { ethers, deployments } = HRE
 

@@ -2,11 +2,11 @@ import 'hardhat'
 import { expect } from 'chai'
 import { BigNumber, utils } from 'ethers'
 
-import { InstanceVars, deployProtocol, createProduct, depositTo, createIncentiveProgram } from './setupHelpers'
-import { expectProgramInfoEq } from '../testutil/types'
-import { currentBlockTimestamp } from '../testutil/time'
-import { time } from '../testutil'
-import { Product } from '../../types/generated'
+import { InstanceVars, deployProtocol, createProduct, depositTo, createIncentiveProgram } from '../helpers/setupHelpers'
+import { expectProgramInfoEq } from '../../testutil/types'
+import { currentBlockTimestamp } from '../../testutil/time'
+import { time } from '../../testutil'
+import { Product } from '../../../types/generated'
 
 const MINUTE = 60
 const HOUR = 60 * MINUTE

@@ -2,7 +2,7 @@ import { expect } from 'chai'
 import 'hardhat'
 import { constants, utils } from 'ethers'
 
-import { InstanceVars, deployProtocol, createProduct, depositTo } from './setupHelpers'
+import { InstanceVars, deployProtocol, createProduct, depositTo } from '../helpers/setupHelpers'
 
 describe('Liquidate', () => {
   let instanceVars: InstanceVars
