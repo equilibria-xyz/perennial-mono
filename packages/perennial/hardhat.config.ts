@@ -18,7 +18,8 @@ import 'hardhat-deploy'
 import 'hardhat-dependency-compiler'
 import { getChainId } from './test/testutil/network'
 
-const PRIVATE_KEY = process.env.PRIVATE_KEY || ''
+const PRIVATE_KEY_MAINNET = process.env.PRIVATE_KEY || ''
+const PRIVATE_KEY_TESTNET = process.env.PRIVATE_KEY_TESTNET || ''
 const MNEMONIC = process.env.MNEMONIC || ''
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || ''
 const ALCHEMY_MAINNET = process.env.ALCHEMY_MAINNET || ''
@@ -56,7 +57,7 @@ task('accounts', 'Prints the list of accounts', async (args, hre) => {
 
 function createTestnetConfig(network: string): NetworkUserConfig {
   return {
-    accounts: PRIVATE_KEY ? [PRIVATE_KEY] : [],
+    accounts: PRIVATE_KEY_TESTNET ? [PRIVATE_KEY_TESTNET] : [],
     chainId: getChainId(network),
     url: getUrl(network),
   }
@@ -69,9 +70,6 @@ const config: HardhatUserConfig = {
   defaultNetwork: 'hardhat',
   networks: {
     hardhat: {
-      accounts: {
-        mnemonic: MNEMONIC,
-      },
       forking: {
         url: getUrl(FORK_NETWORK),
         enabled: FORK_ENABLED,
@@ -87,7 +85,7 @@ const config: HardhatUserConfig = {
     mainnet: {
       chainId: getChainId('mainnet'),
       url: getUrl('mainnet'),
-      // accounts: [ PRIVATE_KEY ]
+      accounts: PRIVATE_KEY_MAINNET ? [PRIVATE_KEY_MAINNET] : [],
     },
   },
   solidity: {
