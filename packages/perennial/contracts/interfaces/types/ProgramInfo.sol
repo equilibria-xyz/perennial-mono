@@ -20,7 +20,12 @@ struct ProgramInfo {
     /// @dev duration of the program (in seconds)
     uint256 duration;
 
-    /// @dev Reward ERC20 token contract
+    /**
+     * @dev Reward ERC20 token contract
+     * @notice Perennial does not support non-standard ERC20s as reward tokens for incentive programs, including,
+                but not limited to: fee on transfer and rebase tokens. Using such a non-standard token will likely
+                result in loss of funds.
+     */
     Token18 token;
 }
 using ProgramInfoLib for ProgramInfo global;
