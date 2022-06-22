@@ -1,5 +1,5 @@
 import { MockContract } from '@ethereum-waffle/mock-contract'
-import { utils } from 'ethers'
+import { constants, utils } from 'ethers'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { expect } from 'chai'
 import HRE, { waffle } from 'hardhat'
@@ -154,6 +154,16 @@ describe('Collateral', () => {
 
       expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(20)
       expect(await collateral['collateral(address)'](product.address)).to.equal(20)
+    })
+
+    it('withdraws all deposited if amount == MAX', async () => {
+      await token.mock.transfer.withArgs(owner.address, 100).returns(true)
+      await expect(collateral.connect(user).withdrawTo(owner.address, product.address, constants.MaxUint256))
+        .to.emit(collateral, 'Withdrawal')
+        .withArgs(user.address, product.address, 100)
+
+      expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(0)
+      expect(await collateral['collateral(address)'](product.address)).to.equal(0)
     })
 
     it('reverts if paused', async () => {
