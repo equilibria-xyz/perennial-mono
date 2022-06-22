@@ -225,6 +225,7 @@ contract Collateral is ICollateral, UInitializable, UControllerProvider, UReentr
      */
     function claimFee() external notPaused {
         UFixed18 amount = fees[msg.sender];
+        if (amount.eq(UFixed18Lib.ZERO)) return;
 
         fees[msg.sender] = UFixed18Lib.ZERO;
         token.push(msg.sender, amount);

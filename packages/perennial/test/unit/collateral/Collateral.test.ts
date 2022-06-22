@@ -477,6 +477,26 @@ describe('Collateral', () => {
       expect(await collateral.fees(treasuryB.address)).to.equal(0)
     })
 
+    it('early returns if claim amount is 0', async () => {
+      await token.mock.transfer.withArgs(treasuryA.address, 9).returns(true)
+      await token.mock.transfer.withArgs(treasuryB.address, 81).returns(true)
+
+      await expect(collateral.connect(treasuryA).claimFee())
+        .to.emit(collateral, 'FeeClaim')
+        .withArgs(treasuryA.address, 9)
+
+      await expect(collateral.connect(treasuryB).claimFee())
+        .to.emit(collateral, 'FeeClaim')
+        .withArgs(treasuryB.address, 81)
+
+      expect(await collateral.fees(treasuryA.address)).to.equal(0)
+      expect(await collateral.fees(treasuryB.address)).to.equal(0)
+
+      // Check the early return case
+      await expect(collateral.connect(treasuryA).claimFee()).to.not.emit(collateral, 'FeeClaim')
+      await expect(collateral.connect(treasuryB).claimFee()).to.not.emit(collateral, 'FeeClaim')
+    })
+
     it('reverts if paused', async () => {
       await controller.mock['paused()'].withArgs().returns(true)
       await expect(collateral.connect(treasuryB).claimFee()).to.be.revertedWith('PausedError()')
