@@ -213,7 +213,7 @@ contract Collateral is ICollateral, UInitializable, UControllerProvider, UReentr
      * @param product Product to resolve shortfall for
      * @param amount Amount of shortfall to resolve
      */
-    function resolveShortfall(IProduct product, UFixed18 amount) external notPausedProduct(product) {
+    function resolveShortfall(IProduct product, UFixed18 amount) external isProduct(product) notPausedProduct(product) {
         _products[product].resolve(amount);
         token.pull(msg.sender, amount);
 
