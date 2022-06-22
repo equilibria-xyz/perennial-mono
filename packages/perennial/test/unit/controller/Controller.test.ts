@@ -1,5 +1,5 @@
 import { MockContract } from '@ethereum-waffle/mock-contract'
-import { utils } from 'ethers'
+import { constants, utils } from 'ethers'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { expect } from 'chai'
 import HRE, { waffle } from 'hardhat'
@@ -333,6 +333,12 @@ describe('Controller', () => {
         'ControllerNotOwnerError(0)',
       )
     })
+
+    it('reverts on invalid address', async () => {
+      await expect(
+        controller.connect(coordinatorOwner).updateCoordinatorTreasury(1, constants.AddressZero),
+      ).to.be.revertedWith('ControllerNoZeroAddressError()')
+    })
   })
 
   describe('#updateCoordinatorPauser', async () => {
@@ -393,6 +399,12 @@ describe('Controller', () => {
       await expect(controller.connect(user).updateCoordinatorPauser(0, pauser.address)).to.be.revertedWith(
         'ControllerNotOwnerError(0)',
       )
+    })
+
+    it('reverts on invalid address', async () => {
+      await expect(
+        controller.connect(coordinatorOwner).updateCoordinatorPauser(1, constants.AddressZero),
+      ).to.be.revertedWith('ControllerNoZeroAddressError()')
     })
   })
 
@@ -582,6 +594,10 @@ describe('Controller', () => {
         'ControllerNotOwnerError(0)',
       )
     })
+
+    it('reverts on invalid address', async () => {
+      await expect(controller.updateCollateral(user.address)).to.be.revertedWith('ControllerNotContractAddressError()')
+    })
   })
 
   describe('#updateIncentivizer', async () => {
@@ -600,9 +616,15 @@ describe('Controller', () => {
         'ControllerNotOwnerError(0)',
       )
     })
+
+    it('reverts on invalid address', async () => {
+      await expect(controller.updateIncentivizer(user.address)).to.be.revertedWith(
+        'ControllerNotContractAddressError()',
+      )
+    })
   })
 
-  describe('#updateproductBeacon', async () => {
+  describe('#updateProductBeacon', async () => {
     it('updates the collateral address', async () => {
       const newProductBeacon = await waffle.deployMockContract(owner, IBeacon__factory.abi)
       await expect(controller.updateProductBeacon(newProductBeacon.address))
@@ -616,6 +638,12 @@ describe('Controller', () => {
       const newProductBeacon = await waffle.deployMockContract(owner, IBeacon__factory.abi)
       await expect(controller.connect(user).updateProductBeacon(newProductBeacon.address)).to.be.revertedWith(
         'ControllerNotOwnerError(0)',
+      )
+    })
+
+    it('reverts on invalid address', async () => {
+      await expect(controller.updateProductBeacon(user.address)).to.be.revertedWith(
+        'ControllerNotContractAddressError()',
       )
     })
   })

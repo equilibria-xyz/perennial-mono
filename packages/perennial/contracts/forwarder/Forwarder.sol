@@ -34,6 +34,11 @@ contract Forwarder is IForwarder {
         IBatcher batcher_,
         ICollateral collateral_
     ) {
+        if (!Address.isContract(Token6.unwrap(usdc_))) revert ForwarderNotContractAddressError();
+        if (!Address.isContract(Token18.unwrap(dsu_))) revert ForwarderNotContractAddressError();
+        if (!Address.isContract(address(batcher_))) revert ForwarderNotContractAddressError();
+        if (!Address.isContract(address(collateral_))) revert ForwarderNotContractAddressError();
+
         USDC = usdc_;
         DSU = dsu_;
         batcher = batcher_;

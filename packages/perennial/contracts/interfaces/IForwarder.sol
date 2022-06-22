@@ -8,6 +8,8 @@ import "@equilibria/emptyset-batcher/interfaces/IBatcher.sol";
 import "./ICollateral.sol";
 
 interface IForwarder {
+    error ForwarderNotContractAddressError();
+
     event WrapAndDeposit(address indexed account, IProduct indexed product, UFixed18 amount);
 
     function USDC() external view returns (Token6); // solhint-disable-line func-name-mixedcase
