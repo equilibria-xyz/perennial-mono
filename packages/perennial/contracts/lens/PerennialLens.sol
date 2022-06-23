@@ -198,7 +198,7 @@ contract PerennialLens is IPerennialLens {
      * @return sum of all fees accrued by the account
      */
     function fees(address account, IProduct[] memory products) external returns (UFixed18) {
-        for (uint256 i = 0; i < products.length; i++) {
+        for (uint256 i; i < products.length; i++) {
             products[i].settle();
         }
 
@@ -281,7 +281,7 @@ contract PerennialLens is IPerennialLens {
         uint256 programsLength = incentivizer.count(product);
         tokens = new Token18[](programsLength);
         amounts = new UFixed18[](programsLength);
-        for (uint256 i = 0; i < programsLength; i++) {
+        for (uint256 i; i < programsLength; i++) {
             ProgramInfo memory programInfo = incentivizer.programInfos(product, i);
             tokens[i] = programInfo.token;
             amounts[i] = incentivizer.unclaimed(product, account, i);
@@ -304,7 +304,7 @@ contract PerennialLens is IPerennialLens {
         IIncentivizer incentivizer = controller.incentivizer();
         tokens = new Token18[](programIds.length);
         amounts = new UFixed18[](programIds.length);
-        for (uint256 i = 0; i < programIds.length; i++) {
+        for (uint256 i; i < programIds.length; i++) {
             ProgramInfo memory programInfo = incentivizer.programInfos(product, programIds[i]);
             tokens[i] = programInfo.token;
             amounts[i] = incentivizer.unclaimed(product, account, programIds[i]);
