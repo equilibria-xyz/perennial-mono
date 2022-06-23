@@ -102,7 +102,7 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
         IProduct product = IProduct(msg.sender);
 
         ProductManagerLib.SyncResult[] memory syncResults = _products[product].sync(product, currentOracleVersion);
-        for (uint256 i = 0; i < syncResults.length; i++) {
+        for (uint256 i; i < syncResults.length; i++) {
             _handleSyncResult(product, syncResults[i]);
         }
     }
