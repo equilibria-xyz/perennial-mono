@@ -44,7 +44,6 @@ interface IController {
     event CoordinatorCreated(uint256 indexed coordinatorId, address owner);
     event ProductCreated(IProduct indexed product, IProductProvider provider);
 
-    error ControllerAlreadyInitializedError();
     error ControllerNoZeroCoordinatorError();
     error ControllerNotPauserError(uint256 coordinatorId);
     error ControllerNotOwnerError(uint256 controllerId);
