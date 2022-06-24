@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.14;
+pragma solidity 0.8.15;
 
 import "@equilibria/root/curve/types/JumpRateUtilizationCurve.sol";
 import "../interfaces/IProductProvider.sol";

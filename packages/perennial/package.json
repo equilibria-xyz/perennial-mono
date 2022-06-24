@@ -1,6 +1,6 @@
 {
   "name": "@equilibria/perennial",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Perennial Protocol Core",
   "files": [
     "contracts/interfaces",
