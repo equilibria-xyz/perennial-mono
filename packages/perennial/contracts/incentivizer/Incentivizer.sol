@@ -103,7 +103,7 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
 
         ProductManagerLib.SyncResult[] memory syncResults = _products[product].sync(product, currentOracleVersion);
         uint256 syncResultsCount = syncResults.length;
-        for (uint256 i; i < syncResultsCount; i++) {
+        for (uint256 i; i < syncResultsCount; ++i) {
             _handleSyncResult(product, syncResults[i]);
         }
     }
@@ -159,7 +159,7 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
     nonReentrant
     {
         uint256 productCount = products.length;
-        for (uint256 i; i < productCount; i++) {
+        for (uint256 i; i < productCount; ++i) {
             _claimProduct(products[i], programIds[i]);
         }
     }
@@ -177,7 +177,7 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
     settleForAccount(msg.sender, product)
     {
         uint256 programCount = programIds.length;
-        for (uint256 i; i < programCount; i++) {
+        for (uint256 i; i < programCount; ++i) {
             _claimProgram(product, programIds[i]);
         }
     }
@@ -204,7 +204,7 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
      */
     function claimFee(Token18[] calldata tokens) external notPaused {
         uint256 tokensCount = tokens.length;
-        for(uint256 i; i < tokensCount; i++) {
+        for(uint256 i; i < tokensCount; ++i) {
             Token18 token = tokens[i];
             UFixed18 amount = fees[token];
             if (amount.isZero()) continue;
