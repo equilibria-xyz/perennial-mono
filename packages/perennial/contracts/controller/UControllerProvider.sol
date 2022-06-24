@@ -57,7 +57,7 @@ abstract contract UControllerProvider is UInitializable {
         _;
     }
 
-    /// @dev Only allow the protocol owner to call
+    /// @dev Only allow the coordinator owner to call
     modifier onlyOwner(uint256 coordinatorId) {
         if (msg.sender != controller().owner(coordinatorId)) revert NotOwnerError(coordinatorId);
 
