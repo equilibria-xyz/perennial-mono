@@ -102,7 +102,8 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
         IProduct product = IProduct(msg.sender);
 
         ProductManagerLib.SyncResult[] memory syncResults = _products[product].sync(product, currentOracleVersion);
-        for (uint256 i; i < syncResults.length; i++) {
+        uint256 syncResultsCount = syncResults.length;
+        for (uint256 i; i < syncResultsCount; i++) {
             _handleSyncResult(product, syncResults[i]);
         }
     }
@@ -202,7 +203,8 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
      * @param tokens Tokens to claim fees for
      */
     function claimFee(Token18[] calldata tokens) external notPaused {
-        for(uint256 i; i < tokens.length; i++) {
+        uint256 tokensCount = tokens.length;
+        for(uint256 i; i < tokensCount; i++) {
             Token18 token = tokens[i];
             UFixed18 amount = fees[token];
             if (amount.isZero()) continue;
