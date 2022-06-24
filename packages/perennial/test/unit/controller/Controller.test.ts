@@ -118,12 +118,6 @@ describe('Controller', () => {
       expect(await controller['pauser(uint256)'](1)).to.equal(coordinatorOwner.address)
       expect(await controller['paused(uint256)'](1)).to.equal(false)
     })
-
-    it('reverts if not protocol owner', async () => {
-      await expect(controller.connect(coordinatorOwner).createCoordinator(coordinatorOwner.address)).to.be.revertedWith(
-        'ControllerNotOwnerError(0)',
-      )
-    })
   })
 
   describe('#updateCoordinatorPendingOwner', async () => {

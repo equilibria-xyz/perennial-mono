@@ -81,7 +81,7 @@ contract Controller is IController, UInitializable {
      * @param coordinatorOwner The owner address of the new coordinator
      * @return New coordinator ID
      */
-    function createCoordinator(address coordinatorOwner) external onlyOwner(0) returns (uint256) {
+    function createCoordinator(address coordinatorOwner) external returns (uint256) {
         return _createCoordinator(coordinatorOwner);
     }
 
