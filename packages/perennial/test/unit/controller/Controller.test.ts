@@ -1,5 +1,5 @@
 import { MockContract } from '@ethereum-waffle/mock-contract'
-import { constants, utils } from 'ethers'
+import { utils } from 'ethers'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { expect } from 'chai'
 import HRE, { waffle } from 'hardhat'
@@ -333,12 +333,6 @@ describe('Controller', () => {
         'ControllerNotOwnerError(0)',
       )
     })
-
-    it('reverts on invalid address', async () => {
-      await expect(
-        controller.connect(coordinatorOwner).updateCoordinatorTreasury(1, constants.AddressZero),
-      ).to.be.revertedWith('ControllerNoZeroAddressError()')
-    })
   })
 
   describe('#updateCoordinatorPauser', async () => {
@@ -399,12 +393,6 @@ describe('Controller', () => {
       await expect(controller.connect(user).updateCoordinatorPauser(0, pauser.address)).to.be.revertedWith(
         'ControllerNotOwnerError(0)',
       )
-    })
-
-    it('reverts on invalid address', async () => {
-      await expect(
-        controller.connect(coordinatorOwner).updateCoordinatorPauser(1, constants.AddressZero),
-      ).to.be.revertedWith('ControllerNoZeroAddressError()')
     })
   })
 

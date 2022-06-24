@@ -136,24 +136,22 @@ contract Controller is IController, UInitializable {
 
     /**
      * @notice Updates the treasury of an existing coordinator
-     * @dev Must be called by the coordinator's current owner
+     * @dev Must be called by the coordinator's current owner. Defaults to the coordinator `owner` if set to address(0)
      * @param coordinatorId Coordinator to update
      * @param newTreasury New treasury address
      */
     function updateCoordinatorTreasury(uint256 coordinatorId, address newTreasury) external onlyOwner(coordinatorId) {
-        if (address(newTreasury) == address(0)) revert ControllerNoZeroAddressError();
         _coordinators[coordinatorId].treasury = newTreasury;
         emit CoordinatorTreasuryUpdated(coordinatorId, newTreasury);
     }
 
     /**
      * @notice Updates the pauser of an existing coordinator
-     * @dev Must be called by the coordinator's current owner
+     * @dev Must be called by the coordinator's current owner. Defaults to the coordinator `owner` if set to address(0)
      * @param coordinatorId Coordinator to update
      * @param newPauser New pauser address
      */
     function updateCoordinatorPauser(uint256 coordinatorId, address newPauser) external onlyOwner(coordinatorId) {
-        if (address(newPauser) == address(0)) revert ControllerNoZeroAddressError();
         _coordinators[coordinatorId].pauser = newPauser;
         emit CoordinatorPauserUpdated(coordinatorId, newPauser);
     }
