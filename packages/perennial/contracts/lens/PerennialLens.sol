@@ -199,8 +199,9 @@ contract PerennialLens is IPerennialLens {
      */
     function fees(address account, IProduct[] memory products) external returns (UFixed18) {
         uint256 productsCount = products.length;
-        for (uint256 i; i < productsCount; ++i) {
+        for (uint256 i; i < productsCount;) {
             products[i].settle();
+            unchecked{ ++i; }
         }
 
         return collateral().fees(account);
@@ -282,10 +283,11 @@ contract PerennialLens is IPerennialLens {
         uint256 programsLength = incentivizer.count(product);
         tokens = new Token18[](programsLength);
         amounts = new UFixed18[](programsLength);
-        for (uint256 i; i < programsLength; ++i) {
+        for (uint256 i; i < programsLength;) {
             ProgramInfo memory programInfo = incentivizer.programInfos(product, i);
             tokens[i] = programInfo.token;
             amounts[i] = incentivizer.unclaimed(product, account, i);
+            unchecked{ ++i; }
         }
     }
 
@@ -306,10 +308,11 @@ contract PerennialLens is IPerennialLens {
         uint256 programsCount = programIds.length;
         tokens = new Token18[](programsCount);
         amounts = new UFixed18[](programsCount);
-        for (uint256 i; i < programsCount; ++i) {
+        for (uint256 i; i < programsCount;) {
             ProgramInfo memory programInfo = incentivizer.programInfos(product, programIds[i]);
             tokens[i] = programInfo.token;
             amounts[i] = incentivizer.unclaimed(product, account, programIds[i]);
+            unchecked{ ++i; }
         }
     }
 
