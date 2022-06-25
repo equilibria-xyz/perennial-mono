@@ -79,6 +79,7 @@ contract Collateral is ICollateral, UInitializable, UControllerProvider, UReentr
     collateralInvariant(msg.sender, product)
     maintenanceInvariant(msg.sender, product)
     {
+        amount = amount.eq(UFixed18Lib.MAX) ? collateral(msg.sender, product) : amount;
         _products[product].debitAccount(msg.sender, amount);
         token.push(account, amount);
 
