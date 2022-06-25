@@ -136,7 +136,7 @@ contract Controller is IController, UInitializable {
 
     /**
      * @notice Updates the treasury of an existing coordinator
-     * @dev Must be called by the coordinator's current owner
+     * @dev Must be called by the coordinator's current owner. Defaults to the coordinator `owner` if set to address(0)
      * @param coordinatorId Coordinator to update
      * @param newTreasury New treasury address
      */
@@ -147,7 +147,7 @@ contract Controller is IController, UInitializable {
 
     /**
      * @notice Updates the pauser of an existing coordinator
-     * @dev Must be called by the coordinator's current owner
+     * @dev Must be called by the coordinator's current owner. Defaults to the coordinator `owner` if set to address(0)
      * @param coordinatorId Coordinator to update
      * @param newPauser New pauser address
      */
@@ -190,6 +190,7 @@ contract Controller is IController, UInitializable {
      * @param newCollateral New Collateral contract address
      */
     function updateCollateral(ICollateral newCollateral) public onlyOwner(0) {
+        if (!Address.isContract(address(newCollateral))) revert ControllerNotContractAddressError();
         _collateral.store(address(newCollateral));
         emit CollateralUpdated(newCollateral);
     }
@@ -199,6 +200,7 @@ contract Controller is IController, UInitializable {
      * @param newIncentivizer New Incentivizer contract address
      */
     function updateIncentivizer(IIncentivizer newIncentivizer) public onlyOwner(0) {
+        if (!Address.isContract(address(newIncentivizer))) revert ControllerNotContractAddressError();
         _incentivizer.store(address(newIncentivizer));
         emit IncentivizerUpdated(newIncentivizer);
     }
@@ -208,6 +210,7 @@ contract Controller is IController, UInitializable {
      * @param newProductBeacon New Product implementation beacon address
      */
     function updateProductBeacon(IBeacon newProductBeacon) public onlyOwner(0) {
+        if (!Address.isContract(address(newProductBeacon))) revert ControllerNotContractAddressError();
         _productBeacon.store(address(newProductBeacon));
         emit ProductBeaconUpdated(newProductBeacon);
     }

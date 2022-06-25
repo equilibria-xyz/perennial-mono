@@ -582,6 +582,10 @@ describe('Controller', () => {
         'ControllerNotOwnerError(0)',
       )
     })
+
+    it('reverts on invalid address', async () => {
+      await expect(controller.updateCollateral(user.address)).to.be.revertedWith('ControllerNotContractAddressError()')
+    })
   })
 
   describe('#updateIncentivizer', async () => {
@@ -600,9 +604,15 @@ describe('Controller', () => {
         'ControllerNotOwnerError(0)',
       )
     })
+
+    it('reverts on invalid address', async () => {
+      await expect(controller.updateIncentivizer(user.address)).to.be.revertedWith(
+        'ControllerNotContractAddressError()',
+      )
+    })
   })
 
-  describe('#updateproductBeacon', async () => {
+  describe('#updateProductBeacon', async () => {
     it('updates the collateral address', async () => {
       const newProductBeacon = await waffle.deployMockContract(owner, IBeacon__factory.abi)
       await expect(controller.updateProductBeacon(newProductBeacon.address))
@@ -616,6 +626,12 @@ describe('Controller', () => {
       const newProductBeacon = await waffle.deployMockContract(owner, IBeacon__factory.abi)
       await expect(controller.connect(user).updateProductBeacon(newProductBeacon.address)).to.be.revertedWith(
         'ControllerNotOwnerError(0)',
+      )
+    })
+
+    it('reverts on invalid address', async () => {
+      await expect(controller.updateProductBeacon(user.address)).to.be.revertedWith(
+        'ControllerNotContractAddressError()',
       )
     })
   })

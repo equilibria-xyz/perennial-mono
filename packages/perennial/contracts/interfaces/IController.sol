@@ -53,6 +53,7 @@ interface IController {
     error ControllerInvalidMinFundingFeeError();
     error ControllerInvalidLiquidationFeeError();
     error ControllerInvalidIncentivizationFeeError();
+    error ControllerNotContractAddressError();
 
     function collateral() external view returns (ICollateral);
     function incentivizer() external view returns (IIncentivizer);
