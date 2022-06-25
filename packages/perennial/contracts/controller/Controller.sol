@@ -424,14 +424,14 @@ contract Controller is IController, UInitializable {
         return paused(coordinatorFor[product]);
     }
 
-    // @dev Only allow owner of `coordinatorId` to call
+    /// @dev Only allow owner of `coordinatorId` to call
     modifier onlyOwner(uint256 coordinatorId) {
         if (msg.sender != owner(coordinatorId)) revert ControllerNotOwnerError(coordinatorId);
 
         _;
     }
 
-    // @dev Only pauser owner of `coordinatorId` to call
+    /// @dev Only pauser owner of `coordinatorId` to call
     modifier onlyPauser(uint256 coordinatorId) {
         if (msg.sender != pauser(coordinatorId)) revert ControllerNotPauserError(coordinatorId);
 

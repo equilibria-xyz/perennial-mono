@@ -14,11 +14,9 @@ import "../interfaces/IProduct.sol";
  *      their storage layout.
  */
 abstract contract UControllerProvider is UInitializable {
-    error AlreadyInitializedError();
     error NotOwnerError(uint256 coordinatorId);
     error NotProductError(IProduct product);
     error NotCollateralError();
-    error NotProductOwnerError(IProduct product);
     error PausedError();
     error InvalidControllerError();
 
