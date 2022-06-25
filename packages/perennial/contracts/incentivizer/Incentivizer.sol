@@ -157,6 +157,7 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
     external
     nonReentrant
     {
+        if (products.length != programIds.length) revert IncentivizerBatchClaimArgumentMismatchError();
         uint256 productCount = products.length;
         for (uint256 i; i < productCount; i++) {
             _claimProduct(products[i], programIds[i]);

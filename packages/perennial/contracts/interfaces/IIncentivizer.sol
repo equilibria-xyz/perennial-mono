@@ -19,6 +19,7 @@ interface IIncentivizer {
     error IncentivizerTooManyProgramsError();
     error IncentivizerNotProgramOwnerError(IProduct product, uint256 programId);
     error IncentivizerInvalidProgramError(IProduct product, uint256 programId);
+    error IncentivizerBatchClaimArgumentMismatchError();
 
     function programInfos(IProduct product, uint256 programId) external view returns (ProgramInfo memory);
     function fees(Token18 token) external view returns (UFixed18);

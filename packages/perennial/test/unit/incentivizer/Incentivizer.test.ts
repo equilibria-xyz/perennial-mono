@@ -2205,6 +2205,16 @@ describe('Incentivizer', () => {
         `PausedError()`,
       )
     })
+
+    it('reverts if argument lengths mismatch', async () => {
+      await product.mock.settleAccount.withArgs(user.address).returns()
+      await productB.mock.settleAccount.withArgs(user.address).returns()
+      await token.mock.transfer.withArgs(user.address, EXPECTED_REWARD).returns(true)
+
+      await expect(
+        incentivizer.connect(user)['claim(address[],uint256[][])']([product.address, productB.address], [[0, 1]]),
+      ).to.be.revertedWith('IncentivizerBatchClaimArgumentMismatchError()')
+    })
   })
 
   describe('#claimFee', async () => {
