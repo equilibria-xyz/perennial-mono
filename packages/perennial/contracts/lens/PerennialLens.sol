@@ -315,21 +315,21 @@ contract PerennialLens is IPerennialLens {
 
     /**
      * @notice Returns the Product's latest position
-     * @dev Internal function, does not call settle itself
+     * @dev Private function, does not call settle itself
      * @param product Product address
      * @return Latest position for the product
      */
-    function _latestPosition(IProduct product) internal view returns (Position memory) {
+    function _latestPosition(IProduct product) private view returns (Position memory) {
         return product.positionAtVersion(product.latestVersion());
     }
 
     /**
      * @notice Returns the Product's latest version
-     * @dev Internal function, does not call settle itself
+     * @dev Private function, does not call settle itself
      * @param product Product address
      * @return Latest version for the product
      */
-    function _latestVersion(IProduct product) internal view returns (IOracleProvider.OracleVersion memory) {
+    function _latestVersion(IProduct product) private view returns (IOracleProvider.OracleVersion memory) {
         return product.productProvider().currentVersion();
     }
 
