@@ -68,7 +68,7 @@ contract Controller is IController, UInitializable {
         IIncentivizer incentivizer_,
         IBeacon productBeacon_
     ) external initializer(1) {
-        _createCoordinator(msg.sender);
+        _createCoordinator();
 
         updateCollateral(collateral_);
         updateIncentivizer(incentivizer_);
@@ -78,31 +78,29 @@ contract Controller is IController, UInitializable {
     /**
      * @notice Creates a new coordinator with `msg.sender` as the owner
      * @dev Can only be called by the protocol owner
-     * @param coordinatorOwner The owner address of the new coordinator
      * @return New coordinator ID
      */
-    function createCoordinator(address coordinatorOwner) external returns (uint256) {
-        return _createCoordinator(coordinatorOwner);
+    function createCoordinator() external returns (uint256) {
+        return _createCoordinator();
     }
 
     /**
      * @notice Creates a new coordinator with `msg.sender` as the owner
      * @dev `treasury` and `pauser` initialize as the 0-address, defaulting to the `owner`
-     * @param coordinatorOwner The owner address of the new coordinator
      * @return New coordinator ID
      */
-    function _createCoordinator(address coordinatorOwner) private returns (uint256) {
+    function _createCoordinator() private returns (uint256) {
         uint256 coordinatorId = _coordinators.length;
 
         _coordinators.push(Coordinator({
             pendingOwner: address(0),
-            owner: coordinatorOwner,
+            owner: msg.sender,
             treasury: address(0),
             pauser: address(0),
             paused: false
         }));
 
-        emit CoordinatorCreated(coordinatorId, coordinatorOwner);
+        emit CoordinatorCreated(coordinatorId, msg.sender);
 
         return coordinatorId;
     }

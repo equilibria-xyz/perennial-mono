@@ -99,8 +99,8 @@ describe('Controller', () => {
 
   describe('#createCoordinator', async () => {
     it('creates the coordinator', async () => {
-      const returnValue = await controller.connect(owner).callStatic.createCoordinator(coordinatorOwner.address)
-      await expect(controller.connect(owner).createCoordinator(coordinatorOwner.address))
+      const returnValue = await controller.connect(coordinatorOwner).callStatic.createCoordinator()
+      await expect(controller.connect(coordinatorOwner).createCoordinator())
         .to.emit(controller, 'CoordinatorCreated')
         .withArgs(1, coordinatorOwner.address)
 
@@ -122,7 +122,7 @@ describe('Controller', () => {
 
   describe('#updateCoordinatorPendingOwner', async () => {
     beforeEach(async () => {
-      await controller.connect(owner).createCoordinator(coordinatorOwner.address)
+      await controller.connect(coordinatorOwner).createCoordinator()
     })
 
     it('updates the coordinator pending owner', async () => {
@@ -185,7 +185,7 @@ describe('Controller', () => {
 
   describe('#acceptCoordinatorOwner', async () => {
     beforeEach(async () => {
-      await controller.connect(owner).createCoordinator(coordinatorOwner.address)
+      await controller.connect(coordinatorOwner).createCoordinator()
     })
 
     it('updates the coordinator owner', async () => {
@@ -270,7 +270,7 @@ describe('Controller', () => {
 
   describe('#updateCoordinatorTreasury', async () => {
     beforeEach(async () => {
-      await controller.connect(owner).createCoordinator(coordinatorOwner.address)
+      await controller.connect(coordinatorOwner).createCoordinator()
     })
 
     it('updates the coordinator treasury', async () => {
@@ -331,7 +331,7 @@ describe('Controller', () => {
 
   describe('#updateCoordinatorPauser', async () => {
     beforeEach(async () => {
-      await controller.connect(owner).createCoordinator(coordinatorOwner.address)
+      await controller.connect(coordinatorOwner).createCoordinator()
     })
 
     it('updates the coordinator pauser', async () => {
@@ -392,7 +392,7 @@ describe('Controller', () => {
 
   describe('#updateCoordinatorPaused', async () => {
     beforeEach(async () => {
-      await controller.connect(owner).createCoordinator(coordinatorOwner.address)
+      await controller.connect(coordinatorOwner).createCoordinator()
     })
 
     context('from owner', async () => {
@@ -517,7 +517,7 @@ describe('Controller', () => {
 
   describe('#createProduct', async () => {
     beforeEach(async () => {
-      await controller.connect(owner).createCoordinator(coordinatorOwner.address)
+      await controller.connect(coordinatorOwner).createCoordinator()
       await controller.connect(coordinatorOwner).updateCoordinatorTreasury(1, coordinatorTreasury.address)
       await controller.connect(coordinatorOwner).updateCoordinatorPauser(1, coordinatorPauser.address)
     })
