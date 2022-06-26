@@ -76,7 +76,7 @@ contract Controller is IController, UInitializable {
     }
 
     /**
-     * @notice Creates a new coordinator with `coordinatorOwner` as the owner
+     * @notice Creates a new coordinator with `msg.sender` as the owner
      * @dev Can only be called by the protocol owner
      * @param coordinatorOwner The owner address of the new coordinator
      * @return New coordinator ID
@@ -86,7 +86,7 @@ contract Controller is IController, UInitializable {
     }
 
     /**
-     * @notice Creates a new coordinator with `coordinatorOwner` as the owner
+     * @notice Creates a new coordinator with `msg.sender` as the owner
      * @dev `treasury` and `pauser` initialize as the 0-address, defaulting to the `owner`
      * @param coordinatorOwner The owner address of the new coordinator
      * @return New coordinator ID
