@@ -77,7 +77,7 @@ library ProductManagerLib {
         uint256 activeProgramsCount = activeProgramIds.length;
         results = new SyncResult[](activeProgramsCount);
 
-        for (uint256 i; i < activeProgramsCount;) {
+        for (uint256 i; i < activeProgramsCount; ++i) {
             // Load program
             uint256 programId = activeProgramIds[i];
             ProgramInfo memory programInfo = self.programInfos[programId];
@@ -98,7 +98,6 @@ library ProductManagerLib {
 
             // Save result
             results[i] = SyncResult(programId, versionStarted, versionComplete, refundAmount);
-            unchecked{ ++i; }
         }
     }
 
@@ -128,14 +127,13 @@ library ProductManagerLib {
         // Settle programs
         uint256[] memory activeProgramIds = self.activeProgramsFor[account].values();
         uint256 activeProgramsCount = activeProgramIds.length;
-        for (uint256 i; i < activeProgramsCount;) {
+        for (uint256 i; i < activeProgramsCount; ++i) {
             uint256 programId = activeProgramIds[i];
             Program storage program = self.programs[programId];
             program.settle(product, self.programInfos[programId], account, currentOracleVersion);
             if (!self.activePrograms.contains(programId) && currentOracleVersion.version >= program.versionComplete) {
                 self.activeProgramsFor[account].remove(programId);
             }
-            unchecked{ ++i; }
         }
     }
 
