@@ -2263,12 +2263,6 @@ describe('Incentivizer', () => {
       expect(await incentivizer.fees(token.address)).to.equal(0)
     })
 
-    it('skips claim if zero', async () => {
-      await incentivizer.connect(user).claimFee([product.address])
-
-      expect(await incentivizer.fees(product.address)).to.equal(0)
-    })
-
     it('reverts if paused (protocol)', async () => {
       await controller.mock['paused()'].withArgs().returns(true)
       await expect(incentivizer.connect(user).claimFee([token.address])).to.be.revertedWith(`PausedError()`)
