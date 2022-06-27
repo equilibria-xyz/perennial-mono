@@ -66,7 +66,7 @@ interface IController {
     function minCollateral() external view returns (UFixed18);
     function programsPerProduct() external view returns (uint256);
     function initialize(ICollateral collateral_, IIncentivizer incentivizer_, IBeacon productBeacon_) external;
-    function createCoordinator(address coordinatorOwner) external returns (uint256);
+    function createCoordinator() external returns (uint256);
     function updateCoordinatorPendingOwner(uint256 coordinatorId, address newPendingOwner) external;
     function acceptCoordinatorOwner(uint256 coordinatorId) external;
     function updateCoordinatorTreasury(uint256 coordinatorId, address newTreasury) external;

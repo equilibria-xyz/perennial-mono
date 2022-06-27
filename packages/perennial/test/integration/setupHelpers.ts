@@ -193,7 +193,7 @@ export async function createCoordinator(instanceVars: InstanceVars): Promise<Pro
   const { owner, controller, treasuryB, productProvider } = instanceVars
 
   await controller.callStatic.createProduct(1, productProvider.address)
-  await controller.createCoordinator(owner.address)
+  await controller.createCoordinator()
   await controller.updateCoordinatorTreasury(1, treasuryB.address)
 
   const productAddress = await controller.callStatic.createProduct(1, productProvider.address)
@@ -205,7 +205,7 @@ export async function createCoordinator(instanceVars: InstanceVars): Promise<Pro
 export async function createProduct(instanceVars: InstanceVars): Promise<Product> {
   const { owner, controller, treasuryB, productProvider } = instanceVars
 
-  await controller.createCoordinator(owner.address)
+  await controller.createCoordinator()
   await controller.updateCoordinatorTreasury(1, treasuryB.address)
 
   const productAddress = await controller.callStatic.createProduct(1, productProvider.address)

@@ -30,9 +30,7 @@ describe('Happy Path', () => {
   it('creates a product', async () => {
     const { owner, user, controller, collateral, treasuryB, productProvider, dsu } = instanceVars
 
-    await expect(controller.createCoordinator(owner.address))
-      .to.emit(controller, 'CoordinatorCreated')
-      .withArgs(1, owner.address)
+    await expect(controller.createCoordinator()).to.emit(controller, 'CoordinatorCreated').withArgs(1, owner.address)
     await expect(controller.updateCoordinatorTreasury(1, treasuryB.address))
       .to.emit(controller, 'CoordinatorTreasuryUpdated')
       .withArgs(1, treasuryB.address)
