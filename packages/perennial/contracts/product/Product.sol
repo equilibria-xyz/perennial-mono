@@ -148,7 +148,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
         // position a->b
         accumulated = accumulated.sub(Fixed18Lib.from(_positions[account].settle(_provider, settleOracleVersion)));
 
-        // short-circuit if a->c
+        // short-circuit from a->c if b == c
         if (settleOracleVersion.version != currentOracleVersion.version) {
             // sync incentivizer before accumulator
             _controller.incentivizer().syncAccount(account, currentOracleVersion);

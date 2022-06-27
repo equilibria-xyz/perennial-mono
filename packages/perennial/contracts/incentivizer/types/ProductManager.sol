@@ -47,7 +47,7 @@ library ProductManagerLib {
 
     /**
      * @notice Registers a new program on this product
-     * @param self The Program manager to operate on
+     * @param self The Product manager to operate on
      * @param programInfo The static program info
      * @return programId The new program's ID
      */
