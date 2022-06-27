@@ -206,7 +206,6 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
         for(uint256 i; i < tokens.length; i++) {
             Token18 token = tokens[i];
             UFixed18 amount = fees[token];
-            if (amount.isZero()) continue;
 
             fees[token] = UFixed18Lib.ZERO;
             token.push(controller().treasury(), amount);
