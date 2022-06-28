@@ -189,27 +189,15 @@ export async function deployProtocol(): Promise<InstanceVars> {
   }
 }
 
-export async function createCoordinator(instanceVars: InstanceVars): Promise<Product> {
-  const { owner, controller, treasuryB, productProvider } = instanceVars
-
-  await controller.callStatic.createProduct(1, productProvider.address)
-  await controller.createCoordinator()
-  await controller.updateCoordinatorTreasury(1, treasuryB.address)
-
-  const productAddress = await controller.callStatic.createProduct(1, productProvider.address)
-  await controller.createProduct(1, productProvider.address)
-
-  return Product__factory.connect(productAddress, owner)
-}
-
 export async function createProduct(instanceVars: InstanceVars): Promise<Product> {
   const { owner, controller, treasuryB, productProvider } = instanceVars
 
   await controller.createCoordinator()
   await controller.updateCoordinatorTreasury(1, treasuryB.address)
 
-  const productAddress = await controller.callStatic.createProduct(1, productProvider.address)
-  await controller.createProduct(1, productProvider.address)
+  const initParams = { name: 'Squeeth', symbol: 'SQTH', productProvider: productProvider.address }
+  const productAddress = await controller.callStatic.createProduct(1, initParams)
+  await controller.createProduct(1, initParams)
 
   return Product__factory.connect(productAddress, owner)
 }

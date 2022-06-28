@@ -13,6 +13,12 @@ import "../controller/UControllerProvider.sol";
  * @dev Cloned by the Controller contract to launch new product markets.
  */
 contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGuard {
+    /// @dev The name of the product
+    string public name;
+
+    /// @dev The symbol of the product
+    string public symbol;
+
     /// @dev The parameter provider of the product market
     IProductProvider public productProvider;
 
@@ -30,13 +36,15 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
 
     /**
      * @notice Initializes the contract state
-     * @param productProvider_ Product provider contract address
+     * @param initParams_ Product initialization params
      */
-    function initialize(IProductProvider productProvider_) external initializer(1) {
+    function initialize(ProductInitParams calldata initParams_) external initializer(1) {
         __UControllerProvider__initialize(IController(msg.sender));
         __UReentrancyGuard__initialize();
 
-        productProvider = productProvider_;
+        name = initParams_.name;
+        symbol = initParams_.symbol;
+        productProvider = initParams_.productProvider;
     }
 
     /**
@@ -444,6 +452,14 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
     /// @dev Ensure we have bootstraped the oracle before creating positions
     modifier nonZeroVersionInvariant {
         if (latestVersion() == 0) revert ProductOracleBootstrappingError();
+
+        _;
+    }
+
+    /// @dev Only allow the Product's coordinator owner to call
+    modifier onlyProductOwner {
+        uint256 coordinatorId = controller().coordinatorFor(IProduct(this));
+        if (controller().owner(coordinatorId) != msg.sender) revert ProductNotOwnerError();
 
         _;
     }

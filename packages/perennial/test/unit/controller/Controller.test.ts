@@ -516,17 +516,17 @@ describe('Controller', () => {
   })
 
   describe('#createProduct', async () => {
+    const PRODUCT_INIT_PARAMS = { name: 'Squeeth', symbol: 'SQTH', productProvider: '' }
     beforeEach(async () => {
+      PRODUCT_INIT_PARAMS.productProvider = productProvider.address
       await controller.connect(coordinatorOwner).createCoordinator()
       await controller.connect(coordinatorOwner).updateCoordinatorTreasury(1, coordinatorTreasury.address)
       await controller.connect(coordinatorOwner).updateCoordinatorPauser(1, coordinatorPauser.address)
     })
 
     it('creates the product', async () => {
-      const productAddress = await controller
-        .connect(coordinatorOwner)
-        .callStatic.createProduct(1, productProvider.address)
-      await expect(controller.connect(coordinatorOwner).createProduct(1, productProvider.address))
+      const productAddress = await controller.connect(coordinatorOwner).callStatic.createProduct(1, PRODUCT_INIT_PARAMS)
+      await expect(controller.connect(coordinatorOwner).createProduct(1, PRODUCT_INIT_PARAMS))
         .to.emit(controller, 'ProductCreated')
         .withArgs(productAddress, productProvider.address)
 
@@ -542,22 +542,20 @@ describe('Controller', () => {
     })
 
     it('reverts if zero coordinator', async () => {
-      await expect(controller.connect(owner).createProduct(0, productProvider.address)).to.be.revertedWith(
+      await expect(controller.connect(owner).createProduct(0, PRODUCT_INIT_PARAMS)).to.be.revertedWith(
         'ControllerNoZeroCoordinatorError()',
       )
     })
 
     it('reverts if not coordinator owner', async () => {
-      await expect(controller.connect(owner).createProduct(1, productProvider.address)).to.be.revertedWith(
+      await expect(controller.connect(owner).createProduct(1, PRODUCT_INIT_PARAMS)).to.be.revertedWith(
         'ControllerNotOwnerError(1)',
       )
     })
 
     it('returns paused correctly', async () => {
-      const productAddress = await controller
-        .connect(coordinatorOwner)
-        .callStatic.createProduct(1, productProvider.address)
-      await controller.connect(coordinatorOwner).createProduct(1, productProvider.address)
+      const productAddress = await controller.connect(coordinatorOwner).callStatic.createProduct(1, PRODUCT_INIT_PARAMS)
+      await controller.connect(coordinatorOwner).createProduct(1, PRODUCT_INIT_PARAMS)
 
       await controller.connect(coordinatorPauser).updateCoordinatorPaused(1, true)
       expect(await controller['paused(address)'](productAddress)).to.equal(true)

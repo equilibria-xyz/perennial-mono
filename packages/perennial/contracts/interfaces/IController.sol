@@ -7,6 +7,7 @@ import "./ICollateral.sol";
 import "./IIncentivizer.sol";
 import "./IProduct.sol";
 import "./IProductProvider.sol";
+import "./types/ProductInitParams.sol";
 
 interface IController {
     /// @dev Coordinator of a one or many products
@@ -72,7 +73,7 @@ interface IController {
     function updateCoordinatorTreasury(uint256 coordinatorId, address newTreasury) external;
     function updateCoordinatorPauser(uint256 coordinatorId, address newPauser) external;
     function updateCoordinatorPaused(uint256 coordinatorId, bool newPaused) external;
-    function createProduct(uint256 coordinatorId, IProductProvider provider) external returns (IProduct);
+    function createProduct(uint256 coordinatorId, ProductInitParams calldata initParams) external returns (IProduct);
     function updateCollateral(ICollateral newCollateral) external;
     function updateIncentivizer(IIncentivizer newIncentivizer) external;
     function updateProductBeacon(IBeacon newProductBeacon) external;

@@ -6,6 +6,7 @@ import "./types/Position.sol";
 import "./types/PrePosition.sol";
 import "./types/Accumulator.sol";
 import "./IProductProvider.sol";
+import "./types/ProductInitParams.sol";
 
 interface IProduct {
     event Settle(uint256 preVersion, uint256 toVersion);
@@ -22,9 +23,12 @@ interface IProduct {
     error ProductInLiquidationError();
     error ProductMakerOverLimitError();
     error ProductOracleBootstrappingError();
+    error ProductNotOwnerError();
 
+    function name() external view returns (string memory);
+    function symbol() external view returns (string memory);
     function productProvider() external view returns (IProductProvider);
-    function initialize(IProductProvider productProvider_) external;
+    function initialize(ProductInitParams calldata initParams_) external;
     function settle() external;
     function settleAccount(address account) external;
     function openTake(UFixed18 amount) external;

@@ -35,8 +35,9 @@ describe('Happy Path', () => {
       .to.emit(controller, 'CoordinatorTreasuryUpdated')
       .withArgs(1, treasuryB.address)
 
-    const productAddress = await controller.callStatic.createProduct(1, productProvider.address)
-    await expect(controller.createProduct(1, productProvider.address)).to.emit(controller, 'ProductCreated')
+    const initParams = { name: 'Squeeth', symbol: 'SQTH', productProvider: productProvider.address }
+    const productAddress = await controller.callStatic.createProduct(1, initParams)
+    await expect(controller.createProduct(1, initParams)).to.emit(controller, 'ProductCreated')
 
     await dsu.connect(user).approve(collateral.address, utils.parseEther('1000'))
     await collateral.connect(user).depositTo(user.address, productAddress, utils.parseEther('1000'))
