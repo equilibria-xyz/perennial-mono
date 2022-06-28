@@ -53,14 +53,14 @@ describe('PerennialLens', () => {
 
   describe('#name', () => {
     it('returns the name of the product', async () => {
-      productProvider.name.returns('MyProduct')
+      product.name.returns('MyProduct')
       expect(await lens.callStatic.name(product.address)).to.equal('MyProduct')
     })
   })
 
   describe('#symbol', () => {
     it('returns the symbol of the product', async () => {
-      productProvider.symbol.returns('PROD')
+      product.symbol.returns('PROD')
       expect(await lens.callStatic.symbol(product.address)).to.equal('PROD')
     })
   })
