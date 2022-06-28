@@ -132,6 +132,7 @@ describe('Liquidate', () => {
     const feesNew = (await collateral.fees(treasuryA.address)).add(await collateral.fees(treasuryB.address))
     const feesDelta = feesNew.sub(feesCurr)
 
+    expect(totalCurr.add(feesDelta)).to.be.gte(totalNew)
     expect(totalCurr.add(feesDelta)).to.be.closeTo(totalNew, 1)
   }).timeout(120000)
 })
