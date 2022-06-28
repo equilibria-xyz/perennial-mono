@@ -132,8 +132,11 @@ library VersionedAccumulatorLib {
             fundingAccumulated.abs().sub(accumulatedFee)
         );
 
-        accumulatedFunding.maker = fundingIncludingFee.div(Fixed18Lib.from(latestPosition.maker));
-        accumulatedFunding.taker = fundingIncludingFee.div(Fixed18Lib.from(latestPosition.taker)).mul(Fixed18Lib.NEG_ONE);
+        bool makerPaysFunding = fundingAccumulated.sign() < 0;
+        accumulatedFunding.maker = (makerPaysFunding ? fundingIncludingFee : fundingAccumulated)
+            .div(Fixed18Lib.from(latestPosition.maker));
+        accumulatedFunding.taker = (makerPaysFunding ? fundingAccumulated : fundingIncludingFee)
+            .div(Fixed18Lib.from(latestPosition.taker)).mul(Fixed18Lib.NEG_ONE);
     }
 
     /**

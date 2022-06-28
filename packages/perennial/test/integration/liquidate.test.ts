@@ -66,7 +66,7 @@ describe('Liquidate', () => {
     await product.settleAccount(userB.address)
 
     expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(0)
-    expect(await collateral.shortfall(product.address)).to.equal('2463736825720737646856')
+    expect(await collateral.shortfall(product.address)).to.equal('2463720317001203086618')
 
     const userBCollateral = await collateral['collateral(address,address)'](userB.address, product.address)
     await expect(
@@ -74,14 +74,14 @@ describe('Liquidate', () => {
     ).to.be.revertedWith('0x11') // underflow
 
     await dsu.connect(userB).approve(collateral.address, constants.MaxUint256)
-    await collateral.connect(userB).resolveShortfall(product.address, '2463736825720737646856')
+    await collateral.connect(userB).resolveShortfall(product.address, '2463720317001203086618')
 
     expect(await collateral.shortfall(product.address)).to.equal(0)
   })
 
   it('uses a socialization factor', async () => {
     const POSITION = utils.parseEther('0.0001')
-    const { user, userB, userC, userD, collateral, chainlink } = instanceVars
+    const { user, userB, userC, userD, collateral, chainlink, treasuryA, treasuryB } = instanceVars
 
     const product = await createProduct(instanceVars)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
@@ -112,6 +112,8 @@ describe('Liquidate', () => {
     const currD = await collateral['collateral(address,address)'](userD.address, product.address)
     const totalCurr = currB.add(currC).add(currD)
 
+    const feesCurr = (await collateral.fees(treasuryA.address)).add(await collateral.fees(treasuryB.address))
+
     await chainlink.next()
     await product.settleAccount(userB.address)
     await product.settleAccount(userC.address)
@@ -127,7 +129,9 @@ describe('Liquidate', () => {
     expect(currC.lt(newC)).to.equal(true)
     expect(currD.lt(newD)).to.equal(true)
 
-    expect(totalCurr.gte(totalNew)).to.equal(true)
-    expect(totalCurr).to.closeTo(totalNew, 1)
+    const feesNew = (await collateral.fees(treasuryA.address)).add(await collateral.fees(treasuryB.address))
+    const feesDelta = feesNew.sub(feesCurr)
+
+    expect(totalCurr.add(feesDelta)).to.be.closeTo(totalNew, 1)
   }).timeout(120000)
 })

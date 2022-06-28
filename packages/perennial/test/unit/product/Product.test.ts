@@ -1117,7 +1117,7 @@ describe('Product', () => {
           closePosition: { maker: 0, taker: 0 },
         })
         expectPositionEq(await product.valueAtVersion(3), {
-          maker: EXPECTED_FUNDING_WITH_FEE.div(20),
+          maker: EXPECTED_FUNDING.div(20),
           taker: EXPECTED_FUNDING_WITH_FEE.div(10).mul(-1),
         })
         expectPositionEq(await product.shareAtVersion(3), {
@@ -1175,7 +1175,7 @@ describe('Product', () => {
           closePosition: { maker: 0, taker: 0 },
         })
         expectPositionEq(await product.valueAtVersion(3), {
-          maker: EXPECTED_FUNDING_WITH_FEE.div(20),
+          maker: EXPECTED_FUNDING.div(20),
           taker: EXPECTED_FUNDING_WITH_FEE.div(10).mul(-1),
         })
         expectPositionEq(await product.shareAtVersion(3), {
@@ -1239,7 +1239,7 @@ describe('Product', () => {
           closePosition: { maker: 0, taker: 0 },
         })
         expectPositionEq(await product.valueAtVersion(3), {
-          maker: EXPECTED_FUNDING_WITH_FEE.div(20),
+          maker: EXPECTED_FUNDING.div(20),
           taker: EXPECTED_FUNDING_WITH_FEE.div(10).mul(-1),
         })
         expectPositionEq(await product.shareAtVersion(3), {
@@ -1437,7 +1437,7 @@ describe('Product', () => {
             closePosition: { maker: 0, taker: 0 },
           })
           expectPositionEq(await product.valueAtVersion(3), {
-            maker: EXPECTED_FUNDING_WITH_FEE.div(20),
+            maker: EXPECTED_FUNDING.div(20),
             taker: EXPECTED_FUNDING_WITH_FEE.div(10).mul(-1),
           })
           expectPositionEq(await product.shareAtVersion(3), {
@@ -1520,7 +1520,7 @@ describe('Product', () => {
             closePosition: { maker: 0, taker: 0 },
           })
           expectPositionEq(await product.valueAtVersion(3), {
-            maker: EXPECTED_FUNDING_WITH_FEE.div(20),
+            maker: EXPECTED_FUNDING.div(20),
             taker: EXPECTED_FUNDING_WITH_FEE.div(10).mul(-1),
           })
           expectPositionEq(await product.shareAtVersion(3), {
@@ -1583,7 +1583,7 @@ describe('Product', () => {
             closePosition: { maker: 0, taker: POSITION.div(2) },
           })
           expectPositionEq(await product.valueAtVersion(3), {
-            maker: EXPECTED_FUNDING_WITH_FEE.div(20),
+            maker: EXPECTED_FUNDING.div(20),
             taker: EXPECTED_FUNDING_WITH_FEE.div(10).mul(-1),
           })
           expectPositionEq(await product.shareAtVersion(3), {
@@ -1637,11 +1637,11 @@ describe('Product', () => {
             closePosition: { maker: 0, taker: 0 },
           })
           expectPositionEq(await product.valueAtVersion(3), {
-            maker: EXPECTED_FUNDING_WITH_FEE_1.div(20),
+            maker: EXPECTED_FUNDING_1.div(20),
             taker: EXPECTED_FUNDING_WITH_FEE_1.div(10).mul(-1),
           })
           expectPositionEq(await product.valueAtVersion(4), {
-            maker: EXPECTED_FUNDING_WITH_FEE_1.add(EXPECTED_FUNDING_WITH_FEE_2).div(20),
+            maker: EXPECTED_FUNDING_1.add(EXPECTED_FUNDING_2).div(20),
             taker: EXPECTED_FUNDING_WITH_FEE_1.div(10).add(EXPECTED_FUNDING_WITH_FEE_2.div(5)).mul(-1),
           })
           expectPositionEq(await product.shareAtVersion(4), {
@@ -1697,7 +1697,7 @@ describe('Product', () => {
             closePosition: { maker: 0, taker: 0 },
           })
           expectPositionEq(await product.valueAtVersion(4), {
-            maker: EXPECTED_FUNDING_WITH_FEE.div(20),
+            maker: EXPECTED_FUNDING.div(20),
             taker: EXPECTED_FUNDING_WITH_FEE.div(10).mul(-1),
           })
           expectPositionEq(await product.shareAtVersion(4), {
@@ -1759,7 +1759,7 @@ describe('Product', () => {
             closePosition: { maker: 0, taker: 0 },
           })
           expectPositionEq(await product.valueAtVersion(4), {
-            maker: EXPECTED_FUNDING_WITH_FEE.div(20),
+            maker: EXPECTED_FUNDING.div(20),
             taker: EXPECTED_FUNDING_WITH_FEE.div(10).mul(-1),
           })
           expectPositionEq(await product.shareAtVersion(4), {
@@ -1897,7 +1897,7 @@ describe('Product', () => {
 
       it('same price same rate settle', async () => {
         await collateral.mock.settleProduct.withArgs(EXPECTED_FUNDING_FEE).returns()
-        await collateral.mock.settleAccount.withArgs(user.address, EXPECTED_FUNDING_WITH_FEE).returns()
+        await collateral.mock.settleAccount.withArgs(user.address, EXPECTED_FUNDING).returns()
         await collateral.mock.settleAccount
           .withArgs(userB.address, -1 * (EXPECTED_FUNDING - EXPECTED_FUNDING_FEE))
           .returns()
@@ -1919,7 +1919,7 @@ describe('Product', () => {
           closePosition: { maker: 0, taker: 0 },
         })
         expectPositionEq(await product.valueAtVersion(3), {
-          maker: EXPECTED_FUNDING_WITH_FEE / 10,
+          maker: EXPECTED_FUNDING / 10,
           taker: (-1 * EXPECTED_FUNDING_WITH_FEE) / 5,
         })
         expectPositionEq(await product.shareAtVersion(3), {
@@ -2030,9 +2030,7 @@ describe('Product', () => {
         const EXPECTED_POSITION = utils.parseEther('2').mul(5) // maker pnl
 
         await collateral.mock.settleProduct.withArgs(EXPECTED_FUNDING_FEE).returns()
-        await collateral.mock.settleAccount
-          .withArgs(user.address, EXPECTED_POSITION.add(EXPECTED_FUNDING_WITH_FEE))
-          .returns()
+        await collateral.mock.settleAccount.withArgs(user.address, EXPECTED_POSITION.add(EXPECTED_FUNDING)).returns()
         await collateral.mock.settleAccount
           .withArgs(userB.address, EXPECTED_POSITION.add(EXPECTED_FUNDING_WITH_FEE).mul(-1))
           .returns()
@@ -2059,7 +2057,7 @@ describe('Product', () => {
           closePosition: { maker: 0, taker: 0 },
         })
         expectPositionEq(await product.valueAtVersion(3), {
-          maker: EXPECTED_POSITION.add(EXPECTED_FUNDING_WITH_FEE).div(10),
+          maker: EXPECTED_POSITION.add(EXPECTED_FUNDING).div(10),
           taker: EXPECTED_POSITION.add(EXPECTED_FUNDING_WITH_FEE).mul(-1).div(5),
         })
         expectPositionEq(await product.shareAtVersion(3), {
@@ -2102,9 +2100,7 @@ describe('Product', () => {
         const EXPECTED_POSITION = utils.parseEther('-2').mul(5) // maker pnl
 
         await collateral.mock.settleProduct.withArgs(EXPECTED_FUNDING_FEE).returns()
-        await collateral.mock.settleAccount
-          .withArgs(user.address, EXPECTED_POSITION.add(EXPECTED_FUNDING_WITH_FEE))
-          .returns()
+        await collateral.mock.settleAccount.withArgs(user.address, EXPECTED_POSITION.add(EXPECTED_FUNDING)).returns()
         await collateral.mock.settleAccount
           .withArgs(userB.address, EXPECTED_POSITION.add(EXPECTED_FUNDING_WITH_FEE).mul(-1))
           .returns()
@@ -2131,7 +2127,7 @@ describe('Product', () => {
           closePosition: { maker: 0, taker: 0 },
         })
         expectPositionEq(await product.valueAtVersion(3), {
-          maker: EXPECTED_POSITION.add(EXPECTED_FUNDING_WITH_FEE).div(10),
+          maker: EXPECTED_POSITION.add(EXPECTED_FUNDING).div(10),
           taker: EXPECTED_POSITION.add(EXPECTED_FUNDING_WITH_FEE).mul(-1).div(5),
         })
         expectPositionEq(await product.shareAtVersion(3), {
@@ -2173,7 +2169,7 @@ describe('Product', () => {
       it('same price negative rate settle', async () => {
         await collateral.mock.settleProduct.withArgs(EXPECTED_FUNDING_FEE).returns()
         await collateral.mock.settleAccount.withArgs(user.address, -1 * EXPECTED_FUNDING_WITH_FEE).returns()
-        await collateral.mock.settleAccount.withArgs(userB.address, EXPECTED_FUNDING_WITH_FEE).returns()
+        await collateral.mock.settleAccount.withArgs(userB.address, EXPECTED_FUNDING).returns()
 
         await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
         await productProvider.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
@@ -2193,7 +2189,7 @@ describe('Product', () => {
         })
         expectPositionEq(await product.valueAtVersion(3), {
           maker: (-1 * EXPECTED_FUNDING_WITH_FEE) / 10,
-          taker: EXPECTED_FUNDING_WITH_FEE / 5,
+          taker: EXPECTED_FUNDING / 5,
         })
         expectPositionEq(await product.shareAtVersion(3), {
           maker: utils.parseEther('0.1').mul(3600),
@@ -2236,7 +2232,7 @@ describe('Product', () => {
           await product.connect(collateralSigner).closeAll(user.address)
 
           await collateral.mock.settleProduct.withArgs(EXPECTED_FUNDING_FEE).returns()
-          await collateral.mock.settleAccount.withArgs(user.address, EXPECTED_FUNDING_WITH_FEE).returns()
+          await collateral.mock.settleAccount.withArgs(user.address, EXPECTED_FUNDING).returns()
           await collateral.mock.settleAccount.withArgs(userB.address, -1 * EXPECTED_FUNDING_WITH_FEE).returns()
 
           await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
@@ -2266,7 +2262,7 @@ describe('Product', () => {
             closePosition: { maker: 0, taker: 0 },
           })
           expectPositionEq(await product.valueAtVersion(3), {
-            maker: EXPECTED_FUNDING_WITH_FEE / 10,
+            maker: EXPECTED_FUNDING / 10,
             taker: (-1 * EXPECTED_FUNDING_WITH_FEE) / 5,
           })
           expectPositionEq(await product.shareAtVersion(3), {
@@ -2274,7 +2270,7 @@ describe('Product', () => {
             taker: utils.parseEther('0.2').mul(3600),
           })
           expectPositionEq(await product.valueAtVersion(4), {
-            maker: EXPECTED_FUNDING_WITH_FEE / 10,
+            maker: EXPECTED_FUNDING / 10,
             taker: (-1 * EXPECTED_FUNDING_WITH_FEE) / 5,
           })
           expectPositionEq(await product.shareAtVersion(4), {
@@ -2330,8 +2326,8 @@ describe('Product', () => {
 
           await collateral.mock.settleProduct.withArgs(EXPECTED_FUNDING_FEE / 2).returns()
 
-          await collateral.mock.settleAccount.withArgs(user.address, EXPECTED_FUNDING_WITH_FEE).returns()
-          await collateral.mock.settleAccount.withArgs(userC.address, EXPECTED_FUNDING_WITH_FEE / 2).returns()
+          await collateral.mock.settleAccount.withArgs(user.address, EXPECTED_FUNDING).returns()
+          await collateral.mock.settleAccount.withArgs(userC.address, EXPECTED_FUNDING / 2).returns()
           await collateral.mock.settleAccount
             .withArgs(userB.address, BigNumber.from(EXPECTED_FUNDING_WITH_FEE).mul(3).div(2).mul(-1))
             .returns()
@@ -2354,7 +2350,7 @@ describe('Product', () => {
             closePosition: { maker: 0, taker: 0 },
           })
           expectPositionEq(await product.valueAtVersion(3), {
-            maker: EXPECTED_FUNDING_WITH_FEE / 10,
+            maker: EXPECTED_FUNDING / 10,
             taker: (-1 * EXPECTED_FUNDING_WITH_FEE) / 5,
           })
           expectPositionEq(await product.shareAtVersion(3), {
@@ -2362,7 +2358,7 @@ describe('Product', () => {
             taker: utils.parseEther('0.2').mul(3600),
           })
           expectPositionEq(await product.valueAtVersion(4), {
-            maker: EXPECTED_FUNDING_WITH_FEE / 10 + EXPECTED_FUNDING_WITH_FEE / 5,
+            maker: EXPECTED_FUNDING / 10 + EXPECTED_FUNDING / 5,
             taker: -1 * (EXPECTED_FUNDING_WITH_FEE / 5 + EXPECTED_FUNDING_WITH_FEE / 10),
           })
           expectPositionEq(await product.shareAtVersion(4), {
@@ -2420,7 +2416,7 @@ describe('Product', () => {
           await product.connect(collateralSigner).closeAll(user.address)
 
           await collateral.mock.settleProduct.withArgs(EXPECTED_FUNDING_FEE).returns()
-          await collateral.mock.settleAccount.withArgs(user.address, EXPECTED_FUNDING_WITH_FEE).returns()
+          await collateral.mock.settleAccount.withArgs(user.address, EXPECTED_FUNDING).returns()
           await collateral.mock.settleAccount.withArgs(userB.address, -1 * EXPECTED_FUNDING_WITH_FEE).returns()
 
           await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
@@ -2455,7 +2451,7 @@ describe('Product', () => {
             closePosition: { maker: 0, taker: 0 },
           })
           expectPositionEq(await product.valueAtVersion(3), {
-            maker: EXPECTED_FUNDING_WITH_FEE / 10,
+            maker: EXPECTED_FUNDING / 10,
             taker: (-1 * EXPECTED_FUNDING_WITH_FEE) / 5,
           })
           expectPositionEq(await product.shareAtVersion(3), {
@@ -2463,7 +2459,7 @@ describe('Product', () => {
             taker: utils.parseEther('0.2').mul(3600),
           })
           expectPositionEq(await product.valueAtVersion(4), {
-            maker: EXPECTED_FUNDING_WITH_FEE / 10,
+            maker: EXPECTED_FUNDING / 10,
             taker: (-1 * EXPECTED_FUNDING_WITH_FEE) / 5,
           })
           expectPositionEq(await product.shareAtVersion(4), {
@@ -2521,9 +2517,9 @@ describe('Product', () => {
 
           await collateral.mock.settleProduct.withArgs(EXPECTED_FUNDING_FEE / 2).returns()
 
-          await collateral.mock.settleAccount.withArgs(user.address, EXPECTED_FUNDING_WITH_FEE).returns()
+          await collateral.mock.settleAccount.withArgs(user.address, EXPECTED_FUNDING).returns()
           await collateral.mock.settleAccount
-            .withArgs(userC.address, EXPECTED_POSITION.add(EXPECTED_FUNDING_WITH_FEE / 2))
+            .withArgs(userC.address, EXPECTED_POSITION.add(EXPECTED_FUNDING / 2))
             .returns()
           await collateral.mock.settleAccount
             .withArgs(
@@ -2555,14 +2551,14 @@ describe('Product', () => {
             closePosition: { maker: 0, taker: 0 },
           })
           expectPositionEq(await product.valueAtVersion(3), {
-            maker: EXPECTED_FUNDING_WITH_FEE / 10,
+            maker: EXPECTED_FUNDING / 10,
             taker: (-1 * EXPECTED_FUNDING_WITH_FEE) / 5,
           })
           expectPositionEq(await product.shareAtVersion(3), {
             maker: utils.parseEther('0.1').mul(3600),
             taker: utils.parseEther('0.2').mul(3600),
           })
-          const MAKER_FUNDING = EXPECTED_FUNDING_WITH_FEE / 10 + EXPECTED_FUNDING_WITH_FEE / 5
+          const MAKER_FUNDING = EXPECTED_FUNDING / 10 + EXPECTED_FUNDING / 5
           const TAKER_FUNDING = -1 * (EXPECTED_FUNDING_WITH_FEE / 5 + EXPECTED_FUNDING_WITH_FEE / 10)
           const MAKER_POSITION = EXPECTED_POSITION.mul(2).div(5)
           const TAKER_POSITION = EXPECTED_POSITION.div(-5)
@@ -3686,7 +3682,7 @@ describe('Product', () => {
           closePosition: { maker: 0, taker: 0 },
         })
         expectPositionEq(await product.valueAtVersion(3), {
-          maker: EXPECTED_FUNDING_WITH_FEE.div(20),
+          maker: EXPECTED_FUNDING.div(20),
           taker: EXPECTED_FUNDING_WITH_FEE.div(10).mul(-1),
         })
         expectPositionEq(await product.shareAtVersion(3), {
@@ -3744,7 +3740,7 @@ describe('Product', () => {
           closePosition: { maker: 0, taker: 0 },
         })
         expectPositionEq(await product.valueAtVersion(3), {
-          maker: EXPECTED_FUNDING_WITH_FEE.div(20),
+          maker: EXPECTED_FUNDING.div(20),
           taker: EXPECTED_FUNDING_WITH_FEE.div(10).mul(-1),
         })
         expectPositionEq(await product.shareAtVersion(3), {
@@ -3808,7 +3804,7 @@ describe('Product', () => {
           closePosition: { maker: 0, taker: 0 },
         })
         expectPositionEq(await product.valueAtVersion(3), {
-          maker: EXPECTED_FUNDING_WITH_FEE.div(20),
+          maker: EXPECTED_FUNDING.div(20),
           taker: EXPECTED_FUNDING_WITH_FEE.div(10).mul(-1),
         })
         expectPositionEq(await product.shareAtVersion(3), {
@@ -4013,7 +4009,7 @@ describe('Product', () => {
             closePosition: { maker: 0, taker: 0 },
           })
           expectPositionEq(await product.valueAtVersion(3), {
-            maker: EXPECTED_FUNDING_WITH_FEE.div(20),
+            maker: EXPECTED_FUNDING.div(20),
             taker: EXPECTED_FUNDING_WITH_FEE.div(10).mul(-1),
           })
           expectPositionEq(await product.shareAtVersion(3), {
@@ -4096,7 +4092,7 @@ describe('Product', () => {
             closePosition: { maker: 0, taker: 0 },
           })
           expectPositionEq(await product.valueAtVersion(3), {
-            maker: EXPECTED_FUNDING_WITH_FEE.div(20),
+            maker: EXPECTED_FUNDING.div(20),
             taker: EXPECTED_FUNDING_WITH_FEE.div(10).mul(-1),
           })
           expectPositionEq(await product.shareAtVersion(3), {
@@ -4159,7 +4155,7 @@ describe('Product', () => {
             closePosition: { maker: 0, taker: POSITION.div(2) },
           })
           expectPositionEq(await product.valueAtVersion(3), {
-            maker: EXPECTED_FUNDING_WITH_FEE.div(20),
+            maker: EXPECTED_FUNDING.div(20),
             taker: EXPECTED_FUNDING_WITH_FEE.div(10).mul(-1),
           })
           expectPositionEq(await product.shareAtVersion(3), {
@@ -4212,11 +4208,11 @@ describe('Product', () => {
             closePosition: { maker: 0, taker: 0 },
           })
           expectPositionEq(await product.valueAtVersion(3), {
-            maker: EXPECTED_FUNDING_WITH_FEE_1.div(20),
+            maker: EXPECTED_FUNDING_1.div(20),
             taker: EXPECTED_FUNDING_WITH_FEE_1.div(10).mul(-1),
           })
           expectPositionEq(await product.valueAtVersion(4), {
-            maker: EXPECTED_FUNDING_WITH_FEE_1.add(EXPECTED_FUNDING_WITH_FEE_2).div(20),
+            maker: EXPECTED_FUNDING_1.add(EXPECTED_FUNDING_2).div(20),
             taker: EXPECTED_FUNDING_WITH_FEE_1.div(10).add(EXPECTED_FUNDING_WITH_FEE_2.div(5)).mul(-1),
           })
           expectPositionEq(await product.shareAtVersion(4), {
@@ -4272,7 +4268,7 @@ describe('Product', () => {
             closePosition: { maker: 0, taker: 0 },
           })
           expectPositionEq(await product.valueAtVersion(4), {
-            maker: EXPECTED_FUNDING_WITH_FEE.div(20),
+            maker: EXPECTED_FUNDING.div(20),
             taker: EXPECTED_FUNDING_WITH_FEE.div(10).mul(-1),
           })
           expectPositionEq(await product.shareAtVersion(4), {
@@ -4334,7 +4330,7 @@ describe('Product', () => {
             closePosition: { maker: 0, taker: 0 },
           })
           expectPositionEq(await product.valueAtVersion(4), {
-            maker: EXPECTED_FUNDING_WITH_FEE.div(20),
+            maker: EXPECTED_FUNDING.div(20),
             taker: EXPECTED_FUNDING_WITH_FEE.div(10).mul(-1),
           })
           expectPositionEq(await product.shareAtVersion(4), {
@@ -4472,7 +4468,7 @@ describe('Product', () => {
 
       it('same price same rate settle', async () => {
         await collateral.mock.settleProduct.withArgs(EXPECTED_FUNDING_FEE).returns()
-        await collateral.mock.settleAccount.withArgs(user.address, EXPECTED_FUNDING_WITH_FEE).returns()
+        await collateral.mock.settleAccount.withArgs(user.address, EXPECTED_FUNDING).returns()
         await collateral.mock.settleAccount
           .withArgs(userB.address, -1 * (EXPECTED_FUNDING - EXPECTED_FUNDING_FEE))
           .returns()
@@ -4494,7 +4490,7 @@ describe('Product', () => {
           closePosition: { maker: 0, taker: 0 },
         })
         expectPositionEq(await product.valueAtVersion(3), {
-          maker: EXPECTED_FUNDING_WITH_FEE / 10,
+          maker: EXPECTED_FUNDING / 10,
           taker: (-1 * EXPECTED_FUNDING_WITH_FEE) / 5,
         })
         expectPositionEq(await product.shareAtVersion(3), {
@@ -4535,7 +4531,7 @@ describe('Product', () => {
 
       it('same price same timestamp settle', async () => {
         await collateral.mock.settleProduct.withArgs(EXPECTED_FUNDING_FEE).returns()
-        await collateral.mock.settleAccount.withArgs(user.address, EXPECTED_FUNDING_WITH_FEE).returns()
+        await collateral.mock.settleAccount.withArgs(user.address, EXPECTED_FUNDING).returns()
         await collateral.mock.settleAccount
           .withArgs(userB.address, -1 * (EXPECTED_FUNDING - EXPECTED_FUNDING_FEE))
           .returns()
@@ -4605,9 +4601,7 @@ describe('Product', () => {
         const EXPECTED_POSITION = utils.parseEther('2').mul(5) // maker pnl
 
         await collateral.mock.settleProduct.withArgs(EXPECTED_FUNDING_FEE).returns()
-        await collateral.mock.settleAccount
-          .withArgs(user.address, EXPECTED_POSITION.add(EXPECTED_FUNDING_WITH_FEE))
-          .returns()
+        await collateral.mock.settleAccount.withArgs(user.address, EXPECTED_POSITION.add(EXPECTED_FUNDING)).returns()
         await collateral.mock.settleAccount
           .withArgs(userB.address, EXPECTED_POSITION.add(EXPECTED_FUNDING_WITH_FEE).mul(-1))
           .returns()
@@ -4634,7 +4628,7 @@ describe('Product', () => {
           closePosition: { maker: 0, taker: 0 },
         })
         expectPositionEq(await product.valueAtVersion(3), {
-          maker: EXPECTED_POSITION.add(EXPECTED_FUNDING_WITH_FEE).div(10),
+          maker: EXPECTED_POSITION.add(EXPECTED_FUNDING).div(10),
           taker: EXPECTED_POSITION.add(EXPECTED_FUNDING_WITH_FEE).mul(-1).div(5),
         })
         expectPositionEq(await product.shareAtVersion(3), {
@@ -4677,9 +4671,7 @@ describe('Product', () => {
         const EXPECTED_POSITION = utils.parseEther('-2').mul(5) // maker pnl
 
         await collateral.mock.settleProduct.withArgs(EXPECTED_FUNDING_FEE).returns()
-        await collateral.mock.settleAccount
-          .withArgs(user.address, EXPECTED_POSITION.add(EXPECTED_FUNDING_WITH_FEE))
-          .returns()
+        await collateral.mock.settleAccount.withArgs(user.address, EXPECTED_POSITION.add(EXPECTED_FUNDING)).returns()
         await collateral.mock.settleAccount
           .withArgs(userB.address, EXPECTED_POSITION.add(EXPECTED_FUNDING_WITH_FEE).mul(-1))
           .returns()
@@ -4706,7 +4698,7 @@ describe('Product', () => {
           closePosition: { maker: 0, taker: 0 },
         })
         expectPositionEq(await product.valueAtVersion(3), {
-          maker: EXPECTED_POSITION.add(EXPECTED_FUNDING_WITH_FEE).div(10),
+          maker: EXPECTED_POSITION.add(EXPECTED_FUNDING).div(10),
           taker: EXPECTED_POSITION.add(EXPECTED_FUNDING_WITH_FEE).mul(-1).div(5),
         })
         expectPositionEq(await product.shareAtVersion(3), {
@@ -4748,7 +4740,7 @@ describe('Product', () => {
       it('same price negative rate settle', async () => {
         await collateral.mock.settleProduct.withArgs(EXPECTED_FUNDING_FEE).returns()
         await collateral.mock.settleAccount.withArgs(user.address, -1 * EXPECTED_FUNDING_WITH_FEE).returns()
-        await collateral.mock.settleAccount.withArgs(userB.address, EXPECTED_FUNDING_WITH_FEE).returns()
+        await collateral.mock.settleAccount.withArgs(userB.address, EXPECTED_FUNDING).returns()
 
         await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
         await productProvider.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
@@ -4768,7 +4760,7 @@ describe('Product', () => {
         })
         expectPositionEq(await product.valueAtVersion(3), {
           maker: (-1 * EXPECTED_FUNDING_WITH_FEE) / 10,
-          taker: EXPECTED_FUNDING_WITH_FEE / 5,
+          taker: EXPECTED_FUNDING / 5,
         })
         expectPositionEq(await product.shareAtVersion(3), {
           maker: utils.parseEther('0.1').mul(3600),
@@ -4811,7 +4803,7 @@ describe('Product', () => {
           await product.connect(collateralSigner).closeAll(user.address)
 
           await collateral.mock.settleProduct.withArgs(EXPECTED_FUNDING_FEE).returns()
-          await collateral.mock.settleAccount.withArgs(user.address, EXPECTED_FUNDING_WITH_FEE).returns()
+          await collateral.mock.settleAccount.withArgs(user.address, EXPECTED_FUNDING).returns()
           await collateral.mock.settleAccount.withArgs(userB.address, -1 * EXPECTED_FUNDING_WITH_FEE).returns()
 
           await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
@@ -4841,7 +4833,7 @@ describe('Product', () => {
             closePosition: { maker: 0, taker: 0 },
           })
           expectPositionEq(await product.valueAtVersion(3), {
-            maker: EXPECTED_FUNDING_WITH_FEE / 10,
+            maker: EXPECTED_FUNDING / 10,
             taker: (-1 * EXPECTED_FUNDING_WITH_FEE) / 5,
           })
           expectPositionEq(await product.shareAtVersion(3), {
@@ -4849,7 +4841,7 @@ describe('Product', () => {
             taker: utils.parseEther('0.2').mul(3600),
           })
           expectPositionEq(await product.valueAtVersion(4), {
-            maker: EXPECTED_FUNDING_WITH_FEE / 10,
+            maker: EXPECTED_FUNDING / 10,
             taker: (-1 * EXPECTED_FUNDING_WITH_FEE) / 5,
           })
           expectPositionEq(await product.shareAtVersion(4), {
@@ -4905,8 +4897,8 @@ describe('Product', () => {
 
           await collateral.mock.settleProduct.withArgs(EXPECTED_FUNDING_FEE / 2).returns()
 
-          await collateral.mock.settleAccount.withArgs(user.address, EXPECTED_FUNDING_WITH_FEE).returns()
-          await collateral.mock.settleAccount.withArgs(userC.address, EXPECTED_FUNDING_WITH_FEE / 2).returns()
+          await collateral.mock.settleAccount.withArgs(user.address, EXPECTED_FUNDING).returns()
+          await collateral.mock.settleAccount.withArgs(userC.address, EXPECTED_FUNDING / 2).returns()
           await collateral.mock.settleAccount
             .withArgs(userB.address, BigNumber.from(EXPECTED_FUNDING_WITH_FEE).mul(3).div(2).mul(-1))
             .returns()
@@ -4929,7 +4921,7 @@ describe('Product', () => {
             closePosition: { maker: 0, taker: 0 },
           })
           expectPositionEq(await product.valueAtVersion(3), {
-            maker: EXPECTED_FUNDING_WITH_FEE / 10,
+            maker: EXPECTED_FUNDING / 10,
             taker: (-1 * EXPECTED_FUNDING_WITH_FEE) / 5,
           })
           expectPositionEq(await product.shareAtVersion(3), {
@@ -4937,7 +4929,7 @@ describe('Product', () => {
             taker: utils.parseEther('0.2').mul(3600),
           })
           expectPositionEq(await product.valueAtVersion(4), {
-            maker: EXPECTED_FUNDING_WITH_FEE / 10 + EXPECTED_FUNDING_WITH_FEE / 5,
+            maker: EXPECTED_FUNDING / 10 + EXPECTED_FUNDING / 5,
             taker: -1 * (EXPECTED_FUNDING_WITH_FEE / 5 + EXPECTED_FUNDING_WITH_FEE / 10),
           })
           expectPositionEq(await product.shareAtVersion(4), {
@@ -4995,7 +4987,7 @@ describe('Product', () => {
           await product.connect(collateralSigner).closeAll(user.address)
 
           await collateral.mock.settleProduct.withArgs(EXPECTED_FUNDING_FEE).returns()
-          await collateral.mock.settleAccount.withArgs(user.address, EXPECTED_FUNDING_WITH_FEE).returns()
+          await collateral.mock.settleAccount.withArgs(user.address, EXPECTED_FUNDING).returns()
           await collateral.mock.settleAccount.withArgs(userB.address, -1 * EXPECTED_FUNDING_WITH_FEE).returns()
 
           await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
@@ -5030,7 +5022,7 @@ describe('Product', () => {
             closePosition: { maker: 0, taker: 0 },
           })
           expectPositionEq(await product.valueAtVersion(3), {
-            maker: EXPECTED_FUNDING_WITH_FEE / 10,
+            maker: EXPECTED_FUNDING / 10,
             taker: (-1 * EXPECTED_FUNDING_WITH_FEE) / 5,
           })
           expectPositionEq(await product.shareAtVersion(3), {
@@ -5038,7 +5030,7 @@ describe('Product', () => {
             taker: utils.parseEther('0.2').mul(3600),
           })
           expectPositionEq(await product.valueAtVersion(4), {
-            maker: EXPECTED_FUNDING_WITH_FEE / 10,
+            maker: EXPECTED_FUNDING / 10,
             taker: (-1 * EXPECTED_FUNDING_WITH_FEE) / 5,
           })
           expectPositionEq(await product.shareAtVersion(4), {
@@ -5096,9 +5088,9 @@ describe('Product', () => {
 
           await collateral.mock.settleProduct.withArgs(EXPECTED_FUNDING_FEE / 2).returns()
 
-          await collateral.mock.settleAccount.withArgs(user.address, EXPECTED_FUNDING_WITH_FEE).returns()
+          await collateral.mock.settleAccount.withArgs(user.address, EXPECTED_FUNDING).returns()
           await collateral.mock.settleAccount
-            .withArgs(userC.address, EXPECTED_POSITION.add(EXPECTED_FUNDING_WITH_FEE / 2))
+            .withArgs(userC.address, EXPECTED_POSITION.add(EXPECTED_FUNDING / 2))
             .returns()
           await collateral.mock.settleAccount
             .withArgs(
@@ -5130,14 +5122,14 @@ describe('Product', () => {
             closePosition: { maker: 0, taker: 0 },
           })
           expectPositionEq(await product.valueAtVersion(3), {
-            maker: EXPECTED_FUNDING_WITH_FEE / 10,
+            maker: EXPECTED_FUNDING / 10,
             taker: (-1 * EXPECTED_FUNDING_WITH_FEE) / 5,
           })
           expectPositionEq(await product.shareAtVersion(3), {
             maker: utils.parseEther('0.1').mul(3600),
             taker: utils.parseEther('0.2').mul(3600),
           })
-          const MAKER_FUNDING = EXPECTED_FUNDING_WITH_FEE / 10 + EXPECTED_FUNDING_WITH_FEE / 5
+          const MAKER_FUNDING = EXPECTED_FUNDING / 10 + EXPECTED_FUNDING / 5
           const TAKER_FUNDING = -1 * (EXPECTED_FUNDING_WITH_FEE / 5 + EXPECTED_FUNDING_WITH_FEE / 10)
           const MAKER_POSITION = EXPECTED_POSITION.mul(2).div(5)
           const TAKER_POSITION = EXPECTED_POSITION.div(-5)

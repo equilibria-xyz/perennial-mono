@@ -161,7 +161,7 @@ describe('Lens', () => {
       '4463736825720737646856',
     )
     expect(await lens.callStatic['collateral(address)'](product.address)).to.equal('1999983491280465439762')
-    expect(await lens.callStatic.shortfall(product.address)).to.equal('2463736825720737646856')
+    expect(await lens.callStatic.shortfall(product.address)).to.equal('2463720317001203086618')
 
     // Fees are updated
     fees = await lens.callStatic['fees(address)'](product.address)
