@@ -18,6 +18,21 @@ interface IProduct {
 
         /// @dev product provider address
         IProductProvider productProvider;
+
+        /// @dev product maintenance ratio
+        UFixed18 maintenance;
+
+        /// @dev product funding fee
+        UFixed18 fundingFee;
+
+        /// @dev product maker fee
+        UFixed18 makerFee;
+
+        /// @dev product taker fee
+        UFixed18 takerFee;
+
+        /// @dev product maker limit
+        UFixed18 makerLimit;
     }
 
     event Settle(uint256 preVersion, uint256 toVersion);
@@ -26,6 +41,11 @@ interface IProduct {
     event TakeOpened(address indexed account, uint256 version, UFixed18 amount);
     event MakeClosed(address indexed account, uint256 version, UFixed18 amount);
     event TakeClosed(address indexed account, uint256 version, UFixed18 amount);
+    event MaintenanceUpdated(UFixed18 newMaintenance);
+    event FundingFeeUpdated(UFixed18 newFundingFee);
+    event MakerFeeUpdated(UFixed18 newMakerFee);
+    event TakerFeeUpdated(UFixed18 newTakerFee);
+    event MakerLimitUpdated(UFixed18 newMakerLimit);
 
     error ProductInsufficientLiquidityError(UFixed18 socializationFactor);
     error ProductDoubleSidedError();
@@ -35,6 +55,9 @@ interface IProduct {
     error ProductMakerOverLimitError();
     error ProductOracleBootstrappingError();
     error ProductNotOwnerError();
+    error ProductInvalidFundingFee();
+    error ProductInvalidMakerFee();
+    error ProductInvalidTakerFee();
 
     function name() external view returns (string memory);
     function symbol() external view returns (string memory);
@@ -59,4 +82,21 @@ interface IProduct {
     function valueAtVersion(uint256 oracleVersion) external view returns (Accumulator memory);
     function shareAtVersion(uint256 oracleVersion) external view returns (Accumulator memory);
     function latestVersion(address account) external view returns (uint256);
+
+    // Product Parameters and Updaters
+    function maintenance() external view returns (UFixed18);
+    function updateMaintenance(UFixed18 newMaintenance) external;
+
+    function fundingFee() external view returns (UFixed18);
+    function updateFundingFee(UFixed18 newFundingFee) external;
+    function safeFundingFee() external view returns (UFixed18);
+
+    function makerFee() external view returns (UFixed18);
+    function updateMakerFee(UFixed18 newMakerFee) external;
+
+    function takerFee() external view returns (UFixed18);
+    function updateTakerFee(UFixed18 newTakerFee) external;
+
+    function makerLimit() external view returns (UFixed18);
+    function updateMakerLimit(UFixed18 newMakerLimit) external;
 }

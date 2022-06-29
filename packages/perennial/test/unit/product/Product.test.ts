@@ -32,6 +32,12 @@ describe('Product', () => {
 
   let product: Product
 
+  const POSITION = utils.parseEther('10')
+  const FUNDING_FEE = utils.parseEther('0.10')
+  const MAKER_FEE = utils.parseEther('0.0')
+  const TAKER_FEE = utils.parseEther('0.0')
+  const MAINTENANCE = utils.parseEther('0.5')
+
   beforeEach(async () => {
     ;[owner, user, userB, userC] = await ethers.getSigners()
     productProvider = await waffle.deployMockContract(owner, IProductProvider__factory.abi)
@@ -44,13 +50,22 @@ describe('Product', () => {
     controllerSigner = await impersonate.impersonateWithBalance(controller.address, utils.parseEther('10'))
 
     product = await new Product__factory(owner).deploy()
-    await product
-      .connect(controllerSigner)
-      .initialize({ name: 'Squeeth', symbol: 'SQTH', productProvider: productProvider.address })
+    await product.connect(controllerSigner).initialize({
+      name: 'Squeeth',
+      symbol: 'SQTH',
+      productProvider: productProvider.address,
+      maintenance: MAINTENANCE,
+      fundingFee: FUNDING_FEE,
+      makerFee: MAKER_FEE,
+      takerFee: TAKER_FEE,
+      makerLimit: POSITION.mul(10),
+    })
 
     await controller.mock['paused(address)'].withArgs(product.address).returns(false)
     await controller.mock.collateral.withArgs().returns(collateral.address)
     await controller.mock.incentivizer.withArgs().returns(incentivizer.address)
+    await controller.mock.coordinatorFor.withArgs(product.address).returns(1)
+    await controller.mock.owner.withArgs(1).returns(owner.address)
   })
 
   describe('#initialize', async () => {
@@ -59,25 +74,76 @@ describe('Product', () => {
       expect(await product.name()).to.equal('Squeeth')
       expect(await product.symbol()).to.equal('SQTH')
       expect(await product.productProvider()).to.equal(productProvider.address)
+      expect(await product['maintenance()']()).to.equal(utils.parseEther('0.5'))
+      expect(await product.fundingFee()).to.equal(utils.parseEther('0.1'))
+      expect(await product.makerFee()).to.equal(utils.parseEther('0'))
+      expect(await product.takerFee()).to.equal(utils.parseEther('0'))
+      expect(await product.makerLimit()).to.equal(utils.parseEther('1'))
     })
 
     it('reverts if already initialized', async () => {
       await expect(
-        product.initialize({ name: 'Foo', symbol: 'FOO', productProvider: productProvider.address }),
+        product.initialize({
+          name: 'Squeeth',
+          symbol: 'SQTH',
+          productProvider: productProvider.address,
+          maintenance: MAINTENANCE,
+          fundingFee: FUNDING_FEE,
+          makerFee: MAKER_FEE,
+          takerFee: TAKER_FEE,
+          makerLimit: POSITION.mul(10),
+        }),
       ).to.be.revertedWith('UInitializableAlreadyInitializedError(1)')
+    })
+  })
+
+  describe('updating params', async () => {
+    it('correct updates the params', async () => {
+      await product.updateMaintenance(utils.parseEther('0.1'))
+      await product.updateFundingFee(utils.parseEther('0.2'))
+      await product.updateMakerFee(utils.parseEther('0.3'))
+      await product.updateTakerFee(utils.parseEther('0.4'))
+      await product.updateMakerLimit(utils.parseEther('0.5'))
+
+      expect(await product['maintenance()']()).to.equal(utils.parseEther('0.1'))
+      expect(await product.fundingFee()).to.equal(utils.parseEther('0.2'))
+      expect(await product.makerFee()).to.equal(utils.parseEther('0.3'))
+      expect(await product.takerFee()).to.equal(utils.parseEther('0.4'))
+      expect(await product.makerLimit()).to.equal(utils.parseEther('0.5'))
+    })
+
+    it('reverts if not owner', async () => {
+      await expect(product.connect(user).updateMaintenance(utils.parseEther('0.1'))).to.be.be.revertedWith(
+        'NotOwnerError(1)',
+      )
+      await expect(product.connect(user).updateFundingFee(utils.parseEther('0.2'))).to.be.be.revertedWith(
+        'NotOwnerError(1)',
+      )
+      await expect(product.connect(user).updateMakerFee(utils.parseEther('0.3'))).to.be.be.revertedWith(
+        'NotOwnerError(1)',
+      )
+      await expect(product.connect(user).updateTakerFee(utils.parseEther('0.4'))).to.be.be.revertedWith(
+        'NotOwnerError(1)',
+      )
+      await expect(product.connect(user).updateMakerLimit(utils.parseEther('0.5'))).to.be.be.revertedWith(
+        'NotOwnerError(1)',
+      )
+    })
+
+    it('reverts if fees are too high', async () => {
+      await expect(product.updateFundingFee(utils.parseEther('1.01'))).to.be.be.revertedWith(
+        'ProductInvalidFundingFee()',
+      )
+      await expect(product.updateMakerFee(utils.parseEther('1.01'))).to.be.be.revertedWith('ProductInvalidMakerFee()')
+      await expect(product.updateTakerFee(utils.parseEther('1.01'))).to.be.be.revertedWith('ProductInvalidTakerFee()')
     })
   })
 
   describe('long market', async () => {
     const ORACLE_VERSION = 1
-    const POSITION = utils.parseEther('10')
     const TIMESTAMP = 1636401093
     const PRICE = utils.parseEther('123')
     const RATE = utils.parseEther('0.10').div(365 * 24 * 60 * 60)
-    const FUNDING_FEE = utils.parseEther('0.10')
-    const MAKER_FEE = utils.parseEther('0.0')
-    const TAKER_FEE = utils.parseEther('0.0')
-    const MAINTENANCE = utils.parseEther('0.5')
 
     const ORACLE_VERSION_0 = {
       price: 0,
@@ -124,11 +190,6 @@ describe('Product', () => {
       await productProvider.mock.atVersion.withArgs(1).returns(ORACLE_VERSION_1)
 
       await productProvider.mock.rate.withArgs({ maker: 0, taker: 0 }).returns(0)
-      await productProvider.mock.fundingFee.withArgs().returns(FUNDING_FEE)
-      await productProvider.mock.makerFee.withArgs().returns(MAKER_FEE)
-      await productProvider.mock.takerFee.withArgs().returns(TAKER_FEE)
-      await productProvider.mock.maintenance.withArgs().returns(MAINTENANCE)
-      await productProvider.mock.makerLimit.withArgs().returns(POSITION.mul(10))
       await controller.mock.minFundingFee.withArgs().returns(FUNDING_FEE)
 
       await incentivizer.mock.sync.withArgs(ORACLE_VERSION_1).returns()
@@ -147,7 +208,7 @@ describe('Product', () => {
           .withArgs(user.address, 1, POSITION)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(0)
+        expect(await product['maintenance(address)'](user.address)).to.equal(0)
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('615'))
         expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -194,7 +255,7 @@ describe('Product', () => {
           .withArgs(user.address, 2, 2)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
+        expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('615'))
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('615'))
         expectPositionEq(await product.position(user.address), { maker: POSITION, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -213,7 +274,7 @@ describe('Product', () => {
           .withArgs(user.address, 1, POSITION)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(0)
+        expect(await product['maintenance(address)'](user.address)).to.equal(0)
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('1230'))
         expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -262,7 +323,7 @@ describe('Product', () => {
           .withArgs(user.address, 2, 2)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(utils.parseEther('1230'))
+        expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('1230'))
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('1230'))
         expectPositionEq(await product.position(user.address), { maker: POSITION.mul(2), taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -286,7 +347,7 @@ describe('Product', () => {
           .withArgs(user.address, 2, POSITION)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
+        expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('615'))
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('1230'))
         expectPositionEq(await product.position(user.address), { maker: POSITION, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -343,7 +404,7 @@ describe('Product', () => {
           .withArgs(user.address, 3, 3)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(utils.parseEther('1230'))
+        expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('1230'))
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('1230'))
         expectPositionEq(await product.position(user.address), { maker: POSITION.mul(2), taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -386,7 +447,7 @@ describe('Product', () => {
           .withArgs(user.address, 2, 3)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
+        expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('615'))
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('615'))
         expectPositionEq(await product.position(user.address), { maker: POSITION, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -398,7 +459,7 @@ describe('Product', () => {
       })
 
       it('opens the position and settles later with fee', async () => {
-        await productProvider.mock.makerFee.withArgs().returns(utils.parseEther('0.01'))
+        await product.updateMakerFee(utils.parseEther('0.01'))
 
         const MAKER_FEE = utils.parseEther('12.3') // position * maker fee * price
         await collateral.mock.settleProduct.withArgs(MAKER_FEE).returns()
@@ -436,7 +497,7 @@ describe('Product', () => {
           .withArgs(user.address, 2, 3)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
+        expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('615'))
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('615'))
         expectPositionEq(await product.position(user.address), { maker: POSITION, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -506,7 +567,7 @@ describe('Product', () => {
       })
 
       it('reverts if over maker limit', async () => {
-        await productProvider.mock.makerLimit.withArgs().returns(POSITION.div(2))
+        await product.updateMakerLimit(POSITION.div(2))
         await expect(product.connect(user).openMake(POSITION)).to.be.revertedWith('ProductMakerOverLimitError()')
       })
     })
@@ -522,7 +583,7 @@ describe('Product', () => {
           .withArgs(user.address, 1, POSITION.div(2))
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(0)
+        expect(await product['maintenance(address)'](user.address)).to.equal(0)
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('307.5'))
         expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -548,7 +609,7 @@ describe('Product', () => {
           .withArgs(user.address, 1, POSITION)
 
         expect(await product.isClosed(user.address)).to.equal(true)
-        expect(await product.maintenance(user.address)).to.equal(0)
+        expect(await product['maintenance(address)'](user.address)).to.equal(0)
         expect(await product.maintenanceNext(user.address)).to.equal(0)
         expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -585,7 +646,7 @@ describe('Product', () => {
             .withArgs(user.address, 2, POSITION)
 
           expect(await product.isClosed(user.address)).to.equal(false)
-          expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
+          expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('615'))
           expect(await product.maintenanceNext(user.address)).to.equal(0)
           expectPositionEq(await product.position(user.address), { maker: POSITION, taker: 0 })
           expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -632,7 +693,7 @@ describe('Product', () => {
             .withArgs(user.address, 3, 3)
 
           expect(await product.isClosed(user.address)).to.equal(true)
-          expect(await product.maintenance(user.address)).to.equal(0)
+          expect(await product['maintenance(address)'](user.address)).to.equal(0)
           expect(await product.maintenanceNext(user.address)).to.equal(0)
           expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
           expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -651,7 +712,7 @@ describe('Product', () => {
             .withArgs(user.address, 2, POSITION.div(2))
 
           expect(await product.isClosed(user.address)).to.equal(false)
-          expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
+          expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('615'))
           expect(await product.maintenanceNext(user.address)).to.equal(0)
           expectPositionEq(await product.position(user.address), { maker: POSITION, taker: 0 })
           expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -700,7 +761,7 @@ describe('Product', () => {
             .withArgs(user.address, 3, 3)
 
           expect(await product.isClosed(user.address)).to.equal(true)
-          expect(await product.maintenance(user.address)).to.equal(0)
+          expect(await product['maintenance(address)'](user.address)).to.equal(0)
           expect(await product.maintenanceNext(user.address)).to.equal(0)
           expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
           expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -724,7 +785,7 @@ describe('Product', () => {
             .withArgs(user.address, 3, POSITION.div(2))
 
           expect(await product.isClosed(user.address)).to.equal(false)
-          expect(await product.maintenance(user.address)).to.equal(utils.parseEther('307.5'))
+          expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('307.5'))
           expect(await product.maintenanceNext(user.address)).to.equal(0)
           expectPositionEq(await product.position(user.address), { maker: POSITION.div(2), taker: 0 })
           expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -781,7 +842,7 @@ describe('Product', () => {
             .withArgs(user.address, 4, 4)
 
           expect(await product.isClosed(user.address)).to.equal(true)
-          expect(await product.maintenance(user.address)).to.equal(0)
+          expect(await product['maintenance(address)'](user.address)).to.equal(0)
           expect(await product.maintenanceNext(user.address)).to.equal(0)
           expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
           expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -825,7 +886,7 @@ describe('Product', () => {
             .withArgs(user.address, 3, 4)
 
           expect(await product.isClosed(user.address)).to.equal(true)
-          expect(await product.maintenance(user.address)).to.equal(0)
+          expect(await product['maintenance(address)'](user.address)).to.equal(0)
           expect(await product.maintenanceNext(user.address)).to.equal(0)
           expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
           expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -837,7 +898,7 @@ describe('Product', () => {
         })
 
         it('closes the position and settles later', async () => {
-          await productProvider.mock.makerFee.withArgs().returns(utils.parseEther('0.01'))
+          await product.updateMakerFee(utils.parseEther('0.01'))
 
           const MAKER_FEE = utils.parseEther('12.3') // position * maker fee * price
           await collateral.mock.settleProduct.withArgs(MAKER_FEE).returns()
@@ -875,7 +936,7 @@ describe('Product', () => {
             .withArgs(user.address, 3, 4)
 
           expect(await product.isClosed(user.address)).to.equal(true)
-          expect(await product.maintenance(user.address)).to.equal(0)
+          expect(await product['maintenance(address)'](user.address)).to.equal(0)
           expect(await product.maintenanceNext(user.address)).to.equal(0)
           expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
           expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -921,7 +982,7 @@ describe('Product', () => {
           .withArgs(user.address, 1, POSITION)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(0)
+        expect(await product['maintenance(address)'](user.address)).to.equal(0)
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('615'))
         expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -968,7 +1029,7 @@ describe('Product', () => {
           .withArgs(user.address, 2, 2)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
+        expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('615'))
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('615'))
         expectPositionEq(await product.position(user.address), { maker: 0, taker: POSITION })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -987,7 +1048,7 @@ describe('Product', () => {
           .withArgs(user.address, 1, POSITION)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(0)
+        expect(await product['maintenance(address)'](user.address)).to.equal(0)
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('1230'))
         expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -1036,7 +1097,7 @@ describe('Product', () => {
           .withArgs(user.address, 2, 2)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(utils.parseEther('1230'))
+        expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('1230'))
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('1230'))
         expectPositionEq(await product.position(user.address), { maker: 0, taker: POSITION.mul(2) })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -1060,7 +1121,7 @@ describe('Product', () => {
           .withArgs(user.address, 2, POSITION)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
+        expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('615'))
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('1230'))
         expectPositionEq(await product.position(user.address), { maker: 0, taker: POSITION })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -1134,7 +1195,7 @@ describe('Product', () => {
           .withArgs(user.address, 3, 3)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(utils.parseEther('1230'))
+        expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('1230'))
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('1230'))
         expectPositionEq(await product.position(user.address), { maker: 0, taker: POSITION.mul(2) })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -1192,7 +1253,7 @@ describe('Product', () => {
           .withArgs(user.address, 2, 3)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
+        expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('615'))
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('615'))
         expectPositionEq(await product.position(user.address), { maker: 0, taker: POSITION })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -1204,7 +1265,7 @@ describe('Product', () => {
       })
 
       it('opens the position and settles later with fee', async () => {
-        await productProvider.mock.takerFee.withArgs().returns(utils.parseEther('0.01'))
+        await product.updateTakerFee(utils.parseEther('0.01'))
 
         const TAKER_FEE = utils.parseEther('12.3') // position * taker fee * price
 
@@ -1254,7 +1315,7 @@ describe('Product', () => {
           .withArgs(user.address, 2, 3)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
+        expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('615'))
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('615'))
         expectPositionEq(await product.position(user.address), { maker: 0, taker: POSITION })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -1325,7 +1386,7 @@ describe('Product', () => {
           .withArgs(user.address, 1, POSITION.div(2))
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(0)
+        expect(await product['maintenance(address)'](user.address)).to.equal(0)
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('307.5'))
         expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -1351,7 +1412,7 @@ describe('Product', () => {
           .withArgs(user.address, 1, POSITION)
 
         expect(await product.isClosed(user.address)).to.equal(true)
-        expect(await product.maintenance(user.address)).to.equal(0)
+        expect(await product['maintenance(address)'](user.address)).to.equal(0)
         expect(await product.maintenanceNext(user.address)).to.equal(0)
         expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -1390,7 +1451,7 @@ describe('Product', () => {
             .withArgs(user.address, 2, POSITION)
 
           expect(await product.isClosed(user.address)).to.equal(false)
-          expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
+          expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('615'))
           expect(await product.maintenanceNext(user.address)).to.equal(0)
           expectPositionEq(await product.position(user.address), { maker: 0, taker: POSITION })
           expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -1452,7 +1513,7 @@ describe('Product', () => {
             .withArgs(user.address, 3, 3)
 
           expect(await product.isClosed(user.address)).to.equal(true)
-          expect(await product.maintenance(user.address)).to.equal(0)
+          expect(await product['maintenance(address)'](user.address)).to.equal(0)
           expect(await product.maintenanceNext(user.address)).to.equal(0)
           expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
           expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -1471,7 +1532,7 @@ describe('Product', () => {
             .withArgs(user.address, 2, POSITION.div(2))
 
           expect(await product.isClosed(user.address)).to.equal(false)
-          expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
+          expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('615'))
           expect(await product.maintenanceNext(user.address)).to.equal(0)
           expectPositionEq(await product.position(user.address), { maker: 0, taker: POSITION })
           expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -1535,7 +1596,7 @@ describe('Product', () => {
             .withArgs(user.address, 3, 3)
 
           expect(await product.isClosed(user.address)).to.equal(true)
-          expect(await product.maintenance(user.address)).to.equal(0)
+          expect(await product['maintenance(address)'](user.address)).to.equal(0)
           expect(await product.maintenanceNext(user.address)).to.equal(0)
           expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
           expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -1568,7 +1629,7 @@ describe('Product', () => {
             .withArgs(user.address, 3, POSITION.div(2))
 
           expect(await product.isClosed(user.address)).to.equal(false)
-          expect(await product.maintenance(user.address)).to.equal(utils.parseEther('307.5'))
+          expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('307.5'))
           expect(await product.maintenanceNext(user.address)).to.equal(0)
           expectPositionEq(await product.position(user.address), { maker: 0, taker: POSITION.div(2) })
           expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -1656,7 +1717,7 @@ describe('Product', () => {
             .withArgs(user.address, 4, 4)
 
           expect(await product.isClosed(user.address)).to.equal(true)
-          expect(await product.maintenance(user.address)).to.equal(0)
+          expect(await product['maintenance(address)'](user.address)).to.equal(0)
           expect(await product.maintenanceNext(user.address)).to.equal(0)
           expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
           expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -1712,7 +1773,7 @@ describe('Product', () => {
             .withArgs(user.address, 3, 4)
 
           expect(await product.isClosed(user.address)).to.equal(true)
-          expect(await product.maintenance(user.address)).to.equal(0)
+          expect(await product['maintenance(address)'](user.address)).to.equal(0)
           expect(await product.maintenanceNext(user.address)).to.equal(0)
           expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
           expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -1724,7 +1785,7 @@ describe('Product', () => {
         })
 
         it('closes the position and settles later', async () => {
-          await productProvider.mock.takerFee.withArgs().returns(utils.parseEther('0.01'))
+          await product.updateTakerFee(utils.parseEther('0.01'))
 
           const TAKER_FEE = utils.parseEther('12.3') // position * taker fee * price
 
@@ -1772,7 +1833,7 @@ describe('Product', () => {
             .withArgs(user.address, 3, 4)
 
           expect(await product.isClosed(user.address)).to.equal(true)
-          expect(await product.maintenance(user.address)).to.equal(0)
+          expect(await product['maintenance(address)'](user.address)).to.equal(0)
           expect(await product.maintenanceNext(user.address)).to.equal(0)
           expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
           expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -1829,7 +1890,7 @@ describe('Product', () => {
           closePosition: { maker: POSITION, taker: 0 },
         })
         expect(await product.isLiquidating(user.address)).to.equal(true)
-        expect(await product.maintenance(user.address)).to.equal(0)
+        expect(await product['maintenance(address)'](user.address)).to.equal(0)
       })
 
       it('closes taker side', async () => {
@@ -1864,7 +1925,7 @@ describe('Product', () => {
           closePosition: { maker: 0, taker: POSITION },
         })
         expect(await product.isLiquidating(user.address)).to.equal(true)
-        expect(await product.maintenance(user.address)).to.equal(0)
+        expect(await product['maintenance(address)'](user.address)).to.equal(0)
       })
 
       it('reverts if already initialized', async () => {
@@ -1930,7 +1991,7 @@ describe('Product', () => {
           .withArgs(user.address, 3, 3)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
+        expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('615'))
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('615'))
         expectPositionEq(await product.position(user.address), { maker: POSITION, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -1945,7 +2006,7 @@ describe('Product', () => {
           .withArgs(userB.address, 3, 3)
 
         expect(await product.isClosed(userB.address)).to.equal(false)
-        expect(await product.maintenance(userB.address)).to.equal(utils.parseEther('307.5'))
+        expect(await product['maintenance(address)'](userB.address)).to.equal(utils.parseEther('307.5'))
         expect(await product.maintenanceNext(userB.address)).to.equal(utils.parseEther('307.5'))
         expectPositionEq(await product.position(userB.address), { maker: 0, taker: POSITION.div(2) })
         expectPrePositionEq(await product['pre(address)'](userB.address), {
@@ -1998,7 +2059,7 @@ describe('Product', () => {
           .withArgs(user.address, 3, 3)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
+        expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('615'))
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('615'))
         expectPositionEq(await product.position(user.address), { maker: POSITION, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -2013,7 +2074,7 @@ describe('Product', () => {
           .withArgs(userB.address, 3, 3)
 
         expect(await product.isClosed(userB.address)).to.equal(false)
-        expect(await product.maintenance(userB.address)).to.equal(utils.parseEther('307.5'))
+        expect(await product['maintenance(address)'](userB.address)).to.equal(utils.parseEther('307.5'))
         expect(await product.maintenanceNext(userB.address)).to.equal(utils.parseEther('307.5'))
         expectPositionEq(await product.position(userB.address), { maker: 0, taker: POSITION.div(2) })
         expectPrePositionEq(await product['pre(address)'](userB.address), {
@@ -2070,7 +2131,7 @@ describe('Product', () => {
           .withArgs(user.address, 3, 3)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(utils.parseEther('605'))
+        expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('605'))
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('605'))
         expectPositionEq(await product.position(user.address), { maker: POSITION, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -2085,7 +2146,7 @@ describe('Product', () => {
           .withArgs(userB.address, 3, 3)
 
         expect(await product.isClosed(userB.address)).to.equal(false)
-        expect(await product.maintenance(userB.address)).to.equal(utils.parseEther('302.5'))
+        expect(await product['maintenance(address)'](userB.address)).to.equal(utils.parseEther('302.5'))
         expect(await product.maintenanceNext(userB.address)).to.equal(utils.parseEther('302.5'))
         expectPositionEq(await product.position(userB.address), { maker: 0, taker: POSITION.div(2) })
         expectPrePositionEq(await product['pre(address)'](userB.address), {
@@ -2142,7 +2203,7 @@ describe('Product', () => {
           .withArgs(user.address, 3, 3)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(utils.parseEther('625'))
+        expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('625'))
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('625'))
         expectPositionEq(await product.position(user.address), { maker: POSITION, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -2157,7 +2218,7 @@ describe('Product', () => {
           .withArgs(userB.address, 3, 3)
 
         expect(await product.isClosed(userB.address)).to.equal(false)
-        expect(await product.maintenance(userB.address)).to.equal(utils.parseEther('312.5'))
+        expect(await product['maintenance(address)'](userB.address)).to.equal(utils.parseEther('312.5'))
         expect(await product.maintenanceNext(userB.address)).to.equal(utils.parseEther('312.5'))
         expectPositionEq(await product.position(userB.address), { maker: 0, taker: POSITION.div(2) })
         expectPrePositionEq(await product['pre(address)'](userB.address), {
@@ -2203,7 +2264,7 @@ describe('Product', () => {
           .withArgs(user.address, 3, 3)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
+        expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('615'))
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('615'))
         expectPositionEq(await product.position(user.address), { maker: POSITION, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -2218,7 +2279,7 @@ describe('Product', () => {
           .withArgs(userB.address, 3, 3)
 
         expect(await product.isClosed(userB.address)).to.equal(false)
-        expect(await product.maintenance(userB.address)).to.equal(utils.parseEther('307.5'))
+        expect(await product['maintenance(address)'](userB.address)).to.equal(utils.parseEther('307.5'))
         expect(await product.maintenanceNext(userB.address)).to.equal(utils.parseEther('307.5'))
         expectPositionEq(await product.position(userB.address), { maker: 0, taker: POSITION.div(2) })
         expectPrePositionEq(await product['pre(address)'](userB.address), {
@@ -2285,7 +2346,7 @@ describe('Product', () => {
             .withArgs(user.address, 3, 4)
 
           expect(await product.isClosed(user.address)).to.equal(true)
-          expect(await product.maintenance(user.address)).to.equal(utils.parseEther('0'))
+          expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('0'))
           expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('0'))
           expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
           expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -2300,7 +2361,7 @@ describe('Product', () => {
             .withArgs(userB.address, 4, 4)
 
           expect(await product.isClosed(userB.address)).to.equal(false)
-          expect(await product.maintenance(userB.address)).to.equal(utils.parseEther('307.5'))
+          expect(await product['maintenance(address)'](userB.address)).to.equal(utils.parseEther('307.5'))
           expect(await product.maintenanceNext(userB.address)).to.equal(utils.parseEther('307.5'))
           expectPositionEq(await product.position(userB.address), { maker: 0, taker: POSITION.div(2) })
           expectPrePositionEq(await product['pre(address)'](userB.address), {
@@ -2373,7 +2434,7 @@ describe('Product', () => {
             .withArgs(user.address, 3, 4)
 
           expect(await product.isClosed(user.address)).to.equal(true)
-          expect(await product.maintenance(user.address)).to.equal(utils.parseEther('0'))
+          expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('0'))
           expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('0'))
           expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
           expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -2388,7 +2449,7 @@ describe('Product', () => {
             .withArgs(userB.address, 4, 4)
 
           expect(await product.isClosed(userB.address)).to.equal(false)
-          expect(await product.maintenance(userB.address)).to.equal(utils.parseEther('307.5'))
+          expect(await product['maintenance(address)'](userB.address)).to.equal(utils.parseEther('307.5'))
           expect(await product.maintenanceNext(userB.address)).to.equal(utils.parseEther('307.5'))
           expectPositionEq(await product.position(userB.address), { maker: 0, taker: POSITION.div(2) })
           expectPrePositionEq(await product['pre(address)'](userB.address), {
@@ -2403,7 +2464,7 @@ describe('Product', () => {
             .withArgs(userC.address, 3, 4)
 
           expect(await product.isClosed(userC.address)).to.equal(false)
-          expect(await product.maintenance(userC.address)).to.equal(utils.parseEther('153.75'))
+          expect(await product['maintenance(address)'](userC.address)).to.equal(utils.parseEther('153.75'))
           expect(await product.maintenanceNext(userC.address)).to.equal(utils.parseEther('153.75'))
           expectPositionEq(await product.position(userC.address), { maker: POSITION.div(4), taker: 0 })
           expectPrePositionEq(await product['pre(address)'](userC.address), {
@@ -2474,7 +2535,7 @@ describe('Product', () => {
             .withArgs(user.address, 3, 4)
 
           expect(await product.isClosed(user.address)).to.equal(true)
-          expect(await product.maintenance(user.address)).to.equal(utils.parseEther('0'))
+          expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('0'))
           expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('0'))
           expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
           expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -2489,7 +2550,7 @@ describe('Product', () => {
             .withArgs(userB.address, 4, 4)
 
           expect(await product.isClosed(userB.address)).to.equal(false)
-          expect(await product.maintenance(userB.address)).to.equal(utils.parseEther('312.5'))
+          expect(await product['maintenance(address)'](userB.address)).to.equal(utils.parseEther('312.5'))
           expect(await product.maintenanceNext(userB.address)).to.equal(utils.parseEther('312.5'))
           expectPositionEq(await product.position(userB.address), { maker: 0, taker: POSITION.div(2) })
           expectPrePositionEq(await product['pre(address)'](userB.address), {
@@ -2575,7 +2636,7 @@ describe('Product', () => {
             .withArgs(user.address, 3, 4)
 
           expect(await product.isClosed(user.address)).to.equal(true)
-          expect(await product.maintenance(user.address)).to.equal(utils.parseEther('0'))
+          expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('0'))
           expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('0'))
           expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
           expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -2590,7 +2651,7 @@ describe('Product', () => {
             .withArgs(userB.address, 4, 4)
 
           expect(await product.isClosed(userB.address)).to.equal(false)
-          expect(await product.maintenance(userB.address)).to.equal(utils.parseEther('312.5'))
+          expect(await product['maintenance(address)'](userB.address)).to.equal(utils.parseEther('312.5'))
           expect(await product.maintenanceNext(userB.address)).to.equal(utils.parseEther('312.5'))
           expectPositionEq(await product.position(userB.address), { maker: 0, taker: POSITION.div(2) })
           expectPrePositionEq(await product['pre(address)'](userB.address), {
@@ -2605,7 +2666,7 @@ describe('Product', () => {
             .withArgs(userC.address, 3, 4)
 
           expect(await product.isClosed(userC.address)).to.equal(false)
-          expect(await product.maintenance(userC.address)).to.equal(utils.parseEther('156.25'))
+          expect(await product['maintenance(address)'](userC.address)).to.equal(utils.parseEther('156.25'))
           expect(await product.maintenanceNext(userC.address)).to.equal(utils.parseEther('156.25'))
           expectPositionEq(await product.position(userC.address), { maker: POSITION.div(4), taker: 0 })
           expectPrePositionEq(await product['pre(address)'](userC.address), {
@@ -2631,14 +2692,9 @@ describe('Product', () => {
 
   describe('short market', async () => {
     const ORACLE_VERSION = 1
-    const POSITION = utils.parseEther('10')
     const TIMESTAMP = 1636401093
     const PRICE = utils.parseEther('-123')
     const RATE = utils.parseEther('0.10').div(365 * 24 * 60 * 60)
-    const FUNDING_FEE = utils.parseEther('0.10')
-    const MAKER_FEE = utils.parseEther('0.0')
-    const TAKER_FEE = utils.parseEther('0.0')
-    const MAINTENANCE = utils.parseEther('0.5')
 
     const ORACLE_VERSION_0 = {
       price: 0,
@@ -2690,11 +2746,6 @@ describe('Product', () => {
       await productProvider.mock.atVersion.withArgs(1).returns(ORACLE_VERSION_1)
 
       await productProvider.mock.rate.withArgs({ maker: 0, taker: 0 }).returns(0)
-      await productProvider.mock.fundingFee.withArgs().returns(FUNDING_FEE)
-      await productProvider.mock.makerFee.withArgs().returns(MAKER_FEE)
-      await productProvider.mock.takerFee.withArgs().returns(TAKER_FEE)
-      await productProvider.mock.maintenance.withArgs().returns(MAINTENANCE)
-      await productProvider.mock.makerLimit.withArgs().returns(POSITION.mul(10))
       await controller.mock.minFundingFee.withArgs().returns(FUNDING_FEE)
 
       await incentivizer.mock.sync.withArgs(ORACLE_VERSION_1).returns()
@@ -2713,7 +2764,7 @@ describe('Product', () => {
           .withArgs(user.address, 1, POSITION)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(0)
+        expect(await product['maintenance(address)'](user.address)).to.equal(0)
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('615'))
         expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -2760,7 +2811,7 @@ describe('Product', () => {
           .withArgs(user.address, 2, 2)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
+        expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('615'))
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('615'))
         expectPositionEq(await product.position(user.address), { maker: POSITION, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -2779,7 +2830,7 @@ describe('Product', () => {
           .withArgs(user.address, 1, POSITION)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(0)
+        expect(await product['maintenance(address)'](user.address)).to.equal(0)
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('1230'))
         expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -2828,7 +2879,7 @@ describe('Product', () => {
           .withArgs(user.address, 2, 2)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(utils.parseEther('1230'))
+        expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('1230'))
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('1230'))
         expectPositionEq(await product.position(user.address), { maker: POSITION.mul(2), taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -2852,7 +2903,7 @@ describe('Product', () => {
           .withArgs(user.address, 2, POSITION)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
+        expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('615'))
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('1230'))
         expectPositionEq(await product.position(user.address), { maker: POSITION, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -2909,7 +2960,7 @@ describe('Product', () => {
           .withArgs(user.address, 3, 3)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(utils.parseEther('1230'))
+        expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('1230'))
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('1230'))
         expectPositionEq(await product.position(user.address), { maker: POSITION.mul(2), taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -2952,7 +3003,7 @@ describe('Product', () => {
           .withArgs(user.address, 2, 3)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
+        expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('615'))
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('615'))
         expectPositionEq(await product.position(user.address), { maker: POSITION, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -2964,7 +3015,7 @@ describe('Product', () => {
       })
 
       it('opens the position and settles later with fee', async () => {
-        await productProvider.mock.makerFee.withArgs().returns(utils.parseEther('0.01'))
+        await product.updateMakerFee(utils.parseEther('0.01'))
 
         const MAKER_FEE = utils.parseEther('12.3') // position * maker fee * price
         await collateral.mock.settleProduct.withArgs(MAKER_FEE).returns()
@@ -3001,7 +3052,7 @@ describe('Product', () => {
           .withArgs(user.address, 2, 3)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
+        expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('615'))
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('615'))
         expectPositionEq(await product.position(user.address), { maker: POSITION, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -3070,7 +3121,7 @@ describe('Product', () => {
       })
 
       it('reverts if over maker limit', async () => {
-        await productProvider.mock.makerLimit.withArgs().returns(POSITION.div(2))
+        await product.updateMakerLimit(POSITION.div(2))
         await expect(product.connect(user).openMake(POSITION)).to.be.revertedWith('ProductMakerOverLimitError()')
       })
     })
@@ -3086,7 +3137,7 @@ describe('Product', () => {
           .withArgs(user.address, 1, POSITION.div(2))
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(0)
+        expect(await product['maintenance(address)'](user.address)).to.equal(0)
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('307.5'))
         expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -3112,7 +3163,7 @@ describe('Product', () => {
           .withArgs(user.address, 1, POSITION)
 
         expect(await product.isClosed(user.address)).to.equal(true)
-        expect(await product.maintenance(user.address)).to.equal(0)
+        expect(await product['maintenance(address)'](user.address)).to.equal(0)
         expect(await product.maintenanceNext(user.address)).to.equal(0)
         expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -3149,7 +3200,7 @@ describe('Product', () => {
             .withArgs(user.address, 2, POSITION)
 
           expect(await product.isClosed(user.address)).to.equal(false)
-          expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
+          expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('615'))
           expect(await product.maintenanceNext(user.address)).to.equal(0)
           expectPositionEq(await product.position(user.address), { maker: POSITION, taker: 0 })
           expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -3196,7 +3247,7 @@ describe('Product', () => {
             .withArgs(user.address, 3, 3)
 
           expect(await product.isClosed(user.address)).to.equal(true)
-          expect(await product.maintenance(user.address)).to.equal(0)
+          expect(await product['maintenance(address)'](user.address)).to.equal(0)
           expect(await product.maintenanceNext(user.address)).to.equal(0)
           expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
           expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -3215,7 +3266,7 @@ describe('Product', () => {
             .withArgs(user.address, 2, POSITION.div(2))
 
           expect(await product.isClosed(user.address)).to.equal(false)
-          expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
+          expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('615'))
           expect(await product.maintenanceNext(user.address)).to.equal(0)
           expectPositionEq(await product.position(user.address), { maker: POSITION, taker: 0 })
           expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -3264,7 +3315,7 @@ describe('Product', () => {
             .withArgs(user.address, 3, 3)
 
           expect(await product.isClosed(user.address)).to.equal(true)
-          expect(await product.maintenance(user.address)).to.equal(0)
+          expect(await product['maintenance(address)'](user.address)).to.equal(0)
           expect(await product.maintenanceNext(user.address)).to.equal(0)
           expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
           expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -3288,7 +3339,7 @@ describe('Product', () => {
             .withArgs(user.address, 3, POSITION.div(2))
 
           expect(await product.isClosed(user.address)).to.equal(false)
-          expect(await product.maintenance(user.address)).to.equal(utils.parseEther('307.5'))
+          expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('307.5'))
           expect(await product.maintenanceNext(user.address)).to.equal(0)
           expectPositionEq(await product.position(user.address), { maker: POSITION.div(2), taker: 0 })
           expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -3344,7 +3395,7 @@ describe('Product', () => {
             .withArgs(user.address, 4, 4)
 
           expect(await product.isClosed(user.address)).to.equal(true)
-          expect(await product.maintenance(user.address)).to.equal(0)
+          expect(await product['maintenance(address)'](user.address)).to.equal(0)
           expect(await product.maintenanceNext(user.address)).to.equal(0)
           expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
           expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -3387,7 +3438,7 @@ describe('Product', () => {
             .withArgs(user.address, 3, 4)
 
           expect(await product.isClosed(user.address)).to.equal(true)
-          expect(await product.maintenance(user.address)).to.equal(0)
+          expect(await product['maintenance(address)'](user.address)).to.equal(0)
           expect(await product.maintenanceNext(user.address)).to.equal(0)
           expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
           expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -3399,7 +3450,7 @@ describe('Product', () => {
         })
 
         it('closes the position and settles later', async () => {
-          await productProvider.mock.makerFee.withArgs().returns(utils.parseEther('0.01'))
+          await product.updateMakerFee(utils.parseEther('0.01'))
 
           const MAKER_FEE = utils.parseEther('12.3') // position * maker fee * price
           await collateral.mock.settleProduct.withArgs(MAKER_FEE).returns()
@@ -3435,7 +3486,7 @@ describe('Product', () => {
             .withArgs(user.address, 3, 4)
 
           expect(await product.isClosed(user.address)).to.equal(true)
-          expect(await product.maintenance(user.address)).to.equal(0)
+          expect(await product['maintenance(address)'](user.address)).to.equal(0)
           expect(await product.maintenanceNext(user.address)).to.equal(0)
           expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
           expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -3481,7 +3532,7 @@ describe('Product', () => {
           .withArgs(user.address, 1, POSITION)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(0)
+        expect(await product['maintenance(address)'](user.address)).to.equal(0)
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('615'))
         expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -3528,7 +3579,7 @@ describe('Product', () => {
           .withArgs(user.address, 2, 2)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
+        expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('615'))
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('615'))
         expectPositionEq(await product.position(user.address), { maker: 0, taker: POSITION })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -3547,7 +3598,7 @@ describe('Product', () => {
           .withArgs(user.address, 1, POSITION)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(0)
+        expect(await product['maintenance(address)'](user.address)).to.equal(0)
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('1230'))
         expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -3596,7 +3647,7 @@ describe('Product', () => {
           .withArgs(user.address, 2, 2)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(utils.parseEther('1230'))
+        expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('1230'))
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('1230'))
         expectPositionEq(await product.position(user.address), { maker: 0, taker: POSITION.mul(2) })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -3620,7 +3671,7 @@ describe('Product', () => {
           .withArgs(user.address, 2, POSITION)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
+        expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('615'))
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('1230'))
         expectPositionEq(await product.position(user.address), { maker: 0, taker: POSITION })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -3694,7 +3745,7 @@ describe('Product', () => {
           .withArgs(user.address, 3, 3)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(utils.parseEther('1230'))
+        expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('1230'))
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('1230'))
         expectPositionEq(await product.position(user.address), { maker: 0, taker: POSITION.mul(2) })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -3752,7 +3803,7 @@ describe('Product', () => {
           .withArgs(user.address, 2, 3)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
+        expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('615'))
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('615'))
         expectPositionEq(await product.position(user.address), { maker: 0, taker: POSITION })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -3764,7 +3815,7 @@ describe('Product', () => {
       })
 
       it('opens the position and settles later with fee', async () => {
-        await productProvider.mock.takerFee.withArgs().returns(utils.parseEther('0.01'))
+        await product.updateTakerFee(utils.parseEther('0.01'))
 
         const TAKER_FEE = utils.parseEther('12.3') // position * taker fee * price
 
@@ -3814,7 +3865,7 @@ describe('Product', () => {
           .withArgs(user.address, 2, 3)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
+        expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('615'))
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('615'))
         expectPositionEq(await product.position(user.address), { maker: 0, taker: POSITION })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -3893,7 +3944,7 @@ describe('Product', () => {
           .withArgs(user.address, 1, POSITION.div(2))
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(0)
+        expect(await product['maintenance(address)'](user.address)).to.equal(0)
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('307.5'))
         expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -3919,7 +3970,7 @@ describe('Product', () => {
           .withArgs(user.address, 1, POSITION)
 
         expect(await product.isClosed(user.address)).to.equal(true)
-        expect(await product.maintenance(user.address)).to.equal(0)
+        expect(await product['maintenance(address)'](user.address)).to.equal(0)
         expect(await product.maintenanceNext(user.address)).to.equal(0)
         expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -3957,7 +4008,7 @@ describe('Product', () => {
             .withArgs(user.address, 2, POSITION)
 
           expect(await product.isClosed(user.address)).to.equal(false)
-          expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
+          expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('615'))
           expect(await product.maintenanceNext(user.address)).to.equal(0)
           expectPositionEq(await product.position(user.address), { maker: 0, taker: POSITION })
           expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -4019,7 +4070,7 @@ describe('Product', () => {
             .withArgs(user.address, 3, 3)
 
           expect(await product.isClosed(user.address)).to.equal(true)
-          expect(await product.maintenance(user.address)).to.equal(0)
+          expect(await product['maintenance(address)'](user.address)).to.equal(0)
           expect(await product.maintenanceNext(user.address)).to.equal(0)
           expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
           expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -4038,7 +4089,7 @@ describe('Product', () => {
             .withArgs(user.address, 2, POSITION.div(2))
 
           expect(await product.isClosed(user.address)).to.equal(false)
-          expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
+          expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('615'))
           expect(await product.maintenanceNext(user.address)).to.equal(0)
           expectPositionEq(await product.position(user.address), { maker: 0, taker: POSITION })
           expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -4102,7 +4153,7 @@ describe('Product', () => {
             .withArgs(user.address, 3, 3)
 
           expect(await product.isClosed(user.address)).to.equal(true)
-          expect(await product.maintenance(user.address)).to.equal(0)
+          expect(await product['maintenance(address)'](user.address)).to.equal(0)
           expect(await product.maintenanceNext(user.address)).to.equal(0)
           expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
           expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -4135,7 +4186,7 @@ describe('Product', () => {
             .withArgs(user.address, 3, POSITION.div(2))
 
           expect(await product.isClosed(user.address)).to.equal(false)
-          expect(await product.maintenance(user.address)).to.equal(utils.parseEther('307.5'))
+          expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('307.5'))
           expect(await product.maintenanceNext(user.address)).to.equal(0)
           expectPositionEq(await product.position(user.address), { maker: 0, taker: POSITION.div(2) })
           expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -4222,7 +4273,7 @@ describe('Product', () => {
             .withArgs(user.address, 4, 4)
 
           expect(await product.isClosed(user.address)).to.equal(true)
-          expect(await product.maintenance(user.address)).to.equal(0)
+          expect(await product['maintenance(address)'](user.address)).to.equal(0)
           expect(await product.maintenanceNext(user.address)).to.equal(0)
           expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
           expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -4278,7 +4329,7 @@ describe('Product', () => {
             .withArgs(user.address, 3, 4)
 
           expect(await product.isClosed(user.address)).to.equal(true)
-          expect(await product.maintenance(user.address)).to.equal(0)
+          expect(await product['maintenance(address)'](user.address)).to.equal(0)
           expect(await product.maintenanceNext(user.address)).to.equal(0)
           expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
           expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -4290,7 +4341,7 @@ describe('Product', () => {
         })
 
         it('closes the position and settles later', async () => {
-          await productProvider.mock.takerFee.withArgs().returns(utils.parseEther('0.01'))
+          await product.updateTakerFee(utils.parseEther('0.01'))
 
           const TAKER_FEE = utils.parseEther('12.3') // position * taker fee * price
 
@@ -4338,7 +4389,7 @@ describe('Product', () => {
             .withArgs(user.address, 3, 4)
 
           expect(await product.isClosed(user.address)).to.equal(true)
-          expect(await product.maintenance(user.address)).to.equal(0)
+          expect(await product['maintenance(address)'](user.address)).to.equal(0)
           expect(await product.maintenanceNext(user.address)).to.equal(0)
           expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
           expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -4395,7 +4446,7 @@ describe('Product', () => {
           closePosition: { maker: POSITION, taker: 0 },
         })
         expect(await product.isLiquidating(user.address)).to.equal(true)
-        expect(await product.maintenance(user.address)).to.equal(0)
+        expect(await product['maintenance(address)'](user.address)).to.equal(0)
       })
 
       it('closes taker side', async () => {
@@ -4430,7 +4481,7 @@ describe('Product', () => {
           closePosition: { maker: 0, taker: POSITION },
         })
         expect(await product.isLiquidating(user.address)).to.equal(true)
-        expect(await product.maintenance(user.address)).to.equal(0)
+        expect(await product['maintenance(address)'](user.address)).to.equal(0)
       })
 
       it('reverts if already initialized', async () => {
@@ -4496,7 +4547,7 @@ describe('Product', () => {
           .withArgs(user.address, 3, 3)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
+        expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('615'))
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('615'))
         expectPositionEq(await product.position(user.address), { maker: POSITION, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -4511,7 +4562,7 @@ describe('Product', () => {
           .withArgs(userB.address, 3, 3)
 
         expect(await product.isClosed(userB.address)).to.equal(false)
-        expect(await product.maintenance(userB.address)).to.equal(utils.parseEther('307.5'))
+        expect(await product['maintenance(address)'](userB.address)).to.equal(utils.parseEther('307.5'))
         expect(await product.maintenanceNext(userB.address)).to.equal(utils.parseEther('307.5'))
         expectPositionEq(await product.position(userB.address), { maker: 0, taker: POSITION.div(2) })
         expectPrePositionEq(await product['pre(address)'](userB.address), {
@@ -4562,7 +4613,7 @@ describe('Product', () => {
           .withArgs(user.address, 3, 3)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
+        expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('615'))
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('615'))
         expectPositionEq(await product.position(user.address), { maker: POSITION, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -4577,7 +4628,7 @@ describe('Product', () => {
           .withArgs(userB.address, 3, 3)
 
         expect(await product.isClosed(userB.address)).to.equal(false)
-        expect(await product.maintenance(userB.address)).to.equal(utils.parseEther('307.5'))
+        expect(await product['maintenance(address)'](userB.address)).to.equal(utils.parseEther('307.5'))
         expect(await product.maintenanceNext(userB.address)).to.equal(utils.parseEther('307.5'))
         expectPositionEq(await product.position(userB.address), { maker: 0, taker: POSITION.div(2) })
         expectPrePositionEq(await product['pre(address)'](userB.address), {
@@ -4634,7 +4685,7 @@ describe('Product', () => {
           .withArgs(user.address, 3, 3)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(utils.parseEther('625'))
+        expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('625'))
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('625'))
         expectPositionEq(await product.position(user.address), { maker: POSITION, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -4649,7 +4700,7 @@ describe('Product', () => {
           .withArgs(userB.address, 3, 3)
 
         expect(await product.isClosed(userB.address)).to.equal(false)
-        expect(await product.maintenance(userB.address)).to.equal(utils.parseEther('312.5'))
+        expect(await product['maintenance(address)'](userB.address)).to.equal(utils.parseEther('312.5'))
         expect(await product.maintenanceNext(userB.address)).to.equal(utils.parseEther('312.5'))
         expectPositionEq(await product.position(userB.address), { maker: 0, taker: POSITION.div(2) })
         expectPrePositionEq(await product['pre(address)'](userB.address), {
@@ -4706,7 +4757,7 @@ describe('Product', () => {
           .withArgs(user.address, 3, 3)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(utils.parseEther('605'))
+        expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('605'))
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('605'))
         expectPositionEq(await product.position(user.address), { maker: POSITION, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -4721,7 +4772,7 @@ describe('Product', () => {
           .withArgs(userB.address, 3, 3)
 
         expect(await product.isClosed(userB.address)).to.equal(false)
-        expect(await product.maintenance(userB.address)).to.equal(utils.parseEther('302.5'))
+        expect(await product['maintenance(address)'](userB.address)).to.equal(utils.parseEther('302.5'))
         expect(await product.maintenanceNext(userB.address)).to.equal(utils.parseEther('302.5'))
         expectPositionEq(await product.position(userB.address), { maker: 0, taker: POSITION.div(2) })
         expectPrePositionEq(await product['pre(address)'](userB.address), {
@@ -4767,7 +4818,7 @@ describe('Product', () => {
           .withArgs(user.address, 3, 3)
 
         expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product.maintenance(user.address)).to.equal(utils.parseEther('615'))
+        expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('615'))
         expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('615'))
         expectPositionEq(await product.position(user.address), { maker: POSITION, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -4782,7 +4833,7 @@ describe('Product', () => {
           .withArgs(userB.address, 3, 3)
 
         expect(await product.isClosed(userB.address)).to.equal(false)
-        expect(await product.maintenance(userB.address)).to.equal(utils.parseEther('307.5'))
+        expect(await product['maintenance(address)'](userB.address)).to.equal(utils.parseEther('307.5'))
         expect(await product.maintenanceNext(userB.address)).to.equal(utils.parseEther('307.5'))
         expectPositionEq(await product.position(userB.address), { maker: 0, taker: POSITION.div(2) })
         expectPrePositionEq(await product['pre(address)'](userB.address), {
@@ -4849,7 +4900,7 @@ describe('Product', () => {
             .withArgs(user.address, 3, 4)
 
           expect(await product.isClosed(user.address)).to.equal(true)
-          expect(await product.maintenance(user.address)).to.equal(utils.parseEther('0'))
+          expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('0'))
           expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('0'))
           expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
           expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -4864,7 +4915,7 @@ describe('Product', () => {
             .withArgs(userB.address, 4, 4)
 
           expect(await product.isClosed(userB.address)).to.equal(false)
-          expect(await product.maintenance(userB.address)).to.equal(utils.parseEther('307.5'))
+          expect(await product['maintenance(address)'](userB.address)).to.equal(utils.parseEther('307.5'))
           expect(await product.maintenanceNext(userB.address)).to.equal(utils.parseEther('307.5'))
           expectPositionEq(await product.position(userB.address), { maker: 0, taker: POSITION.div(2) })
           expectPrePositionEq(await product['pre(address)'](userB.address), {
@@ -4937,7 +4988,7 @@ describe('Product', () => {
             .withArgs(user.address, 3, 4)
 
           expect(await product.isClosed(user.address)).to.equal(true)
-          expect(await product.maintenance(user.address)).to.equal(utils.parseEther('0'))
+          expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('0'))
           expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('0'))
           expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
           expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -4952,7 +5003,7 @@ describe('Product', () => {
             .withArgs(userB.address, 4, 4)
 
           expect(await product.isClosed(userB.address)).to.equal(false)
-          expect(await product.maintenance(userB.address)).to.equal(utils.parseEther('307.5'))
+          expect(await product['maintenance(address)'](userB.address)).to.equal(utils.parseEther('307.5'))
           expect(await product.maintenanceNext(userB.address)).to.equal(utils.parseEther('307.5'))
           expectPositionEq(await product.position(userB.address), { maker: 0, taker: POSITION.div(2) })
           expectPrePositionEq(await product['pre(address)'](userB.address), {
@@ -4967,7 +5018,7 @@ describe('Product', () => {
             .withArgs(userC.address, 3, 4)
 
           expect(await product.isClosed(userC.address)).to.equal(false)
-          expect(await product.maintenance(userC.address)).to.equal(utils.parseEther('153.75'))
+          expect(await product['maintenance(address)'](userC.address)).to.equal(utils.parseEther('153.75'))
           expect(await product.maintenanceNext(userC.address)).to.equal(utils.parseEther('153.75'))
           expectPositionEq(await product.position(userC.address), { maker: POSITION.div(4), taker: 0 })
           expectPrePositionEq(await product['pre(address)'](userC.address), {
@@ -5038,7 +5089,7 @@ describe('Product', () => {
             .withArgs(user.address, 3, 4)
 
           expect(await product.isClosed(user.address)).to.equal(true)
-          expect(await product.maintenance(user.address)).to.equal(utils.parseEther('0'))
+          expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('0'))
           expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('0'))
           expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
           expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -5053,7 +5104,7 @@ describe('Product', () => {
             .withArgs(userB.address, 4, 4)
 
           expect(await product.isClosed(userB.address)).to.equal(false)
-          expect(await product.maintenance(userB.address)).to.equal(utils.parseEther('302.5'))
+          expect(await product['maintenance(address)'](userB.address)).to.equal(utils.parseEther('302.5'))
           expect(await product.maintenanceNext(userB.address)).to.equal(utils.parseEther('302.5'))
           expectPositionEq(await product.position(userB.address), { maker: 0, taker: POSITION.div(2) })
           expectPrePositionEq(await product['pre(address)'](userB.address), {
@@ -5139,7 +5190,7 @@ describe('Product', () => {
             .withArgs(user.address, 3, 4)
 
           expect(await product.isClosed(user.address)).to.equal(true)
-          expect(await product.maintenance(user.address)).to.equal(utils.parseEther('0'))
+          expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('0'))
           expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('0'))
           expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
           expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -5154,7 +5205,7 @@ describe('Product', () => {
             .withArgs(userB.address, 4, 4)
 
           expect(await product.isClosed(userB.address)).to.equal(false)
-          expect(await product.maintenance(userB.address)).to.equal(utils.parseEther('302.5'))
+          expect(await product['maintenance(address)'](userB.address)).to.equal(utils.parseEther('302.5'))
           expect(await product.maintenanceNext(userB.address)).to.equal(utils.parseEther('302.5'))
           expectPositionEq(await product.position(userB.address), { maker: 0, taker: POSITION.div(2) })
           expectPrePositionEq(await product['pre(address)'](userB.address), {
@@ -5169,7 +5220,7 @@ describe('Product', () => {
             .withArgs(userC.address, 3, 4)
 
           expect(await product.isClosed(userC.address)).to.equal(false)
-          expect(await product.maintenance(userC.address)).to.equal(utils.parseEther('151.25'))
+          expect(await product['maintenance(address)'](userC.address)).to.equal(utils.parseEther('151.25'))
           expect(await product.maintenanceNext(userC.address)).to.equal(utils.parseEther('151.25'))
           expectPositionEq(await product.position(userC.address), { maker: POSITION.div(4), taker: 0 })
           expectPrePositionEq(await product['pre(address)'](userC.address), {

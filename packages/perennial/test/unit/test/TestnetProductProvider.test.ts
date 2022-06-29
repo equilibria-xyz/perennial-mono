@@ -31,18 +31,6 @@ describe('TestnetProductProvider', () => {
     testnetProductProvider = await new TestnetProductProvider__factory(user).deploy(oracle.address, CURVE)
   })
 
-  describe('#name', async () => {
-    it('returns correct name', async () => {
-      expect(await testnetProductProvider.name()).to.equal('Squeeth')
-    })
-  })
-
-  describe('#symbol', async () => {
-    it('returns correct symbol', async () => {
-      expect(await testnetProductProvider.symbol()).to.equal('SQTH')
-    })
-  })
-
   describe('#sync', async () => {
     it('calls sync on oracle', async () => {
       await oracle.mock.sync.withArgs().returns({
@@ -119,36 +107,6 @@ describe('TestnetProductProvider', () => {
       expect(await testnetProductProvider.rate({ maker: 100, taker: 125 })).to.equal(
         utils.parseEther('5.00').div(SECONDS_IN_YEAR),
       )
-    })
-  })
-
-  describe('#maintenance', async () => {
-    it('returns correct maintenance', async () => {
-      expect(await testnetProductProvider.maintenance()).to.equal(utils.parseEther('0.3'))
-    })
-  })
-
-  describe('#fundingFee', async () => {
-    it('returns correct fundingFee', async () => {
-      expect(await testnetProductProvider.fundingFee()).to.equal(utils.parseEther('0.1'))
-    })
-  })
-
-  describe('#makerFee', async () => {
-    it('returns correct makerFee', async () => {
-      expect(await testnetProductProvider.makerFee()).to.equal(utils.parseEther('0'))
-    })
-  })
-
-  describe('#takerFee', async () => {
-    it('returns correct takerFee', async () => {
-      expect(await testnetProductProvider.takerFee()).to.equal(utils.parseEther('0'))
-    })
-  })
-
-  describe('#makerLimit', async () => {
-    it('returns correct makerLimit', async () => {
-      expect(await testnetProductProvider.makerLimit()).to.equal(utils.parseEther('1'))
     })
   })
 })

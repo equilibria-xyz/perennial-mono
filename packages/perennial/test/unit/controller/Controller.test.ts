@@ -516,7 +516,16 @@ describe('Controller', () => {
   })
 
   describe('#createProduct', async () => {
-    const PRODUCT_INFO = { name: 'Squeeth', symbol: 'SQTH', productProvider: '' }
+    const PRODUCT_INFO = {
+      name: 'Squeeth',
+      symbol: 'SQTH',
+      productProvider: '',
+      maintenance: 0,
+      fundingFee: 0,
+      makerFee: 0,
+      takerFee: 0,
+      makerLimit: 0,
+    }
     beforeEach(async () => {
       PRODUCT_INFO.productProvider = productProvider.address
       await controller.connect(coordinatorOwner).createCoordinator()

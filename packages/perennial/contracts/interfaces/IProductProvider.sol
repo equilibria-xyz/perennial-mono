@@ -9,9 +9,4 @@ import "./IOracleProvider.sol";
 interface IProductProvider is IOracleProvider {
     function oracle() external view returns (IOracleProvider);
     function rate(Position memory position) external view returns (Fixed18);
-    function maintenance() external view returns (UFixed18);
-    function fundingFee() external view returns (UFixed18);
-    function makerFee() external view returns (UFixed18);
-    function takerFee() external view returns (UFixed18);
-    function makerLimit() external view returns (UFixed18);
 }

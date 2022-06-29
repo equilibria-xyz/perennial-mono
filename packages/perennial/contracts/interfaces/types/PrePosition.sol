@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.13;
 
+import "@equilibria/root/number/types/UFixed18.sol";
 import "./Position.sol";
-import "./ProductProvider.sol";
+import "../IOracleProvider.sol";
+import "../IProduct.sol";
 
 /// @dev PrePosition type
 struct PrePosition {
@@ -29,8 +31,6 @@ using PrePositionLib for PrePosition global;
  *      global state types.
  */
 library PrePositionLib {
-    using ProductProviderLib for IProductProvider;
-
     /**
      * @notice Returns whether there is no pending-settlement position delta
      * @dev Can be "empty" even with a non-zero oracleVersion if a position is opened and
@@ -139,13 +139,11 @@ library PrePositionLib {
     /**
      * @notice Computes the fee incurred for opening or closing the pending-settlement position
      * @param self The struct to operate on
-     * @param provider The parameter provider of the product
      * @param toOracleVersion The oracle version at which settlement takes place
      * @return positionFee The maker / taker fee incurred
      */
     function computeFee(
         PrePosition memory self,
-        IProductProvider provider,
         IOracleProvider.OracleVersion memory toOracleVersion
     ) internal view returns (UFixed18) {
         Position memory positionDelta = self.openPosition.add(self.closePosition);
@@ -155,7 +153,8 @@ library PrePositionLib {
             Fixed18Lib.from(positionDelta.taker).mul(toOracleVersion.price).abs()
         );
 
-        return makerNotional.mul(provider.safeMakerFee()).add(takerNotional.mul(provider.safeTakerFee()));
+        IProduct product = IProduct(address(this));
+        return makerNotional.mul(product.makerFee()).add(takerNotional.mul(product.takerFee()));
     }
 
     /**

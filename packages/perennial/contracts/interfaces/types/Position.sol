@@ -3,6 +3,7 @@ pragma solidity ^0.8.13;
 
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@equilibria/root/number/types/UFixed18.sol";
+import "../IProduct.sol";
 import "./Accumulator.sol";
 import "./PrePosition.sol";
 import "./PackedPosition.sol";
@@ -131,7 +132,6 @@ library PositionLib {
      *      and `pre` and returns accordingly
      * @param self The current Position
      * @param pre The pending-settlement position delta
-     * @param provider The parameter provider of the product
      * @param toOracleVersion The oracle version to settle to
      * @return Settled position at oracle version
      * @return Fee accrued from opening or closing the position
@@ -140,10 +140,9 @@ library PositionLib {
     function settled(
         Position memory self,
         PrePosition memory pre,
-        IProductProvider provider,
         IOracleProvider.OracleVersion memory toOracleVersion
     ) internal view returns (Position memory, UFixed18, bool) {
-        return pre.canSettle(toOracleVersion) ? (next(self, pre), pre.computeFee(provider, toOracleVersion), true) : (self, UFixed18Lib.ZERO, false);
+        return pre.canSettle(toOracleVersion) ? (next(self, pre), pre.computeFee(toOracleVersion), true) : (self, UFixed18Lib.ZERO, false);
     }
 
     /**

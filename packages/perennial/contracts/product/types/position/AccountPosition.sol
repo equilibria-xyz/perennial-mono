@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.15;
 
+import "../../../interfaces/IProduct.sol";
 import "../../../interfaces/types/PrePosition.sol";
 
 /// @dev AccountPosition type
@@ -24,17 +25,15 @@ library AccountPositionLib {
     /**
      * @notice Settled the account's position to oracle version `toOracleVersion`
      * @param self The struct to operate on
-     * @param provider The parameter provider of the product
      * @param toOracleVersion The oracle version to accumulate to
      * @return positionFee The fee accrued from opening or closing a new position
      */
     function settle(
         AccountPosition storage self,
-        IProductProvider provider,
         IOracleProvider.OracleVersion memory toOracleVersion
     ) internal returns (UFixed18 positionFee) {
         bool settled;
-        (self.position, positionFee, settled) = self.position.settled(self.pre, provider, toOracleVersion);
+        (self.position, positionFee, settled) = self.position.settled(self.pre, toOracleVersion);
         if (settled) {
             delete self.pre;
             self.liquidation = false;
@@ -73,7 +72,7 @@ library AccountPositionLib {
     function _maintenance(Position memory position, IProductProvider provider) private view returns (UFixed18) {
         Fixed18 oraclePrice = provider.currentVersion().price;
         UFixed18 notionalMax = Fixed18Lib.from(position.max()).mul(oraclePrice).abs();
-        return notionalMax.mul(provider.maintenance());
+        return notionalMax.mul(IProduct(address(this)).maintenance());
     }
 
     /**

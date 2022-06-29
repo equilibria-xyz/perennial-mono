@@ -261,7 +261,7 @@ contract PerennialLens is IPerennialLens {
         UFixed18 positionSize
     ) external settleAccount(account, product) returns (UFixed18) {
         UFixed18 notional = positionSize.mul(_latestVersion(product).price.abs());
-        return notional.mul(product.productProvider().maintenance());
+        return notional.mul(product.maintenance());
     }
 
     /**

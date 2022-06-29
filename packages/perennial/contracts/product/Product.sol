@@ -17,6 +17,21 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
     AddressStorage private constant _productProvider = AddressStorage.wrap(keccak256("equilibria.perennial.Product.productProvider"));
     function productProvider() public view returns (IProductProvider) { return IProductProvider(_productProvider.read()); }
 
+    UFixed18Storage private constant _maintenance = UFixed18Storage.wrap(keccak256("equilibria.perennial.Product.maintenance"));
+    function maintenance() public view returns (UFixed18) { return _maintenance.read(); }
+
+    UFixed18Storage private constant _fundingFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.Product.fundingFee"));
+    function fundingFee() public view returns (UFixed18) { return _fundingFee.read(); }
+
+    UFixed18Storage private constant _makerFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.Product.makerFee"));
+    function makerFee() public view returns (UFixed18) { return _makerFee.read(); }
+
+    UFixed18Storage private constant _takerFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.Product.takerFee"));
+    function takerFee() public view returns (UFixed18) { return _takerFee.read(); }
+
+    UFixed18Storage private constant _makerLimit = UFixed18Storage.wrap(keccak256("equilibria.perennial.Product.makerLimit"));
+    function makerLimit() public view returns (UFixed18) { return _makerLimit.read(); }
+
     /// @dev The name of the product
     string public name;
 
@@ -46,6 +61,12 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
         name = productInfo_.name;
         symbol = productInfo_.symbol;
         _productProvider.store(address(productInfo_.productProvider));
+
+        _updateMaintenance(productInfo_.maintenance);
+        _updateFundingFee(productInfo_.fundingFee);
+        _updateMakerFee(productInfo_.makerFee);
+        _updateTakerFee(productInfo_.takerFee);
+        _updateMakerLimit(productInfo_.makerLimit);
     }
 
     /**
@@ -86,22 +107,27 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
 
         // Initiate
         _controller.incentivizer().sync(currentOracleVersion);
+        UFixed18 _safeFundingFee = safeFundingFee();
         UFixed18 accumulatedFee;
 
         // value a->b
-        accumulatedFee = accumulatedFee.add(_accumulator.accumulate(_controller, _provider, _position, latestOracleVersion, settleOracleVersion));
+        accumulatedFee = accumulatedFee.add(
+            _accumulator.accumulate(_safeFundingFee, _provider, _position, latestOracleVersion, settleOracleVersion)
+        );
 
         // position a->b
-        accumulatedFee = accumulatedFee.add(_position.settle(_provider, _latestVersion, settleOracleVersion));
+        accumulatedFee = accumulatedFee.add(_position.settle(_latestVersion, settleOracleVersion));
 
         // short-circuit from a->c if b == c
         if (settleOracleVersion.version != currentOracleVersion.version) {
 
             // value b->c
-            accumulatedFee = accumulatedFee.add(_accumulator.accumulate(_controller, _provider, _position, settleOracleVersion, currentOracleVersion));
+            accumulatedFee = accumulatedFee.add(
+                _accumulator.accumulate(_safeFundingFee, _provider, _position, settleOracleVersion, currentOracleVersion)
+            );
 
             // position b->c (every accumulator version needs a position stamp)
-            _position.settle(_provider, settleOracleVersion.version, currentOracleVersion);
+            _position.settle(settleOracleVersion.version, currentOracleVersion);
         }
 
         // settle collateral
@@ -155,7 +181,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
             _accumulators[account].syncTo(_accumulator, _positions[account], settleOracleVersion.version).sum());
 
         // position a->b
-        accumulated = accumulated.sub(Fixed18Lib.from(_positions[account].settle(_provider, settleOracleVersion)));
+        accumulated = accumulated.sub(Fixed18Lib.from(_positions[account].settle(settleOracleVersion)));
 
         // short-circuit from a->c if b == c
         if (settleOracleVersion.version != currentOracleVersion.version) {
@@ -394,13 +420,116 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
         return _accumulators[account].latestVersion;
     }
 
+    /**
+     * @notice Updates the maintenance to `newMaintenance`
+     * @dev only callable by product owner
+     * @param newMaintenance new maintenance value
+     */
+    function updateMaintenance(UFixed18 newMaintenance) external onlyProductOwner(IProduct(this)) {
+        _updateMaintenance(newMaintenance);
+    }
+
+    /**
+     * @notice Updates the maintenance to `newMaintenance`
+     * @param newMaintenance new maintenance value
+     */
+    function _updateMaintenance(UFixed18 newMaintenance) private {
+        _maintenance.store(newMaintenance);
+        emit MaintenanceUpdated(newMaintenance);
+    }
+
+    /**
+     * @notice Returns the minimum funding fee parameter with a capped range for safety
+     * @dev Caps controller.minFundingFee() <= fundingFee() <= 1
+     * @return Safe minimum funding fee parameter
+     */
+    function safeFundingFee() public view returns (UFixed18) {
+        return fundingFee().max(controller().minFundingFee());
+    }
+
+    /**
+     * @notice Updates the funding fee to `newFundingFee`
+     * @dev only callable by product owner
+     * @param newFundingFee new funding fee value
+     */
+    function updateFundingFee(UFixed18 newFundingFee) external onlyProductOwner(IProduct(this)) {
+        _updateFundingFee(newFundingFee);
+    }
+
+    /**
+     * @notice Updates the funding fee to `newFundingFee`
+     * @param newFundingFee new funding fee value
+     */
+    function _updateFundingFee(UFixed18 newFundingFee) private {
+        if (newFundingFee.gt(UFixed18Lib.ONE)) { revert ProductInvalidFundingFee(); }
+        _fundingFee.store(newFundingFee);
+        emit FundingFeeUpdated(newFundingFee);
+    }
+
+    /**
+     * @notice Updates the maker fee to `newMakerFee`
+     * @dev only callable by product owner
+     * @param newMakerFee new maker fee value
+     */
+    function updateMakerFee(UFixed18 newMakerFee) external onlyProductOwner(IProduct(this)) {
+        _updateMakerFee(newMakerFee);
+    }
+
+    /**
+     * @notice Updates the maker fee to `newMakerFee`
+     * @param newMakerFee new maker fee value
+     */
+    function _updateMakerFee(UFixed18 newMakerFee) private {
+        if (newMakerFee.gt(UFixed18Lib.ONE)) { revert ProductInvalidMakerFee(); }
+        _makerFee.store(newMakerFee);
+        emit MakerFeeUpdated(newMakerFee);
+    }
+
+    /**
+     * @notice Updates the taker fee to `newTakerFee`
+     * @dev only callable by product owner
+     * @param newTakerFee new taker fee value
+     */
+    function updateTakerFee(UFixed18 newTakerFee) external onlyProductOwner(IProduct(this)) {
+        _updateTakerFee(newTakerFee);
+    }
+
+    /**
+     * @notice Updates the taker fee to `newTakerFee`
+     * @param newTakerFee new taker fee value
+     */
+    function _updateTakerFee(UFixed18 newTakerFee) private {
+        if (newTakerFee.gt(UFixed18Lib.ONE)) { revert ProductInvalidTakerFee(); }
+        _takerFee.store(newTakerFee);
+        emit TakerFeeUpdated(newTakerFee);
+    }
+
+    /**
+     * @notice Updates the maker limit to `newMakerLimit`
+     * @dev only callable by product owner
+     * @param newMakerLimit new maker limit value
+     */
+    function updateMakerLimit(UFixed18 newMakerLimit) external onlyProductOwner(IProduct(this)) {
+        _updateMakerLimit(newMakerLimit);
+    }
+
+    /**
+     * @notice Updates the maker limit to `newMakerLimit`
+     * @param newMakerLimit new maker limit value
+     */
+    function _updateMakerLimit(UFixed18 newMakerLimit) private {
+        _makerLimit.store(newMakerLimit);
+        emit MakerLimitUpdated(newMakerLimit);
+    }
+
+
     /// @dev Limit total maker for guarded rollouts
     modifier makerInvariant {
         _;
 
         Position memory next = positionAtVersion(latestVersion()).next(_position.pre);
 
-        if (next.maker.gt(productProvider().makerLimit())) revert ProductMakerOverLimitError();
+        if (next.maker.gt(makerLimit())) revert ProductMakerOverLimitError();
     }
 
     /// @dev Limit maker short exposure to the range 0.0-1.0x of their position
