@@ -36,15 +36,15 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
 
     /**
      * @notice Initializes the contract state
-     * @param initParams_ Product initialization params
+     * @param productInfo_ Product initialization params
      */
-    function initialize(ProductInitParams calldata initParams_) external initializer(1) {
+    function initialize(ProductInfo calldata productInfo_) external initializer(1) {
         __UControllerProvider__initialize(IController(msg.sender));
         __UReentrancyGuard__initialize();
 
-        name = initParams_.name;
-        symbol = initParams_.symbol;
-        productProvider = initParams_.productProvider;
+        name = productInfo_.name;
+        symbol = productInfo_.symbol;
+        productProvider = productInfo_.productProvider;
     }
 
     /**

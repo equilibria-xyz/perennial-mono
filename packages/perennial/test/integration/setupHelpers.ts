@@ -195,9 +195,9 @@ export async function createProduct(instanceVars: InstanceVars): Promise<Product
   await controller.createCoordinator()
   await controller.updateCoordinatorTreasury(1, treasuryB.address)
 
-  const initParams = { name: 'Squeeth', symbol: 'SQTH', productProvider: productProvider.address }
-  const productAddress = await controller.callStatic.createProduct(1, initParams)
-  await controller.createProduct(1, initParams)
+  const productInfo = { name: 'Squeeth', symbol: 'SQTH', productProvider: productProvider.address }
+  const productAddress = await controller.callStatic.createProduct(1, productInfo)
+  await controller.createProduct(1, productInfo)
 
   return Product__factory.connect(productAddress, owner)
 }

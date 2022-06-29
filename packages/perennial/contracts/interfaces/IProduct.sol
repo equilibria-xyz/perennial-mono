@@ -9,7 +9,7 @@ import "./IProductProvider.sol";
 
 interface IProduct {
     /// @dev Product Creation parameters
-    struct ProductInitParams {
+    struct ProductInfo {
         /// @dev name of the product
         string name;
 
@@ -39,7 +39,7 @@ interface IProduct {
     function name() external view returns (string memory);
     function symbol() external view returns (string memory);
     function productProvider() external view returns (IProductProvider);
-    function initialize(ProductInitParams calldata initParams_) external;
+    function initialize(ProductInfo calldata productInfo) external;
     function settle() external;
     function settleAccount(address account) external;
     function openTake(UFixed18 amount) external;
