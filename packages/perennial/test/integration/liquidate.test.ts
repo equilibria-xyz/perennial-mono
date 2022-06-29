@@ -66,7 +66,7 @@ describe('Liquidate', () => {
     await product.settleAccount(userB.address)
 
     expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(0)
-    expect(await collateral.shortfall(product.address)).to.equal('2463720317001203086618')
+    expect(await collateral.shortfall(product.address)).to.equal('2463736825720737646856')
 
     const userBCollateral = await collateral['collateral(address,address)'](userB.address, product.address)
     await expect(
@@ -74,7 +74,7 @@ describe('Liquidate', () => {
     ).to.be.revertedWith('0x11') // underflow
 
     await dsu.connect(userB).approve(collateral.address, constants.MaxUint256)
-    await collateral.connect(userB).resolveShortfall(product.address, '2463720317001203086618')
+    await collateral.connect(userB).resolveShortfall(product.address, '2463736825720737646856')
 
     expect(await collateral.shortfall(product.address)).to.equal(0)
   })
@@ -111,7 +111,6 @@ describe('Liquidate', () => {
     const currC = await collateral['collateral(address,address)'](userC.address, product.address)
     const currD = await collateral['collateral(address,address)'](userD.address, product.address)
     const totalCurr = currB.add(currC).add(currD)
-
     const feesCurr = (await collateral.fees(treasuryA.address)).add(await collateral.fees(treasuryB.address))
 
     await chainlink.next()
@@ -130,9 +129,8 @@ describe('Liquidate', () => {
     expect(currD.lt(newD)).to.equal(true)
 
     const feesNew = (await collateral.fees(treasuryA.address)).add(await collateral.fees(treasuryB.address))
-    const feesDelta = feesNew.sub(feesCurr)
 
-    expect(totalCurr.add(feesDelta)).to.be.gte(totalNew)
-    expect(totalCurr.add(feesDelta)).to.be.closeTo(totalNew, 1)
+    expect(totalCurr.add(feesCurr)).to.be.gte(totalNew.add(feesNew))
+    expect(totalCurr.add(feesCurr)).to.be.closeTo(totalNew.add(feesNew), 1)
   }).timeout(120000)
 })
