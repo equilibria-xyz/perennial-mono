@@ -127,15 +127,15 @@ library VersionedAccumulatorLib {
         Fixed18 fundingAccumulated = rateAccumulated.mul(Fixed18Lib.from(socializedNotional));
         accumulatedFee = fundingAccumulated.abs().mul(provider.safeFundingFee(controller));
 
-        Fixed18 fundingIncludingFee = Fixed18Lib.from(
+        Fixed18 fundingAccumulatedWithoutFee = Fixed18Lib.from(
             fundingAccumulated.sign(),
             fundingAccumulated.abs().sub(accumulatedFee)
         );
 
-        bool takerPaysFunding = fundingAccumulated.sign() < 0;
-        accumulatedFunding.maker = (takerPaysFunding ? fundingIncludingFee : fundingAccumulated)
+        bool makerPaysFunding = fundingAccumulated.sign() < 0;
+        accumulatedFunding.maker = (makerPaysFunding ? fundingAccumulated : fundingAccumulatedWithoutFee)
             .div(Fixed18Lib.from(latestPosition.maker));
-        accumulatedFunding.taker = (takerPaysFunding ? fundingAccumulated : fundingIncludingFee)
+        accumulatedFunding.taker = (makerPaysFunding ? fundingAccumulatedWithoutFee : fundingAccumulated)
             .div(Fixed18Lib.from(latestPosition.taker)).mul(Fixed18Lib.NEG_ONE);
     }
 
