@@ -6,9 +6,20 @@ import "./types/Position.sol";
 import "./types/PrePosition.sol";
 import "./types/Accumulator.sol";
 import "./IProductProvider.sol";
-import "./types/ProductInitParams.sol";
 
 interface IProduct {
+    /// @dev Product Creation parameters
+    struct ProductInitParams {
+        /// @dev name of the product
+        string name;
+
+        /// @dev symbol of the product
+        string symbol;
+
+        /// @dev product provider address
+        IProductProvider productProvider;
+    }
+
     event Settle(uint256 preVersion, uint256 toVersion);
     event AccountSettle(address indexed account, uint256 preVersion, uint256 toVersion);
     event MakeOpened(address indexed account, uint256 version, UFixed18 amount);

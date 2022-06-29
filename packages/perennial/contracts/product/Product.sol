@@ -455,12 +455,4 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
 
         _;
     }
-
-    /// @dev Only allow the Product's coordinator owner to call
-    modifier onlyProductOwner {
-        uint256 coordinatorId = controller().coordinatorFor(IProduct(this));
-        if (controller().owner(coordinatorId) != msg.sender) revert ProductNotOwnerError();
-
-        _;
-    }
 }

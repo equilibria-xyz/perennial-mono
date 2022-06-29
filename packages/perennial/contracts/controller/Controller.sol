@@ -172,7 +172,8 @@ contract Controller is IController, UInitializable {
      * @param productParams Params used to initialize the product
      * @return New product contract address
      */
-    function createProduct(uint256 coordinatorId, ProductInitParams calldata productParams) external onlyOwner(coordinatorId) returns (IProduct) {
+    function createProduct(uint256 coordinatorId, IProduct.ProductInitParams calldata productParams)
+    external onlyOwner(coordinatorId) returns (IProduct) {
         if (coordinatorId == 0) revert ControllerNoZeroCoordinatorError();
 
         BeaconProxy newProductProxy = new BeaconProxy(address(productBeacon()), abi.encodeCall(IProduct.initialize, productParams));
