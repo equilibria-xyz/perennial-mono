@@ -176,8 +176,7 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
     notPausedProduct(product)
     settleForAccount(msg.sender, product)
     {
-        uint256 programCount = programIds.length;
-        for (uint256 i; i < programCount; ++i) {
+        for (uint256 i; i < programIds.length; ++i) {
             _claimProgram(product, programIds[i]);
         }
     }
@@ -203,8 +202,7 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
      * @param tokens Tokens to claim fees for
      */
     function claimFee(Token18[] calldata tokens) external notPaused {
-        uint256 tokensCount = tokens.length;
-        for(uint256 i; i < tokensCount; ++i) {
+        for(uint256 i; i < tokens.length; ++i) {
             Token18 token = tokens[i];
             UFixed18 amount = fees[token];
             if (amount.isZero()) continue;

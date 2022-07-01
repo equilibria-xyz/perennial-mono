@@ -198,8 +198,7 @@ contract PerennialLens is IPerennialLens {
      * @return sum of all fees accrued by the account
      */
     function fees(address account, IProduct[] memory products) external returns (UFixed18) {
-        uint256 productsCount = products.length;
-        for (uint256 i; i < productsCount; ++i) {
+        for (uint256 i; i < products.length; ++i) {
             products[i].settle();
         }
 
