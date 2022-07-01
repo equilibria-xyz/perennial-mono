@@ -29,6 +29,7 @@ const FORK_NETWORK = process.env.FORK_NETWORK || 'mainnet'
 const FORK_BLOCK_NUMBER = process.env.FORK_BLOCK_NUMBER ? parseInt(process.env.FORK_BLOCK_NUMBER) : undefined
 const MOCHA_PARALLEL = process.env.MOCHA_PARALLEL === 'true' || false
 const MOCHA_REPORTER = process.env.MOCHA_REPORTER || 'spec'
+const OPTIMIZER_ENABLED = process.env.OPTIMIZER_ENABLED === 'true' || false
 
 function getUrl(networkName: string): string {
   switch (networkName) {
@@ -96,8 +97,8 @@ const config: HardhatUserConfig = {
         version: '0.8.15',
         settings: {
           optimizer: {
-            enabled: false,
-            runs: 1000,
+            enabled: OPTIMIZER_ENABLED,
+            runs: 2 ** 32 - 1,
           },
           outputSelection: {
             '*': {
