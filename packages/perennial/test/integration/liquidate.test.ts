@@ -30,7 +30,7 @@ describe('Liquidate', () => {
     expect(await collateral.liquidatableNext(user.address, product.address)).to.be.true
     expect(await collateral.liquidatable(user.address, product.address)).to.be.true
 
-    expect(await collateral.connect(userB).liquidate(user.address, product.address))
+    await expect(collateral.connect(userB).liquidate(user.address, product.address))
       .to.emit(collateral, 'Liquidation')
       .withArgs(user.address, product.address, userB.address, utils.parseEther('1000'))
 

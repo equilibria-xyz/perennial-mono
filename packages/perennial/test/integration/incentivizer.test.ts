@@ -200,15 +200,15 @@ describe('Incentivizer', () => {
 
     await product.settleAccount(user.address)
     expect(await incentivizer.unclaimed(product.address, user.address, PROGRAM_ID)).to.equal('188786008230451956')
-    expect(await incentivizer.connect(user)['claim(address,uint256[])'](product.address, [PROGRAM_ID]))
+    await expect(incentivizer.connect(user)['claim(address,uint256[])'](product.address, [PROGRAM_ID]))
       .to.emit(incentiveToken, 'Transfer')
       .withArgs(incentivizer.address, user.address, '188786008230451956')
 
     await product.settleAccount(userB.address)
     expect(await incentivizer.unclaimed(product.address, userB.address, PROGRAM_ID)).to.equal('47196502057612989')
-    expect(await incentivizer.connect(userB)['claim(address,uint256[])'](product.address, [PROGRAM_ID]))
+    await expect(incentivizer.connect(userB)['claim(address,uint256[])'](product.address, [PROGRAM_ID]))
       .to.emit(incentiveToken, 'Transfer')
-      .withArgs(incentivizer.address, user.address, '47196502057612989')
+      .withArgs(incentivizer.address, userB.address, '47196502057612989')
 
     expect(await incentivizer.available(product.address, PROGRAM_ID)).to.equal('101808984910837662')
     expect(await incentivizer.active(product.address)).to.equal(0)
@@ -246,15 +246,15 @@ describe('Incentivizer', () => {
 
     await product.settleAccount(user.address)
     expect(await incentivizer.unclaimed(product.address, user.address, PROGRAM_ID)).to.equal('188786008230451956')
-    expect(await incentivizer.connect(user)['claim(address,uint256[])'](product.address, [PROGRAM_ID]))
+    await expect(incentivizer.connect(user)['claim(address,uint256[])'](product.address, [PROGRAM_ID]))
       .to.emit(incentiveToken, 'Transfer')
       .withArgs(incentivizer.address, user.address, '188786008230451956')
 
     await product.settleAccount(userB.address)
     expect(await incentivizer.unclaimed(product.address, userB.address, PROGRAM_ID)).to.equal('47196502057612989')
-    expect(await incentivizer.connect(userB)['claim(address,uint256[])'](product.address, [PROGRAM_ID]))
+    await expect(incentivizer.connect(userB)['claim(address,uint256[])'](product.address, [PROGRAM_ID]))
       .to.emit(incentiveToken, 'Transfer')
-      .withArgs(incentivizer.address, user.address, '47196502057612989')
+      .withArgs(incentivizer.address, userB.address, '47196502057612989')
 
     expect(await incentivizer.available(product.address, PROGRAM_ID)).to.equal('101808984910837662')
     expect(await incentivizer.active(product.address)).to.equal(0)
