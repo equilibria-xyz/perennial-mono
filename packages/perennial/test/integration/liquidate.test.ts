@@ -1,6 +1,6 @@
 import { expect } from 'chai'
 import 'hardhat'
-import { constants, utils } from 'ethers'
+import { BigNumber, constants, utils } from 'ethers'
 
 import { InstanceVars, deployProtocol, createProduct, depositTo } from './setupHelpers'
 
@@ -81,7 +81,7 @@ describe('Liquidate', () => {
 
   it('uses a socialization factor', async () => {
     const POSITION = utils.parseEther('0.0001')
-    const { user, userB, userC, userD, collateral, chainlink } = instanceVars
+    const { user, userB, userC, userD, collateral, chainlink, treasuryA, treasuryB } = instanceVars
 
     const product = await createProduct(instanceVars)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
@@ -99,7 +99,10 @@ describe('Liquidate', () => {
     await chainlink.nextWithPriceModification(price => price.mul(2))
 
     // Liquidate `user` which results in taker > maker
-    await collateral.connect(userB).liquidate(user.address, product.address)
+    const expectedLiquidationFee = BigNumber.from('682778989173237912428')
+    await expect(collateral.connect(userB).liquidate(user.address, product.address))
+      .to.emit(collateral, 'Liquidation')
+      .withArgs(user.address, product.address, userB.address, expectedLiquidationFee)
 
     await chainlink.next()
     await product.settleAccount(user.address)
@@ -107,27 +110,37 @@ describe('Liquidate', () => {
     await product.settleAccount(userC.address)
     await product.settleAccount(userD.address)
 
+    const currA = await collateral['collateral(address,address)'](user.address, product.address)
     const currB = await collateral['collateral(address,address)'](userB.address, product.address)
     const currC = await collateral['collateral(address,address)'](userC.address, product.address)
     const currD = await collateral['collateral(address,address)'](userD.address, product.address)
-    const totalCurr = currB.add(currC).add(currD)
+    const totalCurr = currA.add(currB).add(currC).add(currD)
+    const feesCurr = (await collateral.fees(treasuryA.address)).add(await collateral.fees(treasuryB.address))
 
     await chainlink.next()
     await product.settleAccount(userB.address)
     await product.settleAccount(userC.address)
     await product.settleAccount(userD.address)
 
+    const newA = await collateral['collateral(address,address)'](user.address, product.address)
     const newB = await collateral['collateral(address,address)'](userB.address, product.address)
     const newC = await collateral['collateral(address,address)'](userC.address, product.address)
     const newD = await collateral['collateral(address,address)'](userD.address, product.address)
-    const totalNew = newB.add(newC).add(newD)
+    const totalNew = newA.add(newB).add(newC).add(newD)
 
     // Expect the loss from B to be socialized equally to C and D
+    expect(currA).to.equal(newA)
     expect(currB.gt(newB)).to.equal(true)
     expect(currC.lt(newC)).to.equal(true)
     expect(currD.lt(newD)).to.equal(true)
 
-    expect(totalCurr.gte(totalNew)).to.equal(true)
-    expect(totalCurr).to.closeTo(totalNew, 1)
+    const feesNew = (await collateral.fees(treasuryA.address)).add(await collateral.fees(treasuryB.address))
+
+    console.log(newA.toString())
+    expect(totalCurr.add(feesCurr)).to.be.gte(totalNew.add(feesNew))
+    expect(totalCurr.add(feesCurr)).to.be.closeTo(totalNew.add(feesNew), 1)
+
+    // Expect the system to remain solvent
+    expect(totalNew.add(feesNew)).to.equal(utils.parseEther('22000').sub(expectedLiquidationFee))
   }).timeout(120000)
 })
