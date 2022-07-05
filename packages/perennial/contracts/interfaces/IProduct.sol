@@ -39,7 +39,7 @@ interface IProduct {
     function name() external view returns (string memory);
     function symbol() external view returns (string memory);
     function productProvider() external view returns (IProductProvider);
-    function initialize(ProductInfo calldata productInfo) external;
+    function initialize(ProductInfo calldata productInfo_) external;
     function settle() external;
     function settleAccount(address account) external;
     function openTake(UFixed18 amount) external;
