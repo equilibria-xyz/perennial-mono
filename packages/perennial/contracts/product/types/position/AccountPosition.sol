@@ -42,6 +42,7 @@ library AccountPositionLib {
 
     /**
      * @notice Returns the current maintenance requirement for the account
+     * @dev Must be called from a valid product to get the proper maintenance value
      * @param self The struct to operate on
      * @param provider The parameter provider of the product
      * @return Current maintenance requirement for the account

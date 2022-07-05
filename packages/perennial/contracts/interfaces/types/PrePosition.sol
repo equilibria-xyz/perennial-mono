@@ -138,6 +138,7 @@ library PrePositionLib {
 
     /**
      * @notice Computes the fee incurred for opening or closing the pending-settlement position
+     * @dev Must be called from a valid product to get the proper fee amounts
      * @param self The struct to operate on
      * @param toOracleVersion The oracle version at which settlement takes place
      * @return positionFee The maker / taker fee incurred

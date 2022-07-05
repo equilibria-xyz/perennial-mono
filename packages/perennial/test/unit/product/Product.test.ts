@@ -78,7 +78,7 @@ describe('Product', () => {
       expect(await product.fundingFee()).to.equal(utils.parseEther('0.1'))
       expect(await product.makerFee()).to.equal(utils.parseEther('0'))
       expect(await product.takerFee()).to.equal(utils.parseEther('0'))
-      expect(await product.makerLimit()).to.equal(utils.parseEther('1'))
+      expect(await product.makerLimit()).to.equal(utils.parseEther('100'))
     })
 
     it('reverts if already initialized', async () => {
