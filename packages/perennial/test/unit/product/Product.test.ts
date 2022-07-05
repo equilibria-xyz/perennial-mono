@@ -44,7 +44,9 @@ describe('Product', () => {
     controllerSigner = await impersonate.impersonateWithBalance(controller.address, utils.parseEther('10'))
 
     product = await new Product__factory(owner).deploy()
-    await product.connect(controllerSigner).initialize(productProvider.address)
+    await product
+      .connect(controllerSigner)
+      .initialize({ name: 'Squeeth', symbol: 'SQTH', productProvider: productProvider.address })
 
     await controller.mock['paused(address)'].withArgs(product.address).returns(false)
     await controller.mock.collateral.withArgs().returns(collateral.address)
@@ -54,13 +56,15 @@ describe('Product', () => {
   describe('#initialize', async () => {
     it('initialize with the correct variables set', async () => {
       expect(await product.controller()).to.equal(controller.address)
+      expect(await product.name()).to.equal('Squeeth')
+      expect(await product.symbol()).to.equal('SQTH')
       expect(await product.productProvider()).to.equal(productProvider.address)
     })
 
     it('reverts if already initialized', async () => {
-      await expect(product.initialize(productProvider.address)).to.be.revertedWith(
-        'UInitializableAlreadyInitializedError(1)',
-      )
+      await expect(
+        product.initialize({ name: 'Foo', symbol: 'FOO', productProvider: productProvider.address }),
+      ).to.be.revertedWith('UInitializableAlreadyInitializedError(1)')
     })
   })
 

@@ -25,7 +25,7 @@ contract PerennialLens is IPerennialLens {
      * @return Name of the product
      */
     function name(IProduct product) external view returns (string memory) {
-        return product.productProvider().name();
+        return product.name();
     }
 
     /**
@@ -34,7 +34,7 @@ contract PerennialLens is IPerennialLens {
      * @return Symbol of the product
      */
     function symbol(IProduct product) external view returns (string memory) {
-        return product.productProvider().symbol();
+        return product.symbol();
     }
 
     /**

@@ -13,8 +13,15 @@ import "../controller/UControllerProvider.sol";
  * @dev Cloned by the Controller contract to launch new product markets.
  */
 contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGuard {
-    /// @dev The parameter provider of the product market
-    IProductProvider public productProvider;
+    /// @dev Product Provider contract address for the product
+    AddressStorage private constant _productProvider = AddressStorage.wrap(keccak256("equilibria.perennial.Product.productProvider"));
+    function productProvider() public view returns (IProductProvider) { return IProductProvider(_productProvider.read()); }
+
+    /// @dev The name of the product
+    string public name;
+
+    /// @dev The symbol of the product
+    string public symbol;
 
     /// @dev The individual position state for each account
     mapping(address => AccountPosition) private _positions;
@@ -30,13 +37,15 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
 
     /**
      * @notice Initializes the contract state
-     * @param productProvider_ Product provider contract address
+     * @param productInfo_ Product initialization params
      */
-    function initialize(IProductProvider productProvider_) external initializer(1) {
+    function initialize(ProductInfo calldata productInfo_) external initializer(1) {
         __UControllerProvider__initialize(IController(msg.sender));
         __UReentrancyGuard__initialize();
 
-        productProvider = productProvider_;
+        name = productInfo_.name;
+        symbol = productInfo_.symbol;
+        _productProvider.store(address(productInfo_.productProvider));
     }
 
     /**
@@ -59,7 +68,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
      *  Syncs each to instantaneously after the oracle update.
      */
     function _settle() private returns (IOracleProvider.OracleVersion memory currentOracleVersion) {
-        (IProductProvider _provider, IController _controller) = (productProvider, controller());
+        (IProductProvider _provider, IController _controller) = (productProvider(), controller());
 
         // Get current oracle version
         currentOracleVersion = _provider.sync();
@@ -124,7 +133,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
      *  Syncs each to instantaneously after the oracle update.
      */
     function _settleAccount(address account, IOracleProvider.OracleVersion memory currentOracleVersion) private {
-        (IProductProvider _provider, IController _controller) = (productProvider, controller());
+        (IProductProvider _provider, IController _controller) = (productProvider(), controller());
 
         // Get latest oracle version
         if (latestVersion(account) == currentOracleVersion.version) return; // short circuit entirely if a == c
@@ -281,7 +290,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
      * @return The current maintenance requirement
      */
     function maintenance(address account) external view returns (UFixed18) {
-        return _positions[account].maintenance(productProvider);
+        return _positions[account].maintenance(productProvider());
     }
 
     /**
@@ -291,7 +300,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
      * @return The next maintenance requirement
      */
     function maintenanceNext(address account) external view returns (UFixed18) {
-        return _positions[account].maintenanceNext(productProvider);
+        return _positions[account].maintenanceNext(productProvider());
     }
 
     /**
@@ -391,7 +400,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
 
         Position memory next = positionAtVersion(latestVersion()).next(_position.pre);
 
-        if (next.maker.gt(productProvider.makerLimit())) revert ProductMakerOverLimitError();
+        if (next.maker.gt(productProvider().makerLimit())) revert ProductMakerOverLimitError();
     }
 
     /// @dev Limit maker short exposure to the range 0.0-1.0x of their position

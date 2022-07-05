@@ -8,8 +8,6 @@ import "./IOracleProvider.sol";
 
 interface IProductProvider is IOracleProvider {
     function oracle() external view returns (IOracleProvider);
-    function name() external view returns (string memory);
-    function symbol() external view returns (string memory);
     function rate(Position memory position) external view returns (Fixed18);
     function maintenance() external view returns (UFixed18);
     function fundingFee() external view returns (UFixed18);

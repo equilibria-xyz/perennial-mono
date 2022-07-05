@@ -8,6 +8,18 @@ import "./types/Accumulator.sol";
 import "./IProductProvider.sol";
 
 interface IProduct {
+    /// @dev Product Creation parameters
+    struct ProductInfo {
+        /// @dev name of the product
+        string name;
+
+        /// @dev symbol of the product
+        string symbol;
+
+        /// @dev product provider address
+        IProductProvider productProvider;
+    }
+
     event Settle(uint256 preVersion, uint256 toVersion);
     event AccountSettle(address indexed account, uint256 preVersion, uint256 toVersion);
     event MakeOpened(address indexed account, uint256 version, UFixed18 amount);
@@ -22,9 +34,12 @@ interface IProduct {
     error ProductInLiquidationError();
     error ProductMakerOverLimitError();
     error ProductOracleBootstrappingError();
+    error ProductNotOwnerError();
 
+    function name() external view returns (string memory);
+    function symbol() external view returns (string memory);
     function productProvider() external view returns (IProductProvider);
-    function initialize(IProductProvider productProvider_) external;
+    function initialize(ProductInfo calldata productInfo_) external;
     function settle() external;
     function settleAccount(address account) external;
     function openTake(UFixed18 amount) external;
