@@ -158,8 +158,7 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
     nonReentrant
     {
         if (products.length != programIds.length) revert IncentivizerBatchClaimArgumentMismatchError();
-        uint256 productCount = products.length;
-        for (uint256 i; i < productCount; i++) {
+        for (uint256 i; i < products.length; i++) {
             _claimProduct(products[i], programIds[i]);
         }
     }
@@ -176,8 +175,7 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
     notPausedProduct(product)
     settleForAccount(msg.sender, product)
     {
-        uint256 programCount = programIds.length;
-        for (uint256 i; i < programCount; i++) {
+        for (uint256 i; i < programIds.length; i++) {
             _claimProgram(product, programIds[i]);
         }
     }
