@@ -35,7 +35,16 @@ describe('Happy Path', () => {
       .to.emit(controller, 'CoordinatorTreasuryUpdated')
       .withArgs(1, treasuryB.address)
 
-    const productInfo = { name: 'Squeeth', symbol: 'SQTH', productProvider: productProvider.address }
+    const productInfo = {
+      name: 'Squeeth',
+      symbol: 'SQTH',
+      productProvider: productProvider.address,
+      maintenance: utils.parseEther('0.3'),
+      fundingFee: utils.parseEther('0.1'),
+      makerFee: 0,
+      takerFee: 0,
+      makerLimit: utils.parseEther('1'),
+    }
     const productAddress = await controller.callStatic.createProduct(1, productInfo)
     await expect(controller.createProduct(1, productInfo)).to.emit(controller, 'ProductCreated')
 
@@ -175,7 +184,7 @@ describe('Happy Path', () => {
 
     // User state
     expect(await product.isClosed(user.address)).to.equal(true)
-    expect(await product.maintenance(user.address)).to.equal(0)
+    expect(await product['maintenance(address)'](user.address)).to.equal(0)
     expect(await product.maintenanceNext(user.address)).to.equal(0)
     expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -213,7 +222,7 @@ describe('Happy Path', () => {
 
     // User state
     expect(await product.isClosed(user.address)).to.equal(true)
-    expect(await product.maintenance(user.address)).to.equal(0)
+    expect(await product['maintenance(address)'](user.address)).to.equal(0)
     expect(await product.maintenanceNext(user.address)).to.equal(0)
     expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -385,7 +394,7 @@ describe('Happy Path', () => {
 
     // User State
     expect(await product.isClosed(userB.address)).to.equal(true)
-    expect(await product.maintenance(userB.address)).to.equal(0)
+    expect(await product['maintenance(address)'](userB.address)).to.equal(0)
     expect(await product.maintenanceNext(userB.address)).to.equal(0)
     expectPositionEq(await product.position(userB.address), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre(address)'](userB.address), {
@@ -430,7 +439,7 @@ describe('Happy Path', () => {
 
     // User State
     expect(await product.isClosed(userB.address)).to.equal(true)
-    expect(await product.maintenance(userB.address)).to.equal(0)
+    expect(await product['maintenance(address)'](userB.address)).to.equal(0)
     expect(await product.maintenanceNext(userB.address)).to.equal(0)
     expectPositionEq(await product.position(userB.address), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre(address)'](userB.address), {

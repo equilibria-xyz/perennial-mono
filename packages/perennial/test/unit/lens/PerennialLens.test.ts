@@ -91,14 +91,14 @@ describe('PerennialLens', () => {
 
   describe('#maintenance', () => {
     it('returns the user maintenance amount after settle', async () => {
-      product.maintenance.whenCalledWith(user.address).returns(10)
+      product['maintenance(address)'].whenCalledWith(user.address).returns(10)
       product.maintenanceNext.whenCalledWith(user.address).returns(8)
       expect(await lens.callStatic.maintenance(user.address, product.address)).to.equal(10)
       expect(product.settleAccount).to.have.been.calledOnceWith(user.address)
     })
 
     it('returns maintenanceNext if it is higher than maintenance', async () => {
-      product.maintenance.whenCalledWith(user.address).returns(10)
+      product['maintenance(address)'].whenCalledWith(user.address).returns(10)
       product.maintenanceNext.whenCalledWith(user.address).returns(15)
       expect(await lens.callStatic.maintenance(user.address, product.address)).to.equal(15)
       expect(product.settleAccount).to.have.been.calledOnceWith(user.address)
@@ -273,7 +273,7 @@ describe('PerennialLens', () => {
         price: -789,
       }
       productProvider.currentVersion.returns(currVersion)
-      productProvider.maintenance.returns(ethers.utils.parseEther('0.5'))
+      product['maintenance()'].returns(ethers.utils.parseEther('0.5'))
       expect(
         await lens.callStatic.maintenanceRequired(user.address, product.address, ethers.utils.parseEther('123')),
       ).to.equal(48523)
