@@ -53,7 +53,7 @@ library VersionedAccumulatorLib {
     /**
      * @notice Globally accumulates all value (position + funding) and share since last oracle update
      * @param self The struct to operate on
-     * @param safeFundingFee The funding fee rate for the product
+     * @param fundingFee The funding fee rate for the product
      * @param provider The parameter provider of the product
      * @param position Pointer to global position
      * @param latestOracleVersion The oracle version to accumulate from
@@ -62,7 +62,7 @@ library VersionedAccumulatorLib {
      */
     function accumulate(
         VersionedAccumulator storage self,
-        UFixed18 safeFundingFee,
+        UFixed18 fundingFee,
         IProductProvider provider,
         VersionedPosition storage position,
         IOracleProvider.OracleVersion memory latestOracleVersion,
@@ -73,7 +73,7 @@ library VersionedAccumulatorLib {
         // accumulate funding
         Accumulator memory accumulatedPosition;
         (accumulatedPosition, accumulatedFee) =
-            _accumulateFunding(safeFundingFee, provider, latestPosition, latestOracleVersion, toOracleVersion);
+            _accumulateFunding(fundingFee, provider, latestPosition, latestOracleVersion, toOracleVersion);
 
         // accumulate position
         accumulatedPosition = accumulatedPosition.add(
@@ -98,7 +98,7 @@ library VersionedAccumulatorLib {
      * @dev If an oracle version is skipped due to no pre positions, funding will continue to be
      *      pegged to the price of the last snapshotted oracleVersion until a new one is accumulated.
      *      This is an acceptable approximation.
-     * @param safeFundingFee The funding fee rate for the product
+     * @param fundingFee The funding fee rate for the product
      * @param provider The parameter provider of the product
      * @param latestPosition The latest global position
      * @param latestOracleVersion The oracle version to accumulate from
@@ -107,7 +107,7 @@ library VersionedAccumulatorLib {
      * @return accumulatedFee The total fee accrued from funding accumulation
      */
     function _accumulateFunding(
-        UFixed18 safeFundingFee,
+        UFixed18 fundingFee,
         IProductProvider provider,
         Position memory latestPosition,
         IOracleProvider.OracleVersion memory latestOracleVersion,
@@ -123,7 +123,7 @@ library VersionedAccumulatorLib {
 
         Fixed18 rateAccumulated = provider.rate(latestPosition).mul(Fixed18Lib.from(UFixed18Lib.from(elapsed)));
         Fixed18 fundingAccumulated = rateAccumulated.mul(Fixed18Lib.from(socializedNotional));
-        accumulatedFee = fundingAccumulated.abs().mul(safeFundingFee);
+        accumulatedFee = fundingAccumulated.abs().mul(fundingFee);
 
         Fixed18 fundingAccumulatedWithoutFee = Fixed18Lib.from(
             fundingAccumulated.sign(),

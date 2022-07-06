@@ -60,6 +60,8 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
 
         name = productInfo_.name;
         symbol = productInfo_.symbol;
+
+        if (!Address.isContract(address(productInfo_.productProvider))) revert ProductInvalidProductProvider();
         _productProvider.store(address(productInfo_.productProvider));
 
         _updateMaintenance(productInfo_.maintenance);
@@ -107,12 +109,12 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
 
         // Initiate
         _controller.incentivizer().sync(currentOracleVersion);
-        UFixed18 _safeFundingFee = safeFundingFee();
+        UFixed18 _boundedFundingFee = boundedFundingFee();
         UFixed18 accumulatedFee;
 
         // value a->b
         accumulatedFee = accumulatedFee.add(
-            _accumulator.accumulate(_safeFundingFee, _provider, _position, latestOracleVersion, settleOracleVersion)
+            _accumulator.accumulate(_boundedFundingFee, _provider, _position, latestOracleVersion, settleOracleVersion)
         );
 
         // position a->b
@@ -123,7 +125,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
 
             // value b->c
             accumulatedFee = accumulatedFee.add(
-                _accumulator.accumulate(_safeFundingFee, _provider, _position, settleOracleVersion, currentOracleVersion)
+                _accumulator.accumulate(_boundedFundingFee, _provider, _position, settleOracleVersion, currentOracleVersion)
             );
 
             // position b->c (every accumulator version needs a position stamp)
@@ -443,7 +445,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
      * @dev Caps controller.minFundingFee() <= fundingFee() <= 1
      * @return Safe minimum funding fee parameter
      */
-    function safeFundingFee() public view returns (UFixed18) {
+    function boundedFundingFee() private view returns (UFixed18) {
         return fundingFee().max(controller().minFundingFee());
     }
 
@@ -461,7 +463,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
      * @param newFundingFee new funding fee value
      */
     function _updateFundingFee(UFixed18 newFundingFee) private {
-        if (newFundingFee.gt(UFixed18Lib.ONE)) { revert ProductInvalidFundingFee(); }
+        if (newFundingFee.gt(UFixed18Lib.ONE)) revert ProductInvalidFundingFee();
         _fundingFee.store(newFundingFee);
         emit FundingFeeUpdated(newFundingFee);
     }
@@ -480,7 +482,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
      * @param newMakerFee new maker fee value
      */
     function _updateMakerFee(UFixed18 newMakerFee) private {
-        if (newMakerFee.gt(UFixed18Lib.ONE)) { revert ProductInvalidMakerFee(); }
+        if (newMakerFee.gt(UFixed18Lib.ONE)) revert ProductInvalidMakerFee();
         _makerFee.store(newMakerFee);
         emit MakerFeeUpdated(newMakerFee);
     }
@@ -499,7 +501,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
      * @param newTakerFee new taker fee value
      */
     function _updateTakerFee(UFixed18 newTakerFee) private {
-        if (newTakerFee.gt(UFixed18Lib.ONE)) { revert ProductInvalidTakerFee(); }
+        if (newTakerFee.gt(UFixed18Lib.ONE)) revert ProductInvalidTakerFee();
         _takerFee.store(newTakerFee);
         emit TakerFeeUpdated(newTakerFee);
     }

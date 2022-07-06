@@ -95,6 +95,22 @@ describe('Product', () => {
         }),
       ).to.be.revertedWith('UInitializableAlreadyInitializedError(1)')
     })
+
+    it('reverts if product provider is not a contract', async () => {
+      const otherProduct = await new Product__factory(owner).deploy()
+      await expect(
+        otherProduct.connect(controllerSigner).initialize({
+          name: 'Squeeth',
+          symbol: 'SQTH',
+          productProvider: user.address,
+          maintenance: MAINTENANCE,
+          fundingFee: FUNDING_FEE,
+          makerFee: MAKER_FEE,
+          takerFee: TAKER_FEE,
+          makerLimit: POSITION.mul(10),
+        }),
+      ).to.be.revertedWith('ProductInvalidProductProvider()')
+    })
   })
 
   describe('updating params', async () => {

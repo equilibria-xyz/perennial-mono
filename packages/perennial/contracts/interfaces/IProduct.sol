@@ -55,6 +55,7 @@ interface IProduct {
     error ProductMakerOverLimitError();
     error ProductOracleBootstrappingError();
     error ProductNotOwnerError();
+    error ProductInvalidProductProvider();
     error ProductInvalidFundingFee();
     error ProductInvalidMakerFee();
     error ProductInvalidTakerFee();
@@ -89,7 +90,6 @@ interface IProduct {
 
     function fundingFee() external view returns (UFixed18);
     function updateFundingFee(UFixed18 newFundingFee) external;
-    function safeFundingFee() external view returns (UFixed18);
 
     function makerFee() external view returns (UFixed18);
     function updateMakerFee(UFixed18 newMakerFee) external;
