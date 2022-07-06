@@ -54,7 +54,6 @@ library VersionedAccumulatorLib {
      * @notice Globally accumulates all value (position + funding) and share since last oracle update
      * @param self The struct to operate on
      * @param fundingFee The funding fee rate for the product
-     * @param provider The parameter provider of the product
      * @param position Pointer to global position
      * @param latestOracleVersion The oracle version to accumulate from
      * @param toOracleVersion The oracle version to accumulate to
@@ -63,7 +62,6 @@ library VersionedAccumulatorLib {
     function accumulate(
         VersionedAccumulator storage self,
         UFixed18 fundingFee,
-        IProductProvider provider,
         VersionedPosition storage position,
         IOracleProvider.OracleVersion memory latestOracleVersion,
         IOracleProvider.OracleVersion memory toOracleVersion
@@ -73,7 +71,7 @@ library VersionedAccumulatorLib {
         // accumulate funding
         Accumulator memory accumulatedPosition;
         (accumulatedPosition, accumulatedFee) =
-            _accumulateFunding(fundingFee, provider, latestPosition, latestOracleVersion, toOracleVersion);
+            _accumulateFunding(fundingFee, latestPosition, latestOracleVersion, toOracleVersion);
 
         // accumulate position
         accumulatedPosition = accumulatedPosition.add(
@@ -99,7 +97,6 @@ library VersionedAccumulatorLib {
      *      pegged to the price of the last snapshotted oracleVersion until a new one is accumulated.
      *      This is an acceptable approximation.
      * @param fundingFee The funding fee rate for the product
-     * @param provider The parameter provider of the product
      * @param latestPosition The latest global position
      * @param latestOracleVersion The oracle version to accumulate from
      * @param toOracleVersion The oracle version to accumulate to
@@ -108,7 +105,6 @@ library VersionedAccumulatorLib {
      */
     function _accumulateFunding(
         UFixed18 fundingFee,
-        IProductProvider provider,
         Position memory latestPosition,
         IOracleProvider.OracleVersion memory latestOracleVersion,
         IOracleProvider.OracleVersion memory toOracleVersion
@@ -121,7 +117,8 @@ library VersionedAccumulatorLib {
         UFixed18 takerNotional = Fixed18Lib.from(latestPosition.taker).mul(latestOracleVersion.price).abs();
         UFixed18 socializedNotional = takerNotional.mul(latestPosition.socializationFactor());
 
-        Fixed18 rateAccumulated = provider.rate(latestPosition).mul(Fixed18Lib.from(UFixed18Lib.from(elapsed)));
+        Fixed18 rateAccumulated = IProduct(address(this)).rate(latestPosition)
+            .mul(Fixed18Lib.from(UFixed18Lib.from(elapsed)));
         Fixed18 fundingAccumulated = rateAccumulated.mul(Fixed18Lib.from(socializedNotional));
         accumulatedFee = fundingAccumulated.abs().mul(fundingFee);
 

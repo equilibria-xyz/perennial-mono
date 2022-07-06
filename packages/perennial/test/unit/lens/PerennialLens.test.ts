@@ -249,7 +249,7 @@ describe('PerennialLens', () => {
     it('returns the rate after settle', async () => {
       product['latestVersion()'].returns(100)
       product.positionAtVersion.whenCalledWith(100).returns({ maker: 200, taker: 100 })
-      productProvider.rate.returns(12345)
+      product.rate.returns(12345)
       expect(await lens.callStatic.rate(product.address)).to.equal(12345)
       expect(product.settle).to.have.been.calledOnce
     })
@@ -259,7 +259,7 @@ describe('PerennialLens', () => {
     it('returns the rate after settle', async () => {
       product['latestVersion()'].returns(100)
       product.positionAtVersion.whenCalledWith(100).returns({ maker: 200, taker: 100 })
-      productProvider.rate.returns(12345)
+      product.rate.returns(12345)
       expect(await lens.callStatic.dailyRate(product.address)).to.equal(1066608000)
       expect(product.settle).to.have.been.calledOnce
     })

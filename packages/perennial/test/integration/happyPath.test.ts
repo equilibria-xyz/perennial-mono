@@ -44,6 +44,12 @@ describe('Happy Path', () => {
       makerFee: 0,
       takerFee: 0,
       makerLimit: utils.parseEther('1'),
+      utilizationCurve: {
+        minRate: 0,
+        maxRate: utils.parseEther('5.00'),
+        targetRate: utils.parseEther('0.80'),
+        targetUtilization: utils.parseEther('0.80'),
+      },
     }
     const productAddress = await controller.callStatic.createProduct(1, productInfo)
     await expect(controller.createProduct(1, productInfo)).to.emit(controller, 'ProductCreated')
