@@ -109,12 +109,12 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
 
         // Initiate
         _controller.incentivizer().sync(currentOracleVersion);
-        UFixed18 _boundedFundingFee = boundedFundingFee();
+        UFixed18 boundedFundingFee = _boundedFundingFee();
         UFixed18 accumulatedFee;
 
         // value a->b
         accumulatedFee = accumulatedFee.add(
-            _accumulator.accumulate(_boundedFundingFee, _provider, _position, latestOracleVersion, settleOracleVersion)
+            _accumulator.accumulate(boundedFundingFee, _provider, _position, latestOracleVersion, settleOracleVersion)
         );
 
         // position a->b
@@ -125,7 +125,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
 
             // value b->c
             accumulatedFee = accumulatedFee.add(
-                _accumulator.accumulate(_boundedFundingFee, _provider, _position, settleOracleVersion, currentOracleVersion)
+                _accumulator.accumulate(boundedFundingFee, _provider, _position, settleOracleVersion, currentOracleVersion)
             );
 
             // position b->c (every accumulator version needs a position stamp)
@@ -445,7 +445,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
      * @dev Caps controller.minFundingFee() <= fundingFee() <= 1
      * @return Safe minimum funding fee parameter
      */
-    function boundedFundingFee() private view returns (UFixed18) {
+    function _boundedFundingFee() private view returns (UFixed18) {
         return fundingFee().max(controller().minFundingFee());
     }
 
