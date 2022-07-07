@@ -88,6 +88,12 @@ describe('Product', () => {
       expect(await product.makerFee()).to.equal(utils.parseEther('0'))
       expect(await product.takerFee()).to.equal(utils.parseEther('0'))
       expect(await product.makerLimit()).to.equal(utils.parseEther('100'))
+
+      const curve = await product.utilizationCurve()
+      expect(curve.minRate).to.equal(utils.parseEther('0.10'))
+      expect(curve.maxRate).to.equal(utils.parseEther('0.10'))
+      expect(curve.targetRate).to.equal(utils.parseEther('0.10'))
+      expect(curve.targetUtilization).to.equal(utils.parseEther('1'))
     })
 
     it('reverts if already initialized', async () => {
