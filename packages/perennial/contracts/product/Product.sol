@@ -37,9 +37,9 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
     UFixed18Storage private constant _makerLimit = UFixed18Storage.wrap(keccak256("equilibria.perennial.Product.makerLimit"));
     function makerLimit() public view returns (UFixed18) { return _makerLimit.read(); }
 
-    /// @dev The JumpRateUtilizationCurve value
+    /// @dev The JumpRateUtilizationCurve params
     JumpRateUtilizationCurveStorage private constant _utilizationCurve =
-        JumpRateUtilizationCurveStorage.wrap(keccak256("equilibria.perennial.Product.utilizationCurve"));
+        JumpRateUtilizationCurveStorage.wrap(keccak256("equilibria.perennial.Product.jumpRateUtilizationCurve"));
     function utilizationCurve() public view returns (JumpRateUtilizationCurve memory) { return _utilizationCurve.read(); }
 
     /// @dev The name of the product

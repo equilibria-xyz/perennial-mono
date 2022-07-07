@@ -117,8 +117,8 @@ library VersionedAccumulatorLib {
         UFixed18 takerNotional = Fixed18Lib.from(latestPosition.taker).mul(latestOracleVersion.price).abs();
         UFixed18 socializedNotional = takerNotional.mul(latestPosition.socializationFactor());
 
-        Fixed18 rateAccumulated = IProduct(address(this)).rate(latestPosition)
-            .mul(Fixed18Lib.from(UFixed18Lib.from(elapsed)));
+        IProduct product = IProduct(address(this));
+        Fixed18 rateAccumulated = product.rate(latestPosition).mul(Fixed18Lib.from(UFixed18Lib.from(elapsed)));
         Fixed18 fundingAccumulated = rateAccumulated.mul(Fixed18Lib.from(socializedNotional));
         accumulatedFee = fundingAccumulated.abs().mul(fundingFee);
 
