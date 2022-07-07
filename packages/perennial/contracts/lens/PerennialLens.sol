@@ -330,7 +330,7 @@ contract PerennialLens is IPerennialLens {
      * @return Latest version for the product
      */
     function _latestVersion(IProduct product) private view returns (IOracleProvider.OracleVersion memory) {
-        return product.productProvider().currentVersion();
+        return product.currentVersion();
     }
 
     /// @dev Settles the product

@@ -28,7 +28,7 @@ describe('Happy Path', () => {
   })
 
   it('creates a product', async () => {
-    const { owner, user, controller, collateral, treasuryB, productProvider, dsu } = instanceVars
+    const { owner, user, controller, collateral, treasuryB, productProvider, chainlinkOracle, dsu } = instanceVars
 
     await expect(controller.createCoordinator()).to.emit(controller, 'CoordinatorCreated').withArgs(1, owner.address)
     await expect(controller.updateCoordinatorTreasury(1, treasuryB.address))
@@ -39,6 +39,7 @@ describe('Happy Path', () => {
       name: 'Squeeth',
       symbol: 'SQTH',
       productProvider: productProvider.address,
+      oracle: chainlinkOracle.address,
       maintenance: utils.parseEther('0.3'),
       fundingFee: utils.parseEther('0.1'),
       makerFee: 0,

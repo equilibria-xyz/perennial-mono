@@ -13,6 +13,7 @@ import {
   Incentivizer__factory,
   IProductProvider__factory,
   IBeacon__factory,
+  IOracleProvider__factory,
 } from '../../../types/generated'
 
 const { ethers } = HRE
@@ -29,6 +30,7 @@ describe('Controller', () => {
   let coordinatorPauser: SignerWithAddress
   let collateral: MockContract
   let productProvider: MockContract
+  let oracle: MockContract
   let incentivizer: MockContract
   let productBeacon: MockContract
 
@@ -49,6 +51,7 @@ describe('Controller', () => {
     ] = await ethers.getSigners()
     collateral = await waffle.deployMockContract(owner, Collateral__factory.abi)
     productProvider = await waffle.deployMockContract(owner, IProductProvider__factory.abi)
+    oracle = await waffle.deployMockContract(owner, IOracleProvider__factory.abi)
     incentivizer = await waffle.deployMockContract(owner, Incentivizer__factory.abi)
 
     productBeacon = await waffle.deployMockContract(owner, IBeacon__factory.abi)
@@ -520,6 +523,7 @@ describe('Controller', () => {
       name: 'Squeeth',
       symbol: 'SQTH',
       productProvider: '',
+      oracle: '',
       maintenance: 0,
       fundingFee: 0,
       makerFee: 0,
@@ -534,6 +538,7 @@ describe('Controller', () => {
     }
     beforeEach(async () => {
       PRODUCT_INFO.productProvider = productProvider.address
+      PRODUCT_INFO.oracle = oracle.address
       await controller.connect(coordinatorOwner).createCoordinator()
       await controller.connect(coordinatorOwner).updateCoordinatorTreasury(1, coordinatorTreasury.address)
       await controller.connect(coordinatorOwner).updateCoordinatorPauser(1, coordinatorPauser.address)

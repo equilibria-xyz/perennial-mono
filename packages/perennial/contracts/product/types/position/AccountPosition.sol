@@ -44,36 +44,34 @@ library AccountPositionLib {
      * @notice Returns the current maintenance requirement for the account
      * @dev Must be called from a valid product to get the proper maintenance value
      * @param self The struct to operate on
-     * @param provider The parameter provider of the product
      * @return Current maintenance requirement for the account
      */
-    function maintenance(AccountPosition storage self, IProductProvider provider) internal view returns (UFixed18) {
+    function maintenance(AccountPosition storage self) internal view returns (UFixed18) {
         if (self.liquidation) return UFixed18Lib.ZERO;
-        return _maintenance(self.position, provider);
+        return _maintenance(self.position);
     }
 
     /**
      * @notice Returns the maintenance requirement after the next oracle version settlement
      * @dev Includes the current pending-settlement position delta, assumes no price change
      * @param self The struct to operate on
-     * @param provider The parameter provider of the product
      * @return Next maintenance requirement for the account
      */
-    function maintenanceNext(AccountPosition storage self, IProductProvider provider) internal view returns (UFixed18) {
-        return _maintenance(self.position.next(self.pre), provider);
+    function maintenanceNext(AccountPosition storage self) internal view returns (UFixed18) {
+        return _maintenance(self.position.next(self.pre));
     }
 
     /**
      * @notice Returns the maintenance requirement for a given `position`
      * @dev Internal helper
      * @param position The position to compete the maintenance requirement for
-     * @param provider The parameter provider of the product
      * @return Next maintenance requirement for the account
      */
-    function _maintenance(Position memory position, IProductProvider provider) private view returns (UFixed18) {
-        Fixed18 oraclePrice = provider.currentVersion().price;
+    function _maintenance(Position memory position) private view returns (UFixed18) {
+        IProduct product = IProduct(address(this));
+        Fixed18 oraclePrice = product.currentVersion().price;
         UFixed18 notionalMax = Fixed18Lib.from(position.max()).mul(oraclePrice).abs();
-        return notionalMax.mul(IProduct(address(this)).maintenance());
+        return notionalMax.mul(product.maintenance());
     }
 
     /**

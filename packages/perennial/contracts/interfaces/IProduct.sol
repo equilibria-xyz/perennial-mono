@@ -20,6 +20,9 @@ interface IProduct {
         /// @dev product provider address
         IProductProvider productProvider;
 
+        /// @dev oracle address
+        IOracleProvider oracle;
+
         /// @dev product maintenance ratio
         UFixed18 maintenance;
 
@@ -66,6 +69,7 @@ interface IProduct {
     error ProductOracleBootstrappingError();
     error ProductNotOwnerError();
     error ProductInvalidProductProvider();
+    error ProductInvalidOracle();
     error ProductInvalidFundingFee();
     error ProductInvalidMakerFee();
     error ProductInvalidTakerFee();
@@ -73,6 +77,7 @@ interface IProduct {
     function name() external view returns (string memory);
     function symbol() external view returns (string memory);
     function productProvider() external view returns (IProductProvider);
+    function oracle() external view returns (IOracleProvider);
     function initialize(ProductInfo calldata productInfo_) external;
     function settle() external;
     function settleAccount(address account) external;
@@ -94,6 +99,9 @@ interface IProduct {
     function shareAtVersion(uint256 oracleVersion) external view returns (Accumulator memory);
     function latestVersion(address account) external view returns (uint256);
     function rate(Position memory position) external view returns (Fixed18);
+    function sync() external returns (IOracleProvider.OracleVersion memory);
+    function currentVersion() external view returns (IOracleProvider.OracleVersion memory);
+    function atVersion(uint256 oracleVersion) external view returns (IOracleProvider.OracleVersion memory);
 
     // Product Parameters and Updaters
     function maintenance() external view returns (UFixed18);
