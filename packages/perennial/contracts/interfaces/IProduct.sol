@@ -3,6 +3,7 @@ pragma solidity ^0.8.13;
 
 import "@equilibria/root/number/types/UFixed18.sol";
 import "@equilibria/root/curve/types/JumpRateUtilizationCurve.sol";
+import "./types/PackedProvider.sol";
 import "./types/Position.sol";
 import "./types/PrePosition.sol";
 import "./types/Accumulator.sol";
@@ -18,7 +19,7 @@ interface IProduct {
         string symbol;
 
         /// @dev product provider address
-        IProductProvider productProvider;
+        PackedProvider productProvider;
 
         /// @dev oracle address
         IOracleProvider oracle;
@@ -76,7 +77,7 @@ interface IProduct {
 
     function name() external view returns (string memory);
     function symbol() external view returns (string memory);
-    function productProvider() external view returns (IProductProvider);
+    function productProvider() external view returns (PackedProvider);
     function oracle() external view returns (IOracleProvider);
     function initialize(ProductInfo calldata productInfo_) external;
     function settle() external;

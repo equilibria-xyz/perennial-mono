@@ -42,7 +42,7 @@ interface IController {
     event CoordinatorPauserUpdated(uint256 indexed coordinatorId, address pauser);
     event CoordinatorPausedUpdated(uint256 indexed coordinatorId, bool paused);
     event CoordinatorCreated(uint256 indexed coordinatorId, address owner);
-    event ProductCreated(IProduct indexed product, IProductProvider provider);
+    event ProductCreated(IProduct indexed product, PackedProvider provider);
 
     error ControllerNoZeroCoordinatorError();
     error ControllerNotPauserError(uint256 coordinatorId);

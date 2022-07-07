@@ -5,6 +5,7 @@ import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@equilibria/root/control/unstructured/UReentrancyGuard.sol";
 import "./types/position/AccountPosition.sol";
 import "./types/accumulator/AccountAccumulator.sol";
+import "../interfaces/types/PackedProvider.sol";
 import "../controller/UControllerProvider.sol";
 
 /**
@@ -14,8 +15,8 @@ import "../controller/UControllerProvider.sol";
  */
 contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGuard {
     /// @dev Product Provider contract address for the product
-    AddressStorage private constant _productProvider = AddressStorage.wrap(keccak256("equilibria.perennial.Product.productProvider"));
-    function productProvider() public view returns (IProductProvider) { return IProductProvider(_productProvider.read()); }
+    Bytes32Storage private constant _productProvider = Bytes32Storage.wrap(keccak256("equilibria.perennial.Product.productProvider"));
+    function productProvider() public view returns (PackedProvider) { return PackedProvider.wrap(_productProvider.read()); }
 
     /// @dev The oracle contract address
     AddressStorage private constant _oracle = AddressStorage.wrap(keccak256("equilibria.perennial.Product.oracle"));
@@ -75,8 +76,11 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
         name = productInfo_.name;
         symbol = productInfo_.symbol;
 
-        if (!Address.isContract(address(productInfo_.productProvider))) revert ProductInvalidProductProvider();
-        _productProvider.store(address(productInfo_.productProvider));
+        if (productInfo_.productProvider.providerType() == PackedProviderLib.ProviderType.CONTRACT &&
+            !Address.isContract(address(productInfo_.productProvider.providerContract()))) {
+                revert ProductInvalidProductProvider();
+        }
+        _productProvider.store(PackedProvider.unwrap(productInfo_.productProvider));
 
         if (!Address.isContract(address(productInfo_.oracle))) revert ProductInvalidOracle();
         _oracle.store(address(productInfo_.oracle));
@@ -361,7 +365,12 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
      * @return Transformed oracle version
      */
     function _transform(IOracleProvider.OracleVersion memory oracleVersion) private view returns (IOracleProvider.OracleVersion memory) {
-        oracleVersion.price = productProvider().payoff(oracleVersion.price);
+        PackedProvider provider = productProvider();
+        if (provider.providerType() == PackedProviderLib.ProviderType.PASSTHROUGH) {
+            return oracleVersion;
+        }
+
+        oracleVersion.price = provider.providerContract().payoff(oracleVersion.price);
         return oracleVersion;
     }
 
@@ -662,8 +671,8 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
 
     /// @dev Helper to fully settle an account's state
     modifier settleForAccount(address account) {
-        IOracleProvider.OracleVersion memory currentVersion = _settle();
-        _settleAccount(account, currentVersion);
+        IOracleProvider.OracleVersion memory _currentVersion = _settle();
+        _settleAccount(account, _currentVersion);
 
         _;
     }

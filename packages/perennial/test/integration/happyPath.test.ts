@@ -38,7 +38,7 @@ describe('Happy Path', () => {
     const productInfo = {
       name: 'Squeeth',
       symbol: 'SQTH',
-      productProvider: productProvider.address,
+      productProvider: `0x01${productProvider.address.substring(2).padStart(62, '0')}`,
       oracle: chainlinkOracle.address,
       maintenance: utils.parseEther('0.3'),
       fundingFee: utils.parseEther('0.1'),
