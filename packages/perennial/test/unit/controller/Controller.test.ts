@@ -525,6 +525,12 @@ describe('Controller', () => {
       makerFee: 0,
       takerFee: 0,
       makerLimit: 0,
+      utilizationCurve: {
+        minRate: utils.parseEther('0.10'),
+        maxRate: utils.parseEther('0.10'),
+        targetRate: utils.parseEther('0.10'),
+        targetUtilization: utils.parseEther('1'),
+      },
     }
     beforeEach(async () => {
       PRODUCT_INFO.productProvider = productProvider.address

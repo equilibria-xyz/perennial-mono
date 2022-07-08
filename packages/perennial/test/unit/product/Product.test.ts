@@ -37,6 +37,23 @@ describe('Product', () => {
   const MAKER_FEE = utils.parseEther('0.0')
   const TAKER_FEE = utils.parseEther('0.0')
   const MAINTENANCE = utils.parseEther('0.5')
+  const PRODUCT_INFO = {
+    name: 'Squeeth',
+    symbol: 'SQTH',
+    productProvider: '',
+    maintenance: MAINTENANCE,
+    fundingFee: FUNDING_FEE,
+    makerFee: MAKER_FEE,
+    takerFee: TAKER_FEE,
+    makerLimit: POSITION.mul(10),
+    utilizationCurve: {
+      // Force a 0.10 rate to make tests simpler
+      minRate: utils.parseEther('0.10'),
+      maxRate: utils.parseEther('0.10'),
+      targetRate: utils.parseEther('0.10'),
+      targetUtilization: utils.parseEther('1'),
+    },
+  }
 
   beforeEach(async () => {
     ;[owner, user, userB, userC] = await ethers.getSigners()
@@ -50,16 +67,8 @@ describe('Product', () => {
     controllerSigner = await impersonate.impersonateWithBalance(controller.address, utils.parseEther('10'))
 
     product = await new Product__factory(owner).deploy()
-    await product.connect(controllerSigner).initialize({
-      name: 'Squeeth',
-      symbol: 'SQTH',
-      productProvider: productProvider.address,
-      maintenance: MAINTENANCE,
-      fundingFee: FUNDING_FEE,
-      makerFee: MAKER_FEE,
-      takerFee: TAKER_FEE,
-      makerLimit: POSITION.mul(10),
-    })
+    PRODUCT_INFO.productProvider = productProvider.address
+    await product.connect(controllerSigner).initialize(PRODUCT_INFO)
 
     await controller.mock['paused(address)'].withArgs(product.address).returns(false)
     await controller.mock.collateral.withArgs().returns(collateral.address)
@@ -79,53 +88,51 @@ describe('Product', () => {
       expect(await product.makerFee()).to.equal(utils.parseEther('0'))
       expect(await product.takerFee()).to.equal(utils.parseEther('0'))
       expect(await product.makerLimit()).to.equal(utils.parseEther('100'))
+
+      const curve = await product.utilizationCurve()
+      expect(curve.minRate).to.equal(utils.parseEther('0.10'))
+      expect(curve.maxRate).to.equal(utils.parseEther('0.10'))
+      expect(curve.targetRate).to.equal(utils.parseEther('0.10'))
+      expect(curve.targetUtilization).to.equal(utils.parseEther('1'))
     })
 
     it('reverts if already initialized', async () => {
-      await expect(
-        product.initialize({
-          name: 'Squeeth',
-          symbol: 'SQTH',
-          productProvider: productProvider.address,
-          maintenance: MAINTENANCE,
-          fundingFee: FUNDING_FEE,
-          makerFee: MAKER_FEE,
-          takerFee: TAKER_FEE,
-          makerLimit: POSITION.mul(10),
-        }),
-      ).to.be.revertedWith('UInitializableAlreadyInitializedError(1)')
+      await expect(product.initialize(PRODUCT_INFO)).to.be.revertedWith('UInitializableAlreadyInitializedError(1)')
     })
 
     it('reverts if product provider is not a contract', async () => {
       const otherProduct = await new Product__factory(owner).deploy()
       await expect(
-        otherProduct.connect(controllerSigner).initialize({
-          name: 'Squeeth',
-          symbol: 'SQTH',
-          productProvider: user.address,
-          maintenance: MAINTENANCE,
-          fundingFee: FUNDING_FEE,
-          makerFee: MAKER_FEE,
-          takerFee: TAKER_FEE,
-          makerLimit: POSITION.mul(10),
-        }),
+        otherProduct.connect(controllerSigner).initialize({ ...PRODUCT_INFO, productProvider: user.address }),
       ).to.be.revertedWith('ProductInvalidProductProvider()')
     })
   })
 
   describe('updating params', async () => {
-    it('correct updates the params', async () => {
+    it('correctly updates the params', async () => {
       await product.updateMaintenance(utils.parseEther('0.1'))
       await product.updateFundingFee(utils.parseEther('0.2'))
       await product.updateMakerFee(utils.parseEther('0.3'))
       await product.updateTakerFee(utils.parseEther('0.4'))
       await product.updateMakerLimit(utils.parseEther('0.5'))
+      await product.updateUtilizationCurve({
+        minRate: utils.parseEther('0.10'),
+        maxRate: utils.parseEther('0.20'),
+        targetRate: utils.parseEther('0.30'),
+        targetUtilization: utils.parseEther('0.4'),
+      })
 
       expect(await product['maintenance()']()).to.equal(utils.parseEther('0.1'))
       expect(await product.fundingFee()).to.equal(utils.parseEther('0.2'))
       expect(await product.makerFee()).to.equal(utils.parseEther('0.3'))
       expect(await product.takerFee()).to.equal(utils.parseEther('0.4'))
       expect(await product.makerLimit()).to.equal(utils.parseEther('0.5'))
+
+      const curve = await product.utilizationCurve()
+      expect(curve.minRate).to.equal(utils.parseEther('0.10'))
+      expect(curve.maxRate).to.equal(utils.parseEther('0.20'))
+      expect(curve.targetRate).to.equal(utils.parseEther('0.30'))
+      expect(curve.targetUtilization).to.equal(utils.parseEther('0.4'))
     })
 
     it('reverts if not owner', async () => {
@@ -159,7 +166,6 @@ describe('Product', () => {
     const ORACLE_VERSION = 1
     const TIMESTAMP = 1636401093
     const PRICE = utils.parseEther('123')
-    const RATE = utils.parseEther('0.10').div(365 * 24 * 60 * 60)
 
     const ORACLE_VERSION_0 = {
       price: 0,
@@ -205,7 +211,6 @@ describe('Product', () => {
       await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_1)
       await productProvider.mock.atVersion.withArgs(1).returns(ORACLE_VERSION_1)
 
-      await productProvider.mock.rate.withArgs({ maker: 0, taker: 0 }).returns(0)
       await controller.mock.minFundingFee.withArgs().returns(FUNDING_FEE)
 
       await incentivizer.mock.sync.withArgs(ORACLE_VERSION_1).returns()
@@ -392,8 +397,6 @@ describe('Product', () => {
         await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
         await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_2)
 
-        await productProvider.mock.rate.withArgs({ maker: POSITION, taker: 0 }).returns(RATE)
-
         await expect(product.connect(user).openMake(POSITION))
           .to.emit(product, 'MakeOpened')
           .withArgs(user.address, 2, POSITION)
@@ -443,8 +446,6 @@ describe('Product', () => {
         await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
         await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_3)
 
-        await productProvider.mock.rate.withArgs({ maker: POSITION, taker: 0 }).returns(RATE)
-
         await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(2, 3)
 
         expect(await product['latestVersion()']()).to.equal(3)
@@ -492,8 +493,6 @@ describe('Product', () => {
         await productProvider.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
         await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
         await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_3)
-
-        await productProvider.mock.rate.withArgs({ maker: POSITION, taker: 0 }).returns(RATE)
 
         await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(2, 3)
 
@@ -830,8 +829,6 @@ describe('Product', () => {
           await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
           await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_3)
 
-          await productProvider.mock.rate.withArgs({ maker: POSITION.div(2), taker: 0 }).returns(RATE)
-
           await expect(product.connect(user).closeMake(POSITION.div(2)))
             .to.emit(product, 'MakeClosed')
             .withArgs(user.address, 3, POSITION.div(2))
@@ -882,8 +879,6 @@ describe('Product', () => {
           await incentivizer.mock.sync.withArgs(ORACLE_VERSION_4).returns()
           await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_4)
 
-          await productProvider.mock.rate.withArgs({ maker: POSITION, taker: 0 }).returns(RATE)
-
           await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(3, 4)
 
           expect(await product['latestVersion()']()).to.equal(4)
@@ -931,8 +926,6 @@ describe('Product', () => {
           await productProvider.mock.atVersion.withArgs(4).returns(ORACLE_VERSION_4)
           await incentivizer.mock.sync.withArgs(ORACLE_VERSION_4).returns()
           await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_4)
-
-          await productProvider.mock.rate.withArgs({ maker: POSITION, taker: 0 }).returns(RATE)
 
           await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(3, 4)
 
@@ -1175,8 +1168,6 @@ describe('Product', () => {
         await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
         await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_2)
 
-        await productProvider.mock.rate.withArgs({ maker: POSITION.mul(2), taker: POSITION }).returns(RATE)
-
         await expect(product.connect(user).openTake(POSITION))
           .to.emit(product, 'TakeOpened')
           .withArgs(user.address, 2, POSITION)
@@ -1185,8 +1176,6 @@ describe('Product', () => {
         await productProvider.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
         await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
         await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_3)
-
-        await productProvider.mock.rate.withArgs({ maker: POSITION.mul(2), taker: POSITION }).returns(RATE)
 
         await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(3, 3)
 
@@ -1242,8 +1231,6 @@ describe('Product', () => {
         await productProvider.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
         await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
         await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_3)
-
-        await productProvider.mock.rate.withArgs({ maker: POSITION.mul(2), taker: POSITION }).returns(RATE)
 
         await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(2, 3)
 
@@ -1304,8 +1291,6 @@ describe('Product', () => {
         await productProvider.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
         await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
         await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_3)
-
-        await productProvider.mock.rate.withArgs({ maker: POSITION.mul(2), taker: POSITION }).returns(RATE)
 
         await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(2, 3)
 
@@ -1454,8 +1439,6 @@ describe('Product', () => {
           await productProvider.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
           await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
           await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_2)
-
-          await productProvider.mock.rate.withArgs({ maker: POSITION.mul(2), taker: POSITION }).returns(RATE)
 
           await product.connect(user).settle()
           await product.connect(user).settleAccount(user.address)
@@ -1695,8 +1678,6 @@ describe('Product', () => {
           await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
           await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_3)
 
-          await productProvider.mock.rate.withArgs({ maker: POSITION.mul(2), taker: POSITION.div(2) }).returns(RATE)
-
           await expect(product.connect(user).closeTake(POSITION.div(2)))
             .to.emit(product, 'TakeClosed')
             .withArgs(user.address, 3, POSITION.div(2))
@@ -1918,8 +1899,6 @@ describe('Product', () => {
         await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
         await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_2)
 
-        await productProvider.mock.rate.withArgs({ maker: POSITION.mul(2), taker: POSITION }).returns(RATE)
-
         await product.connect(user).settle()
         await product.connect(user).settleAccount(user.address)
 
@@ -1965,8 +1944,6 @@ describe('Product', () => {
         await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
         await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_2)
 
-        await productProvider.mock.rate.withArgs({ maker: POSITION, taker: POSITION.div(2) }).returns(RATE)
-
         await product.connect(user).settle()
         await product.connect(user).settleAccount(user.address)
         await product.connect(user).settleAccount(userB.address)
@@ -1981,8 +1958,6 @@ describe('Product', () => {
         await productProvider.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
         await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
         await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_3)
-
-        await productProvider.mock.rate.withArgs({ maker: POSITION, taker: POSITION.div(2) }).returns(RATE)
 
         await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(3, 3)
 
@@ -2049,8 +2024,6 @@ describe('Product', () => {
         await productProvider.mock.atVersion.withArgs(3).returns(oracleVersionSameTimestamp)
         await incentivizer.mock.sync.withArgs(oracleVersionSameTimestamp).returns()
         await productProvider.mock.sync.withArgs().returns(oracleVersionSameTimestamp)
-
-        await productProvider.mock.rate.withArgs({ maker: POSITION, taker: POSITION.div(2) }).returns(RATE)
 
         await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(3, 3)
 
@@ -2122,8 +2095,6 @@ describe('Product', () => {
         await incentivizer.mock.sync.withArgs(oracleVersionLowerPrice).returns()
         await productProvider.mock.sync.withArgs().returns(oracleVersionLowerPrice)
 
-        await productProvider.mock.rate.withArgs({ maker: POSITION, taker: POSITION.div(2) }).returns(RATE)
-
         await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(3, 3)
 
         expect(await product['latestVersion()']()).to.equal(3)
@@ -2194,8 +2165,6 @@ describe('Product', () => {
         await incentivizer.mock.sync.withArgs(oracleVersionHigherPrice).returns()
         await productProvider.mock.sync.withArgs().returns(oracleVersionHigherPrice)
 
-        await productProvider.mock.rate.withArgs({ maker: POSITION, taker: POSITION.div(2) }).returns(RATE)
-
         await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(3, 3)
 
         expect(await product['latestVersion()']()).to.equal(3)
@@ -2255,7 +2224,12 @@ describe('Product', () => {
         await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
         await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_3)
 
-        await productProvider.mock.rate.withArgs({ maker: POSITION, taker: POSITION.div(2) }).returns(RATE.mul(-1))
+        await product.updateUtilizationCurve({
+          minRate: utils.parseEther('0.10').mul(-1),
+          maxRate: utils.parseEther('0.10').mul(-1),
+          targetRate: utils.parseEther('0.10').mul(-1),
+          targetUtilization: utils.parseEther('1'),
+        })
 
         await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(3, 3)
 
@@ -2319,16 +2293,12 @@ describe('Product', () => {
           await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
           await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_3)
 
-          await productProvider.mock.rate.withArgs({ maker: POSITION, taker: POSITION.div(2) }).returns(RATE)
-
           await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(3, 3)
 
           await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_4)
           await productProvider.mock.atVersion.withArgs(4).returns(ORACLE_VERSION_4)
           await incentivizer.mock.sync.withArgs(ORACLE_VERSION_4).returns()
           await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_4)
-
-          await productProvider.mock.rate.withArgs({ maker: 0, taker: POSITION.div(2) }).returns(RATE)
 
           await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(4, 4)
 
@@ -2399,8 +2369,6 @@ describe('Product', () => {
           await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
           await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_3)
 
-          await productProvider.mock.rate.withArgs({ maker: POSITION, taker: POSITION.div(2) }).returns(RATE)
-
           await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(3, 3)
 
           await collateral.mock.settleProduct.withArgs(EXPECTED_FUNDING_FEE / 2).returns()
@@ -2415,8 +2383,6 @@ describe('Product', () => {
           await productProvider.mock.atVersion.withArgs(4).returns(ORACLE_VERSION_4)
           await incentivizer.mock.sync.withArgs(ORACLE_VERSION_4).returns()
           await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_4)
-
-          await productProvider.mock.rate.withArgs({ maker: POSITION.div(4), taker: POSITION.div(2) }).returns(RATE)
 
           await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(4, 4)
 
@@ -2503,8 +2469,6 @@ describe('Product', () => {
           await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
           await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_3)
 
-          await productProvider.mock.rate.withArgs({ maker: POSITION, taker: POSITION.div(2) }).returns(RATE)
-
           await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(3, 3)
 
           const oracleVersionHigherPrice = {
@@ -2516,8 +2480,6 @@ describe('Product', () => {
           await productProvider.mock.atVersion.withArgs(4).returns(oracleVersionHigherPrice)
           await incentivizer.mock.sync.withArgs(oracleVersionHigherPrice).returns()
           await productProvider.mock.sync.withArgs().returns(oracleVersionHigherPrice)
-
-          await productProvider.mock.rate.withArgs({ maker: 0, taker: POSITION.div(2) }).returns(RATE)
 
           await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(4, 4)
 
@@ -2590,8 +2552,6 @@ describe('Product', () => {
           await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
           await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_3)
 
-          await productProvider.mock.rate.withArgs({ maker: POSITION, taker: POSITION.div(2) }).returns(RATE)
-
           await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(3, 3)
 
           await collateral.mock.settleProduct.withArgs(EXPECTED_FUNDING_FEE / 2).returns()
@@ -2613,8 +2573,6 @@ describe('Product', () => {
           await productProvider.mock.atVersion.withArgs(4).returns(oracleVersionHigherPrice)
           await incentivizer.mock.sync.withArgs(oracleVersionHigherPrice).returns()
           await productProvider.mock.sync.withArgs().returns(oracleVersionHigherPrice)
-
-          await productProvider.mock.rate.withArgs({ maker: POSITION.div(4), taker: POSITION.div(2) }).returns(RATE)
 
           await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(4, 4)
 
@@ -2710,7 +2668,6 @@ describe('Product', () => {
     const ORACLE_VERSION = 1
     const TIMESTAMP = 1636401093
     const PRICE = utils.parseEther('-123')
-    const RATE = utils.parseEther('0.10').div(365 * 24 * 60 * 60)
 
     const ORACLE_VERSION_0 = {
       price: 0,
@@ -2761,7 +2718,6 @@ describe('Product', () => {
 
       await productProvider.mock.atVersion.withArgs(1).returns(ORACLE_VERSION_1)
 
-      await productProvider.mock.rate.withArgs({ maker: 0, taker: 0 }).returns(0)
       await controller.mock.minFundingFee.withArgs().returns(FUNDING_FEE)
 
       await incentivizer.mock.sync.withArgs(ORACLE_VERSION_1).returns()
@@ -2948,8 +2904,6 @@ describe('Product', () => {
         await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
         await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_2)
 
-        await productProvider.mock.rate.withArgs({ maker: POSITION, taker: 0 }).returns(RATE)
-
         await expect(product.connect(user).openMake(POSITION))
           .to.emit(product, 'MakeOpened')
           .withArgs(user.address, 2, POSITION)
@@ -2999,8 +2953,6 @@ describe('Product', () => {
         await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
         await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_3)
 
-        await productProvider.mock.rate.withArgs({ maker: POSITION, taker: 0 }).returns(RATE)
-
         await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(2, 3)
 
         expect(await product['latestVersion()']()).to.equal(3)
@@ -3047,8 +2999,6 @@ describe('Product', () => {
         await productProvider.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
         await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
         await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_3)
-
-        await productProvider.mock.rate.withArgs({ maker: POSITION, taker: 0 }).returns(RATE)
 
         await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(2, 3)
 
@@ -3383,7 +3333,6 @@ describe('Product', () => {
           await productProvider.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
           await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
           await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_3)
-          await productProvider.mock.rate.withArgs({ maker: POSITION.div(2), taker: 0 }).returns(RATE)
 
           await expect(product.connect(user).closeMake(POSITION.div(2)))
             .to.emit(product, 'MakeClosed')
@@ -3434,8 +3383,6 @@ describe('Product', () => {
           await incentivizer.mock.sync.withArgs(ORACLE_VERSION_4).returns()
           await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_4)
 
-          await productProvider.mock.rate.withArgs({ maker: POSITION, taker: 0 }).returns(RATE)
-
           await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(3, 4)
 
           expect(await product['latestVersion()']()).to.equal(4)
@@ -3482,7 +3429,6 @@ describe('Product', () => {
           await productProvider.mock.atVersion.withArgs(4).returns(ORACLE_VERSION_4)
           await incentivizer.mock.sync.withArgs(ORACLE_VERSION_4).returns()
           await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_4)
-          await productProvider.mock.rate.withArgs({ maker: POSITION, taker: 0 }).returns(RATE)
 
           await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(3, 4)
 
@@ -3725,8 +3671,6 @@ describe('Product', () => {
         await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
         await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_2)
 
-        await productProvider.mock.rate.withArgs({ maker: POSITION.mul(2), taker: POSITION }).returns(RATE)
-
         await expect(product.connect(user).openTake(POSITION))
           .to.emit(product, 'TakeOpened')
           .withArgs(user.address, 2, POSITION)
@@ -3735,8 +3679,6 @@ describe('Product', () => {
         await productProvider.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
         await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
         await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_3)
-
-        await productProvider.mock.rate.withArgs({ maker: POSITION.mul(2), taker: POSITION }).returns(RATE)
 
         await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(3, 3)
 
@@ -3792,8 +3734,6 @@ describe('Product', () => {
         await productProvider.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
         await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
         await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_3)
-
-        await productProvider.mock.rate.withArgs({ maker: POSITION.mul(2), taker: POSITION }).returns(RATE)
 
         await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(2, 3)
 
@@ -3854,8 +3794,6 @@ describe('Product', () => {
         await productProvider.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
         await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
         await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_3)
-
-        await productProvider.mock.rate.withArgs({ maker: POSITION.mul(2), taker: POSITION }).returns(RATE)
 
         await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(2, 3)
 
@@ -4012,7 +3950,6 @@ describe('Product', () => {
           await productProvider.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
           await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
           await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_2)
-          await productProvider.mock.rate.withArgs({ maker: POSITION.mul(2), taker: POSITION }).returns(RATE)
 
           await product.connect(user).settle()
           await product.connect(user).settleAccount(user.address)
@@ -4251,7 +4188,6 @@ describe('Product', () => {
           await productProvider.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
           await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
           await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_3)
-          await productProvider.mock.rate.withArgs({ maker: POSITION.mul(2), taker: POSITION.div(2) }).returns(RATE)
 
           await expect(product.connect(user).closeTake(POSITION.div(2)))
             .to.emit(product, 'TakeClosed')
@@ -4474,8 +4410,6 @@ describe('Product', () => {
         await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
         await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_2)
 
-        await productProvider.mock.rate.withArgs({ maker: POSITION.mul(2), taker: POSITION }).returns(RATE)
-
         await product.connect(user).settle()
         await product.connect(user).settleAccount(user.address)
 
@@ -4521,8 +4455,6 @@ describe('Product', () => {
         await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
         await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_2)
 
-        await productProvider.mock.rate.withArgs({ maker: POSITION, taker: POSITION.div(2) }).returns(RATE)
-
         await product.connect(user).settle()
         await product.connect(user).settleAccount(user.address)
         await product.connect(user).settleAccount(userB.address)
@@ -4537,8 +4469,6 @@ describe('Product', () => {
         await productProvider.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
         await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
         await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_3)
-
-        await productProvider.mock.rate.withArgs({ maker: POSITION, taker: POSITION.div(2) }).returns(RATE)
 
         await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(3, 3)
 
@@ -4603,8 +4533,6 @@ describe('Product', () => {
         await productProvider.mock.atVersion.withArgs(3).returns(oracleVersionSameTimestamp)
         await incentivizer.mock.sync.withArgs(oracleVersionSameTimestamp).returns()
         await productProvider.mock.sync.withArgs().returns(oracleVersionSameTimestamp)
-
-        await productProvider.mock.rate.withArgs({ maker: POSITION, taker: POSITION.div(2) }).returns(RATE)
 
         await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(3, 3)
 
@@ -4676,8 +4604,6 @@ describe('Product', () => {
         await incentivizer.mock.sync.withArgs(oracleVersionLowerPrice).returns()
         await productProvider.mock.sync.withArgs().returns(oracleVersionLowerPrice)
 
-        await productProvider.mock.rate.withArgs({ maker: POSITION, taker: POSITION.div(2) }).returns(RATE)
-
         await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(3, 3)
 
         expect(await product['latestVersion()']()).to.equal(3)
@@ -4748,8 +4674,6 @@ describe('Product', () => {
         await incentivizer.mock.sync.withArgs(oracleVersionHigherPrice).returns()
         await productProvider.mock.sync.withArgs().returns(oracleVersionHigherPrice)
 
-        await productProvider.mock.rate.withArgs({ maker: POSITION, taker: POSITION.div(2) }).returns(RATE)
-
         await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(3, 3)
 
         expect(await product['latestVersion()']()).to.equal(3)
@@ -4809,7 +4733,12 @@ describe('Product', () => {
         await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
         await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_3)
 
-        await productProvider.mock.rate.withArgs({ maker: POSITION, taker: POSITION.div(2) }).returns(RATE.mul(-1))
+        await product.updateUtilizationCurve({
+          minRate: utils.parseEther('0.10').mul(-1),
+          maxRate: utils.parseEther('0.10').mul(-1),
+          targetRate: utils.parseEther('0.10').mul(-1),
+          targetUtilization: utils.parseEther('1'),
+        })
 
         await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(3, 3)
 
@@ -4873,16 +4802,12 @@ describe('Product', () => {
           await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
           await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_3)
 
-          await productProvider.mock.rate.withArgs({ maker: POSITION, taker: POSITION.div(2) }).returns(RATE)
-
           await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(3, 3)
 
           await productProvider.mock.currentVersion.withArgs().returns(ORACLE_VERSION_4)
           await productProvider.mock.atVersion.withArgs(4).returns(ORACLE_VERSION_4)
           await incentivizer.mock.sync.withArgs(ORACLE_VERSION_4).returns()
           await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_4)
-
-          await productProvider.mock.rate.withArgs({ maker: 0, taker: POSITION.div(2) }).returns(RATE)
 
           await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(4, 4)
 
@@ -4953,8 +4878,6 @@ describe('Product', () => {
           await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
           await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_3)
 
-          await productProvider.mock.rate.withArgs({ maker: POSITION, taker: POSITION.div(2) }).returns(RATE)
-
           await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(3, 3)
 
           await collateral.mock.settleProduct.withArgs(EXPECTED_FUNDING_FEE / 2).returns()
@@ -4969,8 +4892,6 @@ describe('Product', () => {
           await productProvider.mock.atVersion.withArgs(4).returns(ORACLE_VERSION_4)
           await incentivizer.mock.sync.withArgs(ORACLE_VERSION_4).returns()
           await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_4)
-
-          await productProvider.mock.rate.withArgs({ maker: POSITION.div(4), taker: POSITION.div(2) }).returns(RATE)
 
           await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(4, 4)
 
@@ -5057,8 +4978,6 @@ describe('Product', () => {
           await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
           await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_3)
 
-          await productProvider.mock.rate.withArgs({ maker: POSITION, taker: POSITION.div(2) }).returns(RATE)
-
           await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(3, 3)
 
           const oracleVersionHigherPrice = {
@@ -5070,8 +4989,6 @@ describe('Product', () => {
           await productProvider.mock.atVersion.withArgs(4).returns(oracleVersionHigherPrice)
           await incentivizer.mock.sync.withArgs(oracleVersionHigherPrice).returns()
           await productProvider.mock.sync.withArgs().returns(oracleVersionHigherPrice)
-
-          await productProvider.mock.rate.withArgs({ maker: 0, taker: POSITION.div(2) }).returns(RATE)
 
           await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(4, 4)
 
@@ -5144,8 +5061,6 @@ describe('Product', () => {
           await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
           await productProvider.mock.sync.withArgs().returns(ORACLE_VERSION_3)
 
-          await productProvider.mock.rate.withArgs({ maker: POSITION, taker: POSITION.div(2) }).returns(RATE)
-
           await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(3, 3)
 
           await collateral.mock.settleProduct.withArgs(EXPECTED_FUNDING_FEE / 2).returns()
@@ -5167,8 +5082,6 @@ describe('Product', () => {
           await productProvider.mock.atVersion.withArgs(4).returns(oracleVersionHigherPrice)
           await incentivizer.mock.sync.withArgs(oracleVersionHigherPrice).returns()
           await productProvider.mock.sync.withArgs().returns(oracleVersionHigherPrice)
-
-          await productProvider.mock.rate.withArgs({ maker: POSITION.div(4), taker: POSITION.div(2) }).returns(RATE)
 
           await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(4, 4)
 
@@ -5257,6 +5170,33 @@ describe('Product', () => {
         await controller.mock['paused(address)'].withArgs(product.address).returns(true)
         await expect(product.connect(user).settleAccount(user.address)).to.be.revertedWith('PausedError()')
       })
+    })
+  })
+
+  describe('#rate', async () => {
+    const SECONDS_IN_YEAR = 60 * 60 * 24 * 365
+    beforeEach(async () => {
+      await product.updateUtilizationCurve({
+        minRate: 0,
+        maxRate: utils.parseEther('5.00'),
+        targetRate: utils.parseEther('0.80'),
+        targetUtilization: utils.parseEther('0.80'),
+      })
+    })
+
+    it('handles zero maker', async () => {
+      expect(await product.rate({ maker: 0, taker: 0 })).to.equal(utils.parseEther('5.00').div(SECONDS_IN_YEAR))
+      expect(await product.rate({ maker: 0, taker: 100 })).to.equal(utils.parseEther('5.00').div(SECONDS_IN_YEAR))
+    })
+
+    it('returns the proper rate from utilization', async () => {
+      expect(await product.rate({ maker: 100, taker: 0 })).to.equal(utils.parseEther('0.00').div(SECONDS_IN_YEAR))
+      expect(await product.rate({ maker: 100, taker: 25 })).to.equal(utils.parseEther('0.25').div(SECONDS_IN_YEAR))
+      expect(await product.rate({ maker: 100, taker: 50 })).to.equal(utils.parseEther('0.50').div(SECONDS_IN_YEAR))
+      expect(await product.rate({ maker: 100, taker: 75 })).to.equal(utils.parseEther('0.75').div(SECONDS_IN_YEAR))
+      expect(await product.rate({ maker: 100, taker: 90 })).to.equal(utils.parseEther('2.90').div(SECONDS_IN_YEAR))
+      expect(await product.rate({ maker: 100, taker: 100 })).to.equal(utils.parseEther('5.00').div(SECONDS_IN_YEAR))
+      expect(await product.rate({ maker: 100, taker: 125 })).to.equal(utils.parseEther('5.00').div(SECONDS_IN_YEAR))
     })
   })
 })

@@ -85,12 +85,7 @@ export async function deployProtocol(): Promise<InstanceVars> {
     CHAINLINK_CUSTOM_CURRENCIES.ETH,
     CHAINLINK_CUSTOM_CURRENCIES.USD,
   )
-  const productProvider = await new TestnetProductProvider__factory(owner).deploy(chainlinkOracle.address, {
-    minRate: 0,
-    maxRate: utils.parseEther('5.00'),
-    targetRate: utils.parseEther('0.80'),
-    targetUtilization: utils.parseEther('0.80'),
-  })
+  const productProvider = await new TestnetProductProvider__factory(owner).deploy(chainlinkOracle.address)
   const dsu = await IERC20Metadata__factory.connect((await deployments.get('DSU')).address, owner)
   const usdc = await IERC20Metadata__factory.connect((await deployments.get('USDC')).address, owner)
   const batcher = await IBatcher__factory.connect((await deployments.get('Batcher')).address, owner)
@@ -204,6 +199,12 @@ export async function createProduct(instanceVars: InstanceVars): Promise<Product
     makerFee: 0,
     takerFee: 0,
     makerLimit: utils.parseEther('1'),
+    utilizationCurve: {
+      minRate: 0,
+      maxRate: utils.parseEther('5.00'),
+      targetRate: utils.parseEther('0.80'),
+      targetUtilization: utils.parseEther('0.80'),
+    },
   }
   const productAddress = await controller.callStatic.createProduct(1, productInfo)
   await controller.createProduct(1, productInfo)

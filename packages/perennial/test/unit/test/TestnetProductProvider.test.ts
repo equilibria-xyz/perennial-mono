@@ -13,12 +13,6 @@ import {
 const { ethers } = HRE
 
 const TIMESTAMP = 1636920000
-const CURVE = {
-  minRate: 0,
-  maxRate: utils.parseEther('5.00'),
-  targetRate: utils.parseEther('0.80'),
-  targetUtilization: utils.parseEther('0.80'),
-}
 
 describe('TestnetProductProvider', () => {
   let user: SignerWithAddress
@@ -28,7 +22,7 @@ describe('TestnetProductProvider', () => {
   beforeEach(async () => {
     ;[user] = await ethers.getSigners()
     oracle = await waffle.deployMockContract(user, IOracleProvider__factory.abi)
-    testnetProductProvider = await new TestnetProductProvider__factory(user).deploy(oracle.address, CURVE)
+    testnetProductProvider = await new TestnetProductProvider__factory(user).deploy(oracle.address)
   })
 
   describe('#sync', async () => {
@@ -70,43 +64,6 @@ describe('TestnetProductProvider', () => {
       expect(oracleVersion.price).to.equal(utils.parseEther('121'))
       expect(oracleVersion.timestamp).to.equal(TIMESTAMP)
       expect(oracleVersion.version).to.equal(2)
-    })
-  })
-
-  describe('#rate', async () => {
-    const SECONDS_IN_YEAR = 60 * 60 * 24 * 365
-
-    it('handles zero maker', async () => {
-      expect(await testnetProductProvider.rate({ maker: 0, taker: 0 })).to.equal(
-        utils.parseEther('5.00').div(SECONDS_IN_YEAR),
-      )
-      expect(await testnetProductProvider.rate({ maker: 0, taker: 100 })).to.equal(
-        utils.parseEther('5.00').div(SECONDS_IN_YEAR),
-      )
-    })
-
-    it('returns the proper rate from utilization', async () => {
-      expect(await testnetProductProvider.rate({ maker: 100, taker: 0 })).to.equal(
-        utils.parseEther('0.00').div(SECONDS_IN_YEAR),
-      )
-      expect(await testnetProductProvider.rate({ maker: 100, taker: 25 })).to.equal(
-        utils.parseEther('0.25').div(SECONDS_IN_YEAR),
-      )
-      expect(await testnetProductProvider.rate({ maker: 100, taker: 50 })).to.equal(
-        utils.parseEther('0.50').div(SECONDS_IN_YEAR),
-      )
-      expect(await testnetProductProvider.rate({ maker: 100, taker: 75 })).to.equal(
-        utils.parseEther('0.75').div(SECONDS_IN_YEAR),
-      )
-      expect(await testnetProductProvider.rate({ maker: 100, taker: 90 })).to.equal(
-        utils.parseEther('2.90').div(SECONDS_IN_YEAR),
-      )
-      expect(await testnetProductProvider.rate({ maker: 100, taker: 100 })).to.equal(
-        utils.parseEther('5.00').div(SECONDS_IN_YEAR),
-      )
-      expect(await testnetProductProvider.rate({ maker: 100, taker: 125 })).to.equal(
-        utils.parseEther('5.00').div(SECONDS_IN_YEAR),
-      )
     })
   })
 })
