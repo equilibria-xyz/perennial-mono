@@ -42,3 +42,11 @@ export function expectProgramInfoEq(a: ProgramInfo, b: ProgramInfo): void {
   expect(a.start).to.equal(b.start)
   expect(a.duration).to.equal(b.duration)
 }
+
+export function createPackedProvider(contractAddress?: string): string {
+  if (contractAddress) {
+    return `0x01${contractAddress.substring(2).padStart(62, '0')}`.toLowerCase()
+  }
+
+  return `0x00`.padEnd(66, '0')
+}

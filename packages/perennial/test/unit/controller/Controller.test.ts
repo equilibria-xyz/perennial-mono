@@ -15,6 +15,7 @@ import {
   IBeacon__factory,
   IOracleProvider__factory,
 } from '../../../types/generated'
+import { createPackedProvider } from '../../testutil/types'
 
 const { ethers } = HRE
 
@@ -537,7 +538,7 @@ describe('Controller', () => {
       },
     }
     beforeEach(async () => {
-      PRODUCT_INFO.productProvider = productProvider.address
+      PRODUCT_INFO.productProvider = createPackedProvider(productProvider.address)
       PRODUCT_INFO.oracle = oracle.address
       await controller.connect(coordinatorOwner).createCoordinator()
       await controller.connect(coordinatorOwner).updateCoordinatorTreasury(1, coordinatorTreasury.address)
@@ -548,7 +549,7 @@ describe('Controller', () => {
       const productAddress = await controller.connect(coordinatorOwner).callStatic.createProduct(1, PRODUCT_INFO)
       await expect(controller.connect(coordinatorOwner).createProduct(1, PRODUCT_INFO))
         .to.emit(controller, 'ProductCreated')
-        .withArgs(productAddress, productProvider.address)
+        .withArgs(productAddress, PRODUCT_INFO.productProvider)
 
       const productInstance = Product__factory.connect(productAddress, owner)
       expect(await productInstance.controller()).to.equal(controller.address)

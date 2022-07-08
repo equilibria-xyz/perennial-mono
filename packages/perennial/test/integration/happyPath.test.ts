@@ -3,7 +3,7 @@ import 'hardhat'
 import { utils } from 'ethers'
 
 import { InstanceVars, deployProtocol, createProduct, depositTo, INITIAL_VERSION } from './setupHelpers'
-import { expectPositionEq, expectPrePositionEq } from '../testutil/types'
+import { createPackedProvider, expectPositionEq, expectPrePositionEq } from '../testutil/types'
 
 describe('Happy Path', () => {
   let instanceVars: InstanceVars
@@ -38,7 +38,7 @@ describe('Happy Path', () => {
     const productInfo = {
       name: 'Squeeth',
       symbol: 'SQTH',
-      productProvider: `0x01${productProvider.address.substring(2).padStart(62, '0')}`,
+      productProvider: createPackedProvider(productProvider.address),
       oracle: chainlinkOracle.address,
       maintenance: utils.parseEther('0.3'),
       fundingFee: utils.parseEther('0.1'),

@@ -17,7 +17,7 @@ import {
   TestnetProductProvider,
   TestnetProductProvider__factory,
 } from '../../../types/generated'
-import { expectPositionEq, expectPrePositionEq } from '../../testutil/types'
+import { createPackedProvider, expectPositionEq, expectPrePositionEq } from '../../testutil/types'
 
 const { ethers } = HRE
 use(smock.matchers)
@@ -44,7 +44,7 @@ describe('Product', () => {
   const PRODUCT_INFO = {
     name: 'Squeeth',
     symbol: 'SQTH',
-    productProvider: '0x00'.padEnd(66, '0'),
+    productProvider: createPackedProvider(),
     oracle: '',
     maintenance: MAINTENANCE,
     fundingFee: FUNDING_FEE,
@@ -5231,7 +5231,7 @@ describe('Product', () => {
       productProvider = await productProviderFactory.deploy()
 
       otherProduct = await new Product__factory(owner).deploy()
-      PRODUCT_INFO.productProvider = `0x01${productProvider.address.substring(2).padStart(62, '0')}`
+      PRODUCT_INFO.productProvider = createPackedProvider(productProvider.address)
       await otherProduct.connect(controllerSigner).initialize(PRODUCT_INFO)
 
       await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_1)
