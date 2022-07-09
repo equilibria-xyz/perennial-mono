@@ -12,7 +12,7 @@ import {
   IController,
   IIncentivizer,
 } from '../../../types/generated'
-import { expectPositionEq, expectPrePositionEq } from '../../testutil/types'
+import { createPayoffDefinition, expectPositionEq, expectPrePositionEq } from '../../testutil/types'
 
 const { ethers } = HRE
 use(smock.matchers)
@@ -39,7 +39,7 @@ describe('PerennialLens', () => {
 
     controller.collateral.returns(collateral.address)
     controller.incentivizer.returns(incentivizer.address)
-    product.productProvider.returns(productProvider.address)
+    product.payoffDefinition.returns(createPayoffDefinition(productProvider.address))
 
     lens = await new PerennialLens__factory(user).deploy(controller.address)
   })

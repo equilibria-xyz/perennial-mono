@@ -17,7 +17,7 @@ import {
   TestnetProductProvider,
   TestnetProductProvider__factory,
 } from '../../../types/generated'
-import { createPackedProvider, expectPositionEq, expectPrePositionEq } from '../../testutil/types'
+import { createPayoffDefinition, expectPositionEq, expectPrePositionEq } from '../../testutil/types'
 
 const { ethers } = HRE
 use(smock.matchers)
@@ -44,7 +44,7 @@ describe('Product', () => {
   const PRODUCT_INFO = {
     name: 'Squeeth',
     symbol: 'SQTH',
-    productProvider: createPackedProvider(),
+    payoffDefinition: createPayoffDefinition(),
     oracle: '',
     maintenance: MAINTENANCE,
     fundingFee: FUNDING_FEE,
@@ -87,7 +87,9 @@ describe('Product', () => {
       expect(await product.controller()).to.equal(controller.address)
       expect(await product.name()).to.equal('Squeeth')
       expect(await product.symbol()).to.equal('SQTH')
-      expect(await product.productProvider()).to.equal('0x00'.padEnd(66, '0'))
+      const payoffDefinition = await product.payoffDefinition()
+      expect(payoffDefinition.payoffType).to.equal(PRODUCT_INFO.payoffDefinition.payoffType)
+      expect(payoffDefinition.data).to.equal(PRODUCT_INFO.payoffDefinition.data)
       expect(await product.oracle()).to.equal(oracle.address)
       expect(await product['maintenance()']()).to.equal(utils.parseEther('0.5'))
       expect(await product.fundingFee()).to.equal(utils.parseEther('0.1'))
@@ -109,15 +111,17 @@ describe('Product', () => {
     it('reverts if product provider is not a contract', async () => {
       const otherProduct = await new Product__factory(owner).deploy()
       await expect(
-        otherProduct.connect(controllerSigner).initialize({ ...PRODUCT_INFO, productProvider: '0x01'.padEnd(66, '0') }),
-      ).to.be.revertedWith('ProductInvalidProductProvider()')
+        otherProduct
+          .connect(controllerSigner)
+          .initialize({ ...PRODUCT_INFO, payoffDefinition: createPayoffDefinition(user.address) }),
+      ).to.be.revertedWith('InvalidPayoffDefinitionError()')
     })
 
     it('reverts if oracle is not a contract', async () => {
       const otherProduct = await new Product__factory(owner).deploy()
       await expect(
         otherProduct.connect(controllerSigner).initialize({ ...PRODUCT_INFO, oracle: user.address }),
-      ).to.be.revertedWith('ProductInvalidOracle()')
+      ).to.be.revertedWith('InvalidOracle()')
     })
   })
 
@@ -5207,7 +5211,7 @@ describe('Product', () => {
   })
 
   describe('contract provider', async () => {
-    let productProvider: SmockContract<TestnetProductProvider>
+    let payoffDefinition: SmockContract<TestnetProductProvider>
     let otherProduct: Product
 
     const ORACLE_VERSION = 1
@@ -5227,26 +5231,16 @@ describe('Product', () => {
     }
 
     beforeEach(async () => {
-      const productProviderFactory = await smock.mock<TestnetProductProvider__factory>('TestnetProductProvider')
-      productProvider = await productProviderFactory.deploy()
+      const payoffDefinitionFactory = await smock.mock<TestnetProductProvider__factory>('TestnetProductProvider')
+      payoffDefinition = await payoffDefinitionFactory.deploy()
 
       otherProduct = await new Product__factory(owner).deploy()
-      PRODUCT_INFO.productProvider = createPackedProvider(productProvider.address)
+      PRODUCT_INFO.payoffDefinition = createPayoffDefinition(payoffDefinition.address)
       await otherProduct.connect(controllerSigner).initialize(PRODUCT_INFO)
 
       await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_1)
       await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_1)
       await oracle.mock.atVersion.withArgs(0).returns(ORACLE_VERSION_0)
-    })
-
-    describe('#sync', () => {
-      it('calls to the provider', async () => {
-        const syncResult = await otherProduct.callStatic.sync()
-        expect(syncResult.price).to.equal(utils.parseEther('15129'))
-        expect(syncResult.timestamp).to.equal(TIMESTAMP)
-        expect(syncResult.version).to.equal(ORACLE_VERSION)
-        expect(productProvider.payoff).to.have.callCount(1)
-      })
     })
 
     describe('#currentVersion', () => {
@@ -5255,7 +5249,7 @@ describe('Product', () => {
         expect(syncResult.price).to.equal(utils.parseEther('15129'))
         expect(syncResult.timestamp).to.equal(TIMESTAMP)
         expect(syncResult.version).to.equal(ORACLE_VERSION)
-        expect(productProvider.payoff).to.have.callCount(1)
+        expect(payoffDefinition.payoff).to.have.callCount(1)
       })
     })
 
@@ -5265,7 +5259,7 @@ describe('Product', () => {
         expect(syncResult.price).to.equal(utils.parseEther('4'))
         expect(syncResult.timestamp).to.equal(0)
         expect(syncResult.version).to.equal(0)
-        expect(productProvider.payoff).to.have.callCount(1)
+        expect(payoffDefinition.payoff).to.have.callCount(1)
       })
     })
   })

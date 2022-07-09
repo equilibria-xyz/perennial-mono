@@ -3,25 +3,17 @@ pragma solidity 0.8.15;
 
 import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@equilibria/root/control/unstructured/UReentrancyGuard.sol";
+import "../controller/UControllerProvider.sol";
+import "./UPayoffProvider.sol";
 import "./types/position/AccountPosition.sol";
 import "./types/accumulator/AccountAccumulator.sol";
-import "../interfaces/types/PackedProvider.sol";
-import "../controller/UControllerProvider.sol";
 
 /**
  * @title Product
  * @notice Manages logic and state for a single product market.
  * @dev Cloned by the Controller contract to launch new product markets.
  */
-contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGuard {
-    /// @dev Product Provider contract address for the product
-    Bytes32Storage private constant _productProvider = Bytes32Storage.wrap(keccak256("equilibria.perennial.Product.productProvider"));
-    function productProvider() public view returns (PackedProvider) { return PackedProvider.wrap(_productProvider.read()); }
-
-    /// @dev The oracle contract address
-    AddressStorage private constant _oracle = AddressStorage.wrap(keccak256("equilibria.perennial.Product.oracle"));
-    function oracle() public view returns (IOracleProvider) { return IOracleProvider(_oracle.read()); }
-
+contract Product is IProduct, UInitializable, UControllerProvider, UPayoffProvider, UReentrancyGuard {
     /// @dev The maintenance value
     UFixed18Storage private constant _maintenance = UFixed18Storage.wrap(keccak256("equilibria.perennial.Product.maintenance"));
     function maintenance() public view returns (UFixed18) { return _maintenance.read(); }
@@ -71,19 +63,11 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
      */
     function initialize(ProductInfo calldata productInfo_) external initializer(1) {
         __UControllerProvider__initialize(IController(msg.sender));
+        __UPayoffProvider__initialize(productInfo_.oracle, productInfo_.payoffDefinition);
         __UReentrancyGuard__initialize();
 
         name = productInfo_.name;
         symbol = productInfo_.symbol;
-
-        if (productInfo_.productProvider.providerType() == PackedProviderLib.ProviderType.CONTRACT &&
-            !Address.isContract(address(productInfo_.productProvider.providerContract()))) {
-                revert ProductInvalidProductProvider();
-        }
-        _productProvider.store(PackedProvider.unwrap(productInfo_.productProvider));
-
-        if (!Address.isContract(address(productInfo_.oracle))) revert ProductInvalidOracle();
-        _oracle.store(address(productInfo_.oracle));
 
         _updateMaintenance(productInfo_.maintenance);
         _updateFundingFee(productInfo_.fundingFee);
@@ -116,7 +100,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
         IController _controller = controller();
 
         // Get current oracle version
-        currentOracleVersion = sync();
+        currentOracleVersion = _sync();
 
         // Get latest oracle version
         uint256 _latestVersion = latestVersion();
@@ -335,46 +319,6 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
     }
 
     /**
-     * @notice Returns the transformed, synced oracle version
-     * @return Synced oracle version transformed by payoff function
-     */
-    function sync() public override returns (IOracleProvider.OracleVersion memory) {
-        return _transform(oracle().sync());
-    }
-
-    /**
-     * @notice Returns the current oracle version
-     * @return Current oracle version transformed by payoff function
-     */
-    function currentVersion() public override view returns (IOracleProvider.OracleVersion memory) {
-        return _transform(oracle().currentVersion());
-    }
-
-    /**
-     * @notice Returns the oracle version at `oracleVersion`
-     * @param oracleVersion Oracle version to return for
-     * @return Oracle version at `oracleVersion` with price transformed by payoff function
-     */
-    function atVersion(uint256 oracleVersion) public override view returns (IOracleProvider.OracleVersion memory) {
-        return _transform(oracle().atVersion(oracleVersion));
-    }
-
-    /**
-     * @notice Returns the transformed oracle version
-     * @param oracleVersion Oracle version to transform
-     * @return Transformed oracle version
-     */
-    function _transform(IOracleProvider.OracleVersion memory oracleVersion) private view returns (IOracleProvider.OracleVersion memory) {
-        PackedProvider provider = productProvider();
-        if (provider.providerType() == PackedProviderLib.ProviderType.PASSTHROUGH) {
-            return oracleVersion;
-        }
-
-        oracleVersion.price = provider.providerContract().payoff(oracleVersion.price);
-        return oracleVersion;
-    }
-
-    /**
      * @notice Returns the maintenance requirement for `account`
      * @param account Account to return for
      * @return The current maintenance requirement
@@ -495,6 +439,29 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
         Fixed18 annualizedRate = utilizationCurve().compute(utilization);
         return annualizedRate.div(Fixed18Lib.from(365 days));
     }
+
+    // /// @return Oracle provider address
+    // function oracle() public view returns (IOracleProvider) { return _oracle(); }
+
+    // /// @return Payoff defintion
+    // function payoffDefinition() public view returns (PayoffDefinition memory) { return _payoffDefinition(); }
+
+    // /**
+    //  * @notice Returns the current oracle version
+    //  * @return Current oracle version
+    //  */
+    // function currentVersion() public view returns (IOracleProvider.OracleVersion memory) {
+    //     return _currentVersion();
+    // }
+
+    // /**
+    //  * @notice Returns the oracle version at `oracleVersion`
+    //  * @param oracleVersion Oracle version to return for
+    //  * @return Oracle version at `oracleVersion` with price transformed by payoff function
+    //  */
+    // function atVersion(uint256 oracleVersion) public view returns (IOracleProvider.OracleVersion memory) {
+    //     return _atVersion(oracleVersion);
+    // }
 
     /**
      * @notice Updates the maintenance to `newMaintenance`

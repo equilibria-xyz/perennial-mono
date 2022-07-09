@@ -33,7 +33,7 @@ import {
   TransparentUpgradeableProxy__factory,
 } from '../../types/generated'
 import { CHAINLINK_CUSTOM_CURRENCIES, ChainlinkContext } from './chainlinkHelpers'
-import { createPackedProvider } from '../testutil/types'
+import { createPayoffDefinition } from '../testutil/types'
 const { config, deployments, ethers } = HRE
 
 export const INITIAL_PHASE_ID = 1
@@ -194,7 +194,7 @@ export async function createProduct(instanceVars: InstanceVars): Promise<Product
   const productInfo = {
     name: 'Squeeth',
     symbol: 'SQTH',
-    productProvider: createPackedProvider(productProvider.address),
+    payoffDefinition: createPayoffDefinition(productProvider.address),
     oracle: chainlinkOracle.address,
     maintenance: utils.parseEther('0.3'),
     fundingFee: utils.parseEther('0.1'),

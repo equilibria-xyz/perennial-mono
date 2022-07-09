@@ -43,10 +43,16 @@ export function expectProgramInfoEq(a: ProgramInfo, b: ProgramInfo): void {
   expect(a.duration).to.equal(b.duration)
 }
 
-export function createPackedProvider(contractAddress?: string): string {
+export function createPayoffDefinition(contractAddress?: string): { payoffType: number; data: string } {
   if (contractAddress) {
-    return `0x01${contractAddress.substring(2).padStart(62, '0')}`.toLowerCase()
+    return {
+      payoffType: 2,
+      data: `0x${contractAddress.substring(2).padStart(62, '0')}`.toLowerCase(),
+    }
   }
 
-  return `0x00`.padEnd(66, '0')
+  return {
+    payoffType: 0,
+    data: `0x`.padEnd(64, '0'),
+  }
 }
