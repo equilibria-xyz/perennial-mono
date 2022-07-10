@@ -108,20 +108,46 @@ describe('Product', () => {
       await expect(product.initialize(PRODUCT_INFO)).to.be.revertedWith('UInitializableAlreadyInitializedError(1)')
     })
 
-    it('reverts if product provider is not a contract', async () => {
-      const otherProduct = await new Product__factory(owner).deploy()
-      await expect(
-        otherProduct
-          .connect(controllerSigner)
-          .initialize({ ...PRODUCT_INFO, payoffDefinition: createPayoffDefinition(user.address) }),
-      ).to.be.revertedWith('InvalidPayoffDefinitionError()')
-    })
-
     it('reverts if oracle is not a contract', async () => {
       const otherProduct = await new Product__factory(owner).deploy()
       await expect(
         otherProduct.connect(controllerSigner).initialize({ ...PRODUCT_INFO, oracle: user.address }),
       ).to.be.revertedWith('InvalidOracle()')
+    })
+
+    describe('payoffDefinition validity', () => {
+      let otherProduct: Product
+
+      beforeEach(async () => {
+        otherProduct = await new Product__factory(owner).deploy()
+      })
+
+      it('reverts if long definition contains data', async () => {
+        const payoffDefinition = createPayoffDefinition()
+        payoffDefinition.data = payoffDefinition.data.substring(0, payoffDefinition.data.length - 1) + '1'
+
+        await expect(
+          otherProduct.connect(controllerSigner).initialize({ ...PRODUCT_INFO, payoffDefinition }),
+        ).to.be.revertedWith('InvalidPayoffDefinitionError()')
+      })
+
+      it('reverts if short definition contains data', async () => {
+        const payoffDefinition = createPayoffDefinition()
+        payoffDefinition.payoffType = 1
+        payoffDefinition.data = payoffDefinition.data.substring(0, payoffDefinition.data.length - 1) + '1'
+
+        await expect(
+          otherProduct.connect(controllerSigner).initialize({ ...PRODUCT_INFO, payoffDefinition }),
+        ).to.be.revertedWith('InvalidPayoffDefinitionError()')
+      })
+
+      it('reverts if product provider is not a contract', async () => {
+        await expect(
+          otherProduct
+            .connect(controllerSigner)
+            .initialize({ ...PRODUCT_INFO, payoffDefinition: createPayoffDefinition(user.address) }),
+        ).to.be.revertedWith('InvalidPayoffDefinitionError()')
+      })
     })
   })
 
@@ -5210,8 +5236,8 @@ describe('Product', () => {
     })
   })
 
-  describe('contract provider', async () => {
-    let payoffDefinition: SmockContract<TestnetProductProvider>
+  describe('contract payoff definition', async () => {
+    let contractPayoffDefinition: SmockContract<TestnetProductProvider>
     let otherProduct: Product
 
     const ORACLE_VERSION = 1
@@ -5232,10 +5258,10 @@ describe('Product', () => {
 
     beforeEach(async () => {
       const payoffDefinitionFactory = await smock.mock<TestnetProductProvider__factory>('TestnetProductProvider')
-      payoffDefinition = await payoffDefinitionFactory.deploy()
+      contractPayoffDefinition = await payoffDefinitionFactory.deploy()
 
       otherProduct = await new Product__factory(owner).deploy()
-      PRODUCT_INFO.payoffDefinition = createPayoffDefinition(payoffDefinition.address)
+      PRODUCT_INFO.payoffDefinition = createPayoffDefinition(contractPayoffDefinition.address)
       await otherProduct.connect(controllerSigner).initialize(PRODUCT_INFO)
 
       await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_1)
@@ -5249,7 +5275,7 @@ describe('Product', () => {
         expect(syncResult.price).to.equal(utils.parseEther('15129'))
         expect(syncResult.timestamp).to.equal(TIMESTAMP)
         expect(syncResult.version).to.equal(ORACLE_VERSION)
-        expect(payoffDefinition.payoff).to.have.callCount(1)
+        expect(contractPayoffDefinition.payoff).to.have.callCount(1)
       })
     })
 
@@ -5259,7 +5285,56 @@ describe('Product', () => {
         expect(syncResult.price).to.equal(utils.parseEther('4'))
         expect(syncResult.timestamp).to.equal(0)
         expect(syncResult.version).to.equal(0)
-        expect(payoffDefinition.payoff).to.have.callCount(1)
+        expect(contractPayoffDefinition.payoff).to.have.callCount(1)
+      })
+    })
+  })
+
+  describe('short payoff definition', async () => {
+    let otherProduct: Product
+
+    const ORACLE_VERSION = 1
+    const TIMESTAMP = 1636401093
+    const PRICE = utils.parseEther('123')
+
+    const ORACLE_VERSION_0 = {
+      price: utils.parseEther('2'),
+      timestamp: 0,
+      version: 0,
+    }
+
+    const ORACLE_VERSION_1 = {
+      price: PRICE,
+      timestamp: TIMESTAMP,
+      version: ORACLE_VERSION,
+    }
+
+    beforeEach(async () => {
+      otherProduct = await new Product__factory(owner).deploy()
+      PRODUCT_INFO.payoffDefinition = createPayoffDefinition()
+      PRODUCT_INFO.payoffDefinition.payoffType = 1
+      await otherProduct.connect(controllerSigner).initialize(PRODUCT_INFO)
+
+      await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_1)
+      await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_1)
+      await oracle.mock.atVersion.withArgs(0).returns(ORACLE_VERSION_0)
+    })
+
+    describe('#currentVersion', () => {
+      it('calls to the provider', async () => {
+        const syncResult = await otherProduct.callStatic.currentVersion()
+        expect(syncResult.price).to.equal(utils.parseEther('-123'))
+        expect(syncResult.timestamp).to.equal(TIMESTAMP)
+        expect(syncResult.version).to.equal(ORACLE_VERSION)
+      })
+    })
+
+    describe('#atVersion', () => {
+      it('calls to the provider', async () => {
+        const syncResult = await otherProduct.callStatic.atVersion(0)
+        expect(syncResult.price).to.equal(utils.parseEther('-2'))
+        expect(syncResult.timestamp).to.equal(0)
+        expect(syncResult.version).to.equal(0)
       })
     })
   })

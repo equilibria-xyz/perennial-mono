@@ -18,7 +18,7 @@ interface IProduct is IPayoffProvider {
         /// @dev symbol of the product
         string symbol;
 
-        /// @dev product payoff provider
+        /// @dev product payoff definition
         PayoffDefinition payoffDefinition;
 
         /// @dev oracle address

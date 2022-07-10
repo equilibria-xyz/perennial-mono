@@ -440,29 +440,6 @@ contract Product is IProduct, UInitializable, UControllerProvider, UPayoffProvid
         return annualizedRate.div(Fixed18Lib.from(365 days));
     }
 
-    // /// @return Oracle provider address
-    // function oracle() public view returns (IOracleProvider) { return _oracle(); }
-
-    // /// @return Payoff defintion
-    // function payoffDefinition() public view returns (PayoffDefinition memory) { return _payoffDefinition(); }
-
-    // /**
-    //  * @notice Returns the current oracle version
-    //  * @return Current oracle version
-    //  */
-    // function currentVersion() public view returns (IOracleProvider.OracleVersion memory) {
-    //     return _currentVersion();
-    // }
-
-    // /**
-    //  * @notice Returns the oracle version at `oracleVersion`
-    //  * @param oracleVersion Oracle version to return for
-    //  * @return Oracle version at `oracleVersion` with price transformed by payoff function
-    //  */
-    // function atVersion(uint256 oracleVersion) public view returns (IOracleProvider.OracleVersion memory) {
-    //     return _atVersion(oracleVersion);
-    // }
-
     /**
      * @notice Updates the maintenance to `newMaintenance`
      * @dev only callable by product owner

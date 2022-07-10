@@ -43,7 +43,7 @@ interface IController {
     event CoordinatorPauserUpdated(uint256 indexed coordinatorId, address pauser);
     event CoordinatorPausedUpdated(uint256 indexed coordinatorId, bool paused);
     event CoordinatorCreated(uint256 indexed coordinatorId, address owner);
-    event ProductCreated(IProduct indexed product, PayoffDefinitionLib.PayoffType payoffType, bytes31 providerData);
+    event ProductCreated(IProduct indexed product, IProduct.ProductInfo productInfo);
 
     error ControllerNoZeroCoordinatorError();
     error ControllerNotPauserError(uint256 coordinatorId);

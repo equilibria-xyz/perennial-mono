@@ -525,11 +525,11 @@ describe('Controller', () => {
       symbol: 'SQTH',
       payoffDefinition: createPayoffDefinition(),
       oracle: '',
-      maintenance: 0,
-      fundingFee: 0,
-      makerFee: 0,
-      takerFee: 0,
-      makerLimit: 0,
+      maintenance: ethers.constants.Zero,
+      fundingFee: ethers.constants.Zero,
+      makerFee: ethers.constants.Zero,
+      takerFee: ethers.constants.Zero,
+      makerLimit: ethers.constants.Zero,
       utilizationCurve: {
         minRate: utils.parseEther('0.10'),
         maxRate: utils.parseEther('0.10'),
@@ -549,7 +549,7 @@ describe('Controller', () => {
       const productAddress = await controller.connect(coordinatorOwner).callStatic.createProduct(1, PRODUCT_INFO)
       await expect(controller.connect(coordinatorOwner).createProduct(1, PRODUCT_INFO))
         .to.emit(controller, 'ProductCreated')
-        .withArgs(productAddress, PRODUCT_INFO.payoffDefinition)
+        .withArgs(productAddress, PRODUCT_INFO)
 
       const productInstance = Product__factory.connect(productAddress, owner)
       expect(await productInstance.controller()).to.equal(controller.address)
