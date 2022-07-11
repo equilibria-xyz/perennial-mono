@@ -3,20 +3,17 @@ pragma solidity 0.8.15;
 
 import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@equilibria/root/control/unstructured/UReentrancyGuard.sol";
+import "../controller/UControllerProvider.sol";
+import "./UPayoffProvider.sol";
 import "./types/position/AccountPosition.sol";
 import "./types/accumulator/AccountAccumulator.sol";
-import "../controller/UControllerProvider.sol";
 
 /**
  * @title Product
  * @notice Manages logic and state for a single product market.
  * @dev Cloned by the Controller contract to launch new product markets.
  */
-contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGuard {
-    /// @dev Product Provider contract address for the product
-    AddressStorage private constant _productProvider = AddressStorage.wrap(keccak256("equilibria.perennial.Product.productProvider"));
-    function productProvider() public view returns (IProductProvider) { return IProductProvider(_productProvider.read()); }
-
+contract Product is IProduct, UInitializable, UControllerProvider, UPayoffProvider, UReentrancyGuard {
     /// @dev The maintenance value
     UFixed18Storage private constant _maintenance = UFixed18Storage.wrap(keccak256("equilibria.perennial.Product.maintenance"));
     function maintenance() public view returns (UFixed18) { return _maintenance.read(); }
@@ -66,13 +63,11 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
      */
     function initialize(ProductInfo calldata productInfo_) external initializer(1) {
         __UControllerProvider__initialize(IController(msg.sender));
+        __UPayoffProvider__initialize(productInfo_.oracle, productInfo_.payoffDefinition);
         __UReentrancyGuard__initialize();
 
         name = productInfo_.name;
         symbol = productInfo_.symbol;
-
-        if (!Address.isContract(address(productInfo_.productProvider))) revert ProductInvalidProductProvider();
-        _productProvider.store(address(productInfo_.productProvider));
 
         _updateMaintenance(productInfo_.maintenance);
         _updateFundingFee(productInfo_.fundingFee);
@@ -102,21 +97,21 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
      *  Syncs each to instantaneously after the oracle update.
      */
     function _settle() private returns (IOracleProvider.OracleVersion memory currentOracleVersion) {
-        (IProductProvider _provider, IController _controller) = (productProvider(), controller());
+        IController _controller = controller();
 
         // Get current oracle version
-        currentOracleVersion = _provider.sync();
+        currentOracleVersion = _sync();
 
         // Get latest oracle version
         uint256 _latestVersion = latestVersion();
         if (_latestVersion == currentOracleVersion.version) return currentOracleVersion; // short circuit entirely if a == c
-        IOracleProvider.OracleVersion memory latestOracleVersion = _provider.atVersion(_latestVersion);
+        IOracleProvider.OracleVersion memory latestOracleVersion = atVersion(_latestVersion);
 
         // Get settle oracle version
         uint256 _settleVersion = _position.pre.settleVersion(currentOracleVersion.version);
         IOracleProvider.OracleVersion memory settleOracleVersion = _settleVersion == currentOracleVersion.version ?
             currentOracleVersion : // if b == c, don't re-call provider for oracle version
-            _provider.atVersion(_settleVersion);
+            atVersion(_settleVersion);
 
         // Initiate
         _controller.incentivizer().sync(currentOracleVersion);
@@ -172,7 +167,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
      *  Syncs each to instantaneously after the oracle update.
      */
     function _settleAccount(address account, IOracleProvider.OracleVersion memory currentOracleVersion) private {
-        (IProductProvider _provider, IController _controller) = (productProvider(), controller());
+        IController _controller = controller();
 
         // Get latest oracle version
         if (latestVersion(account) == currentOracleVersion.version) return; // short circuit entirely if a == c
@@ -181,7 +176,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
         uint256 _settleVersion = _positions[account].pre.settleVersion(currentOracleVersion.version);
         IOracleProvider.OracleVersion memory settleOracleVersion = _settleVersion == currentOracleVersion.version ?
             currentOracleVersion : // if b == c, don't re-call provider for oracle version
-            _provider.atVersion(_settleVersion);
+            atVersion(_settleVersion);
 
         // initialize
         Fixed18 accumulated;
@@ -329,7 +324,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
      * @return The current maintenance requirement
      */
     function maintenance(address account) external view returns (UFixed18) {
-        return _positions[account].maintenance(productProvider());
+        return _positions[account].maintenance();
     }
 
     /**
@@ -339,7 +334,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
      * @return The next maintenance requirement
      */
     function maintenanceNext(address account) external view returns (UFixed18) {
-        return _positions[account].maintenanceNext(productProvider());
+        return _positions[account].maintenanceNext();
     }
 
     /**
@@ -570,7 +565,6 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
         );
     }
 
-
     /// @dev Limit total maker for guarded rollouts
     modifier makerInvariant {
         _;
@@ -621,8 +615,8 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
 
     /// @dev Helper to fully settle an account's state
     modifier settleForAccount(address account) {
-        IOracleProvider.OracleVersion memory currentVersion = _settle();
-        _settleAccount(account, currentVersion);
+        IOracleProvider.OracleVersion memory _currentVersion = _settle();
+        _settleAccount(account, _currentVersion);
 
         _;
     }

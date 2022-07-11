@@ -7,6 +7,7 @@ import "./ICollateral.sol";
 import "./IIncentivizer.sol";
 import "./IProduct.sol";
 import "./IProductProvider.sol";
+import "./types/PayoffDefinition.sol";
 
 interface IController {
     /// @dev Coordinator of a one or many products
@@ -42,7 +43,7 @@ interface IController {
     event CoordinatorPauserUpdated(uint256 indexed coordinatorId, address pauser);
     event CoordinatorPausedUpdated(uint256 indexed coordinatorId, bool paused);
     event CoordinatorCreated(uint256 indexed coordinatorId, address owner);
-    event ProductCreated(IProduct indexed product, IProductProvider provider);
+    event ProductCreated(IProduct indexed product, IProduct.ProductInfo productInfo);
 
     error ControllerNoZeroCoordinatorError();
     error ControllerNotPauserError(uint256 coordinatorId);

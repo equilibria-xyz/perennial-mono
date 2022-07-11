@@ -179,7 +179,7 @@ contract Controller is IController, UInitializable {
         BeaconProxy newProductProxy = new BeaconProxy(address(productBeacon()), abi.encodeCall(IProduct.initialize, productInfo));
         IProduct newProduct = IProduct(address(newProductProxy));
         coordinatorFor[newProduct] = coordinatorId;
-        emit ProductCreated(newProduct, productInfo.productProvider);
+        emit ProductCreated(newProduct, productInfo);
 
         return newProduct;
     }

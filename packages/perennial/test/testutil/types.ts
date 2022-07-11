@@ -42,3 +42,23 @@ export function expectProgramInfoEq(a: ProgramInfo, b: ProgramInfo): void {
   expect(a.start).to.equal(b.start)
   expect(a.duration).to.equal(b.duration)
 }
+
+export function createPayoffDefinition({
+  contractAddress,
+  short,
+}: { contractAddress?: string; short?: boolean } = {}): {
+  payoffType: number
+  data: string
+} {
+  if (contractAddress) {
+    return {
+      payoffType: 2,
+      data: `0x${contractAddress.substring(2).padStart(62, '0')}`.toLowerCase(),
+    }
+  }
+
+  return {
+    payoffType: short ? 1 : 0,
+    data: `0x`.padEnd(64, '0'),
+  }
+}

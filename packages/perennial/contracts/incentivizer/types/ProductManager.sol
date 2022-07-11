@@ -160,7 +160,7 @@ library ProductManagerLib {
 
         // If not started, start first
         if (program.versionStarted == 0) {
-            result.versionStarted = _start(self, programId, product.productProvider().currentVersion());
+            result.versionStarted = _start(self, programId, product.currentVersion());
         }
 
         // If not completed already, complete

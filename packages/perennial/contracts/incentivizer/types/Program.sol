@@ -63,9 +63,8 @@ library ProgramLib {
         versionComplete = Math.max(versionStarted, product.latestVersion());
         self.versionComplete = versionComplete;
 
-        IProductProvider productProvider = product.productProvider();
-        IOracleProvider.OracleVersion memory fromOracleVersion = productProvider.atVersion(versionStarted);
-        IOracleProvider.OracleVersion memory toOracleVersion = productProvider.atVersion(versionComplete);
+        IOracleProvider.OracleVersion memory fromOracleVersion = product.atVersion(versionStarted);
+        IOracleProvider.OracleVersion memory toOracleVersion = product.atVersion(versionComplete);
 
         uint256 inactiveDuration = programInfo.duration - (toOracleVersion.timestamp - fromOracleVersion.timestamp);
         refundAmount = programInfo.amount.sum().muldiv(inactiveDuration, programInfo.duration);

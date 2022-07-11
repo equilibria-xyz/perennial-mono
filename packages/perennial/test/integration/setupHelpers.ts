@@ -33,6 +33,7 @@ import {
   TransparentUpgradeableProxy__factory,
 } from '../../types/generated'
 import { CHAINLINK_CUSTOM_CURRENCIES, ChainlinkContext } from './chainlinkHelpers'
+import { createPayoffDefinition } from '../testutil/types'
 const { config, deployments, ethers } = HRE
 
 export const INITIAL_PHASE_ID = 1
@@ -85,7 +86,7 @@ export async function deployProtocol(): Promise<InstanceVars> {
     CHAINLINK_CUSTOM_CURRENCIES.ETH,
     CHAINLINK_CUSTOM_CURRENCIES.USD,
   )
-  const productProvider = await new TestnetProductProvider__factory(owner).deploy(chainlinkOracle.address)
+  const productProvider = await new TestnetProductProvider__factory(owner).deploy()
   const dsu = await IERC20Metadata__factory.connect((await deployments.get('DSU')).address, owner)
   const usdc = await IERC20Metadata__factory.connect((await deployments.get('USDC')).address, owner)
   const batcher = await IBatcher__factory.connect((await deployments.get('Batcher')).address, owner)
@@ -185,7 +186,7 @@ export async function deployProtocol(): Promise<InstanceVars> {
 }
 
 export async function createProduct(instanceVars: InstanceVars): Promise<Product> {
-  const { owner, controller, treasuryB, productProvider } = instanceVars
+  const { owner, controller, treasuryB, productProvider, chainlinkOracle } = instanceVars
 
   await controller.createCoordinator()
   await controller.updateCoordinatorTreasury(1, treasuryB.address)
@@ -193,7 +194,8 @@ export async function createProduct(instanceVars: InstanceVars): Promise<Product
   const productInfo = {
     name: 'Squeeth',
     symbol: 'SQTH',
-    productProvider: productProvider.address,
+    payoffDefinition: createPayoffDefinition({ contractAddress: productProvider.address }),
+    oracle: chainlinkOracle.address,
     maintenance: utils.parseEther('0.3'),
     fundingFee: utils.parseEther('0.1'),
     makerFee: 0,

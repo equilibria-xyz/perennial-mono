@@ -3,12 +3,13 @@ pragma solidity ^0.8.13;
 
 import "@equilibria/root/number/types/UFixed18.sol";
 import "@equilibria/root/curve/types/JumpRateUtilizationCurve.sol";
+import "./IPayoffProvider.sol";
+import "./types/PayoffDefinition.sol";
 import "./types/Position.sol";
 import "./types/PrePosition.sol";
 import "./types/Accumulator.sol";
-import "./IProductProvider.sol";
 
-interface IProduct {
+interface IProduct is IPayoffProvider {
     /// @dev Product Creation parameters
     struct ProductInfo {
         /// @dev name of the product
@@ -17,8 +18,11 @@ interface IProduct {
         /// @dev symbol of the product
         string symbol;
 
-        /// @dev product provider address
-        IProductProvider productProvider;
+        /// @dev product payoff definition
+        PayoffDefinition payoffDefinition;
+
+        /// @dev oracle address
+        IOracleProvider oracle;
 
         /// @dev product maintenance ratio
         UFixed18 maintenance;
@@ -66,13 +70,13 @@ interface IProduct {
     error ProductOracleBootstrappingError();
     error ProductNotOwnerError();
     error ProductInvalidProductProvider();
+    error ProductInvalidOracle();
     error ProductInvalidFundingFee();
     error ProductInvalidMakerFee();
     error ProductInvalidTakerFee();
 
     function name() external view returns (string memory);
     function symbol() external view returns (string memory);
-    function productProvider() external view returns (IProductProvider);
     function initialize(ProductInfo calldata productInfo_) external;
     function settle() external;
     function settleAccount(address account) external;
@@ -94,7 +98,6 @@ interface IProduct {
     function shareAtVersion(uint256 oracleVersion) external view returns (Accumulator memory);
     function latestVersion(address account) external view returns (uint256);
     function rate(Position memory position) external view returns (Fixed18);
-
     // Product Parameters and Updaters
     function maintenance() external view returns (UFixed18);
     function updateMaintenance(UFixed18 newMaintenance) external;
