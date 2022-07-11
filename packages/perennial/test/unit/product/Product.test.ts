@@ -206,7 +206,7 @@ describe('Product', () => {
     })
   })
 
-  describe('long market', async () => {
+  describe('positive price market', async () => {
     const ORACLE_VERSION = 1
     const TIMESTAMP = 1636401093
     const PRICE = utils.parseEther('123')
@@ -2707,7 +2707,7 @@ describe('Product', () => {
     })
   })
 
-  describe('short market', async () => {
+  describe('negative price market', async () => {
     const ORACLE_VERSION = 1
     const TIMESTAMP = 1636401093
     const PRICE = utils.parseEther('-123')
@@ -5287,6 +5287,54 @@ describe('Product', () => {
         expect(syncResult.timestamp).to.equal(0)
         expect(syncResult.version).to.equal(0)
         expect(contractPayoffDefinition.payoff).to.have.callCount(1)
+      })
+    })
+  })
+
+  describe('long payoff definition', async () => {
+    let otherProduct: Product
+
+    const ORACLE_VERSION = 1
+    const TIMESTAMP = 1636401093
+    const PRICE = utils.parseEther('123')
+
+    const ORACLE_VERSION_0 = {
+      price: utils.parseEther('2'),
+      timestamp: 0,
+      version: 0,
+    }
+
+    const ORACLE_VERSION_1 = {
+      price: PRICE,
+      timestamp: TIMESTAMP,
+      version: ORACLE_VERSION,
+    }
+
+    beforeEach(async () => {
+      otherProduct = await new Product__factory(owner).deploy()
+      PRODUCT_INFO.payoffDefinition = createPayoffDefinition()
+      await otherProduct.connect(controllerSigner).initialize(PRODUCT_INFO)
+
+      await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_1)
+      await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_1)
+      await oracle.mock.atVersion.withArgs(0).returns(ORACLE_VERSION_0)
+    })
+
+    describe('#currentVersion', () => {
+      it('calls to the provider', async () => {
+        const syncResult = await otherProduct.callStatic.currentVersion()
+        expect(syncResult.price).to.equal(utils.parseEther('123'))
+        expect(syncResult.timestamp).to.equal(TIMESTAMP)
+        expect(syncResult.version).to.equal(ORACLE_VERSION)
+      })
+    })
+
+    describe('#atVersion', () => {
+      it('calls to the provider', async () => {
+        const syncResult = await otherProduct.callStatic.atVersion(0)
+        expect(syncResult.price).to.equal(utils.parseEther('2'))
+        expect(syncResult.timestamp).to.equal(0)
+        expect(syncResult.version).to.equal(0)
       })
     })
   })
