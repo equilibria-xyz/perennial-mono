@@ -13,15 +13,26 @@ using PayoffDefinitionLib for PayoffDefinition global;
 type PayoffDefinitionStorage is bytes32;
 using PayoffDefinitionStorageLib for PayoffDefinitionStorage global;
 
+/**
+ * @title PayoffDefinitionLib
+ * @dev Library that surfaces logic for PayoffDefinition type functionality
+ * @notice Library for the PayoffDefinition type. Performs validity and price transformation
+            based on the payoff definition type.
+ */
 library PayoffDefinitionLib {
   using Address for address;
 
   error PayoffDefinitionUnsupportedTransform(PayoffType payoffType);
   error PayoffDefinitionNotContract(PayoffType payoffType, bytes31 data);
 
-  /// @dev Provider type enum
+  /// @dev Payoff function type enum
   enum PayoffType { LONG, SHORT, CONTRACT }
 
+  /**
+   * @notice Checks validity of the payoff definition
+   * @param self a payoff definition
+   * @return Whether the payoff definition is valid for it's given type
+   */
   function valid(PayoffDefinition memory self) internal view returns (bool) {
     if (self.payoffType == PayoffType.CONTRACT) return address(_providerContract(self)).isContract();
 
@@ -29,6 +40,12 @@ library PayoffDefinitionLib {
     return uint(bytes32(self.data)) == 0;
   }
 
+  /**
+   * @notice Transforms a price based on the payoff definition
+   * @param self a payoff definition
+   * @param price raw oracle price
+   * @return Price transformed by the payoff definition function
+   */
   function transform(
     PayoffDefinition memory self,
     Fixed18 price
@@ -42,6 +59,12 @@ library PayoffDefinitionLib {
     revert PayoffDefinitionUnsupportedTransform(payoffType);
   }
 
+  /**
+   * @notice Parses the data field into an address
+   * @dev Reverts if payoffType is not CONTRACT
+   * @param self a payoff definition
+   * @return IProductProvider address
+   */
   function _providerContract(
     PayoffDefinition memory self
   ) private pure returns (IProductProvider) {
@@ -50,6 +73,12 @@ library PayoffDefinitionLib {
     return IProductProvider(address(bytes20(self.data << 88)));
   }
 
+  /**
+   * @notice Performs a price transformation by calling the underlying payoff contract
+   * @param self a payoff definition
+   * @param price raw oracle price
+   * @return Price transformed by the payoff definition function on the contract
+   */
   function _payoffFromContract(
     PayoffDefinition memory self,
     Fixed18 price
@@ -61,6 +90,10 @@ library PayoffDefinitionLib {
   }
 }
 
+/**
+ * @title PayoffDefinitionStorageLib
+ * @notice Library that surfaces storage read and writes for the PayoffDefinition type
+ */
 library PayoffDefinitionStorageLib {
     function read(PayoffDefinitionStorage self) internal view returns (PayoffDefinition memory) {
         return _storagePointer(self);
@@ -73,8 +106,9 @@ library PayoffDefinitionStorageLib {
         storagePointer.data = value.data;
     }
 
-    function _storagePointer(PayoffDefinitionStorage self)
-    private pure returns (PayoffDefinition storage pointer) {
+    function _storagePointer(
+      PayoffDefinitionStorage self
+    ) private pure returns (PayoffDefinition storage pointer) {
         assembly { pointer.slot := self }
     }
 }

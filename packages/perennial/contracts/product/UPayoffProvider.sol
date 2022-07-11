@@ -42,15 +42,15 @@ abstract contract UPayoffProvider is IPayoffProvider, UInitializable {
     }
 
     /**
-     * @notice Returns the current oracle version
-     * @return Current oracle version
+     * @notice Returns the current oracle version transformed by the payoff definition
+     * @return Current oracle version transformed by the payoff definition
      */
     function currentVersion() public view returns (IOracleProvider.OracleVersion memory) {
         return _transform(oracle().currentVersion());
     }
 
     /**
-     * @notice Returns the oracle version at `oracleVersion`
+     * @notice Returns the oracle version at `oracleVersion` transformed by the payoff definition
      * @param oracleVersion Oracle version to return for
      * @return Oracle version at `oracleVersion` with price transformed by payoff function
      */
@@ -59,7 +59,7 @@ abstract contract UPayoffProvider is IPayoffProvider, UInitializable {
     }
 
     /**
-     * @notice Pass-through hook to call sync() on the oracle provider
+     * @notice Yook to call sync() on the oracle provider and transform the resulting oracle version
      */
     function _sync() internal returns (IOracleProvider.OracleVersion memory) {
         return _transform(oracle().sync());
