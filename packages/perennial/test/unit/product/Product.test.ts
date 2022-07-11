@@ -143,9 +143,10 @@ describe('Product', () => {
 
       it('reverts if product provider is not a contract', async () => {
         await expect(
-          otherProduct
-            .connect(controllerSigner)
-            .initialize({ ...PRODUCT_INFO, payoffDefinition: createPayoffDefinition(user.address) }),
+          otherProduct.connect(controllerSigner).initialize({
+            ...PRODUCT_INFO,
+            payoffDefinition: createPayoffDefinition({ contractAddress: user.address }),
+          }),
         ).to.be.revertedWith('InvalidPayoffDefinitionError()')
       })
     })
@@ -5261,7 +5262,7 @@ describe('Product', () => {
       contractPayoffDefinition = await payoffDefinitionFactory.deploy()
 
       otherProduct = await new Product__factory(owner).deploy()
-      PRODUCT_INFO.payoffDefinition = createPayoffDefinition(contractPayoffDefinition.address)
+      PRODUCT_INFO.payoffDefinition = createPayoffDefinition({ contractAddress: contractPayoffDefinition.address })
       await otherProduct.connect(controllerSigner).initialize(PRODUCT_INFO)
 
       await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_1)
@@ -5311,8 +5312,7 @@ describe('Product', () => {
 
     beforeEach(async () => {
       otherProduct = await new Product__factory(owner).deploy()
-      PRODUCT_INFO.payoffDefinition = createPayoffDefinition()
-      PRODUCT_INFO.payoffDefinition.payoffType = 1
+      PRODUCT_INFO.payoffDefinition = createPayoffDefinition({ short: true })
       await otherProduct.connect(controllerSigner).initialize(PRODUCT_INFO)
 
       await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_1)

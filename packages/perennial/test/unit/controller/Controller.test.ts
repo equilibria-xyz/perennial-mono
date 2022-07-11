@@ -538,7 +538,7 @@ describe('Controller', () => {
       },
     }
     beforeEach(async () => {
-      PRODUCT_INFO.payoffDefinition = createPayoffDefinition(productProvider.address)
+      PRODUCT_INFO.payoffDefinition = createPayoffDefinition({ contractAddress: productProvider.address })
       PRODUCT_INFO.oracle = oracle.address
       await controller.connect(coordinatorOwner).createCoordinator()
       await controller.connect(coordinatorOwner).updateCoordinatorTreasury(1, coordinatorTreasury.address)

@@ -39,7 +39,7 @@ describe('PerennialLens', () => {
 
     controller.collateral.returns(collateral.address)
     controller.incentivizer.returns(incentivizer.address)
-    product.payoffDefinition.returns(createPayoffDefinition(productProvider.address))
+    product.payoffDefinition.returns(createPayoffDefinition({ contractAddress: productProvider.address }))
 
     lens = await new PerennialLens__factory(user).deploy(controller.address)
   })

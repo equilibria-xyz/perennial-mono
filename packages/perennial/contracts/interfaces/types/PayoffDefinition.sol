@@ -55,7 +55,7 @@ library PayoffDefinitionLib {
     Fixed18 price
   ) private view returns (Fixed18) {
     bytes memory ret = address(_providerContract(self)).functionStaticCall(
-      abi.encodeWithSelector(IProductProvider.payoff.selector, price)
+      abi.encodeCall(IProductProvider.payoff, price)
     );
     return Fixed18.wrap(abi.decode(ret, (int256)));
   }

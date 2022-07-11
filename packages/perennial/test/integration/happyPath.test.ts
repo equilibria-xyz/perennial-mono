@@ -38,7 +38,7 @@ describe('Happy Path', () => {
     const productInfo = {
       name: 'Squeeth',
       symbol: 'SQTH',
-      payoffDefinition: createPayoffDefinition(productProvider.address),
+      payoffDefinition: createPayoffDefinition({ contractAddress: productProvider.address }),
       oracle: chainlinkOracle.address,
       maintenance: utils.parseEther('0.3'),
       fundingFee: utils.parseEther('0.1'),
