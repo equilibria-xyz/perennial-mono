@@ -34,6 +34,10 @@ contract Product is IProduct, UInitializable, UControllerProvider, UPayoffProvid
     UFixed18Storage private constant _makerLimit = UFixed18Storage.wrap(keccak256("equilibria.perennial.Product.makerLimit"));
     function makerLimit() public view returns (UFixed18) { return _makerLimit.read(); }
 
+    /// @dev The close-only status
+    BoolStorage private constant _closed = BoolStorage.wrap(keccak256("equilibria.perennial.Product.closed"));
+    function closed() public view returns (bool) { return _closed.read(); }
+
     /// @dev The JumpRateUtilizationCurve params
     JumpRateUtilizationCurveStorage private constant _utilizationCurve =
         JumpRateUtilizationCurveStorage.wrap(keccak256("equilibria.perennial.Product.jumpRateUtilizationCurve"));
@@ -563,6 +567,16 @@ contract Product is IProduct, UInitializable, UControllerProvider, UPayoffProvid
             newUtilizationCurve.targetRate.unpack(),
             newUtilizationCurve.targetUtilization.unpack()
         );
+    }
+
+    /**
+     * @notice Opens a taker position for `msg.sender`
+     * @param amount Amount of the position to open
+     */
+    function updateClosed(bool newClosed) external nonReentrant onlyProductOwner(IProduct(this)) {
+        _settle();
+        _closed.store(newClosed);
+        // event
     }
 
     /// @dev Limit total maker for guarded rollouts

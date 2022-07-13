@@ -64,7 +64,8 @@ library VersionedAccumulatorLib {
         UFixed18 fundingFee,
         VersionedPosition storage position,
         IOracleProvider.OracleVersion memory latestOracleVersion,
-        IOracleProvider.OracleVersion memory toOracleVersion
+        IOracleProvider.OracleVersion memory toOracleVersion,
+        bool closed,
     ) internal returns (UFixed18 accumulatedFee) {
         Position memory latestPosition = position.positionAtVersion(latestOracleVersion.version);
 
@@ -109,6 +110,7 @@ library VersionedAccumulatorLib {
         IOracleProvider.OracleVersion memory latestOracleVersion,
         IOracleProvider.OracleVersion memory toOracleVersion
     ) private view returns (Accumulator memory accumulatedFunding, UFixed18 accumulatedFee) {
+        if (IProduct(address(this)).closed()) return (Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO), UFixed18Lib.ZERO);
         if (latestPosition.taker.isZero()) return (Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO), UFixed18Lib.ZERO);
         if (latestPosition.maker.isZero()) return (Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO), UFixed18Lib.ZERO);
 
@@ -146,6 +148,7 @@ library VersionedAccumulatorLib {
         IOracleProvider.OracleVersion memory latestOracleVersion,
         IOracleProvider.OracleVersion memory toOracleVersion
     ) private pure returns (Accumulator memory accumulatedPosition) {
+        if (IProduct(address(this)).closed()) return (Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO), UFixed18Lib.ZERO);
         if (latestPosition.taker.isZero()) return Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO);
         if (latestPosition.maker.isZero()) return Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO);
 

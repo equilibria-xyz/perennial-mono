@@ -111,4 +111,6 @@ interface IProduct is IPayoffProvider {
     function updateMakerLimit(UFixed18 newMakerLimit) external;
     function utilizationCurve() external view returns (JumpRateUtilizationCurve memory);
     function updateUtilizationCurve(JumpRateUtilizationCurve memory newUtilizationCurve) external;
+    function closed() external view returns (bool);
+    function updateClosed(bool newClosed) external;
 }
