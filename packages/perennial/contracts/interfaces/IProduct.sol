@@ -60,6 +60,7 @@ interface IProduct is IPayoffProvider {
         Fixed18 targetRate,
         UFixed18 targetUtilization
     );
+    event ClosedUpdated(bool newClosed);
 
     error ProductInsufficientLiquidityError(UFixed18 socializationFactor);
     error ProductDoubleSidedError();
@@ -74,6 +75,7 @@ interface IProduct is IPayoffProvider {
     error ProductInvalidFundingFee();
     error ProductInvalidMakerFee();
     error ProductInvalidTakerFee();
+    error ProductClosedError();
 
     function name() external view returns (string memory);
     function symbol() external view returns (string memory);
@@ -111,4 +113,6 @@ interface IProduct is IPayoffProvider {
     function updateMakerLimit(UFixed18 newMakerLimit) external;
     function utilizationCurve() external view returns (JumpRateUtilizationCurve memory);
     function updateUtilizationCurve(JumpRateUtilizationCurve memory newUtilizationCurve) external;
+    function closed() external view returns (bool);
+    function updateClosed(bool newClosed) external;
 }

@@ -39,6 +39,12 @@ contract Product is IProduct, UInitializable, UControllerProvider, UPayoffProvid
         JumpRateUtilizationCurveStorage.wrap(keccak256("equilibria.perennial.Product.jumpRateUtilizationCurve"));
     function utilizationCurve() public view returns (JumpRateUtilizationCurve memory) { return _utilizationCurve.read(); }
 
+    /// @dev Whether or not the product is closed
+    BoolStorage private constant _closed =
+        BoolStorage.wrap(keccak256("equilibria.perennial.Product.closed"));
+    function closed() public view returns (bool) { return _closed.read(); }
+
+
     /// @dev The name of the product
     string public name;
 
@@ -215,6 +221,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UPayoffProvid
     external
     nonReentrant
     notPausedProduct(IProduct(this))
+    notClosed
     settleForAccount(msg.sender)
     takerInvariant
     positionInvariant
@@ -261,6 +268,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UPayoffProvid
     external
     nonReentrant
     notPausedProduct(IProduct(this))
+    notClosed
     settleForAccount(msg.sender)
     nonZeroVersionInvariant
     makerInvariant
@@ -306,7 +314,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UPayoffProvid
      * @dev Only callable by the Collateral contract as part of the liquidation flow
      * @param account Account to close out
      */
-    function closeAll(address account) external onlyCollateral settleForAccount(account) {
+    function closeAll(address account) external onlyCollateral notClosed settleForAccount(account) {
         AccountPosition storage accountPosition = _positions[account];
         Position memory p = accountPosition.position.next(_positions[account].pre);
 
@@ -555,7 +563,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UPayoffProvid
      * @notice Updates the utilization curve limit to `newUtilizationCurve`
      * @param newUtilizationCurve new utilization curve value
      */
-    function _updateUtilizationCurve(JumpRateUtilizationCurve calldata newUtilizationCurve) private {
+    function _updateUtilizationCurve(JumpRateUtilizationCurve memory newUtilizationCurve) private {
         _utilizationCurve.store(newUtilizationCurve);
         emit JumpRateUtilizationCurveUpdated(
             newUtilizationCurve.minRate.unpack(),
@@ -563,6 +571,17 @@ contract Product is IProduct, UInitializable, UControllerProvider, UPayoffProvid
             newUtilizationCurve.targetRate.unpack(),
             newUtilizationCurve.targetUtilization.unpack()
         );
+    }
+
+    /**
+     * @notice Updates product closed state
+     * @dev only callable by product owner. Settles the product before flipping the flag
+     * @param newClosed new closed value
+     */
+    function updateClosed(bool newClosed) external onlyProductOwner(IProduct(this)) {
+        _settle();
+        _closed.store(newClosed);
+        emit ClosedUpdated(newClosed);
     }
 
     /// @dev Limit total maker for guarded rollouts
@@ -574,9 +593,11 @@ contract Product is IProduct, UInitializable, UControllerProvider, UPayoffProvid
         if (next.maker.gt(makerLimit())) revert ProductMakerOverLimitError();
     }
 
-    /// @dev Limit maker short exposure to the range 0.0-1.0x of their position
+    /// @dev Limit maker short exposure to the range 0.0-1.0x of their position. Does not apply when in closeOnly state
     modifier takerInvariant {
         _;
+
+        if (closed()) return;
 
         Position memory next = positionAtVersion(latestVersion()).next(_position.pre);
         UFixed18 socializationFactor = next.socializationFactor();
@@ -624,6 +645,13 @@ contract Product is IProduct, UInitializable, UControllerProvider, UPayoffProvid
     /// @dev Ensure we have bootstraped the oracle before creating positions
     modifier nonZeroVersionInvariant {
         if (latestVersion() == 0) revert ProductOracleBootstrappingError();
+
+        _;
+    }
+
+    /// @dev Ensure the product is not closed
+    modifier notClosed {
+        if (closed()) revert ProductClosedError();
 
         _;
     }
