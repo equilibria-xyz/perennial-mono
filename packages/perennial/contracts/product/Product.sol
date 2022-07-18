@@ -579,9 +579,9 @@ contract Product is IProduct, UInitializable, UControllerProvider, UPayoffProvid
      * @param newClosed new closed value
      */
     function updateClosed(bool newClosed) external onlyProductOwner(IProduct(this)) {
-        _settle();
+        IOracleProvider.OracleVersion memory oracleVersion = _settle();
         _closed.store(newClosed);
-        emit ClosedUpdated(newClosed);
+        emit ClosedUpdated(newClosed, oracleVersion.version);
     }
 
     /// @dev Limit total maker for guarded rollouts

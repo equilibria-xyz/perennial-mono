@@ -60,7 +60,7 @@ interface IProduct is IPayoffProvider {
         Fixed18 targetRate,
         UFixed18 targetUtilization
     );
-    event ClosedUpdated(bool newClosed);
+    event ClosedUpdated(bool indexed newClosed, uint256 version);
 
     error ProductInsufficientLiquidityError(UFixed18 socializationFactor);
     error ProductDoubleSidedError();

@@ -29,7 +29,7 @@ describe('Closed Product', () => {
     await chainlink.next()
     await expect(product.updateClosed(true))
       .to.emit(product, 'ClosedUpdated')
-      .withArgs(true)
+      .withArgs(true, 2474)
       .to.emit(product, 'Settle')
       .withArgs(2474, 2474)
 

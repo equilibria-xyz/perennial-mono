@@ -2727,7 +2727,7 @@ describe('Product', () => {
 
           await expect(product.connect(owner).updateClosed(true))
             .to.emit(product, 'ClosedUpdated')
-            .withArgs(true)
+            .withArgs(true, 3)
             .to.emit(product, 'Settle')
             .withArgs(3, 3)
           expect(await product.closed()).to.be.true
@@ -5346,7 +5346,7 @@ describe('Product', () => {
 
           await expect(product.connect(owner).updateClosed(true))
             .to.emit(product, 'ClosedUpdated')
-            .withArgs(true)
+            .withArgs(true, 3)
             .to.emit(product, 'Settle')
             .withArgs(3, 3)
 
