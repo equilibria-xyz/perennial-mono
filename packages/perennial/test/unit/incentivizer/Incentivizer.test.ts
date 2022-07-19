@@ -124,7 +124,7 @@ describe('Incentivizer', () => {
       const returnValue = await incentivizer.connect(productOwner).callStatic.create(product.address, PROGRAM_INFO)
       await expect(incentivizer.connect(productOwner).create(product.address, PROGRAM_INFO))
         .to.emit(incentivizer, 'ProgramCreated')
-        .withArgs(product.address, 0, 0, PROGRAM_INFO)
+        .withArgs(product.address, 0, PROGRAM_INFO, 0)
 
       expect(returnValue).to.equal(EXPECTED_PROGRAM_ID)
       expectProgramInfoEq(await incentivizer.programInfos(product.address, EXPECTED_PROGRAM_ID), PROGRAM_INFO)
@@ -161,7 +161,7 @@ describe('Incentivizer', () => {
       const returnValue = await incentivizer.connect(owner).callStatic.create(product.address, PROGRAM_INFO)
       await expect(incentivizer.connect(owner).create(product.address, PROGRAM_INFO))
         .to.emit(incentivizer, 'ProgramCreated')
-        .withArgs(product.address, 0, 0, PROGRAM_INFO)
+        .withArgs(product.address, 0, PROGRAM_INFO, 0)
 
       expect(returnValue).to.equal(EXPECTED_PROGRAM_ID)
       expectProgramInfoEq(await incentivizer.programInfos(product.address, EXPECTED_PROGRAM_ID), PROGRAM_INFO)
@@ -211,7 +211,7 @@ describe('Incentivizer', () => {
       const returnValue = await incentivizer.connect(owner).callStatic.create(product.address, PROGRAM_INFO)
       await expect(incentivizer.connect(owner).create(product.address, PROGRAM_INFO))
         .to.emit(incentivizer, 'ProgramCreated')
-        .withArgs(product.address, 0, utils.parseEther('100'), PROGRAM_INFO_WITH_FEE)
+        .withArgs(product.address, 0, PROGRAM_INFO_WITH_FEE, utils.parseEther('100'))
 
       expect(returnValue).to.equal(EXPECTED_PROGRAM_ID)
       expectProgramInfoEq(await incentivizer.programInfos(product.address, EXPECTED_PROGRAM_ID), PROGRAM_INFO_WITH_FEE)

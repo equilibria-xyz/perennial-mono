@@ -66,8 +66,8 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
         emit ProgramCreated(
             product,
             programId,
-            programFeeAmount,
-            newProgramInfo
+            newProgramInfo,
+            programFeeAmount
         );
     }
 

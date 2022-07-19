@@ -58,7 +58,7 @@ describe('Incentivizer', () => {
 
     await expect(incentivizer.create(product.address, programInfo))
       .to.emit(incentivizer, 'ProgramCreated')
-      .withArgs(product.address, PROGRAM_ID, 0, programInfo)
+      .withArgs(product.address, PROGRAM_ID, programInfo, 0)
 
     expectProgramInfoEq(programInfo, await incentivizer.programInfos(product.address, PROGRAM_ID))
 
@@ -97,7 +97,7 @@ describe('Incentivizer', () => {
 
     await expect(incentivizer.connect(userB).create(product.address, programInfo))
       .to.emit(incentivizer, 'ProgramCreated')
-      .withArgs(product.address, PROGRAM_ID, 0, programInfo)
+      .withArgs(product.address, PROGRAM_ID, programInfo, 0)
 
     expectProgramInfoEq(programInfo, await incentivizer.programInfos(product.address, PROGRAM_ID))
     expect(await incentivizer.count(product.address)).to.equal(1)
