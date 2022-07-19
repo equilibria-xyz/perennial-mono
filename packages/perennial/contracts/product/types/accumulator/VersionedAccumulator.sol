@@ -109,6 +109,7 @@ library VersionedAccumulatorLib {
         IOracleProvider.OracleVersion memory latestOracleVersion,
         IOracleProvider.OracleVersion memory toOracleVersion
     ) private view returns (Accumulator memory accumulatedFunding, UFixed18 accumulatedFee) {
+        if (_product().closed()) return (Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO), UFixed18Lib.ZERO);
         if (latestPosition.taker.isZero()) return (Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO), UFixed18Lib.ZERO);
         if (latestPosition.maker.isZero()) return (Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO), UFixed18Lib.ZERO);
 
@@ -117,7 +118,7 @@ library VersionedAccumulatorLib {
         UFixed18 takerNotional = Fixed18Lib.from(latestPosition.taker).mul(latestOracleVersion.price).abs();
         UFixed18 socializedNotional = takerNotional.mul(latestPosition.socializationFactor());
 
-        Fixed18 rateAccumulated = IProduct(address(this)).rate(latestPosition)
+        Fixed18 rateAccumulated = _product().rate(latestPosition)
             .mul(Fixed18Lib.from(UFixed18Lib.from(elapsed)));
         Fixed18 fundingAccumulated = rateAccumulated.mul(Fixed18Lib.from(socializedNotional));
         accumulatedFee = fundingAccumulated.abs().mul(fundingFee);
@@ -145,7 +146,8 @@ library VersionedAccumulatorLib {
         Position memory latestPosition,
         IOracleProvider.OracleVersion memory latestOracleVersion,
         IOracleProvider.OracleVersion memory toOracleVersion
-    ) private pure returns (Accumulator memory accumulatedPosition) {
+    ) private view returns (Accumulator memory accumulatedPosition) {
+        if (_product().closed()) return Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO);
         if (latestPosition.taker.isZero()) return Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO);
         if (latestPosition.maker.isZero()) return Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO);
 
@@ -178,5 +180,9 @@ library VersionedAccumulatorLib {
         accumulatedShare.taker = latestPosition.taker.isZero() ?
             Fixed18Lib.ZERO :
             Fixed18Lib.from(UFixed18Lib.from(elapsed).div(latestPosition.taker));
+    }
+
+    function _product() private view returns (IProduct) {
+        return IProduct(address(this));
     }
 }
