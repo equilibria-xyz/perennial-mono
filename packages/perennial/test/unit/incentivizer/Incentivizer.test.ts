@@ -1,5 +1,5 @@
 import { MockContract } from '@ethereum-waffle/mock-contract'
-import { BigNumberish, utils } from 'ethers'
+import { BigNumber, BigNumberish, utils } from 'ethers'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { expect } from 'chai'
 import HRE, { waffle } from 'hardhat'
@@ -13,7 +13,6 @@ import {
   Product__factory,
   Incentivizer__factory,
   IERC20Metadata__factory,
-  TestnetProductProvider__factory,
 } from '../../../types/generated'
 import { currentBlockTimestamp, increase } from '../../testutil/time'
 import { expectProgramInfoEq, ProgramInfo } from '../../testutil/types'
@@ -112,30 +111,20 @@ describe('Incentivizer', () => {
       const NOW = await currentBlockTimestamp()
 
       const PROGRAM_INFO: ProgramInfo = {
-        coordinatorId: PRODUCT_COORDINATOR_ID,
+        coordinatorId: BigNumber.from(PRODUCT_COORDINATOR_ID),
         token: token.address,
         amount: {
           maker: utils.parseEther('8000'),
           taker: utils.parseEther('2000'),
         },
-        start: NOW + HOUR,
-        duration: 30 * DAY,
+        start: BigNumber.from(NOW + HOUR),
+        duration: BigNumber.from(30 * DAY),
       }
 
       const returnValue = await incentivizer.connect(productOwner).callStatic.create(product.address, PROGRAM_INFO)
       await expect(incentivizer.connect(productOwner).create(product.address, PROGRAM_INFO))
         .to.emit(incentivizer, 'ProgramCreated')
-        .withArgs(
-          product.address,
-          0,
-          PROGRAM_INFO.coordinatorId,
-          PROGRAM_INFO.token,
-          PROGRAM_INFO.amount.maker,
-          PROGRAM_INFO.amount.taker,
-          PROGRAM_INFO.start,
-          PROGRAM_INFO.duration,
-          0,
-        )
+        .withArgs(product.address, 0, 0, PROGRAM_INFO)
 
       expect(returnValue).to.equal(EXPECTED_PROGRAM_ID)
       expectProgramInfoEq(await incentivizer.programInfos(product.address, EXPECTED_PROGRAM_ID), PROGRAM_INFO)
@@ -159,30 +148,20 @@ describe('Incentivizer', () => {
       const NOW = await currentBlockTimestamp()
 
       const PROGRAM_INFO: ProgramInfo = {
-        coordinatorId: 0,
+        coordinatorId: BigNumber.from(0),
         token: token.address,
         amount: {
           maker: utils.parseEther('8000'),
           taker: utils.parseEther('2000'),
         },
-        start: NOW + HOUR,
-        duration: 30 * DAY,
+        start: BigNumber.from(NOW + HOUR),
+        duration: BigNumber.from(30 * DAY),
       }
 
       const returnValue = await incentivizer.connect(owner).callStatic.create(product.address, PROGRAM_INFO)
       await expect(incentivizer.connect(owner).create(product.address, PROGRAM_INFO))
         .to.emit(incentivizer, 'ProgramCreated')
-        .withArgs(
-          product.address,
-          0,
-          PROGRAM_INFO.coordinatorId,
-          PROGRAM_INFO.token,
-          PROGRAM_INFO.amount.maker,
-          PROGRAM_INFO.amount.taker,
-          PROGRAM_INFO.start,
-          PROGRAM_INFO.duration,
-          0,
-        )
+        .withArgs(product.address, 0, 0, PROGRAM_INFO)
 
       expect(returnValue).to.equal(EXPECTED_PROGRAM_ID)
       expectProgramInfoEq(await incentivizer.programInfos(product.address, EXPECTED_PROGRAM_ID), PROGRAM_INFO)
@@ -219,30 +198,20 @@ describe('Incentivizer', () => {
       }
 
       const PROGRAM_INFO_WITH_FEE: ProgramInfo = {
-        coordinatorId: 0,
+        coordinatorId: BigNumber.from(0),
         token: token.address,
         amount: {
           maker: utils.parseEther('7920'),
           taker: utils.parseEther('1980'),
         },
-        start: NOW + HOUR,
-        duration: 30 * DAY,
+        start: BigNumber.from(NOW + HOUR),
+        duration: BigNumber.from(30 * DAY),
       }
 
       const returnValue = await incentivizer.connect(owner).callStatic.create(product.address, PROGRAM_INFO)
       await expect(incentivizer.connect(owner).create(product.address, PROGRAM_INFO))
         .to.emit(incentivizer, 'ProgramCreated')
-        .withArgs(
-          product.address,
-          0,
-          PROGRAM_INFO_WITH_FEE.coordinatorId,
-          PROGRAM_INFO_WITH_FEE.token,
-          PROGRAM_INFO_WITH_FEE.amount.maker,
-          PROGRAM_INFO_WITH_FEE.amount.taker,
-          PROGRAM_INFO_WITH_FEE.start,
-          PROGRAM_INFO_WITH_FEE.duration,
-          utils.parseEther('100'),
-        )
+        .withArgs(product.address, 0, utils.parseEther('100'), PROGRAM_INFO_WITH_FEE)
 
       expect(returnValue).to.equal(EXPECTED_PROGRAM_ID)
       expectProgramInfoEq(await incentivizer.programInfos(product.address, EXPECTED_PROGRAM_ID), PROGRAM_INFO_WITH_FEE)

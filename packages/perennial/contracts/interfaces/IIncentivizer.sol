@@ -9,7 +9,7 @@ import "./IController.sol";
 import "./IProduct.sol";
 
 interface IIncentivizer {
-    event ProgramCreated(IProduct indexed product, uint256 indexed programId, uint256 coordinatorId, Token18 token, UFixed18 amountMaker, UFixed18 amountTaker, uint256 start, uint256 duration, UFixed18 programFeeAmount);
+    event ProgramCreated(IProduct indexed product, uint256 indexed programId, UFixed18 programFeeAmount, ProgramInfo programInfo);
     event ProgramStarted(IProduct indexed product, uint256 indexed programId, uint256 version);
     event ProgramComplete(IProduct indexed product, uint256 indexed programId, uint256 version);
     event Claim(IProduct indexed product, address indexed account, uint256 indexed programId, UFixed18 amount);
