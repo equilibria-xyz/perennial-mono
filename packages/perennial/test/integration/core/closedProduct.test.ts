@@ -2,8 +2,8 @@ import { expect } from 'chai'
 import 'hardhat'
 import { utils } from 'ethers'
 
-import { InstanceVars, deployProtocol, createProduct, depositTo } from './setupHelpers'
-import { Product } from '../../types/generated'
+import { InstanceVars, deployProtocol, createProduct, depositTo } from '../helpers/setupHelpers'
+import { Product } from '../../../types/generated'
 
 describe('Closed Product', () => {
   let instanceVars: InstanceVars

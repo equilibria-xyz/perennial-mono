@@ -2,7 +2,7 @@ import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import HRE from 'hardhat'
 import { BigNumber, utils } from 'ethers'
 
-import { time, impersonate } from '../testutil'
+import { time, impersonate } from '../../testutil'
 import {
   Collateral,
   Controller,
@@ -31,9 +31,10 @@ import {
   ProxyAdmin,
   ProxyAdmin__factory,
   TransparentUpgradeableProxy__factory,
-} from '../../types/generated'
+  ReservoirFeedOracle,
+} from '../../../types/generated'
 import { CHAINLINK_CUSTOM_CURRENCIES, ChainlinkContext } from './chainlinkHelpers'
-import { createPayoffDefinition } from '../testutil/types'
+import { createPayoffDefinition } from '../../testutil/types'
 const { config, deployments, ethers } = HRE
 
 export const INITIAL_PHASE_ID = 1
@@ -185,8 +186,18 @@ export async function deployProtocol(): Promise<InstanceVars> {
   }
 }
 
-export async function createProduct(instanceVars: InstanceVars): Promise<Product> {
-  const { owner, controller, treasuryB, productProvider, chainlinkOracle } = instanceVars
+export async function createProduct(
+  instanceVars: InstanceVars,
+  productProvider?: TestnetProductProvider,
+  oracle?: ChainlinkOracle | ReservoirFeedOracle,
+): Promise<Product> {
+  const { owner, controller, treasuryB, chainlinkOracle } = instanceVars
+  if (!productProvider) {
+    productProvider = instanceVars.productProvider
+  }
+  if (!oracle) {
+    oracle = chainlinkOracle
+  }
 
   await controller.createCoordinator()
   await controller.updateCoordinatorTreasury(1, treasuryB.address)
@@ -195,7 +206,7 @@ export async function createProduct(instanceVars: InstanceVars): Promise<Product
     name: 'Squeeth',
     symbol: 'SQTH',
     payoffDefinition: createPayoffDefinition({ contractAddress: productProvider.address }),
-    oracle: chainlinkOracle.address,
+    oracle: oracle.address,
     maintenance: utils.parseEther('0.3'),
     fundingFee: utils.parseEther('0.1'),
     makerFee: 0,
