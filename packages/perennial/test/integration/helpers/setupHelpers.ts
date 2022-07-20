@@ -31,6 +31,7 @@ import {
   ProxyAdmin,
   ProxyAdmin__factory,
   TransparentUpgradeableProxy__factory,
+  ReservoirFeedOracle,
 } from '../../../types/generated'
 import { CHAINLINK_CUSTOM_CURRENCIES, ChainlinkContext } from './chainlinkHelpers'
 import { createPayoffDefinition } from '../../testutil/types'
@@ -188,10 +189,14 @@ export async function deployProtocol(): Promise<InstanceVars> {
 export async function createProduct(
   instanceVars: InstanceVars,
   productProvider?: TestnetProductProvider,
+  oracle?: ChainlinkOracle | ReservoirFeedOracle,
 ): Promise<Product> {
   const { owner, controller, treasuryB, chainlinkOracle } = instanceVars
   if (!productProvider) {
     productProvider = instanceVars.productProvider
+  }
+  if (!oracle) {
+    oracle = chainlinkOracle
   }
 
   await controller.createCoordinator()
@@ -201,7 +206,7 @@ export async function createProduct(
     name: 'Squeeth',
     symbol: 'SQTH',
     payoffDefinition: createPayoffDefinition({ contractAddress: productProvider.address }),
-    oracle: chainlinkOracle.address,
+    oracle: oracle.address,
     maintenance: utils.parseEther('0.3'),
     fundingFee: utils.parseEther('0.1'),
     makerFee: 0,
