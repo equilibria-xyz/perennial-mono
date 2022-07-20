@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.14;
+pragma solidity 0.8.15;
 
 import "../interfaces/IPerennialLens.sol";
 
@@ -140,7 +140,7 @@ contract PerennialLens is IPerennialLens {
      * @return product position
      */
     function position(IProduct product) external settle(product) returns (Position memory) {
-        return latestPosition(product);
+        return _latestPosition(product);
     }
 
     /**
@@ -165,7 +165,7 @@ contract PerennialLens is IPerennialLens {
      * @return Product position
      */
     function globalPosition(IProduct product) external settle(product) returns (PrePosition memory, Position memory) {
-        return (product.pre(), latestPosition(product));
+        return (product.pre(), _latestPosition(product));
     }
 
     /**
@@ -174,7 +174,7 @@ contract PerennialLens is IPerennialLens {
      * @return Product latest price
      */
     function price(IProduct product) external settle(product) returns (Fixed18) {
-        return latestVersion(product).price;
+        return _latestVersion(product).price;
     }
 
     /**
@@ -216,7 +216,7 @@ contract PerennialLens is IPerennialLens {
         settleAccount(account, product)
         returns (Position memory)
     {
-        return product.position(account).mul(latestVersion(product).price.abs());
+        return product.position(account).mul(_latestVersion(product).price.abs());
     }
 
     /**
@@ -225,7 +225,7 @@ contract PerennialLens is IPerennialLens {
      * @return Product maker and taker position multiplied by latest price after settle
      */
     function openInterest(IProduct product) external settle(product) returns (Position memory) {
-        return latestPosition(product).mul(latestVersion(product).price.abs());
+        return _latestPosition(product).mul(_latestVersion(product).price.abs());
     }
 
     /**
@@ -234,7 +234,7 @@ contract PerennialLens is IPerennialLens {
      * @return Product current funding rate
      */
     function rate(IProduct product) external settle(product) returns (Fixed18) {
-        Position memory position_ = latestPosition(product);
+        Position memory position_ = _latestPosition(product);
         return product.productProvider().rate(position_);
     }
 
@@ -244,7 +244,7 @@ contract PerennialLens is IPerennialLens {
      * @return Product current funding extrapolated to a daily rate
      */
     function dailyRate(IProduct product) external settle(product) returns (Fixed18) {
-        Position memory position_ = latestPosition(product);
+        Position memory position_ = _latestPosition(product);
         return product.productProvider().rate(position_).mul(Fixed18Lib.from(60 * 60 * 24));
     }
 
@@ -260,7 +260,7 @@ contract PerennialLens is IPerennialLens {
         IProduct product,
         UFixed18 positionSize
     ) external settleAccount(account, product) returns (UFixed18) {
-        UFixed18 notional = positionSize.mul(latestVersion(product).price.abs());
+        UFixed18 notional = positionSize.mul(_latestVersion(product).price.abs());
         return notional.mul(product.productProvider().maintenance());
     }
 
@@ -315,21 +315,21 @@ contract PerennialLens is IPerennialLens {
 
     /**
      * @notice Returns the Product's latest position
-     * @dev Internal function, does not call settle itself
+     * @dev Private function, does not call settle itself
      * @param product Product address
      * @return Latest position for the product
      */
-    function latestPosition(IProduct product) internal view returns (Position memory) {
+    function _latestPosition(IProduct product) private view returns (Position memory) {
         return product.positionAtVersion(product.latestVersion());
     }
 
     /**
      * @notice Returns the Product's latest version
-     * @dev Internal function, does not call settle itself
+     * @dev Private function, does not call settle itself
      * @param product Product address
      * @return Latest version for the product
      */
-    function latestVersion(IProduct product) internal view returns (IOracleProvider.OracleVersion memory) {
+    function _latestVersion(IProduct product) private view returns (IOracleProvider.OracleVersion memory) {
         return product.productProvider().currentVersion();
     }
 

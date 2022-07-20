@@ -158,7 +158,7 @@ describe('Lens', () => {
 
     expect(await lens.callStatic['collateral(address,address)'](user.address, product.address)).to.equal(0)
     expect(await lens.callStatic['collateral(address,address)'](userB.address, product.address)).to.equal(
-      '4463736825720737646856',
+      '4463720317001203086618',
     )
     expect(await lens.callStatic['collateral(address)'](product.address)).to.equal('1999983491280465439762')
     expect(await lens.callStatic.shortfall(product.address)).to.equal('2463736825720737646856')

@@ -1,6 +1,6 @@
 {
   "name": "@equilibria/perennial-provider",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Library for Perennial product providers",
   "files": [
     "contracts/oracle",

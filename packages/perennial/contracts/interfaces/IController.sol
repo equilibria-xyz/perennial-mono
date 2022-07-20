@@ -44,7 +44,6 @@ interface IController {
     event CoordinatorCreated(uint256 indexed coordinatorId, address owner);
     event ProductCreated(IProduct indexed product, IProductProvider provider);
 
-    error ControllerAlreadyInitializedError();
     error ControllerNoZeroCoordinatorError();
     error ControllerNotPauserError(uint256 coordinatorId);
     error ControllerNotOwnerError(uint256 controllerId);
@@ -53,6 +52,7 @@ interface IController {
     error ControllerInvalidMinFundingFeeError();
     error ControllerInvalidLiquidationFeeError();
     error ControllerInvalidIncentivizationFeeError();
+    error ControllerNotContractAddressError();
 
     function collateral() external view returns (ICollateral);
     function incentivizer() external view returns (IIncentivizer);
@@ -66,7 +66,7 @@ interface IController {
     function minCollateral() external view returns (UFixed18);
     function programsPerProduct() external view returns (uint256);
     function initialize(ICollateral collateral_, IIncentivizer incentivizer_, IBeacon productBeacon_) external;
-    function createCoordinator(address coordinatorOwner) external returns (uint256);
+    function createCoordinator() external returns (uint256);
     function updateCoordinatorPendingOwner(uint256 coordinatorId, address newPendingOwner) external;
     function acceptCoordinatorOwner(uint256 coordinatorId) external;
     function updateCoordinatorTreasury(uint256 coordinatorId, address newTreasury) external;

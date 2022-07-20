@@ -99,8 +99,8 @@ describe('Controller', () => {
 
   describe('#createCoordinator', async () => {
     it('creates the coordinator', async () => {
-      const returnValue = await controller.connect(owner).callStatic.createCoordinator(coordinatorOwner.address)
-      await expect(controller.connect(owner).createCoordinator(coordinatorOwner.address))
+      const returnValue = await controller.connect(coordinatorOwner).callStatic.createCoordinator()
+      await expect(controller.connect(coordinatorOwner).createCoordinator())
         .to.emit(controller, 'CoordinatorCreated')
         .withArgs(1, coordinatorOwner.address)
 
@@ -118,17 +118,11 @@ describe('Controller', () => {
       expect(await controller['pauser(uint256)'](1)).to.equal(coordinatorOwner.address)
       expect(await controller['paused(uint256)'](1)).to.equal(false)
     })
-
-    it('reverts if not protocol owner', async () => {
-      await expect(controller.connect(coordinatorOwner).createCoordinator(coordinatorOwner.address)).to.be.revertedWith(
-        'ControllerNotOwnerError(0)',
-      )
-    })
   })
 
   describe('#updateCoordinatorPendingOwner', async () => {
     beforeEach(async () => {
-      await controller.connect(owner).createCoordinator(coordinatorOwner.address)
+      await controller.connect(coordinatorOwner).createCoordinator()
     })
 
     it('updates the coordinator pending owner', async () => {
@@ -191,7 +185,7 @@ describe('Controller', () => {
 
   describe('#acceptCoordinatorOwner', async () => {
     beforeEach(async () => {
-      await controller.connect(owner).createCoordinator(coordinatorOwner.address)
+      await controller.connect(coordinatorOwner).createCoordinator()
     })
 
     it('updates the coordinator owner', async () => {
@@ -276,7 +270,7 @@ describe('Controller', () => {
 
   describe('#updateCoordinatorTreasury', async () => {
     beforeEach(async () => {
-      await controller.connect(owner).createCoordinator(coordinatorOwner.address)
+      await controller.connect(coordinatorOwner).createCoordinator()
     })
 
     it('updates the coordinator treasury', async () => {
@@ -337,7 +331,7 @@ describe('Controller', () => {
 
   describe('#updateCoordinatorPauser', async () => {
     beforeEach(async () => {
-      await controller.connect(owner).createCoordinator(coordinatorOwner.address)
+      await controller.connect(coordinatorOwner).createCoordinator()
     })
 
     it('updates the coordinator pauser', async () => {
@@ -398,7 +392,7 @@ describe('Controller', () => {
 
   describe('#updateCoordinatorPaused', async () => {
     beforeEach(async () => {
-      await controller.connect(owner).createCoordinator(coordinatorOwner.address)
+      await controller.connect(coordinatorOwner).createCoordinator()
     })
 
     context('from owner', async () => {
@@ -523,14 +517,16 @@ describe('Controller', () => {
 
   describe('#createProduct', async () => {
     beforeEach(async () => {
-      await controller.connect(owner).createCoordinator(coordinatorOwner.address)
+      await controller.connect(coordinatorOwner).createCoordinator()
       await controller.connect(coordinatorOwner).updateCoordinatorTreasury(1, coordinatorTreasury.address)
       await controller.connect(coordinatorOwner).updateCoordinatorPauser(1, coordinatorPauser.address)
     })
 
     it('creates the product', async () => {
-      const productAddress = await controller.connect(owner).callStatic.createProduct(1, productProvider.address)
-      await expect(controller.connect(owner).createProduct(1, productProvider.address))
+      const productAddress = await controller
+        .connect(coordinatorOwner)
+        .callStatic.createProduct(1, productProvider.address)
+      await expect(controller.connect(coordinatorOwner).createProduct(1, productProvider.address))
         .to.emit(controller, 'ProductCreated')
         .withArgs(productAddress, productProvider.address)
 
@@ -551,15 +547,17 @@ describe('Controller', () => {
       )
     })
 
-    it('reverts if not protocol owner', async () => {
-      await expect(controller.connect(coordinatorOwner).createProduct(1, productProvider.address)).to.be.revertedWith(
-        'ControllerNotOwnerError(0)',
+    it('reverts if not coordinator owner', async () => {
+      await expect(controller.connect(owner).createProduct(1, productProvider.address)).to.be.revertedWith(
+        'ControllerNotOwnerError(1)',
       )
     })
 
     it('returns paused correctly', async () => {
-      const productAddress = await controller.connect(owner).callStatic.createProduct(1, productProvider.address)
-      await controller.connect(owner).createProduct(1, productProvider.address)
+      const productAddress = await controller
+        .connect(coordinatorOwner)
+        .callStatic.createProduct(1, productProvider.address)
+      await controller.connect(coordinatorOwner).createProduct(1, productProvider.address)
 
       await controller.connect(coordinatorPauser).updateCoordinatorPaused(1, true)
       expect(await controller['paused(address)'](productAddress)).to.equal(true)
@@ -582,6 +580,10 @@ describe('Controller', () => {
         'ControllerNotOwnerError(0)',
       )
     })
+
+    it('reverts on invalid address', async () => {
+      await expect(controller.updateCollateral(user.address)).to.be.revertedWith('ControllerNotContractAddressError()')
+    })
   })
 
   describe('#updateIncentivizer', async () => {
@@ -600,9 +602,15 @@ describe('Controller', () => {
         'ControllerNotOwnerError(0)',
       )
     })
+
+    it('reverts on invalid address', async () => {
+      await expect(controller.updateIncentivizer(user.address)).to.be.revertedWith(
+        'ControllerNotContractAddressError()',
+      )
+    })
   })
 
-  describe('#updateproductBeacon', async () => {
+  describe('#updateProductBeacon', async () => {
     it('updates the collateral address', async () => {
       const newProductBeacon = await waffle.deployMockContract(owner, IBeacon__factory.abi)
       await expect(controller.updateProductBeacon(newProductBeacon.address))
@@ -616,6 +624,12 @@ describe('Controller', () => {
       const newProductBeacon = await waffle.deployMockContract(owner, IBeacon__factory.abi)
       await expect(controller.connect(user).updateProductBeacon(newProductBeacon.address)).to.be.revertedWith(
         'ControllerNotOwnerError(0)',
+      )
+    })
+
+    it('reverts on invalid address', async () => {
+      await expect(controller.updateProductBeacon(user.address)).to.be.revertedWith(
+        'ControllerNotContractAddressError()',
       )
     })
   })

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.14;
+pragma solidity 0.8.15;
 
 import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
@@ -68,7 +68,7 @@ contract Controller is IController, UInitializable {
         IIncentivizer incentivizer_,
         IBeacon productBeacon_
     ) external initializer(1) {
-        _createCoordinator(msg.sender);
+        _createCoordinator();
 
         updateCollateral(collateral_);
         updateIncentivizer(incentivizer_);
@@ -78,31 +78,29 @@ contract Controller is IController, UInitializable {
     /**
      * @notice Creates a new coordinator with `msg.sender` as the owner
      * @dev Can only be called by the protocol owner
-     * @param coordinatorOwner The owner address of the new coordinator
      * @return New coordinator ID
      */
-    function createCoordinator(address coordinatorOwner) external onlyOwner(0) returns (uint256) {
-        return _createCoordinator(coordinatorOwner);
+    function createCoordinator() external returns (uint256) {
+        return _createCoordinator();
     }
 
     /**
      * @notice Creates a new coordinator with `msg.sender` as the owner
      * @dev `treasury` and `pauser` initialize as the 0-address, defaulting to the `owner`
-     * @param coordinatorOwner The owner address of the new coordinator
      * @return New coordinator ID
      */
-    function _createCoordinator(address coordinatorOwner) private returns (uint256) {
+    function _createCoordinator() private returns (uint256) {
         uint256 coordinatorId = _coordinators.length;
 
         _coordinators.push(Coordinator({
             pendingOwner: address(0),
-            owner: coordinatorOwner,
+            owner: msg.sender,
             treasury: address(0),
             pauser: address(0),
             paused: false
         }));
 
-        emit CoordinatorCreated(coordinatorId, coordinatorOwner);
+        emit CoordinatorCreated(coordinatorId, msg.sender);
 
         return coordinatorId;
     }
@@ -136,7 +134,7 @@ contract Controller is IController, UInitializable {
 
     /**
      * @notice Updates the treasury of an existing coordinator
-     * @dev Must be called by the coordinator's current owner
+     * @dev Must be called by the coordinator's current owner. Defaults to the coordinator `owner` if set to address(0)
      * @param coordinatorId Coordinator to update
      * @param newTreasury New treasury address
      */
@@ -147,7 +145,7 @@ contract Controller is IController, UInitializable {
 
     /**
      * @notice Updates the pauser of an existing coordinator
-     * @dev Must be called by the coordinator's current owner
+     * @dev Must be called by the coordinator's current owner. Defaults to the coordinator `owner` if set to address(0)
      * @param coordinatorId Coordinator to update
      * @param newPauser New pauser address
      */
@@ -169,12 +167,12 @@ contract Controller is IController, UInitializable {
 
     /**
      * @notice Creates a new product market with `provider`
-     * @dev Can only be called by the protocol owner
+     * @dev Can only be called by the coordinator owner
      * @param coordinatorId Coordinator that will own the product
      * @param provider Provider that will service the market
      * @return New product contract address
      */
-    function createProduct(uint256 coordinatorId, IProductProvider provider) external onlyOwner(0) returns (IProduct) {
+    function createProduct(uint256 coordinatorId, IProductProvider provider) external onlyOwner(coordinatorId) returns (IProduct) {
         if (coordinatorId == 0) revert ControllerNoZeroCoordinatorError();
 
         BeaconProxy newProductProxy = new BeaconProxy(address(productBeacon()), abi.encodeCall(IProduct.initialize, provider));
@@ -190,6 +188,7 @@ contract Controller is IController, UInitializable {
      * @param newCollateral New Collateral contract address
      */
     function updateCollateral(ICollateral newCollateral) public onlyOwner(0) {
+        if (!Address.isContract(address(newCollateral))) revert ControllerNotContractAddressError();
         _collateral.store(address(newCollateral));
         emit CollateralUpdated(newCollateral);
     }
@@ -199,6 +198,7 @@ contract Controller is IController, UInitializable {
      * @param newIncentivizer New Incentivizer contract address
      */
     function updateIncentivizer(IIncentivizer newIncentivizer) public onlyOwner(0) {
+        if (!Address.isContract(address(newIncentivizer))) revert ControllerNotContractAddressError();
         _incentivizer.store(address(newIncentivizer));
         emit IncentivizerUpdated(newIncentivizer);
     }
@@ -208,6 +208,7 @@ contract Controller is IController, UInitializable {
      * @param newProductBeacon New Product implementation beacon address
      */
     function updateProductBeacon(IBeacon newProductBeacon) public onlyOwner(0) {
+        if (!Address.isContract(address(newProductBeacon))) revert ControllerNotContractAddressError();
         _productBeacon.store(address(newProductBeacon));
         emit ProductBeaconUpdated(newProductBeacon);
     }
@@ -421,14 +422,14 @@ contract Controller is IController, UInitializable {
         return paused(coordinatorFor[product]);
     }
 
-    // @dev Only allow owner of `coordinatorId` to call
+    /// @dev Only allow owner of `coordinatorId` to call
     modifier onlyOwner(uint256 coordinatorId) {
         if (msg.sender != owner(coordinatorId)) revert ControllerNotOwnerError(coordinatorId);
 
         _;
     }
 
-    // @dev Only pauser owner of `coordinatorId` to call
+    /// @dev Only pauser owner of `coordinatorId` to call
     modifier onlyPauser(uint256 coordinatorId) {
         if (msg.sender != pauser(coordinatorId)) revert ControllerNotPauserError(coordinatorId);
 

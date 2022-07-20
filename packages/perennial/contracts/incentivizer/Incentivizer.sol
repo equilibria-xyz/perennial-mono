@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.14;
+pragma solidity 0.8.15;
 
 import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@equilibria/root/control/unstructured/UReentrancyGuard.sol";
@@ -157,8 +157,8 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
     external
     nonReentrant
     {
-        uint256 productCount = products.length;
-        for (uint256 i; i < productCount; i++) {
+        if (products.length != programIds.length) revert IncentivizerBatchClaimArgumentMismatchError();
+        for (uint256 i; i < products.length; i++) {
             _claimProduct(products[i], programIds[i]);
         }
     }
@@ -175,8 +175,7 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
     notPausedProduct(product)
     settleForAccount(msg.sender, product)
     {
-        uint256 programCount = programIds.length;
-        for (uint256 i; i < programCount; i++) {
+        for (uint256 i; i < programIds.length; i++) {
             _claimProgram(product, programIds[i]);
         }
     }
@@ -205,7 +204,6 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
         for(uint256 i; i < tokens.length; i++) {
             Token18 token = tokens[i];
             UFixed18 amount = fees[token];
-            if (amount.isZero()) continue;
 
             fees[token] = UFixed18Lib.ZERO;
             token.push(controller().treasury(), amount);

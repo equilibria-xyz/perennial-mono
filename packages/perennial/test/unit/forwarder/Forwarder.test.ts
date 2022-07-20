@@ -58,6 +58,21 @@ describe('Forwarder', () => {
       expect(await forwarder.batcher()).to.equal(batcher.address)
       expect(await forwarder.collateral()).to.equal(collateral.address)
     })
+
+    it('reverts on invalid addresses', async () => {
+      await expect(
+        new Forwarder__factory(owner).deploy(user.address, dsu.address, batcher.address, collateral.address),
+      ).to.be.revertedWith('ForwarderNotContractAddressError()')
+      await expect(
+        new Forwarder__factory(owner).deploy(usdc.address, user.address, batcher.address, collateral.address),
+      ).to.be.revertedWith('ForwarderNotContractAddressError()')
+      await expect(
+        new Forwarder__factory(owner).deploy(user.address, dsu.address, user.address, collateral.address),
+      ).to.be.revertedWith('ForwarderNotContractAddressError()')
+      await expect(
+        new Forwarder__factory(owner).deploy(user.address, dsu.address, batcher.address, user.address),
+      ).to.be.revertedWith('ForwarderNotContractAddressError()')
+    })
   })
 
   describe('#wrapAndDeposit', () => {

@@ -20,7 +20,7 @@ describe('Forwarder', () => {
 
     await usdc.connect(user).approve(forwarder.address, 10e12)
 
-    expect(await forwarder.connect(user).wrapAndDeposit(userB.address, product.address, utils.parseEther('1000')))
+    await expect(forwarder.connect(user).wrapAndDeposit(userB.address, product.address, utils.parseEther('1000')))
       .to.emit(forwarder, 'WrapAndDeposit')
       .withArgs(userB.address, product.address, utils.parseEther('1000'))
 

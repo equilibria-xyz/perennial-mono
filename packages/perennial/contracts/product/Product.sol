@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.14;
+pragma solidity 0.8.15;
 
 import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@equilibria/root/control/unstructured/UReentrancyGuard.sol";
@@ -43,7 +43,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
      * @notice Surfaces global settlement externally
      */
     function settle() external nonReentrant notPausedProduct(IProduct(this)) {
-        settleInternal();
+        _settle();
     }
 
     /**
@@ -58,7 +58,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
      *
      *  Syncs each to instantaneously after the oracle update.
      */
-    function settleInternal() internal returns (IOracleProvider.OracleVersion memory currentOracleVersion) {
+    function _settle() private returns (IOracleProvider.OracleVersion memory currentOracleVersion) {
         (IProductProvider _provider, IController _controller) = (productProvider, controller());
 
         // Get current oracle version
@@ -106,8 +106,8 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
      * @param account Account to settle
      */
     function settleAccount(address account) external nonReentrant notPausedProduct(IProduct(this)) {
-        IOracleProvider.OracleVersion memory currentOracleVersion = settleInternal();
-        settleAccountInternal(account, currentOracleVersion);
+        IOracleProvider.OracleVersion memory currentOracleVersion = _settle();
+        _settleAccount(account, currentOracleVersion);
     }
 
     /**
@@ -123,7 +123,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
      *
      *  Syncs each to instantaneously after the oracle update.
      */
-    function settleAccountInternal(address account, IOracleProvider.OracleVersion memory currentOracleVersion) internal {
+    function _settleAccount(address account, IOracleProvider.OracleVersion memory currentOracleVersion) private {
         (IProductProvider _provider, IController _controller) = (productProvider, controller());
 
         // Get latest oracle version
@@ -148,7 +148,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
         // position a->b
         accumulated = accumulated.sub(Fixed18Lib.from(_positions[account].settle(_provider, settleOracleVersion)));
 
-        // short-circuit if a->c
+        // short-circuit from a->c if b == c
         if (settleOracleVersion.version != currentOracleVersion.version) {
             // sync incentivizer before accumulator
             _controller.incentivizer().syncAccount(account, currentOracleVersion);
@@ -198,10 +198,10 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
     closeInvariant
     liquidationInvariant
     {
-        closeTakeInternal(msg.sender, amount);
+        _closeTake(msg.sender, amount);
     }
 
-    function closeTakeInternal(address account, UFixed18 amount) internal {
+    function _closeTake(address account, UFixed18 amount) private {
         uint256 _latestVersion = latestVersion();
 
         _positions[account].pre.closeTake(_latestVersion, amount);
@@ -246,10 +246,10 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
     closeInvariant
     liquidationInvariant
     {
-        closeMakeInternal(msg.sender, amount);
+        _closeMake(msg.sender, amount);
     }
 
-    function closeMakeInternal(address account, UFixed18 amount) internal {
+    function _closeMake(address account, UFixed18 amount) private {
         uint256 _latestVersion = latestVersion();
 
         _positions[account].pre.closeMake(_latestVersion, amount);
@@ -268,8 +268,8 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
         Position memory p = accountPosition.position.next(_positions[account].pre);
 
         // Close all positions
-        closeMakeInternal(account, p.maker);
-        closeTakeInternal(account, p.taker);
+        _closeMake(account, p.maker);
+        _closeTake(account, p.taker);
 
         // Mark liquidation to lock position
         accountPosition.liquidation = true;
@@ -435,8 +435,8 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
 
     /// @dev Helper to fully settle an account's state
     modifier settleForAccount(address account) {
-        IOracleProvider.OracleVersion memory currentVersion = settleInternal();
-        settleAccountInternal(account, currentVersion);
+        IOracleProvider.OracleVersion memory currentVersion = _settle();
+        _settleAccount(account, currentVersion);
 
         _;
     }

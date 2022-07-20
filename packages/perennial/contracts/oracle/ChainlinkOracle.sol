@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.14;
+pragma solidity 0.8.15;
 
 import "@chainlink/contracts/src/v0.8/interfaces/FeedRegistryInterface.sol";
-import "@equilibria/root/control/unstructured/UOwnable.sol";
 import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "../interfaces/IOracleProvider.sol";
 import "./types/ChainlinkRegistry.sol";
@@ -14,7 +13,7 @@ import "./types/ChainlinkRegistry.sol";
  *      ChainlinkOracle instance if their payoff functions are based on the same underlying oracle.
  *      This implementation only support non-negative prices.
  */
-contract ChainlinkOracle is IOracleProvider, UOwnable {
+contract ChainlinkOracle is IOracleProvider {
     /// @dev Chainlink registry feed address
     ChainlinkRegistry public immutable registry;
 
