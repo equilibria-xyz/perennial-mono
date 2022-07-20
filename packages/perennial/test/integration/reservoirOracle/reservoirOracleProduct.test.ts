@@ -47,7 +47,7 @@ describe('Reservoir Oracle Product', () => {
   it('creates a product', async () => {
     const { owner, user, controller, collateral, treasuryB, dsu } = instanceVars
 
-    await expect(controller.createCoordinator(owner.address))
+    await expect(controller.connect(owner).createCoordinator())
       .to.emit(controller, 'CoordinatorCreated')
       .withArgs(1, owner.address)
     await expect(controller.updateCoordinatorTreasury(1, treasuryB.address))
