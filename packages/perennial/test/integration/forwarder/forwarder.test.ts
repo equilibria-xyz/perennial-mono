@@ -2,7 +2,7 @@ import { expect } from 'chai'
 import { BigNumber, utils } from 'ethers'
 import 'hardhat'
 
-import { InstanceVars, deployProtocol, createProduct } from './setupHelpers'
+import { InstanceVars, deployProtocol, createProduct } from '../helpers/setupHelpers'
 
 describe('Forwarder', () => {
   let instanceVars: InstanceVars

@@ -2,8 +2,8 @@ import { expect } from 'chai'
 import 'hardhat'
 import { utils } from 'ethers'
 
-import { InstanceVars, deployProtocol, createProduct, depositTo, INITIAL_VERSION } from './setupHelpers'
-import { expectPositionEq, expectPrePositionEq } from '../testutil/types'
+import { InstanceVars, deployProtocol, createProduct, depositTo, INITIAL_VERSION } from '../helpers/setupHelpers'
+import { expectPositionEq, expectPrePositionEq } from '../../testutil/types'
 
 describe('Happy Path', () => {
   let instanceVars: InstanceVars

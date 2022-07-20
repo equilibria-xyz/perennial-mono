@@ -2,7 +2,7 @@ import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import HRE from 'hardhat'
 import { BigNumber, utils } from 'ethers'
 
-import { time, impersonate } from '../testutil'
+import { time, impersonate } from '../../testutil'
 import {
   Collateral,
   Controller,
@@ -31,7 +31,7 @@ import {
   ProxyAdmin,
   ProxyAdmin__factory,
   TransparentUpgradeableProxy__factory,
-} from '../../types/generated'
+} from '../../../types/generated'
 import { CHAINLINK_CUSTOM_CURRENCIES, ChainlinkContext } from './chainlinkHelpers'
 const { config, deployments, ethers } = HRE
 
@@ -202,8 +202,14 @@ export async function createCoordinator(instanceVars: InstanceVars): Promise<Pro
   return Product__factory.connect(productAddress, owner)
 }
 
-export async function createProduct(instanceVars: InstanceVars): Promise<Product> {
-  const { owner, controller, treasuryB, productProvider } = instanceVars
+export async function createProduct(
+  instanceVars: InstanceVars,
+  productProvider?: TestnetProductProvider,
+): Promise<Product> {
+  const { owner, controller, treasuryB } = instanceVars
+  if (!productProvider) {
+    productProvider = instanceVars.productProvider
+  }
 
   await controller.createCoordinator()
   await controller.updateCoordinatorTreasury(1, treasuryB.address)
