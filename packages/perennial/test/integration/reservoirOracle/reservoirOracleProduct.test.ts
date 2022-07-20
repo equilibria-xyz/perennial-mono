@@ -1,59 +1,61 @@
 import { expect } from 'chai'
 import 'hardhat'
-import { utils } from 'ethers'
+import { BigNumber, utils } from 'ethers'
 
-import { InstanceVars, deployProtocol, createProduct, depositTo, INITIAL_VERSION } from './setupHelpers'
-import { createPayoffDefinition, expectPositionEq, expectPrePositionEq } from '../testutil/types'
+import { InstanceVars, deployProtocol, createProduct, depositTo } from '../helpers/setupHelpers'
+import { expectPositionEq, expectPrePositionEq } from '../../testutil/types'
+import { DataFeedContext } from '../helpers/feedOracleHelper'
+import {
+  ReservoirFeedOracle__factory,
+  TestnetProductProvider,
+  TestnetProductProvider__factory,
+} from '../../../types/generated'
+import { deployments } from 'hardhat'
 
-describe('Happy Path', () => {
+const VERSION_OFFSET = BigNumber.from('73786976294838209800')
+const INITIAL_VERSION = BigNumber.from(1)
+
+describe('Reservoir Oracle Product', () => {
   let instanceVars: InstanceVars
+  let oracleFeed: DataFeedContext
+  let baycUSDCProductProvider: TestnetProductProvider
 
   beforeEach(async () => {
     instanceVars = await deployProtocol()
-  })
+    const { owner } = instanceVars
 
-  it('initializes', async () => {
-    const { collateral, controller, dsu } = instanceVars
+    // Reservoir has not deployed their feed adaptor to mainnet, so for now use Chainlink's DPI feed as a standin
+    // TODO(arjun): Update this with Reservoir's mainnet deploy
+    const baycUSDCFeed = (await deployments.get('ChainlinkDPIFeed')).address
+    oracleFeed = new DataFeedContext(baycUSDCFeed, VERSION_OFFSET)
+    await oracleFeed.init()
 
-    expect((await collateral.controller()).toUpperCase()).to.equal(controller.address.toUpperCase())
-    expect((await collateral.token()).toUpperCase()).to.equal(dsu.address.toUpperCase())
-  })
-
-  it('reverts if already initialized', async () => {
-    const { collateral, controller } = instanceVars
-
-    await expect(collateral.initialize(controller.address)).to.be.revertedWith(
-      'UInitializableAlreadyInitializedError(1)',
+    const reservoirOracle = await new ReservoirFeedOracle__factory(owner).deploy(
+      oracleFeed.feed.address,
+      VERSION_OFFSET,
     )
+    baycUSDCProductProvider = await new TestnetProductProvider__factory(owner).deploy(reservoirOracle.address, {
+      minRate: 0,
+      maxRate: utils.parseEther('5.00'),
+      targetRate: utils.parseEther('0.80'),
+      targetUtilization: utils.parseEther('0.80'),
+    })
+
+    await oracleFeed.next()
   })
 
   it('creates a product', async () => {
-    const { owner, user, controller, collateral, treasuryB, productProvider, chainlinkOracle, dsu } = instanceVars
+    const { owner, user, controller, collateral, treasuryB, dsu } = instanceVars
 
-    await expect(controller.createCoordinator()).to.emit(controller, 'CoordinatorCreated').withArgs(1, owner.address)
+    await expect(controller.connect(owner).createCoordinator())
+      .to.emit(controller, 'CoordinatorCreated')
+      .withArgs(1, owner.address)
     await expect(controller.updateCoordinatorTreasury(1, treasuryB.address))
       .to.emit(controller, 'CoordinatorTreasuryUpdated')
       .withArgs(1, treasuryB.address)
 
-    const productInfo = {
-      name: 'Squeeth',
-      symbol: 'SQTH',
-      payoffDefinition: createPayoffDefinition({ contractAddress: productProvider.address }),
-      oracle: chainlinkOracle.address,
-      maintenance: utils.parseEther('0.3'),
-      fundingFee: utils.parseEther('0.1'),
-      makerFee: 0,
-      takerFee: 0,
-      makerLimit: utils.parseEther('1'),
-      utilizationCurve: {
-        minRate: 0,
-        maxRate: utils.parseEther('5.00'),
-        targetRate: utils.parseEther('0.80'),
-        targetUtilization: utils.parseEther('0.80'),
-      },
-    }
-    const productAddress = await controller.callStatic.createProduct(1, productInfo)
-    await expect(controller.createProduct(1, productInfo)).to.emit(controller, 'ProductCreated')
+    const productAddress = await controller.callStatic.createProduct(1, baycUSDCProductProvider.address)
+    await expect(controller.createProduct(1, baycUSDCProductProvider.address)).to.emit(controller, 'ProductCreated')
 
     await dsu.connect(user).approve(collateral.address, utils.parseEther('1000'))
     await collateral.connect(user).depositTo(user.address, productAddress, utils.parseEther('1000'))
@@ -64,9 +66,9 @@ describe('Happy Path', () => {
 
   it('opens a make position', async () => {
     const POSITION = utils.parseEther('0.0001')
-    const { user, chainlink } = instanceVars
+    const { user } = instanceVars
 
-    const product = await createProduct(instanceVars)
+    const product = await createProduct(instanceVars, baycUSDCProductProvider)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
 
     await expect(product.connect(user).openMake(POSITION))
@@ -95,12 +97,12 @@ describe('Happy Path', () => {
     expectPositionEq(await product.shareAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
 
     // Settle the product with a new oracle version
-    await chainlink.next()
+    await oracleFeed.next()
     await product.settle()
 
     // Check global post-settlement state
-    expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION + 1)
-    expectPositionEq(await product.positionAtVersion(INITIAL_VERSION + 1), { maker: POSITION, taker: 0 })
+    expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION.add(1))
+    expectPositionEq(await product.positionAtVersion(INITIAL_VERSION.add(1)), { maker: POSITION, taker: 0 })
     expectPrePositionEq(await product['pre()'](), {
       oracleVersion: 0,
       openPosition: { maker: 0, taker: 0 },
@@ -115,14 +117,14 @@ describe('Happy Path', () => {
       openPosition: { maker: 0, taker: 0 },
       closePosition: { maker: 0, taker: 0 },
     })
-    expect(await product['latestVersion(address)'](user.address)).to.equal(INITIAL_VERSION + 1)
+    expect(await product['latestVersion(address)'](user.address)).to.equal(INITIAL_VERSION.add(1))
   })
 
   it('opens multiple make positions', async () => {
     const POSITION = utils.parseEther('0.0001')
-    const { user, chainlink } = instanceVars
+    const { user } = instanceVars
 
-    const product = await createProduct(instanceVars)
+    const product = await createProduct(instanceVars, baycUSDCProductProvider)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
 
     await product.connect(user).openMake(POSITION.div(2))
@@ -153,12 +155,12 @@ describe('Happy Path', () => {
     expectPositionEq(await product.shareAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
 
     // Settle the product with a new oracle version
-    await chainlink.next()
+    await oracleFeed.next()
     await product.settle()
 
     // Check global post-settlement state
-    expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION + 1)
-    expectPositionEq(await product.positionAtVersion(INITIAL_VERSION + 1), { maker: POSITION, taker: 0 })
+    expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION.add(1))
+    expectPositionEq(await product.positionAtVersion(INITIAL_VERSION.add(1)), { maker: POSITION, taker: 0 })
     expectPrePositionEq(await product['pre()'](), {
       oracleVersion: 0,
       openPosition: { maker: 0, taker: 0 },
@@ -173,7 +175,7 @@ describe('Happy Path', () => {
       openPosition: { maker: 0, taker: 0 },
       closePosition: { maker: 0, taker: 0 },
     })
-    expect(await product['latestVersion(address)'](user.address)).to.equal(INITIAL_VERSION + 1)
+    expect(await product['latestVersion(address)'](user.address)).to.equal(INITIAL_VERSION.add(1))
   })
 
   it('closes a make position', async () => {
@@ -181,7 +183,7 @@ describe('Happy Path', () => {
     const CLOSE_POSITION = utils.parseEther('0.0001')
     const { user } = instanceVars
 
-    const product = await createProduct(instanceVars)
+    const product = await createProduct(instanceVars, baycUSDCProductProvider)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await product.connect(user).openMake(OPEN_POSITION)
 
@@ -191,7 +193,7 @@ describe('Happy Path', () => {
 
     // User state
     expect(await product.isClosed(user.address)).to.equal(true)
-    expect(await product['maintenance(address)'](user.address)).to.equal(0)
+    expect(await product.maintenance(user.address)).to.equal(0)
     expect(await product.maintenanceNext(user.address)).to.equal(0)
     expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -218,7 +220,7 @@ describe('Happy Path', () => {
     const CLOSE_POSITION = utils.parseEther('0.0001')
     const { user } = instanceVars
 
-    const product = await createProduct(instanceVars)
+    const product = await createProduct(instanceVars, baycUSDCProductProvider)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await product.connect(user).openMake(OPEN_POSITION)
     await product.connect(user).closeMake(CLOSE_POSITION.div(2))
@@ -229,7 +231,7 @@ describe('Happy Path', () => {
 
     // User state
     expect(await product.isClosed(user.address)).to.equal(true)
-    expect(await product['maintenance(address)'](user.address)).to.equal(0)
+    expect(await product.maintenance(user.address)).to.equal(0)
     expect(await product.maintenanceNext(user.address)).to.equal(0)
     expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -256,7 +258,7 @@ describe('Happy Path', () => {
     const TAKE_POSITION = utils.parseEther('0.00001')
     const { user, userB, chainlink, chainlinkOracle } = instanceVars
 
-    const product = await createProduct(instanceVars)
+    const product = await createProduct(instanceVars, baycUSDCProductProvider)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
 
@@ -287,15 +289,15 @@ describe('Happy Path', () => {
     expectPositionEq(await product.shareAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
 
     // One round
-    await chainlink.next()
+    await oracleFeed.next()
     await chainlinkOracle.sync()
 
     // Another round
-    await chainlink.next()
+    await oracleFeed.next()
     await product.settle()
 
-    expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION + 2)
-    expectPositionEq(await product.positionAtVersion(INITIAL_VERSION + 2), {
+    expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION.add(2))
+    expectPositionEq(await product.positionAtVersion(INITIAL_VERSION.add(2)), {
       maker: MAKE_POSITION,
       taker: TAKE_POSITION,
     })
@@ -311,7 +313,7 @@ describe('Happy Path', () => {
       openPosition: { maker: 0, taker: 0 },
       closePosition: { maker: 0, taker: 0 },
     })
-    expect(await product['latestVersion(address)'](userB.address)).to.equal(INITIAL_VERSION + 2)
+    expect(await product['latestVersion(address)'](userB.address)).to.equal(INITIAL_VERSION.add(2))
   })
 
   it('opens multiple take positions', async () => {
@@ -319,7 +321,7 @@ describe('Happy Path', () => {
     const TAKE_POSITION = utils.parseEther('0.00001')
     const { user, userB, chainlink, chainlinkOracle } = instanceVars
 
-    const product = await createProduct(instanceVars)
+    const product = await createProduct(instanceVars, baycUSDCProductProvider)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
 
@@ -352,15 +354,15 @@ describe('Happy Path', () => {
     expectPositionEq(await product.shareAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
 
     // One round
-    await chainlink.next()
+    await oracleFeed.next()
     await chainlinkOracle.sync()
 
     // Another round
-    await chainlink.next()
+    await oracleFeed.next()
     await product.settle()
 
-    expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION + 2)
-    expectPositionEq(await product.positionAtVersion(INITIAL_VERSION + 2), {
+    expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION.add(2))
+    expectPositionEq(await product.positionAtVersion(INITIAL_VERSION.add(2)), {
       maker: MAKE_POSITION,
       taker: TAKE_POSITION,
     })
@@ -376,7 +378,7 @@ describe('Happy Path', () => {
       openPosition: { maker: 0, taker: 0 },
       closePosition: { maker: 0, taker: 0 },
     })
-    expect(await product['latestVersion(address)'](userB.address)).to.equal(INITIAL_VERSION + 2)
+    expect(await product['latestVersion(address)'](userB.address)).to.equal(INITIAL_VERSION.add(2))
   })
 
   it('closes a take position', async () => {
@@ -385,7 +387,7 @@ describe('Happy Path', () => {
     const CLOSE_TAKE_POSITION = utils.parseEther('0.00001')
     const { user, userB } = instanceVars
 
-    const product = await createProduct(instanceVars)
+    const product = await createProduct(instanceVars, baycUSDCProductProvider)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
 
@@ -401,7 +403,7 @@ describe('Happy Path', () => {
 
     // User State
     expect(await product.isClosed(userB.address)).to.equal(true)
-    expect(await product['maintenance(address)'](userB.address)).to.equal(0)
+    expect(await product.maintenance(userB.address)).to.equal(0)
     expect(await product.maintenanceNext(userB.address)).to.equal(0)
     expectPositionEq(await product.position(userB.address), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre(address)'](userB.address), {
@@ -429,7 +431,7 @@ describe('Happy Path', () => {
     const CLOSE_TAKE_POSITION = utils.parseEther('0.00001')
     const { user, userB } = instanceVars
 
-    const product = await createProduct(instanceVars)
+    const product = await createProduct(instanceVars, baycUSDCProductProvider)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
 
@@ -446,7 +448,7 @@ describe('Happy Path', () => {
 
     // User State
     expect(await product.isClosed(userB.address)).to.equal(true)
-    expect(await product['maintenance(address)'](userB.address)).to.equal(0)
+    expect(await product.maintenance(userB.address)).to.equal(0)
     expect(await product.maintenanceNext(userB.address)).to.equal(0)
     expectPositionEq(await product.position(userB.address), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre(address)'](userB.address), {
@@ -471,7 +473,7 @@ describe('Happy Path', () => {
   it('settle no op (gas test)', async () => {
     const { user } = instanceVars
 
-    const product = await createProduct(instanceVars)
+    const product = await createProduct(instanceVars, baycUSDCProductProvider)
 
     await product.settle()
     await product.settle()
