@@ -5,6 +5,7 @@ import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@equilibria/root/control/unstructured/UReentrancyGuard.sol";
 import "../controller/UControllerProvider.sol";
 import "./UPayoffProvider.sol";
+import "./UParamProvider.sol";
 import "./types/position/AccountPosition.sol";
 import "./types/accumulator/AccountAccumulator.sol";
 
@@ -13,37 +14,11 @@ import "./types/accumulator/AccountAccumulator.sol";
  * @notice Manages logic and state for a single product market.
  * @dev Cloned by the Controller contract to launch new product markets.
  */
-contract Product is IProduct, UInitializable, UControllerProvider, UPayoffProvider, UReentrancyGuard {
-    /// @dev The maintenance value
-    UFixed18Storage private constant _maintenance = UFixed18Storage.wrap(keccak256("equilibria.perennial.Product.maintenance"));
-    function maintenance() public view returns (UFixed18) { return _maintenance.read(); }
-
-    /// @dev The funding fee value
-    UFixed18Storage private constant _fundingFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.Product.fundingFee"));
-    function fundingFee() public view returns (UFixed18) { return _fundingFee.read(); }
-
-    /// @dev The maker fee value
-    UFixed18Storage private constant _makerFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.Product.makerFee"));
-    function makerFee() public view returns (UFixed18) { return _makerFee.read(); }
-
-    /// @dev The taker fee value
-    UFixed18Storage private constant _takerFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.Product.takerFee"));
-    function takerFee() public view returns (UFixed18) { return _takerFee.read(); }
-
-    /// @dev The maker limit value
-    UFixed18Storage private constant _makerLimit = UFixed18Storage.wrap(keccak256("equilibria.perennial.Product.makerLimit"));
-    function makerLimit() public view returns (UFixed18) { return _makerLimit.read(); }
-
-    /// @dev The JumpRateUtilizationCurve params
-    JumpRateUtilizationCurveStorage private constant _utilizationCurve =
-        JumpRateUtilizationCurveStorage.wrap(keccak256("equilibria.perennial.Product.jumpRateUtilizationCurve"));
-    function utilizationCurve() public view returns (JumpRateUtilizationCurve memory) { return _utilizationCurve.read(); }
-
+contract Product is IProduct, UInitializable, UParamProvider, UControllerProvider, UPayoffProvider, UReentrancyGuard {
     /// @dev Whether or not the product is closed
     BoolStorage private constant _closed =
         BoolStorage.wrap(keccak256("equilibria.perennial.Product.closed"));
     function closed() public view returns (bool) { return _closed.read(); }
-
 
     /// @dev The name of the product
     string public name;
