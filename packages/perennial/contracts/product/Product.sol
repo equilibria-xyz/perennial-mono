@@ -20,6 +20,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UControllerProvide
         BoolStorage.wrap(keccak256("equilibria.perennial.Product.closed"));
     function closed() public view returns (bool) { return _closed.read(); }
 
+
     /// @dev The name of the product
     string public name;
 

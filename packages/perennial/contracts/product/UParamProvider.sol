@@ -29,5 +29,4 @@ abstract contract UParamProvider is IParamProvider, UInitializable {
     JumpRateUtilizationCurveStorage internal constant _utilizationCurve =
         JumpRateUtilizationCurveStorage.wrap(keccak256("equilibria.perennial.Product.jumpRateUtilizationCurve"));
     function utilizationCurve() public view returns (JumpRateUtilizationCurve memory) { return _utilizationCurve.read(); }
-
 }
