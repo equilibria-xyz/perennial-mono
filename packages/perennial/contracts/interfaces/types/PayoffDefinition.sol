@@ -23,7 +23,7 @@ using PayoffDefinitionStorageLib for PayoffDefinitionStorage global;
 library PayoffDefinitionLib {
   using Address for address;
 
-  error PayoffDefinitionUnsupportedTransform(PayoffType payoffType);
+  error PayoffDefinitionUnsupportedTransform(PayoffType payoffType, PayoffDirection payoffDirection);
   error PayoffDefinitionNotContract(PayoffType payoffType, bytes30 data);
 
   /// @dev Payoff function type enum
@@ -53,17 +53,18 @@ library PayoffDefinitionLib {
     Fixed18 price
   ) internal view returns (Fixed18) {
     PayoffType payoffType = self.payoffType;
+    PayoffDirection payoffDirection = self.payoffDirection;
     Fixed18 transformedPrice;
 
     // First get the price depending on the type
     if (payoffType == PayoffType.PASSTHROUGH) transformedPrice = price;
     else if (payoffType == PayoffType.CONTRACT) transformedPrice =  _payoffFromContract(self, price);
+    else revert PayoffDefinitionUnsupportedTransform(payoffType, payoffDirection);
 
     // Then transform it depending on the direction flag
     if (self.payoffDirection == PayoffDirection.LONG) return transformedPrice;
     else if (self.payoffDirection == PayoffDirection.SHORT) return transformedPrice.mul(Fixed18Lib.NEG_ONE);
-
-    revert PayoffDefinitionUnsupportedTransform(payoffType);
+    else revert PayoffDefinitionUnsupportedTransform(payoffType, payoffDirection);
   }
 
   /**
