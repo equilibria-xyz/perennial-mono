@@ -7,7 +7,8 @@ import "../../interfaces/IProductProvider.sol";
 /// @dev PayoffDefinition tyoe
 struct PayoffDefinition {
   PayoffDefinitionLib.PayoffType payoffType;
-  bytes31 data;
+  PayoffDefinitionLib.PayoffDirection payoffDirection;
+  bytes30 data;
 }
 using PayoffDefinitionLib for PayoffDefinition global;
 type PayoffDefinitionStorage is bytes32;
@@ -22,11 +23,12 @@ using PayoffDefinitionStorageLib for PayoffDefinitionStorage global;
 library PayoffDefinitionLib {
   using Address for address;
 
-  error PayoffDefinitionUnsupportedTransform(PayoffType payoffType);
-  error PayoffDefinitionNotContract(PayoffType payoffType, bytes31 data);
+  error PayoffDefinitionUnsupportedTransform(PayoffType payoffType, PayoffDirection payoffDirection);
+  error PayoffDefinitionNotContract(PayoffType payoffType, bytes30 data);
 
   /// @dev Payoff function type enum
-  enum PayoffType { LONG, SHORT, CONTRACT }
+  enum PayoffType { PASSTHROUGH, CONTRACT }
+  enum PayoffDirection { LONG, SHORT }
 
   /**
    * @notice Checks validity of the payoff definition
@@ -51,12 +53,18 @@ library PayoffDefinitionLib {
     Fixed18 price
   ) internal view returns (Fixed18) {
     PayoffType payoffType = self.payoffType;
+    PayoffDirection payoffDirection = self.payoffDirection;
+    Fixed18 transformedPrice;
 
-    if (payoffType == PayoffType.LONG) return price;
-    if (payoffType == PayoffType.SHORT) return price.mul(Fixed18Lib.NEG_ONE);
-    if (payoffType == PayoffType.CONTRACT) return _payoffFromContract(self, price);
+    // First get the price depending on the type
+    if (payoffType == PayoffType.PASSTHROUGH) transformedPrice = price;
+    else if (payoffType == PayoffType.CONTRACT) transformedPrice =  _payoffFromContract(self, price);
+    else revert PayoffDefinitionUnsupportedTransform(payoffType, payoffDirection);
 
-    revert PayoffDefinitionUnsupportedTransform(payoffType);
+    // Then transform it depending on the direction flag
+    if (self.payoffDirection == PayoffDirection.LONG) return transformedPrice;
+    else if (self.payoffDirection == PayoffDirection.SHORT) return transformedPrice.mul(Fixed18Lib.NEG_ONE);
+    else revert PayoffDefinitionUnsupportedTransform(payoffType, payoffDirection);
   }
 
   /**
@@ -70,7 +78,7 @@ library PayoffDefinitionLib {
   ) private pure returns (IProductProvider) {
     if (self.payoffType != PayoffType.CONTRACT) revert PayoffDefinitionNotContract(self.payoffType, self.data);
     // Shift to pull the last 20 bytes, then cast to an address
-    return IProductProvider(address(bytes20(self.data << 88)));
+    return IProductProvider(address(bytes20(self.data << 80)));
   }
 
   /**
@@ -103,6 +111,7 @@ library PayoffDefinitionStorageLib {
         PayoffDefinition storage storagePointer = _storagePointer(self);
 
         storagePointer.payoffType = value.payoffType;
+        storagePointer.payoffDirection = value.payoffDirection;
         storagePointer.data = value.data;
     }
 

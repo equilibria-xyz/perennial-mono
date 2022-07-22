@@ -89,6 +89,7 @@ describe('Product', () => {
       expect(await product.symbol()).to.equal('SQTH')
       const payoffDefinition = await product.payoffDefinition()
       expect(payoffDefinition.payoffType).to.equal(PRODUCT_INFO.payoffDefinition.payoffType)
+      expect(payoffDefinition.payoffDirection).to.equal(PRODUCT_INFO.payoffDefinition.payoffDirection)
       expect(payoffDefinition.data).to.equal(PRODUCT_INFO.payoffDefinition.data)
       expect(await product.oracle()).to.equal(oracle.address)
       expect(await product['maintenance()']()).to.equal(utils.parseEther('0.5'))
@@ -122,18 +123,8 @@ describe('Product', () => {
         otherProduct = await new Product__factory(owner).deploy()
       })
 
-      it('reverts if long definition contains data', async () => {
+      it('reverts if passthrough definition contains data', async () => {
         const payoffDefinition = createPayoffDefinition()
-        payoffDefinition.data = payoffDefinition.data.substring(0, payoffDefinition.data.length - 1) + '1'
-
-        await expect(
-          otherProduct.connect(controllerSigner).initialize({ ...PRODUCT_INFO, payoffDefinition }),
-        ).to.be.revertedWith('InvalidPayoffDefinitionError()')
-      })
-
-      it('reverts if short definition contains data', async () => {
-        const payoffDefinition = createPayoffDefinition()
-        payoffDefinition.payoffType = 1
         payoffDefinition.data = payoffDefinition.data.substring(0, payoffDefinition.data.length - 1) + '1'
 
         await expect(
@@ -5469,7 +5460,7 @@ describe('Product', () => {
     })
   })
 
-  describe('contract payoff definition', async () => {
+  describe('contract long payoff definition', async () => {
     let contractPayoffDefinition: SmockContract<TestnetProductProvider>
     let otherProduct: Product
 
@@ -5523,7 +5514,64 @@ describe('Product', () => {
     })
   })
 
-  describe('long payoff definition', async () => {
+  describe('contract short payoff definition', async () => {
+    let contractPayoffDefinition: SmockContract<TestnetProductProvider>
+    let otherProduct: Product
+
+    const ORACLE_VERSION = 1
+    const TIMESTAMP = 1636401093
+    const PRICE = utils.parseEther('123')
+
+    const ORACLE_VERSION_0 = {
+      price: utils.parseEther('2'),
+      timestamp: 0,
+      version: 0,
+    }
+
+    const ORACLE_VERSION_1 = {
+      price: PRICE,
+      timestamp: TIMESTAMP,
+      version: ORACLE_VERSION,
+    }
+
+    beforeEach(async () => {
+      const payoffDefinitionFactory = await smock.mock<TestnetProductProvider__factory>('TestnetProductProvider')
+      contractPayoffDefinition = await payoffDefinitionFactory.deploy()
+
+      otherProduct = await new Product__factory(owner).deploy()
+      PRODUCT_INFO.payoffDefinition = createPayoffDefinition({
+        short: true,
+        contractAddress: contractPayoffDefinition.address,
+      })
+      await otherProduct.connect(controllerSigner).initialize(PRODUCT_INFO)
+
+      await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_1)
+      await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_1)
+      await oracle.mock.atVersion.withArgs(0).returns(ORACLE_VERSION_0)
+    })
+
+    describe('#currentVersion', () => {
+      it('calls to the provider', async () => {
+        const syncResult = await otherProduct.callStatic.currentVersion()
+        expect(syncResult.price).to.equal(utils.parseEther('-15129'))
+        expect(syncResult.timestamp).to.equal(TIMESTAMP)
+        expect(syncResult.version).to.equal(ORACLE_VERSION)
+        expect(contractPayoffDefinition.payoff).to.have.callCount(1)
+      })
+    })
+
+    describe('#atVersion', () => {
+      it('calls to the provider', async () => {
+        const syncResult = await otherProduct.callStatic.atVersion(0)
+        expect(syncResult.price).to.equal(utils.parseEther('-4'))
+        expect(syncResult.timestamp).to.equal(0)
+        expect(syncResult.version).to.equal(0)
+        expect(contractPayoffDefinition.payoff).to.have.callCount(1)
+      })
+    })
+  })
+
+  describe('passthrough long payoff definition', async () => {
     let otherProduct: Product
 
     const ORACLE_VERSION = 1
@@ -5571,7 +5619,7 @@ describe('Product', () => {
     })
   })
 
-  describe('short payoff definition', async () => {
+  describe('passthrough short payoff definition', async () => {
     let otherProduct: Product
 
     const ORACLE_VERSION = 1
