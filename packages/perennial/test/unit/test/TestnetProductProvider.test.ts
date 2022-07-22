@@ -3,22 +3,22 @@ import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { expect } from 'chai'
 import HRE from 'hardhat'
 
-import { TestnetProductProvider, TestnetProductProvider__factory } from '../../../types/generated'
+import { TestnetPayoffProvider, TestnetPayoffProvider__factory } from '../../../types/generated'
 
 const { ethers } = HRE
 
-describe('TestnetProductProvider', () => {
+describe('TestnetPayoffProvider', () => {
   let user: SignerWithAddress
-  let testnetProductProvider: TestnetProductProvider
+  let TestnetPayoffProvider: TestnetPayoffProvider
 
   beforeEach(async () => {
     ;[user] = await ethers.getSigners()
-    testnetProductProvider = await new TestnetProductProvider__factory(user).deploy()
+    TestnetPayoffProvider = await new TestnetPayoffProvider__factory(user).deploy()
   })
 
   describe('#payoff', async () => {
     it('modifies price per payoff', async () => {
-      expect(await testnetProductProvider.payoff(utils.parseEther('11'))).to.equal(utils.parseEther('121'))
+      expect(await TestnetPayoffProvider.payoff(utils.parseEther('11'))).to.equal(utils.parseEther('121'))
     })
   })
 })

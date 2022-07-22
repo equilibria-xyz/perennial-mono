@@ -70,7 +70,6 @@ interface IProduct is IPayoffProvider {
     error ProductMakerOverLimitError();
     error ProductOracleBootstrappingError();
     error ProductNotOwnerError();
-    error ProductInvalidProductProvider();
     error ProductInvalidOracle();
     error ProductInvalidFundingFee();
     error ProductInvalidMakerFee();

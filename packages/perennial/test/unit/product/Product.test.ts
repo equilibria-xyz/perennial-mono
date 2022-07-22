@@ -14,8 +14,8 @@ import {
   Product__factory,
   Incentivizer__factory,
   IOracleProvider__factory,
-  TestnetProductProvider,
-  TestnetProductProvider__factory,
+  TestnetPayoffProvider,
+  TestnetPayoffProvider__factory,
 } from '../../../types/generated'
 import { createPayoffDefinition, expectPositionEq, expectPrePositionEq } from '../../testutil/types'
 
@@ -5461,7 +5461,7 @@ describe('Product', () => {
   })
 
   describe('contract long payoff definition', async () => {
-    let contractPayoffDefinition: SmockContract<TestnetProductProvider>
+    let contractPayoffDefinition: SmockContract<TestnetPayoffProvider>
     let otherProduct: Product
 
     const ORACLE_VERSION = 1
@@ -5481,7 +5481,7 @@ describe('Product', () => {
     }
 
     beforeEach(async () => {
-      const payoffDefinitionFactory = await smock.mock<TestnetProductProvider__factory>('TestnetProductProvider')
+      const payoffDefinitionFactory = await smock.mock<TestnetPayoffProvider__factory>('TestnetPayoffProvider')
       contractPayoffDefinition = await payoffDefinitionFactory.deploy()
 
       otherProduct = await new Product__factory(owner).deploy()
@@ -5515,7 +5515,7 @@ describe('Product', () => {
   })
 
   describe('contract short payoff definition', async () => {
-    let contractPayoffDefinition: SmockContract<TestnetProductProvider>
+    let contractPayoffDefinition: SmockContract<TestnetPayoffProvider>
     let otherProduct: Product
 
     const ORACLE_VERSION = 1
@@ -5535,7 +5535,7 @@ describe('Product', () => {
     }
 
     beforeEach(async () => {
-      const payoffDefinitionFactory = await smock.mock<TestnetProductProvider__factory>('TestnetProductProvider')
+      const payoffDefinitionFactory = await smock.mock<TestnetPayoffProvider__factory>('TestnetPayoffProvider')
       contractPayoffDefinition = await payoffDefinitionFactory.deploy()
 
       otherProduct = await new Product__factory(owner).deploy()
