@@ -50,17 +50,6 @@ interface IProduct is IPayoffProvider, IParamProvider {
     event TakeOpened(address indexed account, uint256 version, UFixed18 amount);
     event MakeClosed(address indexed account, uint256 version, UFixed18 amount);
     event TakeClosed(address indexed account, uint256 version, UFixed18 amount);
-    event MaintenanceUpdated(UFixed18 newMaintenance);
-    event FundingFeeUpdated(UFixed18 newFundingFee);
-    event MakerFeeUpdated(UFixed18 newMakerFee);
-    event TakerFeeUpdated(UFixed18 newTakerFee);
-    event MakerLimitUpdated(UFixed18 newMakerLimit);
-    event JumpRateUtilizationCurveUpdated(
-        Fixed18 minRate,
-        Fixed18 maxRate,
-        Fixed18 targetRate,
-        UFixed18 targetUtilization
-    );
     event ClosedUpdated(bool indexed newClosed, uint256 version);
 
     error ProductInsufficientLiquidityError(UFixed18 socializationFactor);
@@ -73,9 +62,6 @@ interface IProduct is IPayoffProvider, IParamProvider {
     error ProductNotOwnerError();
     error ProductInvalidProductProvider();
     error ProductInvalidOracle();
-    error ProductInvalidFundingFee();
-    error ProductInvalidMakerFee();
-    error ProductInvalidTakerFee();
     error ProductClosedError();
 
     function name() external view returns (string memory);

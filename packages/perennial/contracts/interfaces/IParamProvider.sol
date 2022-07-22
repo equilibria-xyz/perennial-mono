@@ -5,6 +5,22 @@ import "@equilibria/root/number/types/UFixed18.sol";
 import "@equilibria/root/curve/types/JumpRateUtilizationCurve.sol";
 
 interface IParamProvider {
+    event MaintenanceUpdated(UFixed18 newMaintenance);
+    event FundingFeeUpdated(UFixed18 newFundingFee);
+    event MakerFeeUpdated(UFixed18 newMakerFee);
+    event TakerFeeUpdated(UFixed18 newTakerFee);
+    event MakerLimitUpdated(UFixed18 newMakerLimit);
+    event JumpRateUtilizationCurveUpdated(
+        Fixed18 minRate,
+        Fixed18 maxRate,
+        Fixed18 targetRate,
+        UFixed18 targetUtilization
+    );
+
+    error ProductInvalidMakerFee();
+    error ProductInvalidTakerFee();
+    error ProductInvalidFundingFee();
+    
     function maintenance() external view returns (UFixed18);
     function updateMaintenance(UFixed18 newMaintenance) external;
     function fundingFee() external view returns (UFixed18);
