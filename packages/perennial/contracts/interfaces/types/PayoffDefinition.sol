@@ -2,7 +2,7 @@
 pragma solidity 0.8.15;
 
 import "@openzeppelin/contracts/utils/Address.sol";
-import "../../interfaces/IProductProvider.sol";
+import "../../interfaces/IContractPayoffProvider.sol";
 
 /// @dev PayoffDefinition tyoe
 struct PayoffDefinition {
@@ -71,14 +71,14 @@ library PayoffDefinitionLib {
    * @notice Parses the data field into an address
    * @dev Reverts if payoffType is not CONTRACT
    * @param self a payoff definition
-   * @return IProductProvider address
+   * @return IContractPayoffProvider address
    */
   function _providerContract(
     PayoffDefinition memory self
-  ) private pure returns (IProductProvider) {
+  ) private pure returns (IContractPayoffProvider) {
     if (self.payoffType != PayoffType.CONTRACT) revert PayoffDefinitionNotContract(self.payoffType, self.data);
     // Shift to pull the last 20 bytes, then cast to an address
-    return IProductProvider(address(bytes20(self.data << 80)));
+    return IContractPayoffProvider(address(bytes20(self.data << 80)));
   }
 
   /**
@@ -92,7 +92,7 @@ library PayoffDefinitionLib {
     Fixed18 price
   ) private view returns (Fixed18) {
     bytes memory ret = address(_providerContract(self)).functionStaticCall(
-      abi.encodeCall(IProductProvider.payoff, price)
+      abi.encodeCall(IContractPayoffProvider.payoff, price)
     );
     return Fixed18.wrap(abi.decode(ret, (int256)));
   }

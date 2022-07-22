@@ -6,7 +6,6 @@ import "@openzeppelin/contracts/proxy/beacon/IBeacon.sol";
 import "./ICollateral.sol";
 import "./IIncentivizer.sol";
 import "./IProduct.sol";
-import "./IProductProvider.sol";
 import "./types/PayoffDefinition.sol";
 
 interface IController {
