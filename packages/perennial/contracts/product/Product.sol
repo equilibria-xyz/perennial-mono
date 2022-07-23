@@ -3,7 +3,6 @@ pragma solidity 0.8.15;
 
 import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@equilibria/root/control/unstructured/UReentrancyGuard.sol";
-import "../controller/UControllerProvider.sol";
 import "./UPayoffProvider.sol";
 import "./UParamProvider.sol";
 import "./types/position/AccountPosition.sol";
@@ -14,7 +13,7 @@ import "./types/accumulator/AccountAccumulator.sol";
  * @notice Manages logic and state for a single product market.
  * @dev Cloned by the Controller contract to launch new product markets.
  */
-contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, UControllerProvider, UReentrancyGuard {
+contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, UReentrancyGuard {
     /// @dev Whether or not the product is closed
     BoolStorage private constant _closed =
         BoolStorage.wrap(keccak256("equilibria.perennial.Product.closed"));
@@ -44,7 +43,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @param productInfo_ Product initialization params
      */
     function initialize(ProductInfo calldata productInfo_) external initializer(1) {
-        __UControllerProvider__initialize(IController(msg.sender));
         __UPayoffProvider__initialize(productInfo_.oracle, productInfo_.payoffDefinition);
         __UReentrancyGuard__initialize();
         __UParamProvider__initialize(productInfo_);
@@ -53,15 +51,14 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         symbol = productInfo_.symbol;
     }
 
-    function coordinatorAddress() internal {
-        uint256 coordinatorId = controller().coordinatorFor(IProduct(this));
-        return controller().owner(coordinatorId);
+    function self() internal override view returns (IProduct) {
+        return IProduct(address(this));
     }
 
     /**
      * @notice Surfaces global settlement externally
      */
-    function settle() external nonReentrant notPausedProduct(IProduct(this)) {
+    function settle() external nonReentrant notPausedProduct(self()) {
         _settle();
     }
 
@@ -129,7 +126,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @notice Surfaces account settlement externally
      * @param account Account to settle
      */
-    function settleAccount(address account) external nonReentrant notPausedProduct(IProduct(this)) {
+    function settleAccount(address account) external nonReentrant notPausedProduct(self()) {
         IOracleProvider.OracleVersion memory currentOracleVersion = _settle();
         _settleAccount(account, currentOracleVersion);
     }
@@ -195,7 +192,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     function openTake(UFixed18 amount)
     external
     nonReentrant
-    notPausedProduct(IProduct(this))
+    notPausedProduct(self())
     notClosed
     settleForAccount(msg.sender)
     takerInvariant
@@ -218,7 +215,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     function closeTake(UFixed18 amount)
     external
     nonReentrant
-    notPausedProduct(IProduct(this))
+    notPausedProduct(self())
     settleForAccount(msg.sender)
     closeInvariant
     liquidationInvariant
@@ -242,7 +239,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     function openMake(UFixed18 amount)
     external
     nonReentrant
-    notPausedProduct(IProduct(this))
+    notPausedProduct(self())
     notClosed
     settleForAccount(msg.sender)
     nonZeroVersionInvariant
@@ -266,7 +263,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     function closeMake(UFixed18 amount)
     external
     nonReentrant
-    notPausedProduct(IProduct(this))
+    notPausedProduct(self())
     settleForAccount(msg.sender)
     takerInvariant
     closeInvariant
@@ -437,7 +434,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @dev only callable by product owner. Settles the product before flipping the flag
      * @param newClosed new closed value
      */
-    function updateClosed(bool newClosed) external onlyProductOwner(IProduct(this)) {
+    function updateClosed(bool newClosed) external onlyProductOwner(self()) {
         IOracleProvider.OracleVersion memory oracleVersion = _settle();
         _closed.store(newClosed);
         emit ClosedUpdated(newClosed, oracleVersion.version);
@@ -482,7 +479,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     modifier maintenanceInvariant {
         _;
 
-        if (controller().collateral().liquidatableNext(msg.sender, IProduct(this)))
+        if (controller().collateral().liquidatableNext(msg.sender, self()))
             revert ProductInsufficientCollateralError();
     }
 

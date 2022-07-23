@@ -77,10 +77,10 @@ abstract contract UControllerProvider is UInitializable {
     }
 
     // /// @dev Only allow the Product's coordinator owner to call
-    // modifier onlyProductOwner(IProduct product) {
-    //     uint256 coordinatorId = controller().coordinatorFor(product);
-    //     if (controller().owner(coordinatorId) != msg.sender) revert NotOwnerError(coordinatorId);
+    modifier onlyProductOwner(IProduct product) {
+        uint256 coordinatorId = controller().coordinatorFor(product);
+        if (controller().owner(coordinatorId) != msg.sender) revert NotOwnerError(coordinatorId);
 
-    //     _;
-    // }
+        _;
+    }
 }
