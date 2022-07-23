@@ -14,7 +14,7 @@ import "./types/accumulator/AccountAccumulator.sol";
  * @notice Manages logic and state for a single product market.
  * @dev Cloned by the Controller contract to launch new product markets.
  */
-contract Product is IProduct, UInitializable, UParamProvider, UControllerProvider, UPayoffProvider, UReentrancyGuard {
+contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, UControllerProvider, UReentrancyGuard {
     /// @dev Whether or not the product is closed
     BoolStorage private constant _closed =
         BoolStorage.wrap(keccak256("equilibria.perennial.Product.closed"));
@@ -51,6 +51,11 @@ contract Product is IProduct, UInitializable, UParamProvider, UControllerProvide
 
         name = productInfo_.name;
         symbol = productInfo_.symbol;
+    }
+
+    function coordinatorAddress() internal {
+        uint256 coordinatorId = controller().coordinatorFor(IProduct(this));
+        return controller().owner(coordinatorId);
     }
 
     /**
@@ -419,66 +424,12 @@ contract Product is IProduct, UInitializable, UParamProvider, UControllerProvide
     }
 
     /**
-     * @notice Updates the maintenance to `newMaintenance`
-     * @dev only callable by product owner
-     * @param newMaintenance new maintenance value
-     */
-    function updateMaintenance(UFixed18 newMaintenance) external onlyProductOwner(IProduct(this)) {
-        _updateMaintenance(newMaintenance);
-    }
-
-    /**
      * @notice Returns the minimum funding fee parameter with a capped range for safety
      * @dev Caps controller.minFundingFee() <= fundingFee() <= 1
      * @return Safe minimum funding fee parameter
      */
     function _boundedFundingFee() private view returns (UFixed18) {
         return fundingFee().max(controller().minFundingFee());
-    }
-
-    /**
-     * @notice Updates the funding fee to `newFundingFee`
-     * @dev only callable by product owner
-     * @param newFundingFee new funding fee value
-     */
-    function updateFundingFee(UFixed18 newFundingFee) external onlyProductOwner(IProduct(this)) {
-        _updateFundingFee(newFundingFee);
-    }
-
-    /**
-     * @notice Updates the maker fee to `newMakerFee`
-     * @dev only callable by product owner
-     * @param newMakerFee new maker fee value
-     */
-    function updateMakerFee(UFixed18 newMakerFee) external onlyProductOwner(IProduct(this)) {
-        _updateMakerFee(newMakerFee);
-    }
-
-    /**
-     * @notice Updates the taker fee to `newTakerFee`
-     * @dev only callable by product owner
-     * @param newTakerFee new taker fee value
-     */
-    function updateTakerFee(UFixed18 newTakerFee) external onlyProductOwner(IProduct(this)) {
-        _updateTakerFee(newTakerFee);
-    }
-
-    /**
-     * @notice Updates the maker limit to `newMakerLimit`
-     * @dev only callable by product owner
-     * @param newMakerLimit new maker limit value
-     */
-    function updateMakerLimit(UFixed18 newMakerLimit) external onlyProductOwner(IProduct(this)) {
-        _updateMakerLimit(newMakerLimit);
-    }
-
-    /**
-     * @notice Updates the utilization curve limit to `newUtilizationCurve`
-     * @dev only callable by product owner
-     * @param newUtilizationCurve new utilization curve value
-     */
-    function updateUtilizationCurve(JumpRateUtilizationCurve calldata newUtilizationCurve) external onlyProductOwner(IProduct(this)) {
-        _updateUtilizationCurve(newUtilizationCurve);
     }
 
     /**
