@@ -6,7 +6,7 @@ import { time, impersonate } from '../../testutil'
 import {
   Collateral,
   Controller,
-  TestnetPayoffProvider,
+  TestnetContractPayoffProvider,
   IERC20Metadata,
   ChainlinkOracle,
   Product,
@@ -15,7 +15,7 @@ import {
   IERC20Metadata__factory,
   Collateral__factory,
   Controller__factory,
-  TestnetPayoffProvider__factory,
+  TestnetContractPayoffProvider__factory,
   ChainlinkOracle__factory,
   Product__factory,
   Incentivizer__factory,
@@ -54,7 +54,7 @@ export interface InstanceVars {
   treasuryB: SignerWithAddress
   proxyAdmin: ProxyAdmin
   controller: Controller
-  contractPayoffProvider: TestnetPayoffProvider
+  contractPayoffProvider: TestnetContractPayoffProvider
   dsu: IERC20Metadata
   usdc: IERC20Metadata
   dsuHolder: SignerWithAddress
@@ -87,7 +87,7 @@ export async function deployProtocol(): Promise<InstanceVars> {
     CHAINLINK_CUSTOM_CURRENCIES.ETH,
     CHAINLINK_CUSTOM_CURRENCIES.USD,
   )
-  const payoffProvider = await new TestnetPayoffProvider__factory(owner).deploy()
+  const contractPayoffProvider = await new TestnetContractPayoffProvider__factory(owner).deploy()
   const dsu = await IERC20Metadata__factory.connect((await deployments.get('DSU')).address, owner)
   const usdc = await IERC20Metadata__factory.connect((await deployments.get('USDC')).address, owner)
   const batcher = await IBatcher__factory.connect((await deployments.get('Batcher')).address, owner)
@@ -169,7 +169,7 @@ export async function deployProtocol(): Promise<InstanceVars> {
     dsuHolder,
     chainlink,
     chainlinkOracle,
-    contractPayoffProvider: payoffProvider,
+    contractPayoffProvider: contractPayoffProvider,
     dsu,
     usdc,
     usdcHolder,
@@ -188,7 +188,7 @@ export async function deployProtocol(): Promise<InstanceVars> {
 
 export async function createProduct(
   instanceVars: InstanceVars,
-  payoffProvider?: TestnetPayoffProvider,
+  payoffProvider?: TestnetContractPayoffProvider,
   oracle?: ChainlinkOracle | ReservoirFeedOracle,
 ): Promise<Product> {
   const { owner, controller, treasuryB, chainlinkOracle } = instanceVars

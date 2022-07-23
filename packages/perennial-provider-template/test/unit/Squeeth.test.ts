@@ -17,7 +17,7 @@ describe('Squeeth', () => {
   })
   describe('#payoff', async () => {
     it('modifies price per payoff', async () => {
-      expect(await squeeth.payoff(utils.parseEther('11'))).to.equal(utils.parseEther('121'))
+      expect(await squeeth.payoff(utils.parseEther('11'))).to.equal(utils.parseEther('0.121'))
     })
   })
 })

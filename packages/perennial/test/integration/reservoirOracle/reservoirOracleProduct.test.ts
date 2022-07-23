@@ -8,8 +8,8 @@ import { DataFeedContext } from '../helpers/feedOracleHelper'
 import {
   ReservoirFeedOracle,
   ReservoirFeedOracle__factory,
-  TestnetPayoffProvider,
-  TestnetPayoffProvider__factory,
+  TestnetContractPayoffProvider,
+  TestnetContractPayoffProvider__factory,
 } from '../../../types/generated'
 import { deployments } from 'hardhat'
 
@@ -37,7 +37,7 @@ describe('Reservoir Oracle Product', () => {
   let instanceVars: InstanceVars
   let oracleFeed: DataFeedContext
   let reservoirOracle: ReservoirFeedOracle
-  let baycUSDCPayoffProvider: TestnetPayoffProvider
+  let baycUSDCPayoffProvider: TestnetContractPayoffProvider
 
   beforeEach(async () => {
     instanceVars = await deployProtocol()
@@ -50,7 +50,7 @@ describe('Reservoir Oracle Product', () => {
     await oracleFeed.init()
 
     reservoirOracle = await new ReservoirFeedOracle__factory(owner).deploy(oracleFeed.feed.address, VERSION_OFFSET)
-    baycUSDCPayoffProvider = await new TestnetPayoffProvider__factory(owner).deploy()
+    baycUSDCPayoffProvider = await new TestnetContractPayoffProvider__factory(owner).deploy()
     PRODUCT_INFO.oracle = reservoirOracle.address
     PRODUCT_INFO.payoffDefinition = createPayoffDefinition({ contractAddress: baycUSDCPayoffProvider.address })
 
