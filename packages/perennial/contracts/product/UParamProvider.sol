@@ -151,7 +151,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
      * @notice Updates the utilization curve limit to `newUtilizationCurve`
      * @param newUtilizationCurve new utilization curve value
      */
-    function _updateUtilizationCurve(JumpRateUtilizationCurve memory newUtilizationCurve) internal {
+    function _updateUtilizationCurve(JumpRateUtilizationCurve memory newUtilizationCurve) private {
         _utilizationCurve.store(newUtilizationCurve);
         emit JumpRateUtilizationCurveUpdated(
             newUtilizationCurve.minRate.unpack(),
@@ -159,5 +159,14 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
             newUtilizationCurve.targetRate.unpack(),
             newUtilizationCurve.targetUtilization.unpack()
         );
+    }
+
+    /**
+     * @notice Updates the utilization curve limit to `newUtilizationCurve`
+     * @dev only callable by product owner
+     * @param newUtilizationCurve new utilization curve value
+     */
+    function updateUtilizationCurve(JumpRateUtilizationCurve calldata newUtilizationCurve) external onlyProductOwner {
+        _updateUtilizationCurve(newUtilizationCurve);
     }
 }
