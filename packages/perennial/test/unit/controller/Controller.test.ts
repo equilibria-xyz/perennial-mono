@@ -11,7 +11,7 @@ import {
   Controller__factory,
   Product__factory,
   Incentivizer__factory,
-  IProductProvider__factory,
+  IContractPayoffProvider__factory,
   IBeacon__factory,
   IOracleProvider__factory,
 } from '../../../types/generated'
@@ -30,7 +30,7 @@ describe('Controller', () => {
   let coordinatorTreasury: SignerWithAddress
   let coordinatorPauser: SignerWithAddress
   let collateral: MockContract
-  let productProvider: MockContract
+  let payoffProvider: MockContract
   let oracle: MockContract
   let incentivizer: MockContract
   let productBeacon: MockContract
@@ -51,7 +51,7 @@ describe('Controller', () => {
       coordinatorPauser,
     ] = await ethers.getSigners()
     collateral = await waffle.deployMockContract(owner, Collateral__factory.abi)
-    productProvider = await waffle.deployMockContract(owner, IProductProvider__factory.abi)
+    payoffProvider = await waffle.deployMockContract(owner, IContractPayoffProvider__factory.abi)
     oracle = await waffle.deployMockContract(owner, IOracleProvider__factory.abi)
     incentivizer = await waffle.deployMockContract(owner, Incentivizer__factory.abi)
 
@@ -538,7 +538,7 @@ describe('Controller', () => {
       },
     }
     beforeEach(async () => {
-      PRODUCT_INFO.payoffDefinition = createPayoffDefinition({ contractAddress: productProvider.address })
+      PRODUCT_INFO.payoffDefinition = createPayoffDefinition({ contractAddress: payoffProvider.address })
       PRODUCT_INFO.oracle = oracle.address
       await controller.connect(coordinatorOwner).createCoordinator()
       await controller.connect(coordinatorOwner).updateCoordinatorTreasury(1, coordinatorTreasury.address)

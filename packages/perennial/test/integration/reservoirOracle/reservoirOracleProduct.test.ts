@@ -8,8 +8,8 @@ import { DataFeedContext } from '../helpers/feedOracleHelper'
 import {
   ReservoirFeedOracle,
   ReservoirFeedOracle__factory,
-  TestnetProductProvider,
-  TestnetProductProvider__factory,
+  TestnetContractPayoffProvider,
+  TestnetContractPayoffProvider__factory,
 } from '../../../types/generated'
 import { deployments } from 'hardhat'
 
@@ -37,7 +37,7 @@ describe('Reservoir Oracle Product', () => {
   let instanceVars: InstanceVars
   let oracleFeed: DataFeedContext
   let reservoirOracle: ReservoirFeedOracle
-  let baycUSDCProductProvider: TestnetProductProvider
+  let baycUSDCPayoffProvider: TestnetContractPayoffProvider
 
   beforeEach(async () => {
     instanceVars = await deployProtocol()
@@ -50,9 +50,9 @@ describe('Reservoir Oracle Product', () => {
     await oracleFeed.init()
 
     reservoirOracle = await new ReservoirFeedOracle__factory(owner).deploy(oracleFeed.feed.address, VERSION_OFFSET)
-    baycUSDCProductProvider = await new TestnetProductProvider__factory(owner).deploy()
+    baycUSDCPayoffProvider = await new TestnetContractPayoffProvider__factory(owner).deploy()
     PRODUCT_INFO.oracle = reservoirOracle.address
-    PRODUCT_INFO.payoffDefinition = createPayoffDefinition({ contractAddress: baycUSDCProductProvider.address })
+    PRODUCT_INFO.payoffDefinition = createPayoffDefinition({ contractAddress: baycUSDCPayoffProvider.address })
 
     await oracleFeed.next()
   })
@@ -81,7 +81,7 @@ describe('Reservoir Oracle Product', () => {
     const POSITION = utils.parseEther('0.0001')
     const { user } = instanceVars
 
-    const product = await createProduct(instanceVars, baycUSDCProductProvider, reservoirOracle)
+    const product = await createProduct(instanceVars, baycUSDCPayoffProvider, reservoirOracle)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
 
     await expect(product.connect(user).openMake(POSITION))
@@ -137,7 +137,7 @@ describe('Reservoir Oracle Product', () => {
     const POSITION = utils.parseEther('0.0001')
     const { user } = instanceVars
 
-    const product = await createProduct(instanceVars, baycUSDCProductProvider, reservoirOracle)
+    const product = await createProduct(instanceVars, baycUSDCPayoffProvider, reservoirOracle)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
 
     await product.connect(user).openMake(POSITION.div(2))
@@ -196,7 +196,7 @@ describe('Reservoir Oracle Product', () => {
     const CLOSE_POSITION = utils.parseEther('0.0001')
     const { user } = instanceVars
 
-    const product = await createProduct(instanceVars, baycUSDCProductProvider, reservoirOracle)
+    const product = await createProduct(instanceVars, baycUSDCPayoffProvider, reservoirOracle)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await product.connect(user).openMake(OPEN_POSITION)
 
@@ -233,7 +233,7 @@ describe('Reservoir Oracle Product', () => {
     const CLOSE_POSITION = utils.parseEther('0.0001')
     const { user } = instanceVars
 
-    const product = await createProduct(instanceVars, baycUSDCProductProvider, reservoirOracle)
+    const product = await createProduct(instanceVars, baycUSDCPayoffProvider, reservoirOracle)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await product.connect(user).openMake(OPEN_POSITION)
     await product.connect(user).closeMake(CLOSE_POSITION.div(2))
@@ -271,7 +271,7 @@ describe('Reservoir Oracle Product', () => {
     const TAKE_POSITION = utils.parseEther('0.00001')
     const { user, userB, chainlink, chainlinkOracle } = instanceVars
 
-    const product = await createProduct(instanceVars, baycUSDCProductProvider, reservoirOracle)
+    const product = await createProduct(instanceVars, baycUSDCPayoffProvider, reservoirOracle)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
 
@@ -334,7 +334,7 @@ describe('Reservoir Oracle Product', () => {
     const TAKE_POSITION = utils.parseEther('0.00001')
     const { user, userB, chainlink, chainlinkOracle } = instanceVars
 
-    const product = await createProduct(instanceVars, baycUSDCProductProvider, reservoirOracle)
+    const product = await createProduct(instanceVars, baycUSDCPayoffProvider, reservoirOracle)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
 
@@ -400,7 +400,7 @@ describe('Reservoir Oracle Product', () => {
     const CLOSE_TAKE_POSITION = utils.parseEther('0.00001')
     const { user, userB } = instanceVars
 
-    const product = await createProduct(instanceVars, baycUSDCProductProvider, reservoirOracle)
+    const product = await createProduct(instanceVars, baycUSDCPayoffProvider, reservoirOracle)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
 
@@ -444,7 +444,7 @@ describe('Reservoir Oracle Product', () => {
     const CLOSE_TAKE_POSITION = utils.parseEther('0.00001')
     const { user, userB } = instanceVars
 
-    const product = await createProduct(instanceVars, baycUSDCProductProvider, reservoirOracle)
+    const product = await createProduct(instanceVars, baycUSDCPayoffProvider, reservoirOracle)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
 
@@ -486,7 +486,7 @@ describe('Reservoir Oracle Product', () => {
   it('settle no op (gas test)', async () => {
     const { user } = instanceVars
 
-    const product = await createProduct(instanceVars, baycUSDCProductProvider, reservoirOracle)
+    const product = await createProduct(instanceVars, baycUSDCPayoffProvider, reservoirOracle)
 
     await product.settle()
     await product.settle()

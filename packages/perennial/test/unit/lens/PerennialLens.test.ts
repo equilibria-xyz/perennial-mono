@@ -8,7 +8,7 @@ import {
   PerennialLens,
   PerennialLens__factory,
   IProduct,
-  IProductProvider,
+  IContractPayoffProvider,
   IController,
   IIncentivizer,
 } from '../../../types/generated'
@@ -23,7 +23,7 @@ describe('PerennialLens', () => {
   let productTreasury: SignerWithAddress
   let collateral: FakeContract<ICollateral>
   let product: FakeContract<IProduct>
-  let productProvider: FakeContract<IProductProvider>
+  let payoffProvider: FakeContract<IContractPayoffProvider>
   let controller: FakeContract<IController>
   let incentivizer: FakeContract<IIncentivizer>
   let lens: PerennialLens
@@ -33,13 +33,13 @@ describe('PerennialLens', () => {
 
     collateral = await smock.fake<ICollateral>('ICollateral')
     product = await smock.fake<IProduct>('IProduct')
-    productProvider = await smock.fake<IProductProvider>('IProductProvider')
+    payoffProvider = await smock.fake<IContractPayoffProvider>('IContractPayoffProvider')
     controller = await smock.fake<IController>('IController')
     incentivizer = await smock.fake<IIncentivizer>('IIncentivizer')
 
     controller.collateral.returns(collateral.address)
     controller.incentivizer.returns(incentivizer.address)
-    product.payoffDefinition.returns(createPayoffDefinition({ contractAddress: productProvider.address }))
+    product.payoffDefinition.returns(createPayoffDefinition({ contractAddress: payoffProvider.address }))
 
     lens = await new PerennialLens__factory(user).deploy(controller.address)
   })
