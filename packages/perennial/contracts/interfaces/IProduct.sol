@@ -87,8 +87,6 @@ interface IProduct is IPayoffProvider, IParamProvider {
     function shareAtVersion(uint256 oracleVersion) external view returns (Accumulator memory);
     function latestVersion(address account) external view returns (uint256);
     function rate(Position memory position) external view returns (Fixed18);
-    // Product Parameters and Updaters
-    function updateUtilizationCurve(JumpRateUtilizationCurve memory newUtilizationCurve) external;
     function closed() external view returns (bool);
     function updateClosed(bool newClosed) external;
 }

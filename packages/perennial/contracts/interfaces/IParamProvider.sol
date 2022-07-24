@@ -21,7 +21,6 @@ interface IParamProvider {
     error ProductInvalidTakerFee();
     error ProductInvalidFundingFee();
     
-    function coordinatorAddress() internal returns (address);
     function maintenance() external view returns (UFixed18);
     function updateMaintenance(UFixed18 newMaintenance) external;
     function fundingFee() external view returns (UFixed18);

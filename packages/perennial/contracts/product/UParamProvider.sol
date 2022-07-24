@@ -2,10 +2,11 @@
 pragma solidity ^0.8.13;
 
 import "@equilibria/root/control/unstructured/UInitializable.sol";
+import "../controller/UControllerProvider.sol";
 import "../interfaces/IParamProvider.sol";
 import "../interfaces/IProduct.sol";
 
-abstract contract UParamProvider is IParamProvider, UInitializable {
+abstract contract UParamProvider is IParamProvider, UControllerProvider {
     /**
      * @notice Initializes the contract state
      * @param productInfo_ product info struct
@@ -21,8 +22,9 @@ abstract contract UParamProvider is IParamProvider, UInitializable {
     }
 
     /// @dev Only allow the Product's coordinator owner to call
-    modifier onlyProductOwner(address coordinatorAddress) {
-        if (coordinatorAddress != msg.sender) revert NotOwnerError(coordinatorAddress);
+    modifier onlyProductOwner {
+        uint256 coordinatorId = controller().coordinatorFor(IProduct(address(this)));
+        if (controller().owner(coordinatorId) != msg.sender) revert NotOwnerError(coordinatorId);
 
         _;
     }
@@ -66,7 +68,7 @@ abstract contract UParamProvider is IParamProvider, UInitializable {
      * @dev only callable by product owner
      * @param newMaintenance new maintenance value
      */
-    function updateMaintenance(UFixed18 newMaintenance) external onlyProductOwner(coordinatorAddress()) {
+    function updateMaintenance(UFixed18 newMaintenance) external onlyProductOwner {
         _updateMaintenance(newMaintenance);
     }
 
@@ -85,7 +87,7 @@ abstract contract UParamProvider is IParamProvider, UInitializable {
      * @dev only callable by product owner
      * @param newFundingFee new funding fee value
      */
-    function updateFundingFee(UFixed18 newFundingFee) external onlyProductOwner(coordinatorAddress()) {
+    function updateFundingFee(UFixed18 newFundingFee) external onlyProductOwner {
         _updateFundingFee(newFundingFee);
     }
 
@@ -104,7 +106,7 @@ abstract contract UParamProvider is IParamProvider, UInitializable {
      * @dev only callable by product owner
      * @param newMakerFee new maker fee value
      */
-    function updateMakerFee(UFixed18 newMakerFee) external onlyProductOwner(coordinatorAddress()) {
+    function updateMakerFee(UFixed18 newMakerFee) external onlyProductOwner {
         _updateMakerFee(newMakerFee);
     }
 
@@ -123,7 +125,7 @@ abstract contract UParamProvider is IParamProvider, UInitializable {
      * @dev only callable by product owner
      * @param newTakerFee new taker fee value
      */
-    function updateTakerFee(UFixed18 newTakerFee) external onlyProductOwner(coordinatorAddress()) {
+    function updateTakerFee(UFixed18 newTakerFee) external onlyProductOwner {
         _updateTakerFee(newTakerFee);
     }
     
@@ -141,7 +143,7 @@ abstract contract UParamProvider is IParamProvider, UInitializable {
      * @dev only callable by product owner
      * @param newMakerLimit new maker limit value
      */
-    function updateMakerLimit(UFixed18 newMakerLimit) external onlyProductOwner(coordinatorAddress()) {
+    function updateMakerLimit(UFixed18 newMakerLimit) external onlyProductOwner {
         _updateMakerLimit(newMakerLimit);
     }
 

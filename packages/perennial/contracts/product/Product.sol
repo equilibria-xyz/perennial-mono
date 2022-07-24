@@ -14,7 +14,7 @@ import "./types/accumulator/AccountAccumulator.sol";
  * @notice Manages logic and state for a single product market.
  * @dev Cloned by the Controller contract to launch new product markets.
  */
-contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, UControllerProvider, UReentrancyGuard {
+contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, UReentrancyGuard {
     /// @dev Whether or not the product is closed
     BoolStorage private constant _closed =
         BoolStorage.wrap(keccak256("equilibria.perennial.Product.closed"));
@@ -51,11 +51,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
         name = productInfo_.name;
         symbol = productInfo_.symbol;
-    }
-
-    function coordinatorAddress() internal {
-        uint256 coordinatorId = controller().coordinatorFor(IProduct(this));
-        return controller().owner(coordinatorId);
     }
 
     /**
@@ -437,7 +432,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @dev only callable by product owner. Settles the product before flipping the flag
      * @param newClosed new closed value
      */
-    function updateClosed(bool newClosed) external onlyProductOwner(IProduct(this)) {
+    function updateClosed(bool newClosed) external onlyProductOwner {
         IOracleProvider.OracleVersion memory oracleVersion = _settle();
         _closed.store(newClosed);
         emit ClosedUpdated(newClosed, oracleVersion.version);
