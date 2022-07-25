@@ -148,7 +148,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
     }
 
     /**
-     * @notice Updates the utilization curve limit to `newUtilizationCurve`
+     * @notice Updates the utilization curve to `newUtilizationCurve`
      * @param newUtilizationCurve new utilization curve value
      */
     function _updateUtilizationCurve(JumpRateUtilizationCurve memory newUtilizationCurve) private {
@@ -162,7 +162,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
     }
 
     /**
-     * @notice Updates the utilization curve limit to `newUtilizationCurve`
+     * @notice Updates the utilization curve to `newUtilizationCurve`
      * @dev only callable by product owner
      * @param newUtilizationCurve new utilization curve value
      */
