@@ -17,9 +17,9 @@ interface IParamProvider {
         UFixed18 targetUtilization
     );
 
-    error ProductInvalidMakerFee();
-    error ProductInvalidTakerFee();
-    error ProductInvalidFundingFee();
+    error ParamProviderInvalidMakerFee();
+    error ParamProviderInvalidTakerFee();
+    error ParamProviderInvalidFundingFee();
     
     function maintenance() external view returns (UFixed18);
     function updateMaintenance(UFixed18 newMaintenance) external;

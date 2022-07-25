@@ -77,7 +77,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
      * @param newFundingFee new funding fee value
      */
     function _updateFundingFee(UFixed18 newFundingFee) private {
-        if (newFundingFee.gt(UFixed18Lib.ONE)) revert ProductInvalidFundingFee();
+        if (newFundingFee.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidFundingFee();
         _fundingFee.store(newFundingFee);
         emit FundingFeeUpdated(newFundingFee);
     }
@@ -96,7 +96,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
      * @param newMakerFee new maker fee value
      */
     function _updateMakerFee(UFixed18 newMakerFee) private {
-        if (newMakerFee.gt(UFixed18Lib.ONE)) revert ProductInvalidMakerFee();
+        if (newMakerFee.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidMakerFee();
         _makerFee.store(newMakerFee);
         emit MakerFeeUpdated(newMakerFee);
     }
@@ -115,7 +115,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
      * @param newTakerFee new taker fee value
      */
     function _updateTakerFee(UFixed18 newTakerFee) private {
-        if (newTakerFee.gt(UFixed18Lib.ONE)) revert ProductInvalidTakerFee();
+        if (newTakerFee.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidTakerFee();
         _takerFee.store(newTakerFee);
         emit TakerFeeUpdated(newTakerFee);
     }

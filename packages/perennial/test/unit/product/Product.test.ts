@@ -199,10 +199,14 @@ describe('Product', () => {
 
     it('reverts if fees are too high', async () => {
       await expect(product.updateFundingFee(utils.parseEther('1.01'))).to.be.be.revertedWith(
-        'ProductInvalidFundingFee()',
+        'ParamProviderInvalidFundingFee()',
       )
-      await expect(product.updateMakerFee(utils.parseEther('1.01'))).to.be.be.revertedWith('ProductInvalidMakerFee()')
-      await expect(product.updateTakerFee(utils.parseEther('1.01'))).to.be.be.revertedWith('ProductInvalidTakerFee()')
+      await expect(product.updateMakerFee(utils.parseEther('1.01'))).to.be.be.revertedWith(
+        'ParamProviderInvalidMakerFee()',
+      )
+      await expect(product.updateTakerFee(utils.parseEther('1.01'))).to.be.be.revertedWith(
+        'ParamProviderInvalidTakerFee()',
+      )
     })
   })
 
