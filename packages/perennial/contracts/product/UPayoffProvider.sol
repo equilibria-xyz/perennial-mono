@@ -14,9 +14,6 @@ import "../interfaces/types/PayoffDefinition.sol";
         provider to be safely used with upgradeable contracts.
  */
 abstract contract UPayoffProvider is IPayoffProvider, UInitializable {
-    error InvalidOracle();
-    error InvalidPayoffDefinitionError();
-
     /// @dev The oracle contract address
     AddressStorage private constant _oracle =
         AddressStorage.wrap(keccak256("equilibria.perennial.UPayoffProvider.oracle"));
@@ -34,10 +31,10 @@ abstract contract UPayoffProvider is IPayoffProvider, UInitializable {
      */
     // solhint-disable-next-line func-name-mixedcase
     function __UPayoffProvider__initialize(IOracleProvider oracle_, PayoffDefinition calldata payoffDefinition_) internal onlyInitializer {
-        if (!Address.isContract(address(oracle_))) revert InvalidOracle();
+        if (!Address.isContract(address(oracle_))) revert PayoffProviderInvalidOracle();
         _oracle.store(address(oracle_));
 
-        if (!payoffDefinition_.valid()) revert InvalidPayoffDefinitionError();
+        if (!payoffDefinition_.valid()) revert PayoffProviderInvalidPayoffDefinitionError();
         _payoffDefinition.store(payoffDefinition_);
     }
 

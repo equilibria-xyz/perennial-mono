@@ -6,6 +6,9 @@ import "./IOracleProvider.sol";
 import "./types/PayoffDefinition.sol";
 
 interface IPayoffProvider {
+    error PayoffProviderInvalidOracle();
+    error PayoffProviderInvalidPayoffDefinitionError();
+
     function oracle() external view returns (IOracleProvider);
     function payoffDefinition() external view returns (PayoffDefinition memory);
     function currentVersion() external view returns (IOracleProvider.OracleVersion memory);

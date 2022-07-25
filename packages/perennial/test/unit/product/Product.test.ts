@@ -113,7 +113,7 @@ describe('Product', () => {
       const otherProduct = await new Product__factory(owner).deploy()
       await expect(
         otherProduct.connect(controllerSigner).initialize({ ...PRODUCT_INFO, oracle: user.address }),
-      ).to.be.revertedWith('InvalidOracle()')
+      ).to.be.revertedWith('PayoffProviderInvalidOracle()')
     })
 
     describe('payoffDefinition validity', () => {
@@ -129,7 +129,7 @@ describe('Product', () => {
 
         await expect(
           otherProduct.connect(controllerSigner).initialize({ ...PRODUCT_INFO, payoffDefinition }),
-        ).to.be.revertedWith('InvalidPayoffDefinitionError()')
+        ).to.be.revertedWith('PayoffProviderInvalidPayoffDefinitionError()')
       })
 
       it('reverts if product provider is not a contract', async () => {
@@ -138,7 +138,7 @@ describe('Product', () => {
             ...PRODUCT_INFO,
             payoffDefinition: createPayoffDefinition({ contractAddress: user.address }),
           }),
-        ).to.be.revertedWith('InvalidPayoffDefinitionError()')
+        ).to.be.revertedWith('PayoffProviderInvalidPayoffDefinitionError()')
       })
     })
   })
