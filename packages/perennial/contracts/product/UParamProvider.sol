@@ -30,28 +30,28 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
     }
 
     /// @dev The maintenance value
-    UFixed18Storage private constant _maintenance = UFixed18Storage.wrap(keccak256("equilibria.perennial.Product.maintenance"));
+    UFixed18Storage private constant _maintenance = UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.maintenance"));
     function maintenance() public view returns (UFixed18) { return _maintenance.read(); }
 
     /// @dev The funding fee value
-    UFixed18Storage private constant _fundingFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.Product.fundingFee"));
+    UFixed18Storage private constant _fundingFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.fundingFee"));
     function fundingFee() public view returns (UFixed18) { return _fundingFee.read(); }
 
     /// @dev The maker fee value
-    UFixed18Storage private constant _makerFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.Product.makerFee"));
+    UFixed18Storage private constant _makerFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.makerFee"));
     function makerFee() public view returns (UFixed18) { return _makerFee.read(); }
 
     /// @dev The taker fee value
-    UFixed18Storage private constant _takerFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.Product.takerFee"));
+    UFixed18Storage private constant _takerFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.takerFee"));
     function takerFee() public view returns (UFixed18) { return _takerFee.read(); }
 
     /// @dev The maker limit value
-    UFixed18Storage private constant _makerLimit = UFixed18Storage.wrap(keccak256("equilibria.perennial.Product.makerLimit"));
+    UFixed18Storage private constant _makerLimit = UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.makerLimit"));
     function makerLimit() public view returns (UFixed18) { return _makerLimit.read(); }
 
     /// @dev The JumpRateUtilizationCurve params
     JumpRateUtilizationCurveStorage private constant _utilizationCurve =
-        JumpRateUtilizationCurveStorage.wrap(keccak256("equilibria.perennial.Product.jumpRateUtilizationCurve"));
+        JumpRateUtilizationCurveStorage.wrap(keccak256("equilibria.perennial.UParamProvider.jumpRateUtilizationCurve"));
     function utilizationCurve() public view returns (JumpRateUtilizationCurve memory) { return _utilizationCurve.read(); }
 
     /**

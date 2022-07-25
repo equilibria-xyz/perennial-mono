@@ -32,4 +32,5 @@ interface IParamProvider {
     function makerLimit() external view returns (UFixed18);
     function updateMakerLimit(UFixed18 newMakerLimit) external;
     function utilizationCurve() external view returns (JumpRateUtilizationCurve memory);
+    function updateUtilizationCurve(JumpRateUtilizationCurve memory newUtilizationCurve) external;
 }
