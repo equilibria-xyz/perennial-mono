@@ -30,6 +30,7 @@ interface IController {
     event IncentivizationFeeUpdated(UFixed18 newIncentivizationFee);
     event MinCollateralUpdated(UFixed18 newMinCollateral);
     event ProgramsPerProductUpdated(uint256 newProgramsPerProduct);
+    event PauserUpdated(address newPauser);
     event PausedUpdated(bool newPaused);
     event CoordinatorPendingOwnerUpdated(uint256 indexed coordinatorId, address newPendingOwner);
     event CoordinatorOwnerUpdated(uint256 indexed coordinatorId, address newOwner);
@@ -38,7 +39,7 @@ interface IController {
     event ProductCreated(IProduct indexed product, IProduct.ProductInfo productInfo);
 
     error ControllerNoZeroCoordinatorError();
-    error ControllerNotPauserError(uint256 coordinatorId);
+    error ControllerNotPauserError();
     error ControllerNotOwnerError(uint256 controllerId);
     error ControllerNotPendingOwnerError(uint256 controllerId);
     error ControllerInvalidProtocolFeeError();
@@ -74,6 +75,7 @@ interface IController {
     function updateIncentivizationFee(UFixed18 newIncentivizationFee) external;
     function updateMinCollateral(UFixed18 newMinCollateral) external;
     function updateProgramsPerProduct(uint256 newProductsPerProduct) external;
+    function updatePauser(address newPauser) external;
     function updatePaused(bool newPaused) external;
     function isProduct(IProduct product) external view returns (bool);
     function owner() external view returns (address);
@@ -82,4 +84,5 @@ interface IController {
     function treasury() external view returns (address);
     function treasury(uint256 coordinatorId) external view returns (address);
     function treasury(IProduct product) external view returns (address);
+    function pauser() external view returns (address);
 }

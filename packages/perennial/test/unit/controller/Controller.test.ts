@@ -80,6 +80,7 @@ describe('Controller', () => {
       expect(await controller['pendingOwner(uint256)'](0)).to.equal(ethers.constants.AddressZero)
       expect(await controller['treasury()']()).to.equal(owner.address)
       expect(await controller['treasury(uint256)'](0)).to.equal(owner.address)
+      expect(await controller.pauser()).to.equal(owner.address)
       expect(await controller.paused()).to.equal(false)
       expect(await controller.protocolFee()).to.equal(0)
       expect(await controller.minFundingFee()).to.equal(0)
@@ -562,8 +563,21 @@ describe('Controller', () => {
       expect(await controller.paused()).to.equal(false)
     })
 
+    it('reverts if not pauser', async () => {
+      await expect(controller.connect(user).updatePaused(true)).to.be.revertedWith(`ControllerNotPauserError()`)
+    })
+  })
+
+  describe('#updatePauser', async () => {
+    it('updates the pauser address', async () => {
+      expect(await controller.pauser()).to.equal(owner.address)
+      await expect(controller.connect(owner).updatePauser(user.address))
+        .to.emit(controller, 'PauserUpdated')
+        .withArgs(user.address)
+    })
+
     it('reverts if not owner', async () => {
-      await expect(controller.connect(user).updatePaused(true)).to.be.revertedWith(`ControllerNotOwnerError(0)`)
+      await expect(controller.connect(user).updatePauser(user.address)).to.be.revertedWith('ControllerNotOwnerError(0)')
     })
   })
 })

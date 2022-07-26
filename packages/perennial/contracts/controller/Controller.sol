@@ -49,6 +49,13 @@ contract Controller is IController, UInitializable {
     Uint256Storage private constant _programsPerProduct = Uint256Storage.wrap(keccak256("equilibria.perennial.Controller.programsPerProduct"));
     function programsPerProduct() public view returns (uint256) { return _programsPerProduct.read(); }
 
+    /// @dev Protocol pauser address. address(0) defaults to owner(0)
+    AddressStorage private constant _pauser = AddressStorage.wrap(keccak256("equilibria.perennial.Controller.pauser"));
+    function pauser() public view returns (address) {
+        address pauser_ = _pauser.read();
+        return pauser_ == address(0) ? owner() : pauser_;
+    }
+
     /// @dev The paused status of the protocol
     BoolStorage private constant _paused = BoolStorage.wrap(keccak256("equilibria.perennial.Controller.paused"));
     function paused() public view returns (bool) { return _paused.read(); }
@@ -74,6 +81,7 @@ contract Controller is IController, UInitializable {
     ) external initializer(1) {
         _createCoordinator();
 
+        updatePauser(address(0));
         updateCollateral(collateral_);
         updateIncentivizer(incentivizer_);
         updateProductBeacon(productBeacon_);
@@ -257,10 +265,19 @@ contract Controller is IController, UInitializable {
     }
 
     /**
+     * @notice Updates the protocol pauser address. Zero address defaults to owner(0)
+     * @param newPauser New protocol pauser address
+     */
+    function updatePauser(address newPauser) public onlyOwner(0) {
+        _pauser.store(newPauser);
+        emit PauserUpdated(newPauser);
+    }
+
+    /**
      * @notice Updates the protocol paused state
      * @param newPaused New protocol paused state
      */
-    function updatePaused(bool newPaused) public onlyOwner(0) {
+    function updatePaused(bool newPaused) public onlyPauser {
         _paused.store(newPaused);
         emit PausedUpdated(newPaused);
     }
@@ -359,6 +376,13 @@ contract Controller is IController, UInitializable {
     /// @dev Only allow owner of `coordinatorId` to call
     modifier onlyOwner(uint256 coordinatorId) {
         if (msg.sender != owner(coordinatorId)) revert ControllerNotOwnerError(coordinatorId);
+
+        _;
+    }
+
+    /// @dev Only allow the pauser to call
+    modifier onlyPauser {
+        if (msg.sender != pauser()) revert ControllerNotPauserError();
 
         _;
     }
