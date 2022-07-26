@@ -129,7 +129,6 @@ export async function deployProtocol(): Promise<InstanceVars> {
 
   // Params - TODO: finalize before launch
   await controller.updateCoordinatorTreasury(0, treasuryA.address)
-  await controller.updateCoordinatorPauser(0, pauser.address)
   await controller.updateProtocolFee(utils.parseEther('0.50'))
   await controller.updateMinFundingFee(utils.parseEther('0.10'))
   await controller.updateLiquidationFee(utils.parseEther('0.50'))

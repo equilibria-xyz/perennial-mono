@@ -19,12 +19,6 @@ interface IController {
 
         /// @dev Treasury of the product, collects fees
         address treasury;
-
-        /// @dev the address that is allowed to pause the coordinated products (0-address defaults to owner)
-        address pauser;
-
-        /// @dev Whether the coordinated products are paused
-        bool paused;
     }
 
     event CollateralUpdated(ICollateral newCollateral);
@@ -36,11 +30,10 @@ interface IController {
     event IncentivizationFeeUpdated(UFixed18 newIncentivizationFee);
     event MinCollateralUpdated(UFixed18 newMinCollateral);
     event ProgramsPerProductUpdated(uint256 newProgramsPerProduct);
+    event PausedUpdated(bool newPaused);
     event CoordinatorPendingOwnerUpdated(uint256 indexed coordinatorId, address newPendingOwner);
     event CoordinatorOwnerUpdated(uint256 indexed coordinatorId, address newOwner);
     event CoordinatorTreasuryUpdated(uint256 indexed coordinatorId, address newTreasury);
-    event CoordinatorPauserUpdated(uint256 indexed coordinatorId, address pauser);
-    event CoordinatorPausedUpdated(uint256 indexed coordinatorId, bool paused);
     event CoordinatorCreated(uint256 indexed coordinatorId, address owner);
     event ProductCreated(IProduct indexed product, IProduct.ProductInfo productInfo);
 
@@ -65,13 +58,12 @@ interface IController {
     function incentivizationFee() external view returns (UFixed18);
     function minCollateral() external view returns (UFixed18);
     function programsPerProduct() external view returns (uint256);
+    function paused() external view returns (bool);
     function initialize(ICollateral collateral_, IIncentivizer incentivizer_, IBeacon productBeacon_) external;
     function createCoordinator() external returns (uint256);
     function updateCoordinatorPendingOwner(uint256 coordinatorId, address newPendingOwner) external;
     function acceptCoordinatorOwner(uint256 coordinatorId) external;
     function updateCoordinatorTreasury(uint256 coordinatorId, address newTreasury) external;
-    function updateCoordinatorPauser(uint256 coordinatorId, address newPauser) external;
-    function updateCoordinatorPaused(uint256 coordinatorId, bool newPaused) external;
     function createProduct(uint256 coordinatorId, IProduct.ProductInfo calldata productInfo) external returns (IProduct);
     function updateCollateral(ICollateral newCollateral) external;
     function updateIncentivizer(IIncentivizer newIncentivizer) external;
@@ -82,6 +74,7 @@ interface IController {
     function updateIncentivizationFee(UFixed18 newIncentivizationFee) external;
     function updateMinCollateral(UFixed18 newMinCollateral) external;
     function updateProgramsPerProduct(uint256 newProductsPerProduct) external;
+    function updatePaused(bool newPaused) external;
     function isProduct(IProduct product) external view returns (bool);
     function owner() external view returns (address);
     function owner(uint256 coordinatorId) external view returns (address);
@@ -89,10 +82,4 @@ interface IController {
     function treasury() external view returns (address);
     function treasury(uint256 coordinatorId) external view returns (address);
     function treasury(IProduct product) external view returns (address);
-    function pauser() external view returns (address);
-    function pauser(uint256 coordinatorId) external view returns (address);
-    function pauser(IProduct product) external view returns (address);
-    function paused() external view returns (bool);
-    function paused(uint256 coordinatorId) external view returns (bool);
-    function paused(IProduct product) external view returns (bool);
 }

@@ -56,7 +56,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     /**
      * @notice Surfaces global settlement externally
      */
-    function settle() external nonReentrant notPausedProduct(IProduct(this)) {
+    function settle() external nonReentrant notPaused {
         _settle();
     }
 
@@ -124,7 +124,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @notice Surfaces account settlement externally
      * @param account Account to settle
      */
-    function settleAccount(address account) external nonReentrant notPausedProduct(IProduct(this)) {
+    function settleAccount(address account) external nonReentrant notPaused {
         IOracleProvider.OracleVersion memory currentOracleVersion = _settle();
         _settleAccount(account, currentOracleVersion);
     }
@@ -190,7 +190,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     function openTake(UFixed18 amount)
     external
     nonReentrant
-    notPausedProduct(IProduct(this))
+    notPaused
     notClosed
     settleForAccount(msg.sender)
     takerInvariant
@@ -213,7 +213,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     function closeTake(UFixed18 amount)
     external
     nonReentrant
-    notPausedProduct(IProduct(this))
+    notPaused
     settleForAccount(msg.sender)
     closeInvariant
     liquidationInvariant
@@ -237,7 +237,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     function openMake(UFixed18 amount)
     external
     nonReentrant
-    notPausedProduct(IProduct(this))
+    notPaused
     notClosed
     settleForAccount(msg.sender)
     nonZeroVersionInvariant
@@ -261,7 +261,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     function closeMake(UFixed18 amount)
     external
     nonReentrant
-    notPausedProduct(IProduct(this))
+    notPaused
     settleForAccount(msg.sender)
     takerInvariant
     closeInvariant
