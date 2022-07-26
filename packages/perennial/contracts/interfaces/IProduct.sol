@@ -4,12 +4,13 @@ pragma solidity ^0.8.13;
 import "@equilibria/root/number/types/UFixed18.sol";
 import "@equilibria/root/curve/types/JumpRateUtilizationCurve.sol";
 import "./IPayoffProvider.sol";
+import "./IParamProvider.sol";
 import "./types/PayoffDefinition.sol";
 import "./types/Position.sol";
 import "./types/PrePosition.sol";
 import "./types/Accumulator.sol";
 
-interface IProduct is IPayoffProvider {
+interface IProduct is IPayoffProvider, IParamProvider {
     /// @dev Product Creation parameters
     struct ProductInfo {
         /// @dev name of the product
@@ -49,17 +50,6 @@ interface IProduct is IPayoffProvider {
     event TakeOpened(address indexed account, uint256 version, UFixed18 amount);
     event MakeClosed(address indexed account, uint256 version, UFixed18 amount);
     event TakeClosed(address indexed account, uint256 version, UFixed18 amount);
-    event MaintenanceUpdated(UFixed18 newMaintenance);
-    event FundingFeeUpdated(UFixed18 newFundingFee);
-    event MakerFeeUpdated(UFixed18 newMakerFee);
-    event TakerFeeUpdated(UFixed18 newTakerFee);
-    event MakerLimitUpdated(UFixed18 newMakerLimit);
-    event JumpRateUtilizationCurveUpdated(
-        Fixed18 minRate,
-        Fixed18 maxRate,
-        Fixed18 targetRate,
-        UFixed18 targetUtilization
-    );
     event ClosedUpdated(bool indexed newClosed, uint256 version);
 
     error ProductInsufficientLiquidityError(UFixed18 socializationFactor);
@@ -71,9 +61,6 @@ interface IProduct is IPayoffProvider {
     error ProductOracleBootstrappingError();
     error ProductNotOwnerError();
     error ProductInvalidOracle();
-    error ProductInvalidFundingFee();
-    error ProductInvalidMakerFee();
-    error ProductInvalidTakerFee();
     error ProductClosedError();
 
     function name() external view returns (string memory);
@@ -99,19 +86,6 @@ interface IProduct is IPayoffProvider {
     function shareAtVersion(uint256 oracleVersion) external view returns (Accumulator memory);
     function latestVersion(address account) external view returns (uint256);
     function rate(Position memory position) external view returns (Fixed18);
-    // Product Parameters and Updaters
-    function maintenance() external view returns (UFixed18);
-    function updateMaintenance(UFixed18 newMaintenance) external;
-    function fundingFee() external view returns (UFixed18);
-    function updateFundingFee(UFixed18 newFundingFee) external;
-    function makerFee() external view returns (UFixed18);
-    function updateMakerFee(UFixed18 newMakerFee) external;
-    function takerFee() external view returns (UFixed18);
-    function updateTakerFee(UFixed18 newTakerFee) external;
-    function makerLimit() external view returns (UFixed18);
-    function updateMakerLimit(UFixed18 newMakerLimit) external;
-    function utilizationCurve() external view returns (JumpRateUtilizationCurve memory);
-    function updateUtilizationCurve(JumpRateUtilizationCurve memory newUtilizationCurve) external;
     function closed() external view returns (bool);
     function updateClosed(bool newClosed) external;
 }

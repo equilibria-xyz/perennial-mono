@@ -5,6 +5,7 @@ import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@equilibria/root/control/unstructured/UReentrancyGuard.sol";
 import "../controller/UControllerProvider.sol";
 import "./UPayoffProvider.sol";
+import "./UParamProvider.sol";
 import "./types/position/AccountPosition.sol";
 import "./types/accumulator/AccountAccumulator.sol";
 
@@ -13,32 +14,7 @@ import "./types/accumulator/AccountAccumulator.sol";
  * @notice Manages logic and state for a single product market.
  * @dev Cloned by the Controller contract to launch new product markets.
  */
-contract Product is IProduct, UInitializable, UControllerProvider, UPayoffProvider, UReentrancyGuard {
-    /// @dev The maintenance value
-    UFixed18Storage private constant _maintenance = UFixed18Storage.wrap(keccak256("equilibria.perennial.Product.maintenance"));
-    function maintenance() public view returns (UFixed18) { return _maintenance.read(); }
-
-    /// @dev The funding fee value
-    UFixed18Storage private constant _fundingFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.Product.fundingFee"));
-    function fundingFee() public view returns (UFixed18) { return _fundingFee.read(); }
-
-    /// @dev The maker fee value
-    UFixed18Storage private constant _makerFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.Product.makerFee"));
-    function makerFee() public view returns (UFixed18) { return _makerFee.read(); }
-
-    /// @dev The taker fee value
-    UFixed18Storage private constant _takerFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.Product.takerFee"));
-    function takerFee() public view returns (UFixed18) { return _takerFee.read(); }
-
-    /// @dev The maker limit value
-    UFixed18Storage private constant _makerLimit = UFixed18Storage.wrap(keccak256("equilibria.perennial.Product.makerLimit"));
-    function makerLimit() public view returns (UFixed18) { return _makerLimit.read(); }
-
-    /// @dev The JumpRateUtilizationCurve params
-    JumpRateUtilizationCurveStorage private constant _utilizationCurve =
-        JumpRateUtilizationCurveStorage.wrap(keccak256("equilibria.perennial.Product.jumpRateUtilizationCurve"));
-    function utilizationCurve() public view returns (JumpRateUtilizationCurve memory) { return _utilizationCurve.read(); }
-
+contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, UReentrancyGuard {
     /// @dev Whether or not the product is closed
     BoolStorage private constant _closed =
         BoolStorage.wrap(keccak256("equilibria.perennial.Product.closed"));
@@ -71,16 +47,10 @@ contract Product is IProduct, UInitializable, UControllerProvider, UPayoffProvid
         __UControllerProvider__initialize(IController(msg.sender));
         __UPayoffProvider__initialize(productInfo_.oracle, productInfo_.payoffDefinition);
         __UReentrancyGuard__initialize();
+        __UParamProvider__initialize(productInfo_);
 
         name = productInfo_.name;
         symbol = productInfo_.symbol;
-
-        _updateMaintenance(productInfo_.maintenance);
-        _updateFundingFee(productInfo_.fundingFee);
-        _updateMakerFee(productInfo_.makerFee);
-        _updateTakerFee(productInfo_.takerFee);
-        _updateMakerLimit(productInfo_.makerLimit);
-        _updateUtilizationCurve(productInfo_.utilizationCurve);
     }
 
     /**
@@ -449,24 +419,6 @@ contract Product is IProduct, UInitializable, UControllerProvider, UPayoffProvid
     }
 
     /**
-     * @notice Updates the maintenance to `newMaintenance`
-     * @dev only callable by product owner
-     * @param newMaintenance new maintenance value
-     */
-    function updateMaintenance(UFixed18 newMaintenance) external onlyProductOwner(IProduct(this)) {
-        _updateMaintenance(newMaintenance);
-    }
-
-    /**
-     * @notice Updates the maintenance to `newMaintenance`
-     * @param newMaintenance new maintenance value
-     */
-    function _updateMaintenance(UFixed18 newMaintenance) private {
-        _maintenance.store(newMaintenance);
-        emit MaintenanceUpdated(newMaintenance);
-    }
-
-    /**
      * @notice Returns the minimum funding fee parameter with a capped range for safety
      * @dev Caps controller.minFundingFee() <= fundingFee() <= 1
      * @return Safe minimum funding fee parameter
@@ -476,109 +428,11 @@ contract Product is IProduct, UInitializable, UControllerProvider, UPayoffProvid
     }
 
     /**
-     * @notice Updates the funding fee to `newFundingFee`
-     * @dev only callable by product owner
-     * @param newFundingFee new funding fee value
-     */
-    function updateFundingFee(UFixed18 newFundingFee) external onlyProductOwner(IProduct(this)) {
-        _updateFundingFee(newFundingFee);
-    }
-
-    /**
-     * @notice Updates the funding fee to `newFundingFee`
-     * @param newFundingFee new funding fee value
-     */
-    function _updateFundingFee(UFixed18 newFundingFee) private {
-        if (newFundingFee.gt(UFixed18Lib.ONE)) revert ProductInvalidFundingFee();
-        _fundingFee.store(newFundingFee);
-        emit FundingFeeUpdated(newFundingFee);
-    }
-
-    /**
-     * @notice Updates the maker fee to `newMakerFee`
-     * @dev only callable by product owner
-     * @param newMakerFee new maker fee value
-     */
-    function updateMakerFee(UFixed18 newMakerFee) external onlyProductOwner(IProduct(this)) {
-        _updateMakerFee(newMakerFee);
-    }
-
-    /**
-     * @notice Updates the maker fee to `newMakerFee`
-     * @param newMakerFee new maker fee value
-     */
-    function _updateMakerFee(UFixed18 newMakerFee) private {
-        if (newMakerFee.gt(UFixed18Lib.ONE)) revert ProductInvalidMakerFee();
-        _makerFee.store(newMakerFee);
-        emit MakerFeeUpdated(newMakerFee);
-    }
-
-    /**
-     * @notice Updates the taker fee to `newTakerFee`
-     * @dev only callable by product owner
-     * @param newTakerFee new taker fee value
-     */
-    function updateTakerFee(UFixed18 newTakerFee) external onlyProductOwner(IProduct(this)) {
-        _updateTakerFee(newTakerFee);
-    }
-
-    /**
-     * @notice Updates the taker fee to `newTakerFee`
-     * @param newTakerFee new taker fee value
-     */
-    function _updateTakerFee(UFixed18 newTakerFee) private {
-        if (newTakerFee.gt(UFixed18Lib.ONE)) revert ProductInvalidTakerFee();
-        _takerFee.store(newTakerFee);
-        emit TakerFeeUpdated(newTakerFee);
-    }
-
-    /**
-     * @notice Updates the maker limit to `newMakerLimit`
-     * @dev only callable by product owner
-     * @param newMakerLimit new maker limit value
-     */
-    function updateMakerLimit(UFixed18 newMakerLimit) external onlyProductOwner(IProduct(this)) {
-        _updateMakerLimit(newMakerLimit);
-    }
-
-    /**
-     * @notice Updates the maker limit to `newMakerLimit`
-     * @param newMakerLimit new maker limit value
-     */
-    function _updateMakerLimit(UFixed18 newMakerLimit) private {
-        _makerLimit.store(newMakerLimit);
-        emit MakerLimitUpdated(newMakerLimit);
-    }
-
-    /**
-     * @notice Updates the utilization curve limit to `newUtilizationCurve`
-     * @dev only callable by product owner
-     * @param newUtilizationCurve new utilization curve value
-     */
-    function updateUtilizationCurve(JumpRateUtilizationCurve calldata newUtilizationCurve) external onlyProductOwner(IProduct(this)) {
-        _updateUtilizationCurve(newUtilizationCurve);
-    }
-
-    /**
-     * @notice Updates the utilization curve limit to `newUtilizationCurve`
-     * @param newUtilizationCurve new utilization curve value
-     */
-    function _updateUtilizationCurve(JumpRateUtilizationCurve memory newUtilizationCurve) private {
-        _utilizationCurve.store(newUtilizationCurve);
-        emit JumpRateUtilizationCurveUpdated(
-            newUtilizationCurve.minRate.unpack(),
-            newUtilizationCurve.maxRate.unpack(),
-            newUtilizationCurve.targetRate.unpack(),
-            newUtilizationCurve.targetUtilization.unpack()
-        );
-    }
-
-    /**
      * @notice Updates product closed state
      * @dev only callable by product owner. Settles the product before flipping the flag
      * @param newClosed new closed value
      */
-    function updateClosed(bool newClosed) external onlyProductOwner(IProduct(this)) {
+    function updateClosed(bool newClosed) external onlyProductOwner {
         IOracleProvider.OracleVersion memory oracleVersion = _settle();
         _closed.store(newClosed);
         emit ClosedUpdated(newClosed, oracleVersion.version);
