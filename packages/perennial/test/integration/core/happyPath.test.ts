@@ -480,18 +480,18 @@ describe('Happy Path', () => {
     await product.settleAccount(user.address)
   })
 
-  describe('protocol paused', async () => {
-    const { controller, collateral, user } = instanceVars
+  it('disables actions when paused', async () => {
+    const { controller, collateral, pauser, user } = instanceVars
     const product = await createProduct(instanceVars)
 
-    await expect(controller.updatePaused(true)).to.emit(controller, 'PausedUpdated').withArgs(true)
+    await expect(controller.connect(pauser).updatePaused(true)).to.emit(controller, 'PausedUpdated').withArgs(true)
     await expect(collateral.depositTo(user.address, product.address, utils.parseEther('1000'))).to.be.revertedWith(
       'PausedError()',
     )
     await expect(collateral.withdrawTo(user.address, product.address, utils.parseEther('1000'))).to.be.revertedWith(
       'PausedError()',
     )
-    await expect(collateral.liquidatable(user.address, product.address)).to.be.revertedWith('PausedError()')
+    await expect(collateral.liquidate(user.address, product.address)).to.be.revertedWith('PausedError()')
 
     await expect(product.openMake(utils.parseEther('0.001'))).to.be.revertedWith('PausedError()')
     await expect(product.closeMake(utils.parseEther('0.001'))).to.be.revertedWith('PausedError()')

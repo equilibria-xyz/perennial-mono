@@ -154,7 +154,6 @@ describe('Controller', () => {
       expect(await controller['owner(uint256)'](0)).to.equal(owner.address)
       expect(await controller['treasury()']()).to.equal(owner.address)
       expect(await controller['treasury(uint256)'](0)).to.equal(owner.address)
-      expect(await controller.paused()).to.equal(false)
     })
 
     it('reverts if not owner', async () => {
@@ -210,7 +209,6 @@ describe('Controller', () => {
       expect(await controller['owner(uint256)'](0)).to.equal(pendingOwner.address)
       expect(await controller['treasury()']()).to.equal(pendingOwner.address)
       expect(await controller['treasury(uint256)'](0)).to.equal(pendingOwner.address)
-      expect(await controller.paused()).to.equal(false)
     })
 
     it('reverts if owner', async () => {
@@ -282,7 +280,6 @@ describe('Controller', () => {
       expect(await controller['owner(uint256)'](0)).to.equal(owner.address)
       expect(await controller['treasury()']()).to.equal(treasury.address)
       expect(await controller['treasury(uint256)'](0)).to.equal(treasury.address)
-      expect(await controller.paused()).to.equal(false)
     })
 
     it('reverts if not owner', async () => {

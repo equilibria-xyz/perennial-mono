@@ -59,6 +59,7 @@ interface IController {
     function incentivizationFee() external view returns (UFixed18);
     function minCollateral() external view returns (UFixed18);
     function programsPerProduct() external view returns (uint256);
+    function pauser() external view returns (address);
     function paused() external view returns (bool);
     function initialize(ICollateral collateral_, IIncentivizer incentivizer_, IBeacon productBeacon_) external;
     function createCoordinator() external returns (uint256);
@@ -84,5 +85,4 @@ interface IController {
     function treasury() external view returns (address);
     function treasury(uint256 coordinatorId) external view returns (address);
     function treasury(IProduct product) external view returns (address);
-    function pauser() external view returns (address);
 }
