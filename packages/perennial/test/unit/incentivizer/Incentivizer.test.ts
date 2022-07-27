@@ -73,9 +73,7 @@ describe('Incentivizer', () => {
     await controller.mock['treasury(uint256)'].withArgs(PRODUCT_COORDINATOR_ID).returns(productTreasury.address)
     await controller.mock['owner(uint256)'].withArgs(2).returns(productOwnerB.address)
     await controller.mock['treasury(uint256)'].withArgs(2).returns(productTreasuryB.address)
-    await controller.mock['paused()'].withArgs().returns(false)
-    await controller.mock['paused(address)'].withArgs(product.address).returns(false)
-    await controller.mock['paused(address)'].withArgs(productB.address).returns(false)
+    await controller.mock.paused.withArgs().withArgs().returns(false)
     await controller.mock.coordinatorFor.withArgs(product.address).returns(PRODUCT_COORDINATOR_ID)
     await controller.mock.coordinatorFor.withArgs(productB.address).returns(2)
     await controller.mock.incentivizationFee.withArgs().returns(0)
@@ -393,7 +391,7 @@ describe('Incentivizer', () => {
     })
 
     it('reverts if paused', async () => {
-      await controller.mock['paused(address)'].withArgs(product.address).returns(true)
+      await controller.mock.paused.withArgs().returns(true)
 
       const NOW = await currentBlockTimestamp()
 
@@ -1975,7 +1973,7 @@ describe('Incentivizer', () => {
     })
 
     it('reverts if paused', async () => {
-      await controller.mock['paused(address)'].withArgs(product.address).returns(true)
+      await controller.mock.paused.withArgs().returns(true)
       await expect(incentivizer.connect(productOwner).complete(product.address, 0)).to.be.revertedWith(`PausedError()`)
     })
   })
@@ -2163,7 +2161,7 @@ describe('Incentivizer', () => {
     })
 
     it('reverts if paused', async () => {
-      await controller.mock['paused(address)'].withArgs(product.address).returns(true)
+      await controller.mock.paused.withArgs().returns(true)
       await expect(incentivizer.connect(user)['claim(address,uint256[])'](product.address, [1])).to.be.revertedWith(
         `PausedError()`,
       )
@@ -2227,7 +2225,7 @@ describe('Incentivizer', () => {
     })
 
     it('reverts if paused (protocol)', async () => {
-      await controller.mock['paused()'].withArgs().returns(true)
+      await controller.mock.paused.withArgs().returns(true)
       await expect(incentivizer.connect(user).claimFee([token.address])).to.be.revertedWith(`PausedError()`)
     })
   })

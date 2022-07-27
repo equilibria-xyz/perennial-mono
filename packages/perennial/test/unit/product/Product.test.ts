@@ -75,7 +75,7 @@ describe('Product', () => {
     PRODUCT_INFO.oracle = oracle.address
     await product.connect(controllerSigner).initialize(PRODUCT_INFO)
 
-    await controller.mock['paused(address)'].withArgs(product.address).returns(false)
+    await controller.mock.paused.withArgs().returns(false)
     await controller.mock.collateral.withArgs().returns(collateral.address)
     await controller.mock.incentivizer.withArgs().returns(incentivizer.address)
     await controller.mock.coordinatorFor.withArgs(product.address).returns(1)
@@ -615,7 +615,7 @@ describe('Product', () => {
       })
 
       it('reverts if paused', async () => {
-        await controller.mock['paused(address)'].withArgs(product.address).returns(true)
+        await controller.mock.paused.withArgs().returns(true)
         await expect(product.connect(user).openMake(POSITION)).to.be.revertedWith('PausedError()')
       })
 
@@ -1026,7 +1026,7 @@ describe('Product', () => {
         })
 
         it('reverts if paused', async () => {
-          await controller.mock['paused(address)'].withArgs(product.address).returns(true)
+          await controller.mock.paused.withArgs().returns(true)
           await expect(product.connect(user).closeMake(POSITION)).to.be.revertedWith('PausedError()')
         })
       })
@@ -1422,7 +1422,7 @@ describe('Product', () => {
       })
 
       it('reverts if paused', async () => {
-        await controller.mock['paused(address)'].withArgs(product.address).returns(true)
+        await controller.mock.paused.withArgs().returns(true)
         await expect(product.connect(user).openTake(POSITION)).to.be.revertedWith('PausedError()')
       })
 
@@ -1908,7 +1908,7 @@ describe('Product', () => {
         })
 
         it('reverts if paused', async () => {
-          await controller.mock['paused(address)'].withArgs(product.address).returns(true)
+          await controller.mock.paused.withArgs().returns(true)
           await expect(product.connect(user).closeTake(POSITION)).to.be.revertedWith('PausedError()')
         })
       })
@@ -2807,12 +2807,12 @@ describe('Product', () => {
       })
 
       it('reverts if paused', async () => {
-        await controller.mock['paused(address)'].withArgs(product.address).returns(true)
+        await controller.mock.paused.withArgs().returns(true)
         await expect(product.connect(user).settle()).to.be.revertedWith('PausedError()')
       })
 
       it('reverts if paused', async () => {
-        await controller.mock['paused(address)'].withArgs(product.address).returns(true)
+        await controller.mock.paused.withArgs().returns(true)
         await expect(product.connect(user).settleAccount(user.address)).to.be.revertedWith('PausedError()')
       })
     })
@@ -3230,7 +3230,7 @@ describe('Product', () => {
       })
 
       it('reverts if paused', async () => {
-        await controller.mock['paused(address)'].withArgs(product.address).returns(true)
+        await controller.mock.paused.withArgs().returns(true)
         await expect(product.connect(user).openMake(POSITION)).to.be.revertedWith('PausedError()')
       })
 
@@ -3639,7 +3639,7 @@ describe('Product', () => {
         })
 
         it('reverts if paused', async () => {
-          await controller.mock['paused(address)'].withArgs(product.address).returns(true)
+          await controller.mock.paused.withArgs().returns(true)
           await expect(product.connect(user).closeMake(POSITION)).to.be.revertedWith('PausedError()')
         })
       })
@@ -4043,7 +4043,7 @@ describe('Product', () => {
       })
 
       it('reverts if paused', async () => {
-        await controller.mock['paused(address)'].withArgs(product.address).returns(true)
+        await controller.mock.paused.withArgs().returns(true)
         await expect(product.connect(user).openTake(POSITION)).to.be.revertedWith('PausedError()')
       })
 
@@ -4529,7 +4529,7 @@ describe('Product', () => {
         })
 
         it('reverts if paused', async () => {
-          await controller.mock['paused(address)'].withArgs(product.address).returns(true)
+          await controller.mock.paused.withArgs().returns(true)
           await expect(product.connect(user).closeTake(POSITION)).to.be.revertedWith('PausedError()')
         })
       })
@@ -5426,12 +5426,12 @@ describe('Product', () => {
       })
 
       it('reverts if paused', async () => {
-        await controller.mock['paused(address)'].withArgs(product.address).returns(true)
+        await controller.mock.paused.withArgs().returns(true)
         await expect(product.connect(user).settle()).to.be.revertedWith('PausedError()')
       })
 
       it('reverts if paused', async () => {
-        await controller.mock['paused(address)'].withArgs(product.address).returns(true)
+        await controller.mock.paused.withArgs().returns(true)
         await expect(product.connect(user).settleAccount(user.address)).to.be.revertedWith('PausedError()')
       })
     })

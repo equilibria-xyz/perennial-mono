@@ -41,7 +41,7 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
     external
     nonReentrant
     isProduct(product)
-    notPausedProduct(product)
+    notPaused
     onlyOwner(programInfo.coordinatorId)
     returns (uint256 programId) {
         IController _controller = controller();
@@ -81,7 +81,7 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
     external
     nonReentrant
     isProgram(product, programId)
-    notPausedProduct(product)
+    notPaused
     onlyProgramOwner(product, programId)
     {
         ProductManagerLib.SyncResult memory syncResult = _products[product].complete(product, programId);
@@ -167,7 +167,7 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
     function _claimProduct(IProduct product, uint256[] memory programIds)
     private
     isProduct(product)
-    notPausedProduct(product)
+    notPaused
     settleForAccount(msg.sender, product)
     {
         for (uint256 i; i < programIds.length; i++) {
