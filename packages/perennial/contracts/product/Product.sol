@@ -47,7 +47,14 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         __UControllerProvider__initialize(IController(msg.sender));
         __UPayoffProvider__initialize(productInfo_.oracle, productInfo_.payoffDefinition);
         __UReentrancyGuard__initialize();
-        __UParamProvider__initialize(productInfo_);
+        __UParamProvider__initialize(
+            productInfo_.maintenance,
+            productInfo_.fundingFee,
+            productInfo_.makerFee,
+            productInfo_.takerFee,
+            productInfo_.makerLimit,
+            productInfo_.utilizationCurve
+        );
 
         name = productInfo_.name;
         symbol = productInfo_.symbol;
