@@ -9,16 +9,28 @@ import "../interfaces/IProduct.sol";
 abstract contract UParamProvider is IParamProvider, UControllerProvider {
     /**
      * @notice Initializes the contract state
-     * @param productInfo_ product info struct
+     * @param maintenance_ product maintenance ratio
+     * @param fundingFee_ product funding fee
+     * @param makerFee_ product maker fee
+     * @param takerFee_ product taker fee
+     * @param makerLimit_ product maker limit
+     * @param utilizationCurve_ utulization curve definition
      */
     // solhint-disable-next-line func-name-mixedcase
-    function __UParamProvider__initialize(IProduct.ProductInfo calldata productInfo_) internal onlyInitializer {        
-        _updateMaintenance(productInfo_.maintenance);
-        _updateFundingFee(productInfo_.fundingFee);
-        _updateMakerFee(productInfo_.makerFee);
-        _updateTakerFee(productInfo_.takerFee);
-        _updateMakerLimit(productInfo_.makerLimit);
-        _updateUtilizationCurve(productInfo_.utilizationCurve);
+    function __UParamProvider__initialize(
+        UFixed18 maintenance_,
+        UFixed18 fundingFee_,
+        UFixed18 makerFee_,
+        UFixed18 takerFee_,
+        UFixed18 makerLimit_,
+        JumpRateUtilizationCurve memory utilizationCurve_
+    ) internal onlyInitializer {
+        _updateMaintenance(maintenance_);
+        _updateFundingFee(fundingFee_);
+        _updateMakerFee(makerFee_);
+        _updateTakerFee(takerFee_);
+        _updateMakerLimit(makerLimit_);
+        _updateUtilizationCurve(utilizationCurve_);
     }
 
     /// @dev Only allow the Product's coordinator owner to call
@@ -128,7 +140,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
     function updateTakerFee(UFixed18 newTakerFee) external onlyProductOwner {
         _updateTakerFee(newTakerFee);
     }
-    
+
     /**
      * @notice Updates the maker limit to `newMakerLimit`
      * @param newMakerLimit new maker limit value
