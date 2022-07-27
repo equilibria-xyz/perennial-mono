@@ -1,5 +1,5 @@
 import { MockContract } from '@ethereum-waffle/mock-contract'
-import { utils } from 'ethers'
+import { constants, utils } from 'ethers'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { expect } from 'chai'
 import HRE, { waffle } from 'hardhat'
@@ -571,6 +571,17 @@ describe('Controller', () => {
       await expect(controller.connect(owner).updatePauser(user.address))
         .to.emit(controller, 'PauserUpdated')
         .withArgs(user.address)
+    })
+
+    it('updates the pauser to address(0) to default to owner', async () => {
+      await controller.connect(owner).updatePauser(user.address)
+      expect(await controller.pauser()).to.equal(user.address)
+
+      await expect(controller.connect(owner).updatePauser(constants.AddressZero))
+        .to.emit(controller, 'PauserUpdated')
+        .withArgs(constants.AddressZero)
+
+      expect(await controller.pauser()).to.equal(owner.address)
     })
 
     it('reverts if not owner', async () => {

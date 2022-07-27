@@ -81,7 +81,6 @@ contract Controller is IController, UInitializable {
     ) external initializer(1) {
         _createCoordinator();
 
-        updatePauser(address(0));
         updateCollateral(collateral_);
         updateIncentivizer(incentivizer_);
         updateProductBeacon(productBeacon_);
