@@ -3,7 +3,7 @@ import 'hardhat'
 import { utils } from 'ethers'
 
 import { InstanceVars, deployProtocol, createProduct, depositTo, INITIAL_VERSION } from '../helpers/setupHelpers'
-import { expectPositionEq, expectPrePositionEq } from '../../testutil/types'
+import { createPayoffDefinition, expectPositionEq, expectPrePositionEq } from '../../testutil/types'
 
 describe('Happy Path', () => {
   let instanceVars: InstanceVars
@@ -28,15 +28,33 @@ describe('Happy Path', () => {
   })
 
   it('creates a product', async () => {
-    const { owner, user, controller, collateral, treasuryB, productProvider, dsu } = instanceVars
+    const { owner, user, controller, collateral, treasuryB, contractPayoffProvider, chainlinkOracle, dsu } =
+      instanceVars
 
     await expect(controller.createCoordinator()).to.emit(controller, 'CoordinatorCreated').withArgs(1, owner.address)
     await expect(controller.updateCoordinatorTreasury(1, treasuryB.address))
       .to.emit(controller, 'CoordinatorTreasuryUpdated')
       .withArgs(1, treasuryB.address)
 
-    const productAddress = await controller.callStatic.createProduct(1, productProvider.address)
-    await expect(controller.createProduct(1, productProvider.address)).to.emit(controller, 'ProductCreated')
+    const productInfo = {
+      name: 'Squeeth',
+      symbol: 'SQTH',
+      payoffDefinition: createPayoffDefinition({ contractAddress: contractPayoffProvider.address }),
+      oracle: chainlinkOracle.address,
+      maintenance: utils.parseEther('0.3'),
+      fundingFee: utils.parseEther('0.1'),
+      makerFee: 0,
+      takerFee: 0,
+      makerLimit: utils.parseEther('1'),
+      utilizationCurve: {
+        minRate: 0,
+        maxRate: utils.parseEther('5.00'),
+        targetRate: utils.parseEther('0.80'),
+        targetUtilization: utils.parseEther('0.80'),
+      },
+    }
+    const productAddress = await controller.callStatic.createProduct(1, productInfo)
+    await expect(controller.createProduct(1, productInfo)).to.emit(controller, 'ProductCreated')
 
     await dsu.connect(user).approve(collateral.address, utils.parseEther('1000'))
     await collateral.connect(user).depositTo(user.address, productAddress, utils.parseEther('1000'))
@@ -174,7 +192,7 @@ describe('Happy Path', () => {
 
     // User state
     expect(await product.isClosed(user.address)).to.equal(true)
-    expect(await product.maintenance(user.address)).to.equal(0)
+    expect(await product['maintenance(address)'](user.address)).to.equal(0)
     expect(await product.maintenanceNext(user.address)).to.equal(0)
     expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -212,7 +230,7 @@ describe('Happy Path', () => {
 
     // User state
     expect(await product.isClosed(user.address)).to.equal(true)
-    expect(await product.maintenance(user.address)).to.equal(0)
+    expect(await product['maintenance(address)'](user.address)).to.equal(0)
     expect(await product.maintenanceNext(user.address)).to.equal(0)
     expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -384,7 +402,7 @@ describe('Happy Path', () => {
 
     // User State
     expect(await product.isClosed(userB.address)).to.equal(true)
-    expect(await product.maintenance(userB.address)).to.equal(0)
+    expect(await product['maintenance(address)'](userB.address)).to.equal(0)
     expect(await product.maintenanceNext(userB.address)).to.equal(0)
     expectPositionEq(await product.position(userB.address), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre(address)'](userB.address), {
@@ -429,7 +447,7 @@ describe('Happy Path', () => {
 
     // User State
     expect(await product.isClosed(userB.address)).to.equal(true)
-    expect(await product.maintenance(userB.address)).to.equal(0)
+    expect(await product['maintenance(address)'](userB.address)).to.equal(0)
     expect(await product.maintenanceNext(userB.address)).to.equal(0)
     expectPositionEq(await product.position(userB.address), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre(address)'](userB.address), {
@@ -460,5 +478,26 @@ describe('Happy Path', () => {
     await product.settle()
     await product.settleAccount(user.address)
     await product.settleAccount(user.address)
+  })
+
+  it('disables actions when paused', async () => {
+    const { controller, collateral, pauser, user } = instanceVars
+    const product = await createProduct(instanceVars)
+
+    await expect(controller.connect(pauser).updatePaused(true)).to.emit(controller, 'PausedUpdated').withArgs(true)
+    await expect(collateral.depositTo(user.address, product.address, utils.parseEther('1000'))).to.be.revertedWith(
+      'PausedError()',
+    )
+    await expect(collateral.withdrawTo(user.address, product.address, utils.parseEther('1000'))).to.be.revertedWith(
+      'PausedError()',
+    )
+    await expect(collateral.liquidate(user.address, product.address)).to.be.revertedWith('PausedError()')
+
+    await expect(product.openMake(utils.parseEther('0.001'))).to.be.revertedWith('PausedError()')
+    await expect(product.closeMake(utils.parseEther('0.001'))).to.be.revertedWith('PausedError()')
+    await expect(product.openTake(utils.parseEther('0.001'))).to.be.revertedWith('PausedError()')
+    await expect(product.closeTake(utils.parseEther('0.001'))).to.be.revertedWith('PausedError()')
+    await expect(product.settle()).to.be.revertedWith('PausedError()')
+    await expect(product.settleAccount(user.address)).to.be.revertedWith('PausedError()')
   })
 })

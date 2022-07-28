@@ -2,18 +2,55 @@
 pragma solidity ^0.8.13;
 
 import "@equilibria/root/number/types/UFixed18.sol";
+import "@equilibria/root/curve/types/JumpRateUtilizationCurve.sol";
+import "./IPayoffProvider.sol";
+import "./IParamProvider.sol";
+import "./types/PayoffDefinition.sol";
 import "./types/Position.sol";
 import "./types/PrePosition.sol";
 import "./types/Accumulator.sol";
-import "./IProductProvider.sol";
 
-interface IProduct {
+interface IProduct is IPayoffProvider, IParamProvider {
+    /// @dev Product Creation parameters
+    struct ProductInfo {
+        /// @dev name of the product
+        string name;
+
+        /// @dev symbol of the product
+        string symbol;
+
+        /// @dev product payoff definition
+        PayoffDefinition payoffDefinition;
+
+        /// @dev oracle address
+        IOracleProvider oracle;
+
+        /// @dev product maintenance ratio
+        UFixed18 maintenance;
+
+        /// @dev product funding fee
+        UFixed18 fundingFee;
+
+        /// @dev product maker fee
+        UFixed18 makerFee;
+
+        /// @dev product taker fee
+        UFixed18 takerFee;
+
+        /// @dev product maker limit
+        UFixed18 makerLimit;
+
+        /// @dev utulization curve definition
+        JumpRateUtilizationCurve utilizationCurve;
+    }
+
     event Settle(uint256 preVersion, uint256 toVersion);
     event AccountSettle(address indexed account, uint256 preVersion, uint256 toVersion);
     event MakeOpened(address indexed account, uint256 version, UFixed18 amount);
     event TakeOpened(address indexed account, uint256 version, UFixed18 amount);
     event MakeClosed(address indexed account, uint256 version, UFixed18 amount);
     event TakeClosed(address indexed account, uint256 version, UFixed18 amount);
+    event ClosedUpdated(bool indexed newClosed, uint256 version);
 
     error ProductInsufficientLiquidityError(UFixed18 socializationFactor);
     error ProductDoubleSidedError();
@@ -22,9 +59,13 @@ interface IProduct {
     error ProductInLiquidationError();
     error ProductMakerOverLimitError();
     error ProductOracleBootstrappingError();
+    error ProductNotOwnerError();
+    error ProductInvalidOracle();
+    error ProductClosedError();
 
-    function productProvider() external view returns (IProductProvider);
-    function initialize(IProductProvider productProvider_) external;
+    function name() external view returns (string memory);
+    function symbol() external view returns (string memory);
+    function initialize(ProductInfo calldata productInfo_) external;
     function settle() external;
     function settleAccount(address account) external;
     function openTake(UFixed18 amount) external;
@@ -44,4 +85,7 @@ interface IProduct {
     function valueAtVersion(uint256 oracleVersion) external view returns (Accumulator memory);
     function shareAtVersion(uint256 oracleVersion) external view returns (Accumulator memory);
     function latestVersion(address account) external view returns (uint256);
+    function rate(Position memory position) external view returns (Fixed18);
+    function closed() external view returns (bool);
+    function updateClosed(bool newClosed) external;
 }

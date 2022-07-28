@@ -51,7 +51,7 @@ contract Collateral is ICollateral, UInitializable, UControllerProvider, UReentr
     function depositTo(address account, IProduct product, UFixed18 amount)
     external
     nonReentrant
-    notPausedProduct(product)
+    notPaused
     notZeroAddress(account)
     isProduct(product)
     collateralInvariant(account, product)
@@ -72,7 +72,7 @@ contract Collateral is ICollateral, UInitializable, UControllerProvider, UReentr
     function withdrawTo(address account, IProduct product, UFixed18 amount)
     external
     nonReentrant
-    notPausedProduct(product)
+    notPaused
     notZeroAddress(account)
     isProduct(product)
     settleForAccount(msg.sender, product)
@@ -95,7 +95,7 @@ contract Collateral is ICollateral, UInitializable, UControllerProvider, UReentr
     function liquidate(address account, IProduct product)
     external
     nonReentrant
-    notPausedProduct(product)
+    notPaused
     isProduct(product)
     settleForAccount(account, product)
     {
@@ -214,7 +214,7 @@ contract Collateral is ICollateral, UInitializable, UControllerProvider, UReentr
      * @param product Product to resolve shortfall for
      * @param amount Amount of shortfall to resolve
      */
-    function resolveShortfall(IProduct product, UFixed18 amount) external isProduct(product) notPausedProduct(product) {
+    function resolveShortfall(IProduct product, UFixed18 amount) external isProduct(product) notPaused {
         _products[product].resolve(amount);
         token.pull(msg.sender, amount);
 

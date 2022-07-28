@@ -43,14 +43,14 @@ describe('Incentivizer', () => {
     const product = await createProduct(instanceVars)
     const now = await currentBlockTimestamp()
     const programInfo = {
-      coordinatorId: 0,
+      coordinatorId: BigNumber.from(0),
       token: incentiveToken.address,
       amount: {
         maker: utils.parseEther('8000'),
         taker: utils.parseEther('2000'),
       },
-      start: now + HOUR,
-      duration: 30 * DAY,
+      start: BigNumber.from(now + HOUR),
+      duration: BigNumber.from(30 * DAY),
     }
     const PROGRAM_ID = 0
     const returnValue = await incentivizer.callStatic.create(product.address, programInfo)
@@ -58,17 +58,7 @@ describe('Incentivizer', () => {
 
     await expect(incentivizer.create(product.address, programInfo))
       .to.emit(incentivizer, 'ProgramCreated')
-      .withArgs(
-        product.address,
-        PROGRAM_ID,
-        0,
-        incentiveToken.address,
-        utils.parseEther('8000'),
-        utils.parseEther('2000'),
-        now + HOUR,
-        30 * DAY,
-        0,
-      )
+      .withArgs(product.address, PROGRAM_ID, programInfo, 0)
 
     expectProgramInfoEq(programInfo, await incentivizer.programInfos(product.address, PROGRAM_ID))
 
@@ -92,14 +82,14 @@ describe('Incentivizer', () => {
 
     const now = await currentBlockTimestamp()
     const programInfo = {
-      coordinatorId: PRODUCT_COORDINATOR_ID,
+      coordinatorId: BigNumber.from(PRODUCT_COORDINATOR_ID),
       token: incentiveToken.address,
       amount: {
         maker: utils.parseEther('8000'),
         taker: utils.parseEther('2000'),
       },
-      start: now + HOUR,
-      duration: 30 * DAY,
+      start: BigNumber.from(now + HOUR),
+      duration: BigNumber.from(30 * DAY),
     }
     const PROGRAM_ID = 0
     const returnValue = await incentivizer.connect(userB).callStatic.create(product.address, programInfo)
@@ -107,17 +97,7 @@ describe('Incentivizer', () => {
 
     await expect(incentivizer.connect(userB).create(product.address, programInfo))
       .to.emit(incentivizer, 'ProgramCreated')
-      .withArgs(
-        product.address,
-        PROGRAM_ID,
-        PRODUCT_COORDINATOR_ID,
-        incentiveToken.address,
-        utils.parseEther('8000'),
-        utils.parseEther('2000'),
-        now + HOUR,
-        30 * DAY,
-        0,
-      )
+      .withArgs(product.address, PROGRAM_ID, programInfo, 0)
 
     expectProgramInfoEq(programInfo, await incentivizer.programInfos(product.address, PROGRAM_ID))
     expect(await incentivizer.count(product.address)).to.equal(1)

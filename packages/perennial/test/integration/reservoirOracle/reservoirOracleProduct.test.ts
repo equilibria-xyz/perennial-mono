@@ -3,22 +3,41 @@ import 'hardhat'
 import { BigNumber, utils } from 'ethers'
 
 import { InstanceVars, deployProtocol, createProduct, depositTo } from '../helpers/setupHelpers'
-import { expectPositionEq, expectPrePositionEq } from '../../testutil/types'
+import { createPayoffDefinition, expectPositionEq, expectPrePositionEq } from '../../testutil/types'
 import { DataFeedContext } from '../helpers/feedOracleHelper'
 import {
+  ReservoirFeedOracle,
   ReservoirFeedOracle__factory,
-  TestnetProductProvider,
-  TestnetProductProvider__factory,
+  TestnetContractPayoffProvider,
+  TestnetContractPayoffProvider__factory,
 } from '../../../types/generated'
 import { deployments } from 'hardhat'
 
 const VERSION_OFFSET = BigNumber.from('73786976294838209800')
 const INITIAL_VERSION = BigNumber.from(1)
+const PRODUCT_INFO = {
+  name: 'Squeeth',
+  symbol: 'SQTH',
+  payoffDefinition: createPayoffDefinition(),
+  oracle: '',
+  maintenance: utils.parseEther('0.3'),
+  fundingFee: utils.parseEther('0.1'),
+  makerFee: 0,
+  takerFee: 0,
+  makerLimit: utils.parseEther('1'),
+  utilizationCurve: {
+    minRate: 0,
+    maxRate: utils.parseEther('5.00'),
+    targetRate: utils.parseEther('0.80'),
+    targetUtilization: utils.parseEther('0.80'),
+  },
+}
 
 describe('Reservoir Oracle Product', () => {
   let instanceVars: InstanceVars
   let oracleFeed: DataFeedContext
-  let baycUSDCProductProvider: TestnetProductProvider
+  let reservoirOracle: ReservoirFeedOracle
+  let baycUSDCPayoffProvider: TestnetContractPayoffProvider
 
   beforeEach(async () => {
     instanceVars = await deployProtocol()
@@ -30,16 +49,10 @@ describe('Reservoir Oracle Product', () => {
     oracleFeed = new DataFeedContext(baycUSDCFeed, VERSION_OFFSET)
     await oracleFeed.init()
 
-    const reservoirOracle = await new ReservoirFeedOracle__factory(owner).deploy(
-      oracleFeed.feed.address,
-      VERSION_OFFSET,
-    )
-    baycUSDCProductProvider = await new TestnetProductProvider__factory(owner).deploy(reservoirOracle.address, {
-      minRate: 0,
-      maxRate: utils.parseEther('5.00'),
-      targetRate: utils.parseEther('0.80'),
-      targetUtilization: utils.parseEther('0.80'),
-    })
+    reservoirOracle = await new ReservoirFeedOracle__factory(owner).deploy(oracleFeed.feed.address, VERSION_OFFSET)
+    baycUSDCPayoffProvider = await new TestnetContractPayoffProvider__factory(owner).deploy()
+    PRODUCT_INFO.oracle = reservoirOracle.address
+    PRODUCT_INFO.payoffDefinition = createPayoffDefinition({ contractAddress: baycUSDCPayoffProvider.address })
 
     await oracleFeed.next()
   })
@@ -54,8 +67,8 @@ describe('Reservoir Oracle Product', () => {
       .to.emit(controller, 'CoordinatorTreasuryUpdated')
       .withArgs(1, treasuryB.address)
 
-    const productAddress = await controller.callStatic.createProduct(1, baycUSDCProductProvider.address)
-    await expect(controller.createProduct(1, baycUSDCProductProvider.address)).to.emit(controller, 'ProductCreated')
+    const productAddress = await controller.callStatic.createProduct(1, PRODUCT_INFO)
+    await expect(controller.createProduct(1, PRODUCT_INFO)).to.emit(controller, 'ProductCreated')
 
     await dsu.connect(user).approve(collateral.address, utils.parseEther('1000'))
     await collateral.connect(user).depositTo(user.address, productAddress, utils.parseEther('1000'))
@@ -68,7 +81,7 @@ describe('Reservoir Oracle Product', () => {
     const POSITION = utils.parseEther('0.0001')
     const { user } = instanceVars
 
-    const product = await createProduct(instanceVars, baycUSDCProductProvider)
+    const product = await createProduct(instanceVars, baycUSDCPayoffProvider, reservoirOracle)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
 
     await expect(product.connect(user).openMake(POSITION))
@@ -124,7 +137,7 @@ describe('Reservoir Oracle Product', () => {
     const POSITION = utils.parseEther('0.0001')
     const { user } = instanceVars
 
-    const product = await createProduct(instanceVars, baycUSDCProductProvider)
+    const product = await createProduct(instanceVars, baycUSDCPayoffProvider, reservoirOracle)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
 
     await product.connect(user).openMake(POSITION.div(2))
@@ -183,7 +196,7 @@ describe('Reservoir Oracle Product', () => {
     const CLOSE_POSITION = utils.parseEther('0.0001')
     const { user } = instanceVars
 
-    const product = await createProduct(instanceVars, baycUSDCProductProvider)
+    const product = await createProduct(instanceVars, baycUSDCPayoffProvider, reservoirOracle)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await product.connect(user).openMake(OPEN_POSITION)
 
@@ -193,7 +206,7 @@ describe('Reservoir Oracle Product', () => {
 
     // User state
     expect(await product.isClosed(user.address)).to.equal(true)
-    expect(await product.maintenance(user.address)).to.equal(0)
+    expect(await product['maintenance(address)'](user.address)).to.equal(0)
     expect(await product.maintenanceNext(user.address)).to.equal(0)
     expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -220,7 +233,7 @@ describe('Reservoir Oracle Product', () => {
     const CLOSE_POSITION = utils.parseEther('0.0001')
     const { user } = instanceVars
 
-    const product = await createProduct(instanceVars, baycUSDCProductProvider)
+    const product = await createProduct(instanceVars, baycUSDCPayoffProvider, reservoirOracle)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await product.connect(user).openMake(OPEN_POSITION)
     await product.connect(user).closeMake(CLOSE_POSITION.div(2))
@@ -231,7 +244,7 @@ describe('Reservoir Oracle Product', () => {
 
     // User state
     expect(await product.isClosed(user.address)).to.equal(true)
-    expect(await product.maintenance(user.address)).to.equal(0)
+    expect(await product['maintenance(address)'](user.address)).to.equal(0)
     expect(await product.maintenanceNext(user.address)).to.equal(0)
     expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -258,7 +271,7 @@ describe('Reservoir Oracle Product', () => {
     const TAKE_POSITION = utils.parseEther('0.00001')
     const { user, userB, chainlink, chainlinkOracle } = instanceVars
 
-    const product = await createProduct(instanceVars, baycUSDCProductProvider)
+    const product = await createProduct(instanceVars, baycUSDCPayoffProvider, reservoirOracle)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
 
@@ -321,7 +334,7 @@ describe('Reservoir Oracle Product', () => {
     const TAKE_POSITION = utils.parseEther('0.00001')
     const { user, userB, chainlink, chainlinkOracle } = instanceVars
 
-    const product = await createProduct(instanceVars, baycUSDCProductProvider)
+    const product = await createProduct(instanceVars, baycUSDCPayoffProvider, reservoirOracle)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
 
@@ -387,7 +400,7 @@ describe('Reservoir Oracle Product', () => {
     const CLOSE_TAKE_POSITION = utils.parseEther('0.00001')
     const { user, userB } = instanceVars
 
-    const product = await createProduct(instanceVars, baycUSDCProductProvider)
+    const product = await createProduct(instanceVars, baycUSDCPayoffProvider, reservoirOracle)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
 
@@ -403,7 +416,7 @@ describe('Reservoir Oracle Product', () => {
 
     // User State
     expect(await product.isClosed(userB.address)).to.equal(true)
-    expect(await product.maintenance(userB.address)).to.equal(0)
+    expect(await product['maintenance(address)'](userB.address)).to.equal(0)
     expect(await product.maintenanceNext(userB.address)).to.equal(0)
     expectPositionEq(await product.position(userB.address), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre(address)'](userB.address), {
@@ -431,7 +444,7 @@ describe('Reservoir Oracle Product', () => {
     const CLOSE_TAKE_POSITION = utils.parseEther('0.00001')
     const { user, userB } = instanceVars
 
-    const product = await createProduct(instanceVars, baycUSDCProductProvider)
+    const product = await createProduct(instanceVars, baycUSDCPayoffProvider, reservoirOracle)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
 
@@ -448,7 +461,7 @@ describe('Reservoir Oracle Product', () => {
 
     // User State
     expect(await product.isClosed(userB.address)).to.equal(true)
-    expect(await product.maintenance(userB.address)).to.equal(0)
+    expect(await product['maintenance(address)'](userB.address)).to.equal(0)
     expect(await product.maintenanceNext(userB.address)).to.equal(0)
     expectPositionEq(await product.position(userB.address), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre(address)'](userB.address), {
@@ -473,7 +486,7 @@ describe('Reservoir Oracle Product', () => {
   it('settle no op (gas test)', async () => {
     const { user } = instanceVars
 
-    const product = await createProduct(instanceVars, baycUSDCProductProvider)
+    const product = await createProduct(instanceVars, baycUSDCPayoffProvider, reservoirOracle)
 
     await product.settle()
     await product.settle()

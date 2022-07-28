@@ -4,7 +4,9 @@ on:
   push:
     branches: [ master ]
   pull_request:
-    branches: [ master ]
+    branches:
+      - master
+      - product-provider-refactor-base
 
 env:
   CI: true
@@ -63,6 +65,7 @@ jobs:
           title: Unit Test Coverage Report
           lcov-file: ./packages/perennial/coverage/lcov.info
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          delete-old-comments: true
         if: ${{ github.event_name == 'pull_request' && env.PARSER_BROKEN != 'true' }}
   integration-test:
     name: Integration Tests w/ Coverage
@@ -94,4 +97,5 @@ jobs:
           title: Integration Test Coverage Report
           lcov-file: ./packages/perennial/coverage/lcov.info
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          delete-old-comments: true
         if: ${{ github.event_name == 'pull_request' && env.PARSER_BROKEN != 'true' }}

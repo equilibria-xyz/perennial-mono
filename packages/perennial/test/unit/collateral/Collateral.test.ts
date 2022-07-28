@@ -40,9 +40,7 @@ describe('Collateral', () => {
     productSigner = await impersonate.impersonateWithBalance(product.address, utils.parseEther('10'))
 
     controller = await waffle.deployMockContract(owner, Controller__factory.abi)
-    await controller.mock['paused()'].withArgs().returns(false)
-    await controller.mock['paused(address)'].withArgs(product.address).returns(false)
-    await controller.mock['paused(address)'].withArgs(notProduct.address).returns(false)
+    await controller.mock.paused.withArgs().returns(false)
     await controller.mock.liquidationFee.withArgs().returns(utils.parseEther('0.5'))
     await controller.mock.minCollateral.withArgs().returns(0)
     await controller.mock.isProduct.withArgs(product.address).returns(true)
@@ -84,7 +82,7 @@ describe('Collateral', () => {
     })
 
     it('reverts if paused', async () => {
-      await controller.mock['paused(address)'].withArgs(product.address).returns(true)
+      await controller.mock.paused.withArgs().returns(true)
       await expect(collateral.connect(owner).depositTo(user.address, product.address, 100)).to.be.revertedWith(
         'PausedError()',
       )
@@ -167,7 +165,7 @@ describe('Collateral', () => {
     })
 
     it('reverts if paused', async () => {
-      await controller.mock['paused(address)'].withArgs(product.address).returns(true)
+      await controller.mock.paused.withArgs().returns(true)
       await expect(collateral.connect(user).withdrawTo(user.address, product.address, 80)).to.be.revertedWith(
         'PausedError()',
       )
@@ -406,7 +404,7 @@ describe('Collateral', () => {
       })
 
       it('reverts if paused', async () => {
-        await controller.mock['paused(address)'].withArgs(product.address).returns(true)
+        await controller.mock.paused.withArgs().returns(true)
         await expect(collateral.liquidate(user.address, product.address)).to.be.revertedWith('PausedError()')
       })
 
@@ -454,7 +452,7 @@ describe('Collateral', () => {
     })
 
     it('reverts if paused', async () => {
-      await controller.mock['paused(address)'].withArgs(product.address).returns(true)
+      await controller.mock.paused.withArgs().returns(true)
       await expect(collateral.connect(user).resolveShortfall(product.address, 90)).to.be.revertedWith('PausedError()')
     })
   })
@@ -488,7 +486,7 @@ describe('Collateral', () => {
     })
 
     it('reverts if paused', async () => {
-      await controller.mock['paused()'].withArgs().returns(true)
+      await controller.mock.paused.returns(true)
       await expect(collateral.connect(treasuryB).claimFee()).to.be.revertedWith('PausedError()')
     })
   })

@@ -49,6 +49,17 @@ contract Controller is IController, UInitializable {
     Uint256Storage private constant _programsPerProduct = Uint256Storage.wrap(keccak256("equilibria.perennial.Controller.programsPerProduct"));
     function programsPerProduct() public view returns (uint256) { return _programsPerProduct.read(); }
 
+    /// @dev Protocol pauser address. address(0) defaults to owner(0)
+    AddressStorage private constant _pauser = AddressStorage.wrap(keccak256("equilibria.perennial.Controller.pauser"));
+    function pauser() public view returns (address) {
+        address pauser_ = _pauser.read();
+        return pauser_ == address(0) ? owner() : pauser_;
+    }
+
+    /// @dev The paused status of the protocol
+    BoolStorage private constant _paused = BoolStorage.wrap(keccak256("equilibria.perennial.Controller.paused"));
+    function paused() public view returns (bool) { return _paused.read(); }
+
     /// @dev List of product coordinators
     Coordinator[] private _coordinators;
 
@@ -95,9 +106,7 @@ contract Controller is IController, UInitializable {
         _coordinators.push(Coordinator({
             pendingOwner: address(0),
             owner: msg.sender,
-            treasury: address(0),
-            pauser: address(0),
-            paused: false
+            treasury: address(0)
         }));
 
         emit CoordinatorCreated(coordinatorId, msg.sender);
@@ -144,41 +153,20 @@ contract Controller is IController, UInitializable {
     }
 
     /**
-     * @notice Updates the pauser of an existing coordinator
-     * @dev Must be called by the coordinator's current owner. Defaults to the coordinator `owner` if set to address(0)
-     * @param coordinatorId Coordinator to update
-     * @param newPauser New pauser address
-     */
-    function updateCoordinatorPauser(uint256 coordinatorId, address newPauser) external onlyOwner(coordinatorId) {
-        _coordinators[coordinatorId].pauser = newPauser;
-        emit CoordinatorPauserUpdated(coordinatorId, newPauser);
-    }
-
-    /**
-     * @notice Updates the paused status of an existing coordinator
-     * @dev Must be called by the coordinator's current owner
-     * @param coordinatorId Coordinator to update
-     * @param newPaused New paused status
-     */
-    function updateCoordinatorPaused(uint256 coordinatorId, bool newPaused) external onlyPauser(coordinatorId) {
-        _coordinators[coordinatorId].paused = newPaused;
-        emit CoordinatorPausedUpdated(coordinatorId, newPaused);
-    }
-
-    /**
      * @notice Creates a new product market with `provider`
      * @dev Can only be called by the coordinator owner
      * @param coordinatorId Coordinator that will own the product
-     * @param provider Provider that will service the market
+     * @param productInfo Product params used to initialize the product
      * @return New product contract address
      */
-    function createProduct(uint256 coordinatorId, IProductProvider provider) external onlyOwner(coordinatorId) returns (IProduct) {
+    function createProduct(uint256 coordinatorId, IProduct.ProductInfo calldata productInfo)
+    external onlyOwner(coordinatorId) returns (IProduct) {
         if (coordinatorId == 0) revert ControllerNoZeroCoordinatorError();
 
-        BeaconProxy newProductProxy = new BeaconProxy(address(productBeacon()), abi.encodeCall(IProduct.initialize, provider));
+        BeaconProxy newProductProxy = new BeaconProxy(address(productBeacon()), abi.encodeCall(IProduct.initialize, productInfo));
         IProduct newProduct = IProduct(address(newProductProxy));
         coordinatorFor[newProduct] = coordinatorId;
-        emit ProductCreated(newProduct, provider);
+        emit ProductCreated(newProduct, productInfo);
 
         return newProduct;
     }
@@ -276,6 +264,24 @@ contract Controller is IController, UInitializable {
     }
 
     /**
+     * @notice Updates the protocol pauser address. Zero address defaults to owner(0)
+     * @param newPauser New protocol pauser address
+     */
+    function updatePauser(address newPauser) public onlyOwner(0) {
+        _pauser.store(newPauser);
+        emit PauserUpdated(newPauser);
+    }
+
+    /**
+     * @notice Updates the protocol paused state
+     * @param newPaused New protocol paused state
+     */
+    function updatePaused(bool newPaused) public onlyPauser {
+        _paused.store(newPaused);
+        emit PausedUpdated(newPaused);
+    }
+
+    /**
      * @notice Returns whether a contract is a product
      * @param product Contract address to check
      * @return Whether a contract is a product
@@ -366,62 +372,6 @@ contract Controller is IController, UInitializable {
         return treasury(coordinatorFor[product]);
     }
 
-    /**
-     * @notice Returns the pauser of the protocol
-     * @dev Defaults to the `owner` when `pauser` is unset
-     * @return Pauser of the protocol
-     */
-    function pauser() external view returns (address) {
-        return pauser(0);
-    }
-
-    /**
-     * @notice Returns the pauser of the coordinator `coordinatorId`
-     * @dev Defaults to the `owner` when `pauser` is unset
-     * @param coordinatorId Coordinator to return for
-     * @return Pauser of the coordinator
-     */
-    function pauser(uint256 coordinatorId) public view returns (address) {
-        address _pauser = _coordinators[coordinatorId].pauser;
-        return _pauser == address(0) ? owner(coordinatorId) : _pauser;
-    }
-
-    /**
-     * @notice Returns the pauser of the product `product`
-     * @dev Defaults to the `owner` when `pauser` is unset
-     * @param product Product to return for
-     * @return Pauser of the product
-     */
-    function pauser(IProduct product) external view returns (address) {
-        return pauser(coordinatorFor[product]);
-    }
-
-    /**
-     * @notice Returns the paused status of the protocol
-     * @return Paused status of the protocol
-     */
-    function paused() public view returns (bool) {
-        return _coordinators[0].paused;
-    }
-
-    /**
-     * @notice Returns the paused status of the coordinator `coordinatorId`
-     * @param coordinatorId Coordinator to return for
-     * @return Paused status of the coordinator
-     */
-    function paused(uint256 coordinatorId) public view returns (bool) {
-        return paused() || _coordinators[coordinatorId].paused;
-    }
-
-    /**
-     * @notice Returns the paused status of the product `product`
-     * @param product Product to return for
-     * @return Paused status of the product
-     */
-    function paused(IProduct product) external view returns (bool) {
-        return paused(coordinatorFor[product]);
-    }
-
     /// @dev Only allow owner of `coordinatorId` to call
     modifier onlyOwner(uint256 coordinatorId) {
         if (msg.sender != owner(coordinatorId)) revert ControllerNotOwnerError(coordinatorId);
@@ -429,9 +379,9 @@ contract Controller is IController, UInitializable {
         _;
     }
 
-    /// @dev Only pauser owner of `coordinatorId` to call
-    modifier onlyPauser(uint256 coordinatorId) {
-        if (msg.sender != pauser(coordinatorId)) revert ControllerNotPauserError(coordinatorId);
+    /// @dev Only allow the pauser to call
+    modifier onlyPauser {
+        if (msg.sender != pauser()) revert ControllerNotPauserError();
 
         _;
     }

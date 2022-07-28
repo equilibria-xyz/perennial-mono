@@ -3,18 +3,29 @@ pragma solidity 0.8.15;
 
 import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@equilibria/root/control/unstructured/UReentrancyGuard.sol";
+import "../controller/UControllerProvider.sol";
+import "./UPayoffProvider.sol";
+import "./UParamProvider.sol";
 import "./types/position/AccountPosition.sol";
 import "./types/accumulator/AccountAccumulator.sol";
-import "../controller/UControllerProvider.sol";
 
 /**
  * @title Product
  * @notice Manages logic and state for a single product market.
  * @dev Cloned by the Controller contract to launch new product markets.
  */
-contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGuard {
-    /// @dev The parameter provider of the product market
-    IProductProvider public productProvider;
+contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, UReentrancyGuard {
+    /// @dev Whether or not the product is closed
+    BoolStorage private constant _closed =
+        BoolStorage.wrap(keccak256("equilibria.perennial.Product.closed"));
+    function closed() public view returns (bool) { return _closed.read(); }
+
+
+    /// @dev The name of the product
+    string public name;
+
+    /// @dev The symbol of the product
+    string public symbol;
 
     /// @dev The individual position state for each account
     mapping(address => AccountPosition) private _positions;
@@ -30,19 +41,29 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
 
     /**
      * @notice Initializes the contract state
-     * @param productProvider_ Product provider contract address
+     * @param productInfo_ Product initialization params
      */
-    function initialize(IProductProvider productProvider_) external initializer(1) {
+    function initialize(ProductInfo calldata productInfo_) external initializer(1) {
         __UControllerProvider__initialize(IController(msg.sender));
+        __UPayoffProvider__initialize(productInfo_.oracle, productInfo_.payoffDefinition);
         __UReentrancyGuard__initialize();
+        __UParamProvider__initialize(
+            productInfo_.maintenance,
+            productInfo_.fundingFee,
+            productInfo_.makerFee,
+            productInfo_.takerFee,
+            productInfo_.makerLimit,
+            productInfo_.utilizationCurve
+        );
 
-        productProvider = productProvider_;
+        name = productInfo_.name;
+        symbol = productInfo_.symbol;
     }
 
     /**
      * @notice Surfaces global settlement externally
      */
-    function settle() external nonReentrant notPausedProduct(IProduct(this)) {
+    function settle() external nonReentrant notPaused {
         _settle();
     }
 
@@ -59,40 +80,45 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
      *  Syncs each to instantaneously after the oracle update.
      */
     function _settle() private returns (IOracleProvider.OracleVersion memory currentOracleVersion) {
-        (IProductProvider _provider, IController _controller) = (productProvider, controller());
+        IController _controller = controller();
 
         // Get current oracle version
-        currentOracleVersion = _provider.sync();
+        currentOracleVersion = _sync();
 
         // Get latest oracle version
         uint256 _latestVersion = latestVersion();
         if (_latestVersion == currentOracleVersion.version) return currentOracleVersion; // short circuit entirely if a == c
-        IOracleProvider.OracleVersion memory latestOracleVersion = _provider.atVersion(_latestVersion);
+        IOracleProvider.OracleVersion memory latestOracleVersion = atVersion(_latestVersion);
 
         // Get settle oracle version
         uint256 _settleVersion = _position.pre.settleVersion(currentOracleVersion.version);
         IOracleProvider.OracleVersion memory settleOracleVersion = _settleVersion == currentOracleVersion.version ?
             currentOracleVersion : // if b == c, don't re-call provider for oracle version
-            _provider.atVersion(_settleVersion);
+            atVersion(_settleVersion);
 
         // Initiate
         _controller.incentivizer().sync(currentOracleVersion);
+        UFixed18 boundedFundingFee = _boundedFundingFee();
         UFixed18 accumulatedFee;
 
         // value a->b
-        accumulatedFee = accumulatedFee.add(_accumulator.accumulate(_controller, _provider, _position, latestOracleVersion, settleOracleVersion));
+        accumulatedFee = accumulatedFee.add(
+            _accumulator.accumulate(boundedFundingFee, _position, latestOracleVersion, settleOracleVersion)
+        );
 
         // position a->b
-        accumulatedFee = accumulatedFee.add(_position.settle(_provider, _latestVersion, settleOracleVersion));
+        accumulatedFee = accumulatedFee.add(_position.settle(_latestVersion, settleOracleVersion));
 
         // short-circuit from a->c if b == c
         if (settleOracleVersion.version != currentOracleVersion.version) {
 
             // value b->c
-            accumulatedFee = accumulatedFee.add(_accumulator.accumulate(_controller, _provider, _position, settleOracleVersion, currentOracleVersion));
+            accumulatedFee = accumulatedFee.add(
+                _accumulator.accumulate(boundedFundingFee, _position, settleOracleVersion, currentOracleVersion)
+            );
 
             // position b->c (every accumulator version needs a position stamp)
-            _position.settle(_provider, settleOracleVersion.version, currentOracleVersion);
+            _position.settle(settleOracleVersion.version, currentOracleVersion);
         }
 
         // settle collateral
@@ -105,7 +131,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
      * @notice Surfaces account settlement externally
      * @param account Account to settle
      */
-    function settleAccount(address account) external nonReentrant notPausedProduct(IProduct(this)) {
+    function settleAccount(address account) external nonReentrant notPaused {
         IOracleProvider.OracleVersion memory currentOracleVersion = _settle();
         _settleAccount(account, currentOracleVersion);
     }
@@ -124,7 +150,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
      *  Syncs each to instantaneously after the oracle update.
      */
     function _settleAccount(address account, IOracleProvider.OracleVersion memory currentOracleVersion) private {
-        (IProductProvider _provider, IController _controller) = (productProvider, controller());
+        IController _controller = controller();
 
         // Get latest oracle version
         if (latestVersion(account) == currentOracleVersion.version) return; // short circuit entirely if a == c
@@ -133,7 +159,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
         uint256 _settleVersion = _positions[account].pre.settleVersion(currentOracleVersion.version);
         IOracleProvider.OracleVersion memory settleOracleVersion = _settleVersion == currentOracleVersion.version ?
             currentOracleVersion : // if b == c, don't re-call provider for oracle version
-            _provider.atVersion(_settleVersion);
+            atVersion(_settleVersion);
 
         // initialize
         Fixed18 accumulated;
@@ -146,7 +172,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
             _accumulators[account].syncTo(_accumulator, _positions[account], settleOracleVersion.version).sum());
 
         // position a->b
-        accumulated = accumulated.sub(Fixed18Lib.from(_positions[account].settle(_provider, settleOracleVersion)));
+        accumulated = accumulated.sub(Fixed18Lib.from(_positions[account].settle(settleOracleVersion)));
 
         // short-circuit from a->c if b == c
         if (settleOracleVersion.version != currentOracleVersion.version) {
@@ -171,7 +197,8 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
     function openTake(UFixed18 amount)
     external
     nonReentrant
-    notPausedProduct(IProduct(this))
+    notPaused
+    notClosed
     settleForAccount(msg.sender)
     takerInvariant
     positionInvariant
@@ -193,7 +220,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
     function closeTake(UFixed18 amount)
     external
     nonReentrant
-    notPausedProduct(IProduct(this))
+    notPaused
     settleForAccount(msg.sender)
     closeInvariant
     liquidationInvariant
@@ -217,7 +244,8 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
     function openMake(UFixed18 amount)
     external
     nonReentrant
-    notPausedProduct(IProduct(this))
+    notPaused
+    notClosed
     settleForAccount(msg.sender)
     nonZeroVersionInvariant
     makerInvariant
@@ -240,7 +268,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
     function closeMake(UFixed18 amount)
     external
     nonReentrant
-    notPausedProduct(IProduct(this))
+    notPaused
     settleForAccount(msg.sender)
     takerInvariant
     closeInvariant
@@ -263,7 +291,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
      * @dev Only callable by the Collateral contract as part of the liquidation flow
      * @param account Account to close out
      */
-    function closeAll(address account) external onlyCollateral settleForAccount(account) {
+    function closeAll(address account) external onlyCollateral notClosed settleForAccount(account) {
         AccountPosition storage accountPosition = _positions[account];
         Position memory p = accountPosition.position.next(_positions[account].pre);
 
@@ -281,7 +309,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
      * @return The current maintenance requirement
      */
     function maintenance(address account) external view returns (UFixed18) {
-        return _positions[account].maintenance(productProvider);
+        return _positions[account].maintenance();
     }
 
     /**
@@ -291,7 +319,7 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
      * @return The next maintenance requirement
      */
     function maintenanceNext(address account) external view returns (UFixed18) {
-        return _positions[account].maintenanceNext(productProvider);
+        return _positions[account].maintenanceNext();
     }
 
     /**
@@ -385,18 +413,52 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
         return _accumulators[account].latestVersion;
     }
 
+    /**
+     * @notice Returns The per-second rate based on the provided `position`
+     * @dev Handles 0-maker/taker edge cases
+     * @param position_ Position to base utilization on
+     * @return The per-second rate
+     */
+    function rate(Position calldata position_) public view returns (Fixed18) {
+        UFixed18 utilization = position_.taker.unsafeDiv(position_.maker);
+        Fixed18 annualizedRate = utilizationCurve().compute(utilization);
+        return annualizedRate.div(Fixed18Lib.from(365 days));
+    }
+
+    /**
+     * @notice Returns the minimum funding fee parameter with a capped range for safety
+     * @dev Caps controller.minFundingFee() <= fundingFee() <= 1
+     * @return Safe minimum funding fee parameter
+     */
+    function _boundedFundingFee() private view returns (UFixed18) {
+        return fundingFee().max(controller().minFundingFee());
+    }
+
+    /**
+     * @notice Updates product closed state
+     * @dev only callable by product owner. Settles the product before flipping the flag
+     * @param newClosed new closed value
+     */
+    function updateClosed(bool newClosed) external onlyProductOwner {
+        IOracleProvider.OracleVersion memory oracleVersion = _settle();
+        _closed.store(newClosed);
+        emit ClosedUpdated(newClosed, oracleVersion.version);
+    }
+
     /// @dev Limit total maker for guarded rollouts
     modifier makerInvariant {
         _;
 
         Position memory next = positionAtVersion(latestVersion()).next(_position.pre);
 
-        if (next.maker.gt(productProvider.makerLimit())) revert ProductMakerOverLimitError();
+        if (next.maker.gt(makerLimit())) revert ProductMakerOverLimitError();
     }
 
-    /// @dev Limit maker short exposure to the range 0.0-1.0x of their position
+    /// @dev Limit maker short exposure to the range 0.0-1.0x of their position. Does not apply when in closeOnly state
     modifier takerInvariant {
         _;
+
+        if (closed()) return;
 
         Position memory next = positionAtVersion(latestVersion()).next(_position.pre);
         UFixed18 socializationFactor = next.socializationFactor();
@@ -435,8 +497,8 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
 
     /// @dev Helper to fully settle an account's state
     modifier settleForAccount(address account) {
-        IOracleProvider.OracleVersion memory currentVersion = _settle();
-        _settleAccount(account, currentVersion);
+        IOracleProvider.OracleVersion memory _currentVersion = _settle();
+        _settleAccount(account, _currentVersion);
 
         _;
     }
@@ -444,6 +506,13 @@ contract Product is IProduct, UInitializable, UControllerProvider, UReentrancyGu
     /// @dev Ensure we have bootstraped the oracle before creating positions
     modifier nonZeroVersionInvariant {
         if (latestVersion() == 0) revert ProductOracleBootstrappingError();
+
+        _;
+    }
+
+    /// @dev Ensure the product is not closed
+    modifier notClosed {
+        if (closed()) revert ProductClosedError();
 
         _;
     }

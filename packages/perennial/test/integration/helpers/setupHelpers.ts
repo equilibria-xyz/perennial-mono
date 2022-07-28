@@ -6,7 +6,7 @@ import { time, impersonate } from '../../testutil'
 import {
   Collateral,
   Controller,
-  TestnetProductProvider,
+  TestnetContractPayoffProvider,
   IERC20Metadata,
   ChainlinkOracle,
   Product,
@@ -15,7 +15,7 @@ import {
   IERC20Metadata__factory,
   Collateral__factory,
   Controller__factory,
-  TestnetProductProvider__factory,
+  TestnetContractPayoffProvider__factory,
   ChainlinkOracle__factory,
   Product__factory,
   Incentivizer__factory,
@@ -31,8 +31,10 @@ import {
   ProxyAdmin,
   ProxyAdmin__factory,
   TransparentUpgradeableProxy__factory,
+  ReservoirFeedOracle,
 } from '../../../types/generated'
 import { CHAINLINK_CUSTOM_CURRENCIES, ChainlinkContext } from './chainlinkHelpers'
+import { createPayoffDefinition } from '../../testutil/types'
 const { config, deployments, ethers } = HRE
 
 export const INITIAL_PHASE_ID = 1
@@ -52,7 +54,7 @@ export interface InstanceVars {
   treasuryB: SignerWithAddress
   proxyAdmin: ProxyAdmin
   controller: Controller
-  productProvider: TestnetProductProvider
+  contractPayoffProvider: TestnetContractPayoffProvider
   dsu: IERC20Metadata
   usdc: IERC20Metadata
   dsuHolder: SignerWithAddress
@@ -85,12 +87,7 @@ export async function deployProtocol(): Promise<InstanceVars> {
     CHAINLINK_CUSTOM_CURRENCIES.ETH,
     CHAINLINK_CUSTOM_CURRENCIES.USD,
   )
-  const productProvider = await new TestnetProductProvider__factory(owner).deploy(chainlinkOracle.address, {
-    minRate: 0,
-    maxRate: utils.parseEther('5.00'),
-    targetRate: utils.parseEther('0.80'),
-    targetUtilization: utils.parseEther('0.80'),
-  })
+  const contractPayoffProvider = await new TestnetContractPayoffProvider__factory(owner).deploy()
   const dsu = await IERC20Metadata__factory.connect((await deployments.get('DSU')).address, owner)
   const usdc = await IERC20Metadata__factory.connect((await deployments.get('USDC')).address, owner)
   const batcher = await IBatcher__factory.connect((await deployments.get('Batcher')).address, owner)
@@ -131,8 +128,8 @@ export async function deployProtocol(): Promise<InstanceVars> {
   await collateral.initialize(controller.address)
 
   // Params - TODO: finalize before launch
+  await controller.updatePauser(pauser.address)
   await controller.updateCoordinatorTreasury(0, treasuryA.address)
-  await controller.updateCoordinatorPauser(0, pauser.address)
   await controller.updateProtocolFee(utils.parseEther('0.50'))
   await controller.updateMinFundingFee(utils.parseEther('0.10'))
   await controller.updateLiquidationFee(utils.parseEther('0.50'))
@@ -172,7 +169,7 @@ export async function deployProtocol(): Promise<InstanceVars> {
     dsuHolder,
     chainlink,
     chainlinkOracle,
-    productProvider,
+    contractPayoffProvider: contractPayoffProvider,
     dsu,
     usdc,
     usdcHolder,
@@ -189,33 +186,41 @@ export async function deployProtocol(): Promise<InstanceVars> {
   }
 }
 
-export async function createCoordinator(instanceVars: InstanceVars): Promise<Product> {
-  const { owner, controller, treasuryB, productProvider } = instanceVars
-
-  await controller.callStatic.createProduct(1, productProvider.address)
-  await controller.createCoordinator()
-  await controller.updateCoordinatorTreasury(1, treasuryB.address)
-
-  const productAddress = await controller.callStatic.createProduct(1, productProvider.address)
-  await controller.createProduct(1, productProvider.address)
-
-  return Product__factory.connect(productAddress, owner)
-}
-
 export async function createProduct(
   instanceVars: InstanceVars,
-  productProvider?: TestnetProductProvider,
+  payoffProvider?: TestnetContractPayoffProvider,
+  oracle?: ChainlinkOracle | ReservoirFeedOracle,
 ): Promise<Product> {
-  const { owner, controller, treasuryB } = instanceVars
-  if (!productProvider) {
-    productProvider = instanceVars.productProvider
+  const { owner, controller, treasuryB, chainlinkOracle } = instanceVars
+  if (!payoffProvider) {
+    payoffProvider = instanceVars.contractPayoffProvider
+  }
+  if (!oracle) {
+    oracle = chainlinkOracle
   }
 
   await controller.createCoordinator()
   await controller.updateCoordinatorTreasury(1, treasuryB.address)
 
-  const productAddress = await controller.callStatic.createProduct(1, productProvider.address)
-  await controller.createProduct(1, productProvider.address)
+  const productInfo = {
+    name: 'Squeeth',
+    symbol: 'SQTH',
+    payoffDefinition: createPayoffDefinition({ contractAddress: payoffProvider.address }),
+    oracle: oracle.address,
+    maintenance: utils.parseEther('0.3'),
+    fundingFee: utils.parseEther('0.1'),
+    makerFee: 0,
+    takerFee: 0,
+    makerLimit: utils.parseEther('1'),
+    utilizationCurve: {
+      minRate: 0,
+      maxRate: utils.parseEther('5.00'),
+      targetRate: utils.parseEther('0.80'),
+      targetUtilization: utils.parseEther('0.80'),
+    },
+  }
+  const productAddress = await controller.callStatic.createProduct(1, productInfo)
+  await controller.createProduct(1, productInfo)
 
   return Product__factory.connect(productAddress, owner)
 }

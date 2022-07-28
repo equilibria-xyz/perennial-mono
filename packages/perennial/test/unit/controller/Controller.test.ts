@@ -1,5 +1,5 @@
 import { MockContract } from '@ethereum-waffle/mock-contract'
-import { utils } from 'ethers'
+import { constants, utils } from 'ethers'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { expect } from 'chai'
 import HRE, { waffle } from 'hardhat'
@@ -11,9 +11,11 @@ import {
   Controller__factory,
   Product__factory,
   Incentivizer__factory,
-  IProductProvider__factory,
+  IContractPayoffProvider__factory,
   IBeacon__factory,
+  IOracleProvider__factory,
 } from '../../../types/generated'
+import { createPayoffDefinition } from '../../testutil/types'
 
 const { ethers } = HRE
 
@@ -28,7 +30,8 @@ describe('Controller', () => {
   let coordinatorTreasury: SignerWithAddress
   let coordinatorPauser: SignerWithAddress
   let collateral: MockContract
-  let productProvider: MockContract
+  let payoffProvider: MockContract
+  let oracle: MockContract
   let incentivizer: MockContract
   let productBeacon: MockContract
 
@@ -48,7 +51,8 @@ describe('Controller', () => {
       coordinatorPauser,
     ] = await ethers.getSigners()
     collateral = await waffle.deployMockContract(owner, Collateral__factory.abi)
-    productProvider = await waffle.deployMockContract(owner, IProductProvider__factory.abi)
+    payoffProvider = await waffle.deployMockContract(owner, IContractPayoffProvider__factory.abi)
+    oracle = await waffle.deployMockContract(owner, IOracleProvider__factory.abi)
     incentivizer = await waffle.deployMockContract(owner, Incentivizer__factory.abi)
 
     productBeacon = await waffle.deployMockContract(owner, IBeacon__factory.abi)
@@ -66,8 +70,6 @@ describe('Controller', () => {
       expect(coordinator.pendingOwner).to.equal(ethers.constants.AddressZero)
       expect(coordinator.owner).to.equal(owner.address)
       expect(coordinator.treasury).to.equal(ethers.constants.AddressZero)
-      expect(coordinator.pauser).to.equal(ethers.constants.AddressZero)
-      expect(coordinator.paused).to.equal(false)
 
       expect(await controller.collateral()).to.equal(collateral.address)
       expect(await controller.incentivizer()).to.equal(incentivizer.address)
@@ -78,10 +80,8 @@ describe('Controller', () => {
       expect(await controller['pendingOwner(uint256)'](0)).to.equal(ethers.constants.AddressZero)
       expect(await controller['treasury()']()).to.equal(owner.address)
       expect(await controller['treasury(uint256)'](0)).to.equal(owner.address)
-      expect(await controller['pauser()']()).to.equal(owner.address)
-      expect(await controller['pauser(uint256)'](0)).to.equal(owner.address)
-      expect(await controller['paused()']()).to.equal(false)
-      expect(await controller['paused(uint256)'](0)).to.equal(false)
+      expect(await controller.pauser()).to.equal(owner.address)
+      expect(await controller.paused()).to.equal(false)
       expect(await controller.protocolFee()).to.equal(0)
       expect(await controller.minFundingFee()).to.equal(0)
       expect(await controller.liquidationFee()).to.equal(0)
@@ -110,13 +110,9 @@ describe('Controller', () => {
       expect(coordinator.pendingOwner).to.equal(ethers.constants.AddressZero)
       expect(coordinator.owner).to.equal(coordinatorOwner.address)
       expect(coordinator.treasury).to.equal(ethers.constants.AddressZero)
-      expect(coordinator.pauser).to.equal(ethers.constants.AddressZero)
-      expect(coordinator.paused).to.equal(false)
       expect(await controller['pendingOwner(uint256)'](1)).to.equal(ethers.constants.AddressZero)
       expect(await controller['owner(uint256)'](1)).to.equal(coordinatorOwner.address)
       expect(await controller['treasury(uint256)'](1)).to.equal(coordinatorOwner.address)
-      expect(await controller['pauser(uint256)'](1)).to.equal(coordinatorOwner.address)
-      expect(await controller['paused(uint256)'](1)).to.equal(false)
     })
   })
 
@@ -137,13 +133,9 @@ describe('Controller', () => {
       expect(coordinator.pendingOwner).to.equal(coordinatorPendingOwner.address)
       expect(coordinator.owner).to.equal(coordinatorOwner.address)
       expect(coordinator.treasury).to.equal(ethers.constants.AddressZero)
-      expect(coordinator.pauser).to.equal(ethers.constants.AddressZero)
-      expect(coordinator.paused).to.equal(false)
       expect(await controller['pendingOwner(uint256)'](1)).to.equal(coordinatorPendingOwner.address)
       expect(await controller['owner(uint256)'](1)).to.equal(coordinatorOwner.address)
       expect(await controller['treasury(uint256)'](1)).to.equal(coordinatorOwner.address)
-      expect(await controller['pauser(uint256)'](1)).to.equal(coordinatorOwner.address)
-      expect(await controller['paused(uint256)'](1)).to.equal(false)
     })
 
     it('updates the coordinator pending owner (protocol)', async () => {
@@ -156,18 +148,12 @@ describe('Controller', () => {
       expect(coordinator.pendingOwner).to.equal(pendingOwner.address)
       expect(coordinator.owner).to.equal(owner.address)
       expect(coordinator.treasury).to.equal(ethers.constants.AddressZero)
-      expect(coordinator.pauser).to.equal(ethers.constants.AddressZero)
-      expect(coordinator.paused).to.equal(false)
       expect(await controller['pendingOwner()']()).to.equal(pendingOwner.address)
       expect(await controller['pendingOwner(uint256)'](0)).to.equal(pendingOwner.address)
       expect(await controller['owner()']()).to.equal(owner.address)
       expect(await controller['owner(uint256)'](0)).to.equal(owner.address)
       expect(await controller['treasury()']()).to.equal(owner.address)
       expect(await controller['treasury(uint256)'](0)).to.equal(owner.address)
-      expect(await controller['pauser()']()).to.equal(owner.address)
-      expect(await controller['pauser(uint256)'](0)).to.equal(owner.address)
-      expect(await controller['paused()']()).to.equal(false)
-      expect(await controller['paused(uint256)'](0)).to.equal(false)
     })
 
     it('reverts if not owner', async () => {
@@ -200,13 +186,9 @@ describe('Controller', () => {
       expect(coordinator.pendingOwner).to.equal(ethers.constants.AddressZero)
       expect(coordinator.owner).to.equal(coordinatorPendingOwner.address)
       expect(coordinator.treasury).to.equal(ethers.constants.AddressZero)
-      expect(coordinator.pauser).to.equal(ethers.constants.AddressZero)
-      expect(coordinator.paused).to.equal(false)
       expect(await controller['pendingOwner(uint256)'](1)).to.equal(ethers.constants.AddressZero)
       expect(await controller['owner(uint256)'](1)).to.equal(coordinatorPendingOwner.address)
       expect(await controller['treasury(uint256)'](1)).to.equal(coordinatorPendingOwner.address)
-      expect(await controller['pauser(uint256)'](1)).to.equal(coordinatorPendingOwner.address)
-      expect(await controller['paused(uint256)'](1)).to.equal(false)
     })
 
     it('updates the coordinator owner (protocol)', async () => {
@@ -221,18 +203,12 @@ describe('Controller', () => {
       expect(coordinator.pendingOwner).to.equal(ethers.constants.AddressZero)
       expect(coordinator.owner).to.equal(pendingOwner.address)
       expect(coordinator.treasury).to.equal(ethers.constants.AddressZero)
-      expect(coordinator.pauser).to.equal(ethers.constants.AddressZero)
-      expect(coordinator.paused).to.equal(false)
       expect(await controller['pendingOwner()']()).to.equal(ethers.constants.AddressZero)
       expect(await controller['pendingOwner(uint256)'](0)).to.equal(ethers.constants.AddressZero)
       expect(await controller['owner()']()).to.equal(pendingOwner.address)
       expect(await controller['owner(uint256)'](0)).to.equal(pendingOwner.address)
       expect(await controller['treasury()']()).to.equal(pendingOwner.address)
       expect(await controller['treasury(uint256)'](0)).to.equal(pendingOwner.address)
-      expect(await controller['pauser()']()).to.equal(pendingOwner.address)
-      expect(await controller['pauser(uint256)'](0)).to.equal(pendingOwner.address)
-      expect(await controller['paused()']()).to.equal(false)
-      expect(await controller['paused(uint256)'](0)).to.equal(false)
     })
 
     it('reverts if owner', async () => {
@@ -283,13 +259,9 @@ describe('Controller', () => {
       expect(coordinator.pendingOwner).to.equal(ethers.constants.AddressZero)
       expect(coordinator.owner).to.equal(coordinatorOwner.address)
       expect(coordinator.treasury).to.equal(coordinatorTreasury.address)
-      expect(coordinator.pauser).to.equal(ethers.constants.AddressZero)
-      expect(coordinator.paused).to.equal(false)
       expect(await controller['pendingOwner(uint256)'](1)).to.equal(ethers.constants.AddressZero)
       expect(await controller['owner(uint256)'](1)).to.equal(coordinatorOwner.address)
       expect(await controller['treasury(uint256)'](1)).to.equal(coordinatorTreasury.address)
-      expect(await controller['pauser(uint256)'](1)).to.equal(coordinatorOwner.address)
-      expect(await controller['paused(uint256)'](1)).to.equal(false)
     })
 
     it('updates the coordinator treasury (protocol)', async () => {
@@ -302,18 +274,12 @@ describe('Controller', () => {
       expect(coordinator.pendingOwner).to.equal(ethers.constants.AddressZero)
       expect(coordinator.owner).to.equal(owner.address)
       expect(coordinator.treasury).to.equal(treasury.address)
-      expect(coordinator.pauser).to.equal(ethers.constants.AddressZero)
-      expect(coordinator.paused).to.equal(false)
       expect(await controller['pendingOwner()']()).to.equal(ethers.constants.AddressZero)
       expect(await controller['pendingOwner(uint256)'](0)).to.equal(ethers.constants.AddressZero)
       expect(await controller['owner()']()).to.equal(owner.address)
       expect(await controller['owner(uint256)'](0)).to.equal(owner.address)
       expect(await controller['treasury()']()).to.equal(treasury.address)
       expect(await controller['treasury(uint256)'](0)).to.equal(treasury.address)
-      expect(await controller['pauser()']()).to.equal(owner.address)
-      expect(await controller['pauser(uint256)'](0)).to.equal(owner.address)
-      expect(await controller['paused()']()).to.equal(false)
-      expect(await controller['paused(uint256)'](0)).to.equal(false)
     })
 
     it('reverts if not owner', async () => {
@@ -329,206 +295,36 @@ describe('Controller', () => {
     })
   })
 
-  describe('#updateCoordinatorPauser', async () => {
-    beforeEach(async () => {
-      await controller.connect(coordinatorOwner).createCoordinator()
-    })
-
-    it('updates the coordinator pauser', async () => {
-      await expect(controller.connect(coordinatorOwner).updateCoordinatorPauser(1, coordinatorPauser.address))
-        .to.emit(controller, 'CoordinatorPauserUpdated')
-        .withArgs(1, coordinatorPauser.address)
-
-      const coordinator = await controller.coordinators(1)
-
-      expect(coordinator.pendingOwner).to.equal(ethers.constants.AddressZero)
-      expect(coordinator.owner).to.equal(coordinatorOwner.address)
-      expect(coordinator.treasury).to.equal(ethers.constants.AddressZero)
-      expect(coordinator.pauser).to.equal(coordinatorPauser.address)
-      expect(coordinator.paused).to.equal(false)
-      expect(await controller['pendingOwner(uint256)'](1)).to.equal(ethers.constants.AddressZero)
-      expect(await controller['owner(uint256)'](1)).to.equal(coordinatorOwner.address)
-      expect(await controller['treasury(uint256)'](1)).to.equal(coordinatorOwner.address)
-      expect(await controller['pauser(uint256)'](1)).to.equal(coordinatorPauser.address)
-      expect(await controller['paused(uint256)'](1)).to.equal(false)
-    })
-
-    it('updates the coordinator pauser (protocol)', async () => {
-      await expect(controller.connect(owner).updateCoordinatorPauser(0, pauser.address))
-        .to.emit(controller, 'CoordinatorPauserUpdated')
-        .withArgs(0, pauser.address)
-
-      const coordinator = await controller.coordinators(0)
-
-      expect(coordinator.pendingOwner).to.equal(ethers.constants.AddressZero)
-      expect(coordinator.owner).to.equal(owner.address)
-      expect(coordinator.treasury).to.equal(ethers.constants.AddressZero)
-      expect(coordinator.pauser).to.equal(pauser.address)
-      expect(coordinator.paused).to.equal(false)
-      expect(await controller['pendingOwner()']()).to.equal(ethers.constants.AddressZero)
-      expect(await controller['pendingOwner(uint256)'](0)).to.equal(ethers.constants.AddressZero)
-      expect(await controller['owner()']()).to.equal(owner.address)
-      expect(await controller['owner(uint256)'](0)).to.equal(owner.address)
-      expect(await controller['treasury()']()).to.equal(owner.address)
-      expect(await controller['treasury(uint256)'](0)).to.equal(owner.address)
-      expect(await controller['pauser()']()).to.equal(pauser.address)
-      expect(await controller['pauser(uint256)'](0)).to.equal(pauser.address)
-      expect(await controller['paused()']()).to.equal(false)
-      expect(await controller['paused(uint256)'](0)).to.equal(false)
-    })
-
-    it('reverts if not owner', async () => {
-      await expect(controller.connect(owner).updateCoordinatorPauser(1, coordinatorPauser.address)).to.be.revertedWith(
-        'ControllerNotOwnerError(1)',
-      )
-    })
-
-    it('reverts if not owner (protocol)', async () => {
-      await expect(controller.connect(user).updateCoordinatorPauser(0, pauser.address)).to.be.revertedWith(
-        'ControllerNotOwnerError(0)',
-      )
-    })
-  })
-
-  describe('#updateCoordinatorPaused', async () => {
-    beforeEach(async () => {
-      await controller.connect(coordinatorOwner).createCoordinator()
-    })
-
-    context('from owner', async () => {
-      it('updates the coordinator paused', async () => {
-        await expect(controller.connect(coordinatorOwner).updateCoordinatorPaused(1, true))
-          .to.emit(controller, 'CoordinatorPausedUpdated')
-          .withArgs(1, true)
-
-        const coordinator = await controller.coordinators(1)
-
-        expect(coordinator.pendingOwner).to.equal(ethers.constants.AddressZero)
-        expect(coordinator.owner).to.equal(coordinatorOwner.address)
-        expect(coordinator.treasury).to.equal(ethers.constants.AddressZero)
-        expect(coordinator.pauser).to.equal(ethers.constants.AddressZero)
-        expect(coordinator.paused).to.equal(true)
-        expect(await controller['pendingOwner(uint256)'](1)).to.equal(ethers.constants.AddressZero)
-        expect(await controller['owner(uint256)'](1)).to.equal(coordinatorOwner.address)
-        expect(await controller['treasury(uint256)'](1)).to.equal(coordinatorOwner.address)
-        expect(await controller['pauser(uint256)'](1)).to.equal(coordinatorOwner.address)
-        expect(await controller['paused(uint256)'](1)).to.equal(true)
-      })
-
-      it('updates the coordinator paused (protocol)', async () => {
-        await expect(controller.connect(owner).updateCoordinatorPaused(0, true))
-          .to.emit(controller, 'CoordinatorPausedUpdated')
-          .withArgs(0, true)
-
-        const coordinator = await controller.coordinators(0)
-
-        expect(coordinator.pendingOwner).to.equal(ethers.constants.AddressZero)
-        expect(coordinator.owner).to.equal(owner.address)
-        expect(coordinator.treasury).to.equal(ethers.constants.AddressZero)
-        expect(coordinator.pauser).to.equal(ethers.constants.AddressZero)
-        expect(coordinator.paused).to.equal(true)
-        expect(await controller['pendingOwner()']()).to.equal(ethers.constants.AddressZero)
-        expect(await controller['pendingOwner(uint256)'](0)).to.equal(ethers.constants.AddressZero)
-        expect(await controller['owner()']()).to.equal(owner.address)
-        expect(await controller['owner(uint256)'](0)).to.equal(owner.address)
-        expect(await controller['treasury()']()).to.equal(owner.address)
-        expect(await controller['treasury(uint256)'](0)).to.equal(owner.address)
-        expect(await controller['pauser()']()).to.equal(owner.address)
-        expect(await controller['pauser(uint256)'](0)).to.equal(owner.address)
-        expect(await controller['paused()']()).to.equal(true)
-        expect(await controller['paused(uint256)'](0)).to.equal(true)
-        expect(await controller['paused(uint256)'](1)).to.equal(true)
-      })
-
-      it('reverts if not owner', async () => {
-        await expect(controller.connect(owner).updateCoordinatorPaused(1, true)).to.be.revertedWith(
-          'ControllerNotPauserError(1)',
-        )
-      })
-
-      it('reverts if not owner (protocol)', async () => {
-        await expect(controller.connect(user).updateCoordinatorPaused(0, true)).to.be.revertedWith(
-          'ControllerNotPauserError(0)',
-        )
-      })
-    })
-
-    context('from pauser', async () => {
-      it('updates the coordinator paused', async () => {
-        await controller.connect(coordinatorOwner).updateCoordinatorPauser(1, coordinatorPauser.address)
-
-        await expect(controller.connect(coordinatorPauser).updateCoordinatorPaused(1, true))
-          .to.emit(controller, 'CoordinatorPausedUpdated')
-          .withArgs(1, true)
-
-        const coordinator = await controller.coordinators(1)
-
-        expect(coordinator.pendingOwner).to.equal(ethers.constants.AddressZero)
-        expect(coordinator.owner).to.equal(coordinatorOwner.address)
-        expect(coordinator.treasury).to.equal(ethers.constants.AddressZero)
-        expect(coordinator.pauser).to.equal(coordinatorPauser.address)
-        expect(coordinator.paused).to.equal(true)
-        expect(await controller['pendingOwner(uint256)'](1)).to.equal(ethers.constants.AddressZero)
-        expect(await controller['owner(uint256)'](1)).to.equal(coordinatorOwner.address)
-        expect(await controller['treasury(uint256)'](1)).to.equal(coordinatorOwner.address)
-        expect(await controller['pauser(uint256)'](1)).to.equal(coordinatorPauser.address)
-        expect(await controller['paused(uint256)'](1)).to.equal(true)
-      })
-
-      it('updates the coordinator paused (protocol)', async () => {
-        await controller.connect(owner).updateCoordinatorPauser(0, pauser.address)
-
-        await expect(controller.connect(pauser).updateCoordinatorPaused(0, true))
-          .to.emit(controller, 'CoordinatorPausedUpdated')
-          .withArgs(0, true)
-
-        const coordinator = await controller.coordinators(0)
-
-        expect(coordinator.pendingOwner).to.equal(ethers.constants.AddressZero)
-        expect(coordinator.owner).to.equal(owner.address)
-        expect(coordinator.treasury).to.equal(ethers.constants.AddressZero)
-        expect(coordinator.pauser).to.equal(pauser.address)
-        expect(coordinator.paused).to.equal(true)
-        expect(await controller['pendingOwner()']()).to.equal(ethers.constants.AddressZero)
-        expect(await controller['pendingOwner(uint256)'](0)).to.equal(ethers.constants.AddressZero)
-        expect(await controller['owner()']()).to.equal(owner.address)
-        expect(await controller['owner(uint256)'](0)).to.equal(owner.address)
-        expect(await controller['treasury()']()).to.equal(owner.address)
-        expect(await controller['treasury(uint256)'](0)).to.equal(owner.address)
-        expect(await controller['pauser()']()).to.equal(pauser.address)
-        expect(await controller['pauser(uint256)'](0)).to.equal(pauser.address)
-        expect(await controller['paused()']()).to.equal(true)
-        expect(await controller['paused(uint256)'](0)).to.equal(true)
-      })
-
-      it('reverts if not owner', async () => {
-        await expect(controller.connect(owner).updateCoordinatorPaused(1, true)).to.be.revertedWith(
-          'ControllerNotPauserError(1)',
-        )
-      })
-
-      it('reverts if not owner (protocol)', async () => {
-        await expect(controller.connect(user).updateCoordinatorPaused(0, true)).to.be.revertedWith(
-          'ControllerNotPauserError(0)',
-        )
-      })
-    })
-  })
-
   describe('#createProduct', async () => {
+    const PRODUCT_INFO = {
+      name: 'Squeeth',
+      symbol: 'SQTH',
+      payoffDefinition: createPayoffDefinition(),
+      oracle: '',
+      maintenance: ethers.constants.Zero,
+      fundingFee: ethers.constants.Zero,
+      makerFee: ethers.constants.Zero,
+      takerFee: ethers.constants.Zero,
+      makerLimit: ethers.constants.Zero,
+      utilizationCurve: {
+        minRate: utils.parseEther('0.10'),
+        maxRate: utils.parseEther('0.10'),
+        targetRate: utils.parseEther('0.10'),
+        targetUtilization: utils.parseEther('1'),
+      },
+    }
     beforeEach(async () => {
+      PRODUCT_INFO.payoffDefinition = createPayoffDefinition({ contractAddress: payoffProvider.address })
+      PRODUCT_INFO.oracle = oracle.address
       await controller.connect(coordinatorOwner).createCoordinator()
       await controller.connect(coordinatorOwner).updateCoordinatorTreasury(1, coordinatorTreasury.address)
-      await controller.connect(coordinatorOwner).updateCoordinatorPauser(1, coordinatorPauser.address)
     })
 
     it('creates the product', async () => {
-      const productAddress = await controller
-        .connect(coordinatorOwner)
-        .callStatic.createProduct(1, productProvider.address)
-      await expect(controller.connect(coordinatorOwner).createProduct(1, productProvider.address))
+      const productAddress = await controller.connect(coordinatorOwner).callStatic.createProduct(1, PRODUCT_INFO)
+      await expect(controller.connect(coordinatorOwner).createProduct(1, PRODUCT_INFO))
         .to.emit(controller, 'ProductCreated')
-        .withArgs(productAddress, productProvider.address)
+        .withArgs(productAddress, PRODUCT_INFO)
 
       const productInstance = Product__factory.connect(productAddress, owner)
       expect(await productInstance.controller()).to.equal(controller.address)
@@ -537,30 +333,18 @@ describe('Controller', () => {
       expect(await controller.isProduct(productAddress)).to.equal(true)
       expect(await controller['owner(address)'](productAddress)).to.equal(coordinatorOwner.address)
       expect(await controller['treasury(address)'](productAddress)).to.equal(coordinatorTreasury.address)
-      expect(await controller['pauser(address)'](productAddress)).to.equal(coordinatorPauser.address)
-      expect(await controller['paused(address)'](productAddress)).to.equal(false)
     })
 
     it('reverts if zero coordinator', async () => {
-      await expect(controller.connect(owner).createProduct(0, productProvider.address)).to.be.revertedWith(
+      await expect(controller.connect(owner).createProduct(0, PRODUCT_INFO)).to.be.revertedWith(
         'ControllerNoZeroCoordinatorError()',
       )
     })
 
     it('reverts if not coordinator owner', async () => {
-      await expect(controller.connect(owner).createProduct(1, productProvider.address)).to.be.revertedWith(
+      await expect(controller.connect(owner).createProduct(1, PRODUCT_INFO)).to.be.revertedWith(
         'ControllerNotOwnerError(1)',
       )
-    })
-
-    it('returns paused correctly', async () => {
-      const productAddress = await controller
-        .connect(coordinatorOwner)
-        .callStatic.createProduct(1, productProvider.address)
-      await controller.connect(coordinatorOwner).createProduct(1, productProvider.address)
-
-      await controller.connect(coordinatorPauser).updateCoordinatorPaused(1, true)
-      expect(await controller['paused(address)'](productAddress)).to.equal(true)
     })
   })
 
@@ -762,6 +546,46 @@ describe('Controller', () => {
       await expect(controller.connect(user).updateProgramsPerProduct(3)).to.be.revertedWith(
         `ControllerNotOwnerError(0)`,
       )
+    })
+  })
+
+  describe('#updatePaused', async () => {
+    it('updates the protocol paused state', async () => {
+      expect(await controller.paused()).to.equal(false)
+      await expect(controller.connect(owner).updatePaused(true)).to.emit(controller, 'PausedUpdated').withArgs(true)
+
+      expect(await controller.paused()).to.equal(true)
+      await expect(controller.connect(owner).updatePaused(false)).to.emit(controller, 'PausedUpdated').withArgs(false)
+
+      expect(await controller.paused()).to.equal(false)
+    })
+
+    it('reverts if not pauser', async () => {
+      await expect(controller.connect(user).updatePaused(true)).to.be.revertedWith(`ControllerNotPauserError()`)
+    })
+  })
+
+  describe('#updatePauser', async () => {
+    it('updates the pauser address', async () => {
+      expect(await controller.pauser()).to.equal(owner.address)
+      await expect(controller.connect(owner).updatePauser(user.address))
+        .to.emit(controller, 'PauserUpdated')
+        .withArgs(user.address)
+    })
+
+    it('updates the pauser to address(0) to default to owner', async () => {
+      await controller.connect(owner).updatePauser(user.address)
+      expect(await controller.pauser()).to.equal(user.address)
+
+      await expect(controller.connect(owner).updatePauser(constants.AddressZero))
+        .to.emit(controller, 'PauserUpdated')
+        .withArgs(constants.AddressZero)
+
+      expect(await controller.pauser()).to.equal(owner.address)
+    })
+
+    it('reverts if not owner', async () => {
+      await expect(controller.connect(user).updatePauser(user.address)).to.be.revertedWith('ControllerNotOwnerError(0)')
     })
   })
 })

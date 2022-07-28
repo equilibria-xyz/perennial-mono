@@ -25,7 +25,7 @@ contract PerennialLens is IPerennialLens {
      * @return Name of the product
      */
     function name(IProduct product) external view returns (string memory) {
-        return product.productProvider().name();
+        return product.name();
     }
 
     /**
@@ -34,7 +34,7 @@ contract PerennialLens is IPerennialLens {
      * @return Symbol of the product
      */
     function symbol(IProduct product) external view returns (string memory) {
-        return product.productProvider().symbol();
+        return product.symbol();
     }
 
     /**
@@ -235,7 +235,7 @@ contract PerennialLens is IPerennialLens {
      */
     function rate(IProduct product) external settle(product) returns (Fixed18) {
         Position memory position_ = _latestPosition(product);
-        return product.productProvider().rate(position_);
+        return product.rate(position_);
     }
 
     /**
@@ -245,7 +245,7 @@ contract PerennialLens is IPerennialLens {
      */
     function dailyRate(IProduct product) external settle(product) returns (Fixed18) {
         Position memory position_ = _latestPosition(product);
-        return product.productProvider().rate(position_).mul(Fixed18Lib.from(60 * 60 * 24));
+        return product.rate(position_).mul(Fixed18Lib.from(60 * 60 * 24));
     }
 
     /**
@@ -261,7 +261,7 @@ contract PerennialLens is IPerennialLens {
         UFixed18 positionSize
     ) external settleAccount(account, product) returns (UFixed18) {
         UFixed18 notional = positionSize.mul(_latestVersion(product).price.abs());
-        return notional.mul(product.productProvider().maintenance());
+        return notional.mul(product.maintenance());
     }
 
     /**
@@ -330,7 +330,7 @@ contract PerennialLens is IPerennialLens {
      * @return Latest version for the product
      */
     function _latestVersion(IProduct product) private view returns (IOracleProvider.OracleVersion memory) {
-        return product.productProvider().currentVersion();
+        return product.currentVersion();
     }
 
     /// @dev Settles the product

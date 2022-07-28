@@ -8,11 +8,11 @@ import {
   PerennialLens,
   PerennialLens__factory,
   IProduct,
-  IProductProvider,
+  IContractPayoffProvider,
   IController,
   IIncentivizer,
 } from '../../../types/generated'
-import { expectPositionEq, expectPrePositionEq } from '../../testutil/types'
+import { createPayoffDefinition, expectPositionEq, expectPrePositionEq } from '../../testutil/types'
 
 const { ethers } = HRE
 use(smock.matchers)
@@ -23,7 +23,7 @@ describe('PerennialLens', () => {
   let productTreasury: SignerWithAddress
   let collateral: FakeContract<ICollateral>
   let product: FakeContract<IProduct>
-  let productProvider: FakeContract<IProductProvider>
+  let payoffProvider: FakeContract<IContractPayoffProvider>
   let controller: FakeContract<IController>
   let incentivizer: FakeContract<IIncentivizer>
   let lens: PerennialLens
@@ -33,13 +33,13 @@ describe('PerennialLens', () => {
 
     collateral = await smock.fake<ICollateral>('ICollateral')
     product = await smock.fake<IProduct>('IProduct')
-    productProvider = await smock.fake<IProductProvider>('IProductProvider')
+    payoffProvider = await smock.fake<IContractPayoffProvider>('IContractPayoffProvider')
     controller = await smock.fake<IController>('IController')
     incentivizer = await smock.fake<IIncentivizer>('IIncentivizer')
 
     controller.collateral.returns(collateral.address)
     controller.incentivizer.returns(incentivizer.address)
-    product.productProvider.returns(productProvider.address)
+    product.payoffDefinition.returns(createPayoffDefinition({ contractAddress: payoffProvider.address }))
 
     lens = await new PerennialLens__factory(user).deploy(controller.address)
   })
@@ -53,14 +53,14 @@ describe('PerennialLens', () => {
 
   describe('#name', () => {
     it('returns the name of the product', async () => {
-      productProvider.name.returns('MyProduct')
+      product.name.returns('MyProduct')
       expect(await lens.callStatic.name(product.address)).to.equal('MyProduct')
     })
   })
 
   describe('#symbol', () => {
     it('returns the symbol of the product', async () => {
-      productProvider.symbol.returns('PROD')
+      product.symbol.returns('PROD')
       expect(await lens.callStatic.symbol(product.address)).to.equal('PROD')
     })
   })
@@ -91,14 +91,14 @@ describe('PerennialLens', () => {
 
   describe('#maintenance', () => {
     it('returns the user maintenance amount after settle', async () => {
-      product.maintenance.whenCalledWith(user.address).returns(10)
+      product['maintenance(address)'].whenCalledWith(user.address).returns(10)
       product.maintenanceNext.whenCalledWith(user.address).returns(8)
       expect(await lens.callStatic.maintenance(user.address, product.address)).to.equal(10)
       expect(product.settleAccount).to.have.been.calledOnceWith(user.address)
     })
 
     it('returns maintenanceNext if it is higher than maintenance', async () => {
-      product.maintenance.whenCalledWith(user.address).returns(10)
+      product['maintenance(address)'].whenCalledWith(user.address).returns(10)
       product.maintenanceNext.whenCalledWith(user.address).returns(15)
       expect(await lens.callStatic.maintenance(user.address, product.address)).to.equal(15)
       expect(product.settleAccount).to.have.been.calledOnceWith(user.address)
@@ -203,7 +203,7 @@ describe('PerennialLens', () => {
         price: -789,
       }
       product.position.whenCalledWith(user.address).returns({ maker: ethers.utils.parseEther('100'), taker: 0 })
-      productProvider.currentVersion.returns(currVersion)
+      product.currentVersion.returns(currVersion)
       expectPositionEq(await lens.callStatic['openInterest(address,address)'](user.address, product.address), {
         maker: 78900,
         taker: 0,
@@ -223,7 +223,7 @@ describe('PerennialLens', () => {
       product.positionAtVersion
         .whenCalledWith(100)
         .returns({ maker: ethers.utils.parseEther('200'), taker: ethers.utils.parseEther('100') })
-      productProvider.currentVersion.returns(currVersion)
+      product.currentVersion.returns(currVersion)
       expectPositionEq(await lens.callStatic['openInterest(address)'](product.address), {
         maker: 157800,
         taker: 78900,
@@ -239,7 +239,7 @@ describe('PerennialLens', () => {
         timestamp: 456,
         price: 789,
       }
-      productProvider.currentVersion.returns(currVersion)
+      product.currentVersion.returns(currVersion)
       expect(await lens.callStatic.price(product.address)).to.equal(789)
       expect(product.settle).to.have.been.calledOnce
     })
@@ -249,7 +249,7 @@ describe('PerennialLens', () => {
     it('returns the rate after settle', async () => {
       product['latestVersion()'].returns(100)
       product.positionAtVersion.whenCalledWith(100).returns({ maker: 200, taker: 100 })
-      productProvider.rate.returns(12345)
+      product.rate.returns(12345)
       expect(await lens.callStatic.rate(product.address)).to.equal(12345)
       expect(product.settle).to.have.been.calledOnce
     })
@@ -259,7 +259,7 @@ describe('PerennialLens', () => {
     it('returns the rate after settle', async () => {
       product['latestVersion()'].returns(100)
       product.positionAtVersion.whenCalledWith(100).returns({ maker: 200, taker: 100 })
-      productProvider.rate.returns(12345)
+      product.rate.returns(12345)
       expect(await lens.callStatic.dailyRate(product.address)).to.equal(1066608000)
       expect(product.settle).to.have.been.calledOnce
     })
@@ -272,8 +272,8 @@ describe('PerennialLens', () => {
         timestamp: 456,
         price: -789,
       }
-      productProvider.currentVersion.returns(currVersion)
-      productProvider.maintenance.returns(ethers.utils.parseEther('0.5'))
+      product.currentVersion.returns(currVersion)
+      product['maintenance()'].returns(ethers.utils.parseEther('0.5'))
       expect(
         await lens.callStatic.maintenanceRequired(user.address, product.address, ethers.utils.parseEther('123')),
       ).to.equal(48523)
