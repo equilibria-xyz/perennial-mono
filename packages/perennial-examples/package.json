@@ -5,6 +5,7 @@
   "files": [
     "contracts/examples",
     "deploy",
+    "util",
     "artifacts/contracts/examples",
     "deployments/!(localhost)"
   ],

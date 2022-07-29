@@ -1,3 +1,4 @@
 {
-  "extends": "../common/tsconfig.default"
+  "extends": "../common/tsconfig.default",
+  "files": ["./deploy", "./test", "./util"]
 }

@@ -1,8 +1,10 @@
+import '@nomiclabs/hardhat-ethers'
+import 'hardhat-deploy'
 import { HardhatRuntimeEnvironment } from 'hardhat/types'
 import { DeployFunction } from 'hardhat-deploy/types'
 import { IController, IController__factory, IProduct } from '../types/generated'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
-import { createPayoffDefinition, reuseOrDeployProduct } from './util'
+import { createPayoffDefinition, reuseOrDeployProduct } from '../util'
 
 const EXAMPLE_COORDINATOR_ID = 1
 

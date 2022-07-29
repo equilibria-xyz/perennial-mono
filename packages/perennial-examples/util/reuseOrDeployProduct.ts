@@ -1,5 +1,6 @@
+import 'hardhat-deploy'
 import { HardhatRuntimeEnvironment } from 'hardhat/types'
-import { IController, IProduct, IProduct__factory } from '../../types/generated'
+import { IController, IProduct, IProduct__factory } from '../types/generated'
 
 export default async function reuseOrDeployProduct(
   { deployments: { getOrNull, save } }: HardhatRuntimeEnvironment,
