@@ -21,7 +21,7 @@
     "format": "prettier -w .",
     "prepare": "yarn build",
     "clean": "rm -rf cache artifacts types/generated",
-    "node:fork:kovan": "HARDHAT_DEPLOY_FORK=kovan FORK_NETWORK=kovan FORK_ENABLED=true hardhat node",
+    "node:fork:kovan": "HARDHAT_DEPLOY_FORK=kovan FORK_ENABLED=true FORK_NETWORK=kovan NODE_INTERVAL_MINING=200 DEPLOY_EXAMPLES=true hardhat node",
     "prepack": "yarn build && rm -rf ./artifacts/contracts/**/*.dbg.json"
   },
   "author": "",
