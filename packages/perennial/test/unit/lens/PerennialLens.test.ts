@@ -12,7 +12,7 @@ import {
   IController,
   IIncentivizer,
 } from '../../../types/generated'
-import { createPayoffDefinition, expectPositionEq, expectPrePositionEq } from '../../testutil/types'
+import { createPayoffDefinition, expectPositionEq, expectPrePositionEq } from '../../../../common/testutil/types'
 
 const { ethers } = HRE
 use(smock.matchers)

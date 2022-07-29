@@ -10,7 +10,7 @@ import {
   AggregatorV3Interface,
   AggregatorV3Interface__factory,
 } from '../../../types/generated'
-import { currentBlockTimestamp } from '../../testutil/time'
+import { currentBlockTimestamp } from '../../../../common/testutil/time'
 
 const { ethers } = HRE
 

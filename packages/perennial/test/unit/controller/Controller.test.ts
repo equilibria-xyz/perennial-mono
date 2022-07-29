@@ -15,7 +15,7 @@ import {
   IBeacon__factory,
   IOracleProvider__factory,
 } from '../../../types/generated'
-import { createPayoffDefinition } from '../../testutil/types'
+import { createPayoffDefinition } from '../../../../common/testutil/types'
 
 const { ethers } = HRE
 

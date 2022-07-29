@@ -2,7 +2,7 @@ import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import HRE from 'hardhat'
 import { BigNumber, utils } from 'ethers'
 
-import { time, impersonate } from '../../testutil'
+import { time, impersonate } from '../../../../common/testutil'
 import {
   Collateral,
   Controller,
@@ -34,7 +34,7 @@ import {
   ReservoirFeedOracle,
 } from '../../../types/generated'
 import { CHAINLINK_CUSTOM_CURRENCIES, ChainlinkContext } from './chainlinkHelpers'
-import { createPayoffDefinition } from '../../testutil/types'
+import { createPayoffDefinition } from '../../../../common/testutil/types'
 const { config, deployments, ethers } = HRE
 
 export const INITIAL_PHASE_ID = 1
