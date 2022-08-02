@@ -9,6 +9,7 @@ import { createPayoffDefinition, reuseOrDeployProduct } from '../util'
 const EXAMPLE_COORDINATOR_ID = 1
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
+  const coordinatorID = process.env.COORDINATOR_ID ? parseInt(process.env.COORDINATOR_ID) : EXAMPLE_COORDINATOR_ID
   const { deployments, getNamedAccounts, ethers } = hre
   const { deploy, get } = deployments
   const { deployer } = await getNamedAccounts()
@@ -19,7 +20,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   console.log('using Controller at ' + controller.address)
 
   // Check coordinator owner
-  if (deployerSigner.address !== (await controller['owner(uint256)'](EXAMPLE_COORDINATOR_ID))) {
+  if (deployerSigner.address !== (await controller['owner(uint256)'](coordinatorID))) {
     process.stdout.write('not deploying from coordinator owner address... exiting.')
     return
   }
@@ -52,7 +53,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     },
   }
 
-  await reuseOrDeployProduct(hre, EXAMPLE_COORDINATOR_ID, controller, productInfo)
+  await reuseOrDeployProduct(hre, coordinatorID, controller, productInfo)
 }
 
 export default func

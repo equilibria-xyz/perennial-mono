@@ -22,3 +22,5 @@ export default function createPayoffDefinition({
 
   return definition
 }
+
+export { createPayoffDefinition }

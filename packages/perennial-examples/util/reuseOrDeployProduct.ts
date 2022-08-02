@@ -1,9 +1,8 @@
-import 'hardhat-deploy'
-import { HardhatRuntimeEnvironment } from 'hardhat/types'
+import { DeploymentsExtension } from 'hardhat-deploy/types'
 import { IController, IProduct, IProduct__factory } from '../types/generated'
 
 export default async function reuseOrDeployProduct(
-  { deployments: { getOrNull, save } }: HardhatRuntimeEnvironment,
+  { deployments: { getOrNull, save } }: { deployments: DeploymentsExtension },
   coordinatorId: number,
   controller: IController,
   productInfo: IProduct.ProductInfoStruct,
@@ -12,7 +11,7 @@ export default async function reuseOrDeployProduct(
   let productAddress: string | undefined = (await getOrNull(deploymentName))?.address
 
   if (productAddress == null) {
-    process.stdout.write('creating product Squeeth...')
+    process.stdout.write(`creating ${deploymentName}...`)
     productAddress = await controller.callStatic.createProduct(coordinatorId, productInfo)
 
     const receipt = await (await controller.createProduct(coordinatorId, productInfo)).wait(2)
@@ -27,3 +26,5 @@ export default async function reuseOrDeployProduct(
     console.log(`reusing product ${deploymentName} at ${productAddress}`)
   }
 }
+
+export { reuseOrDeployProduct }

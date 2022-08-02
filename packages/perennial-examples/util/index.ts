@@ -1,4 +1,2 @@
-import createPayoffDefinition from './createPayoffDefinition'
-import reuseOrDeployProduct from './reuseOrDeployProduct'
-
-export { createPayoffDefinition, reuseOrDeployProduct }
+export * from './createPayoffDefinition'
+export * from './reuseOrDeployProduct'

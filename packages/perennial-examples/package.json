@@ -4,13 +4,14 @@
   "description": "Perennial product examples",
   "files": [
     "contracts/examples",
-    "deploy",
-    "util",
     "artifacts/contracts/examples",
-    "deployments/!(localhost)"
+    "deployments/!(localhost)",
+    "dist"
   ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
   "scripts": {
-    "build": "yarn compile",
+    "build": "yarn compile && tsc -p tsconfig.build.json",
     "compile": "hardhat compile",
     "deploy": "hardhat deploy",
     "verify": "hardhat etherscan-verify",
@@ -21,8 +22,8 @@
     "coverage:integration": "FORK_ENABLED=true FORK_BLOCK_NUMBER=14325080 hardhat coverage --testfiles 'test/integration/*'",
     "lint": "eslint --fix --ext '.ts,.js' ./ && solhint 'contracts/**/*.sol' --fix",
     "format": "prettier -w .",
-    "prepare": "yarn build",
-    "clean": "rm -rf cache artifacts types/generated",
+    "prepare": "yarn clean && yarn build",
+    "clean": "rm -rf cache artifacts types/generated dist",
     "node:fork:kovan": "HARDHAT_DEPLOY_FORK=kovan FORK_NETWORK=kovan FORK_ENABLED=true hardhat node",
     "prepack": "yarn build && rm -rf ./artifacts/contracts/**/*.dbg.json"
   },

@@ -19,3 +19,4 @@ deployments/localhost
 .vscode
 
 .idea
+dist
