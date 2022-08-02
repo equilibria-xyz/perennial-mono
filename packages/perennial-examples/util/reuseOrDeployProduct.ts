@@ -7,7 +7,7 @@ export default async function reuseOrDeployProduct(
   controller: IController,
   productInfo: IProduct.ProductInfoStruct,
 ): Promise<void> {
-  const deploymentName = `Product_${productInfo.name}`
+  const deploymentName = `Product_${productInfo.symbol}`
   let productAddress: string | undefined = (await getOrNull(deploymentName))?.address
 
   if (productAddress == null) {

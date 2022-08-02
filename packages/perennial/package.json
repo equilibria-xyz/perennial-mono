@@ -29,7 +29,7 @@
   "dependencies": {
     "@chainlink/contracts": "0.3.1",
     "@equilibria/emptyset-batcher": "0.0.4",
-    "@equilibria/root": "0.1.5",
+    "@equilibria/root": "0.1.6",
     "@openzeppelin/contracts": "4.6.0"
   },
   "devDependencies": {
