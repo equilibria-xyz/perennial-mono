@@ -3,7 +3,7 @@ import 'hardhat'
 import { BigNumber, utils } from 'ethers'
 
 import { InstanceVars, deployProtocol, createProduct, depositTo } from '../helpers/setupHelpers'
-import { createPayoffDefinition, expectPositionEq, expectPrePositionEq } from '../../testutil/types'
+import { createPayoffDefinition, expectPositionEq, expectPrePositionEq } from '../../../../common/testutil/types'
 import { DataFeedContext } from '../helpers/feedOracleHelper'
 import {
   ReservoirFeedOracle,

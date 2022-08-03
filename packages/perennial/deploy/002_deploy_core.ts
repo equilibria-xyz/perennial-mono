@@ -1,7 +1,7 @@
 import { HardhatRuntimeEnvironment } from 'hardhat/types'
 import { DeployFunction } from 'hardhat-deploy/types'
 import { Deployment } from 'hardhat-deploy/dist/types'
-import { getMultisigAddress } from '../test/testutil/constants'
+import { getMultisigAddress } from '../../common/testutil/constants'
 import {
   Collateral,
   Collateral__factory,

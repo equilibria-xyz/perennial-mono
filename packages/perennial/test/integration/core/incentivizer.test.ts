@@ -3,9 +3,9 @@ import { expect } from 'chai'
 import { BigNumber, utils } from 'ethers'
 
 import { InstanceVars, deployProtocol, createProduct, depositTo, createIncentiveProgram } from '../helpers/setupHelpers'
-import { expectProgramInfoEq } from '../../testutil/types'
-import { currentBlockTimestamp } from '../../testutil/time'
-import { time } from '../../testutil'
+import { expectProgramInfoEq } from '../../../../common/testutil/types'
+import { currentBlockTimestamp } from '../../../../common/testutil/time'
+import { time } from '../../../../common/testutil'
 import { Product } from '../../../types/generated'
 
 const MINUTE = 60

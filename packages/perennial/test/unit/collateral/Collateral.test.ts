@@ -4,7 +4,7 @@ import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { expect } from 'chai'
 import HRE, { waffle } from 'hardhat'
 
-import { impersonate } from '../../testutil'
+import { impersonate } from '../../../../common/testutil'
 
 import {
   Collateral,

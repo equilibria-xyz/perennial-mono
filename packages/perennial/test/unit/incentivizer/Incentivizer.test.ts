@@ -4,7 +4,7 @@ import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { expect } from 'chai'
 import HRE, { waffle } from 'hardhat'
 
-import { impersonate } from '../../testutil'
+import { impersonate } from '../../../../common/testutil'
 
 import {
   Incentivizer,
@@ -14,8 +14,8 @@ import {
   Incentivizer__factory,
   IERC20Metadata__factory,
 } from '../../../types/generated'
-import { currentBlockTimestamp, increase } from '../../testutil/time'
-import { expectProgramInfoEq, ProgramInfo } from '../../testutil/types'
+import { currentBlockTimestamp, increase } from '../../../../common/testutil/time'
+import { expectProgramInfoEq, ProgramInfo } from '../../../../common/testutil/types'
 
 const { ethers } = HRE
 
