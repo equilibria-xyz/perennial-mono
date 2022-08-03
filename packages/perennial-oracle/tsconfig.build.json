@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {},
+  "files": ["index.ts"],
+  "include": ["deploy", "util"]
+}

@@ -3,7 +3,7 @@ pragma solidity 0.8.15;
 
 import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
-import "../interfaces/IOracleProvider.sol";
+import "./interfaces/IOracleProvider.sol";
 
 /**
  * @title ReservoirFeedOracle

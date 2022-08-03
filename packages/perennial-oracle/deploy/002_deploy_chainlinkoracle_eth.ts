@@ -1,6 +1,8 @@
+import '@nomiclabs/hardhat-ethers'
+import 'hardhat-deploy'
 import { HardhatRuntimeEnvironment } from 'hardhat/types'
 import { DeployFunction } from 'hardhat-deploy/types'
-import { CHAINLINK_CUSTOM_CURRENCIES } from '@equilibria/perennial-oracle/util'
+import { CHAINLINK_CUSTOM_CURRENCIES } from '../util'
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployments, getNamedAccounts } = hre
@@ -27,4 +29,4 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 }
 
 export default func
-func.tags = ['Examples']
+func.tags = ['OracleETH']

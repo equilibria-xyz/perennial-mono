@@ -2,7 +2,7 @@
 pragma solidity ^0.8.13;
 
 import "@equilibria/root/number/types/Fixed18.sol";
-import "./IOracleProvider.sol";
+import "@equilibria/perennial-oracle/contracts/interfaces/IOracleProvider.sol";
 import "./types/PayoffDefinition.sol";
 
 interface IPayoffProvider {
