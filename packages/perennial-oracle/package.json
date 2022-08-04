@@ -31,7 +31,8 @@
   "license": "APACHE-2.0",
   "dependencies": {
     "@equilibria/root": "0.1.6",
-    "@openzeppelin/contracts": "4.6.0"
+    "@openzeppelin/contracts": "4.6.0",
+    "@ethersproject/bignumber": "^5.5.1"
   },
   "peerDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.1.0",
