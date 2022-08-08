@@ -3,8 +3,8 @@ pragma solidity ^0.8.13;
 
 import "@equilibria/root/token/types/Token18.sol";
 import "@equilibria/root/number/types/UFixed18.sol";
+import "@equilibria/perennial-oracle/contracts/interfaces/IOracleProvider.sol";
 import "./types/ProgramInfo.sol";
-import "./IOracleProvider.sol";
 import "./IController.sol";
 import "./IProduct.sol";
 

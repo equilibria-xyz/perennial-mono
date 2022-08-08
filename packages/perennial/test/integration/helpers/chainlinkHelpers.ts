@@ -11,11 +11,6 @@ import {
 
 const { ethers, deployments } = HRE
 
-export const CHAINLINK_CUSTOM_CURRENCIES = {
-  ETH: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
-  USD: '0x0000000000000000000000000000000000000348',
-}
-
 export class ChainlinkContext {
   private feedRegistryExternal!: FeedRegistryInterface
   private latestRoundId: BigNumber
@@ -75,9 +70,5 @@ export class ChainlinkContext {
     this.feedRegistry.latestRoundData.reset()
     this.feedRegistry.latestRoundData.whenCalledWith(this.base, this.quote).returns(modifiedData)
     this.feedRegistry.getRoundData.whenCalledWith(this.base, this.quote, this.latestRoundId).returns(modifiedData)
-  }
-
-  public static buildRoundId(phaseId: number, aggregatorRoundId: number): BigNumber {
-    return BigNumber.from(16).pow(16).mul(phaseId).add(aggregatorRoundId)
   }
 }

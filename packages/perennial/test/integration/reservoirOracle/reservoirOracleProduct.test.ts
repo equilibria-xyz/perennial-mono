@@ -269,7 +269,7 @@ describe('Reservoir Oracle Product', () => {
   it('opens a take position', async () => {
     const MAKE_POSITION = utils.parseEther('0.0001')
     const TAKE_POSITION = utils.parseEther('0.00001')
-    const { user, userB, chainlink, chainlinkOracle } = instanceVars
+    const { user, userB, chainlinkOracle } = instanceVars
 
     const product = await createProduct(instanceVars, baycUSDCPayoffProvider, reservoirOracle)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
@@ -332,7 +332,7 @@ describe('Reservoir Oracle Product', () => {
   it('opens multiple take positions', async () => {
     const MAKE_POSITION = utils.parseEther('0.0001')
     const TAKE_POSITION = utils.parseEther('0.00001')
-    const { user, userB, chainlink, chainlinkOracle } = instanceVars
+    const { user, userB, chainlinkOracle } = instanceVars
 
     const product = await createProduct(instanceVars, baycUSDCPayoffProvider, reservoirOracle)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))

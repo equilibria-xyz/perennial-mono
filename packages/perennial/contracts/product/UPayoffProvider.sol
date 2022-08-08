@@ -2,9 +2,9 @@
 pragma solidity ^0.8.13;
 
 import "@equilibria/root/control/unstructured/UInitializable.sol";
+import "@equilibria/perennial-oracle/contracts/interfaces/IOracleProvider.sol";
 import "@equilibria/root/storage/UStorage.sol";
 import "../interfaces/IPayoffProvider.sol";
-import "../interfaces/IOracleProvider.sol";
 import "../interfaces/types/PayoffDefinition.sol";
 
 /**

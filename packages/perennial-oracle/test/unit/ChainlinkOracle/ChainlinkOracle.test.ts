@@ -6,7 +6,7 @@ import HRE, { waffle } from 'hardhat'
 
 import { ChainlinkOracle, ChainlinkOracle__factory, FeedRegistryInterface__factory } from '../../../types/generated'
 import { currentBlockTimestamp } from '../../../../common/testutil/time'
-import { ChainlinkContext } from '../../integration/helpers/chainlinkHelpers'
+import { buildChainlinkRoundId } from '../../../util'
 
 const { ethers } = HRE
 
@@ -48,12 +48,12 @@ describe('ChainlinkOracle', () => {
       await registry.mock.decimals.withArgs(eth.address, usd.address).returns(8)
       await registry.mock.getPhaseRange
         .withArgs(eth.address, usd.address, 1)
-        .returns(ChainlinkContext.buildRoundId(1, 100), ChainlinkContext.buildRoundId(1, 500))
+        .returns(buildChainlinkRoundId(1, 100), buildChainlinkRoundId(1, 500))
       oracle = await new ChainlinkOracle__factory(owner).deploy(registry.address, eth.address, usd.address)
     })
 
     it('syncs first version', async () => {
-      const roundId = ChainlinkContext.buildRoundId(1, 123)
+      const roundId = buildChainlinkRoundId(1, 123)
       await registry.mock.latestRoundData
         .withArgs(eth.address, usd.address)
         .returns(roundId, ethers.BigNumber.from(111100000000), TIMESTAMP_START - HOUR, TIMESTAMP_START, roundId)
@@ -82,7 +82,7 @@ describe('ChainlinkOracle', () => {
 
     describe('after synced', async () => {
       beforeEach(async () => {
-        const roundId = ChainlinkContext.buildRoundId(1, 123)
+        const roundId = buildChainlinkRoundId(1, 123)
 
         await registry.mock.latestRoundData
           .withArgs(eth.address, usd.address)
@@ -92,7 +92,7 @@ describe('ChainlinkOracle', () => {
       })
 
       it('doesnt sync new version if not available', async () => {
-        const roundId = ChainlinkContext.buildRoundId(1, 123)
+        const roundId = buildChainlinkRoundId(1, 123)
         await registry.mock.latestRoundData
           .withArgs(eth.address, usd.address)
           .returns(roundId, ethers.BigNumber.from(111100000000), TIMESTAMP_START - HOUR, TIMESTAMP_START, roundId)
@@ -120,7 +120,7 @@ describe('ChainlinkOracle', () => {
       })
 
       it('syncs new version if available', async () => {
-        const roundId = ChainlinkContext.buildRoundId(1, 124)
+        const roundId = buildChainlinkRoundId(1, 124)
         await registry.mock.latestRoundData
           .withArgs(eth.address, usd.address)
           .returns(roundId, ethers.BigNumber.from(122200000000), TIMESTAMP_START, TIMESTAMP_START + HOUR, roundId)
@@ -150,9 +150,9 @@ describe('ChainlinkOracle', () => {
       it('syncs with new phase', async () => {
         await registry.mock.getPhaseRange
           .withArgs(eth.address, usd.address, 2)
-          .returns(ChainlinkContext.buildRoundId(2, 320), ChainlinkContext.buildRoundId(2, 700))
+          .returns(buildChainlinkRoundId(2, 320), buildChainlinkRoundId(2, 700))
 
-        const roundId = ChainlinkContext.buildRoundId(2, 345)
+        const roundId = buildChainlinkRoundId(2, 345)
         await registry.mock.latestRoundData
           .withArgs(eth.address, usd.address)
           .returns(roundId, ethers.BigNumber.from(133300000000), TIMESTAMP_START, TIMESTAMP_START + HOUR, roundId)
@@ -190,10 +190,10 @@ describe('ChainlinkOracle', () => {
       await registry.mock.decimals.withArgs(eth.address, usd.address).returns(8)
       await registry.mock.getPhaseRange
         .withArgs(eth.address, usd.address, 1)
-        .returns(ChainlinkContext.buildRoundId(1, 100), ChainlinkContext.buildRoundId(1, 500))
+        .returns(buildChainlinkRoundId(1, 100), buildChainlinkRoundId(1, 500))
       oracle = await new ChainlinkOracle__factory(owner).deploy(registry.address, eth.address, usd.address)
 
-      const roundId = ChainlinkContext.buildRoundId(1, 123)
+      const roundId = buildChainlinkRoundId(1, 123)
 
       await registry.mock.latestRoundData
         .withArgs(eth.address, usd.address)
@@ -203,7 +203,7 @@ describe('ChainlinkOracle', () => {
     })
 
     it('reads prior version', async () => {
-      const roundId = ChainlinkContext.buildRoundId(1, 112)
+      const roundId = buildChainlinkRoundId(1, 112)
 
       await registry.mock.getRoundData
         .withArgs(eth.address, usd.address, roundId)
@@ -216,11 +216,11 @@ describe('ChainlinkOracle', () => {
     })
 
     it('reads prior version in prior phase', async () => {
-      const currentRoundId = ChainlinkContext.buildRoundId(2, 345)
+      const currentRoundId = buildChainlinkRoundId(2, 345)
 
       await registry.mock.getPhaseRange
         .withArgs(eth.address, usd.address, 2)
-        .returns(ChainlinkContext.buildRoundId(2, 320), ChainlinkContext.buildRoundId(2, 700))
+        .returns(buildChainlinkRoundId(2, 320), buildChainlinkRoundId(2, 700))
 
       await registry.mock.latestRoundData
         .withArgs(eth.address, usd.address)
@@ -234,7 +234,7 @@ describe('ChainlinkOracle', () => {
 
       await oracle.connect(user).sync()
 
-      const roundId = ChainlinkContext.buildRoundId(1, 112)
+      const roundId = buildChainlinkRoundId(1, 112)
 
       await registry.mock.getRoundData
         .withArgs(eth.address, usd.address, roundId)
