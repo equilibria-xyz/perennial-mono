@@ -2,7 +2,7 @@ import { config as dotenvConfig } from 'dotenv'
 import { resolve } from 'path'
 dotenvConfig({ path: resolve(__dirname, '../../.env') })
 
-import { HardhatUserConfig } from 'hardhat/types'
+import { HardhatUserConfig, SolcUserConfig } from 'hardhat/types'
 import { NetworkUserConfig } from 'hardhat/types'
 
 import '@typechain/hardhat'
@@ -16,6 +16,7 @@ import 'hardhat-deploy'
 import 'hardhat-dependency-compiler'
 import { getChainId } from './testutil/network'
 
+export const SOLIDITY_VERSION = '0.8.15'
 const PRIVATE_KEY_MAINNET = process.env.PRIVATE_KEY || ''
 const PRIVATE_KEY_TESTNET = process.env.PRIVATE_KEY_TESTNET || ''
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || ''
@@ -28,7 +29,7 @@ const FORK_BLOCK_NUMBER = process.env.FORK_BLOCK_NUMBER ? parseInt(process.env.F
 const NODE_INTERVAL_MINING = process.env.NODE_INTERVAL_MINING ? parseInt(process.env.NODE_INTERVAL_MINING) : undefined
 const MOCHA_PARALLEL = process.env.MOCHA_PARALLEL === 'true' || false
 const MOCHA_REPORTER = process.env.MOCHA_REPORTER || 'spec'
-const OPTIMIZER_ENABLED = process.env.OPTIMIZER_ENABLED === 'true' || false
+export const OPTIMIZER_ENABLED = process.env.OPTIMIZER_ENABLED === 'true' || false
 
 function getUrl(networkName: string): string {
   switch (networkName) {
@@ -59,8 +60,17 @@ function createNetworkConfig(network: string): NetworkUserConfig {
 }
 // You need to export an object to set up your config
 // Go to https://hardhat.org/config/ to learn more
+type configOverrides = {
+  solidityOverrides?: Record<string, SolcUserConfig>
+  externalDeployments?: { [networkName: string]: string[] }
+  dependencyPaths?: string[]
+}
 
-export default function defaultConfig(): HardhatUserConfig {
+export default function defaultConfig({
+  solidityOverrides,
+  externalDeployments,
+  dependencyPaths,
+}: configOverrides = {}): HardhatUserConfig {
   return {
     defaultNetwork: 'hardhat',
     networks: {
@@ -87,23 +97,26 @@ export default function defaultConfig(): HardhatUserConfig {
     solidity: {
       compilers: [
         {
-          version: '0.8.15',
+          version: SOLIDITY_VERSION,
           settings: {
             optimizer: {
               enabled: OPTIMIZER_ENABLED,
-              runs: 2 ** 32 - 1,
+              runs: 1000000, // Max allowed by Etherscan verify
             },
-            outputSelection: {
-              '*': {
-                '*': ['storageLayout'],
-              },
-            },
+            outputSelection: OPTIMIZER_ENABLED
+              ? {}
+              : {
+                  '*': {
+                    '*': ['storageLayout'],
+                  },
+                },
           },
         },
       ],
+      overrides: solidityOverrides,
     },
     dependencyCompiler: {
-      paths: [],
+      paths: dependencyPaths,
     },
     namedAccounts: {
       deployer: 0,
@@ -135,10 +148,13 @@ export default function defaultConfig(): HardhatUserConfig {
     external: {
       contracts: [{ artifacts: 'external/contracts' }],
       deployments: {
-        kovan: ['external/deployments/kovan'],
-        mainnet: ['external/deployments/mainnet'],
-        hardhat: [FORK_ENABLED ? `external/deployments/${FORK_NETWORK}` : ''],
-        localhost: [FORK_ENABLED ? `external/deployments/${FORK_NETWORK}` : ''],
+        kovan: ['external/deployments/kovan', ...(externalDeployments?.kovan || [])],
+        mainnet: ['external/deployments/mainnet', ...(externalDeployments?.mainnet || [])],
+        hardhat: [FORK_ENABLED ? `external/deployments/${FORK_NETWORK}` : '', ...(externalDeployments?.hardhat || [])],
+        localhost: [
+          FORK_ENABLED ? `external/deployments/${FORK_NETWORK}` : '',
+          ...(externalDeployments?.localhost || []),
+        ],
       },
     },
   }

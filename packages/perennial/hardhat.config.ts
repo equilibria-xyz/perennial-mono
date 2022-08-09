@@ -1,8 +1,27 @@
-import defaultConfig from '../common/hardhat.default.config'
+import { dirname } from 'path'
 
-const config = defaultConfig()
-config.dependencyCompiler = {
-  paths: [
+import defaultConfig, { OPTIMIZER_ENABLED, SOLIDITY_VERSION } from '../common/hardhat.default.config'
+const eqPerennialOracleDir = dirname(require.resolve('@equilibria/perennial-oracle/package.json'))
+
+const config = defaultConfig({
+  solidityOverrides: {
+    'contracts/product/Product.sol': {
+      version: SOLIDITY_VERSION,
+      settings: {
+        optimizer: {
+          enabled: OPTIMIZER_ENABLED,
+          runs: 5800, // Maximum value as of commit e6b7ab7
+        },
+      },
+    },
+  },
+  externalDeployments: {
+    kovan: [`${eqPerennialOracleDir}/deployments/kovan`],
+    mainnet: [`${eqPerennialOracleDir}/deployments/mainnet`],
+    hardhat: [`${eqPerennialOracleDir}/deployments/mainnet`],
+    localhost: [`${eqPerennialOracleDir}/deployments/localhost`],
+  },
+  dependencyPaths: [
     '@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol',
     '@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol',
     '@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol',
@@ -15,6 +34,6 @@ config.dependencyCompiler = {
     '@equilibria/perennial-oracle/contracts/test/PassthroughChainlinkFeed.sol',
     '@equilibria/emptyset-batcher/batcher/Batcher.sol',
   ],
-}
+})
 
 export default config

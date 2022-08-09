@@ -9,7 +9,8 @@
   ],
   "scripts": {
     "prepare": "husky install",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package",
+    "deploy:fork:kovan": "concurrently \"yarn workspace @equilibria/perennial run node:fork:kovan --no-deploy > /dev/null\" \"./scripts/deploy_kovan_fork.sh\""
   },
   "devDependencies": {
     "@codechecks/client": "^0.1.10",
@@ -30,6 +31,7 @@
     "@typescript-eslint/eslint-plugin": "^4.26.1",
     "@typescript-eslint/parser": "^4.26.1",
     "chai": "^4.2.0",
+    "concurrently": "^7.3.0",
     "dotenv": "^8.2.0",
     "eslint": "^7.28.0",
     "eslint-config-prettier": "^8.3.0",

@@ -13,7 +13,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const reservoirBAYCDataFeedAddress = (await getOrNull('ReservoirDataFeedBAYCUSDC'))?.address
 
-  if (reservoirBAYCDataFeedAddress === null) {
+  if (reservoirBAYCDataFeedAddress == null) {
     console.log('no deployment found for ReservoirDataFeedBAYCUSDC')
     return
   }

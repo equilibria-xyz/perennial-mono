@@ -23,8 +23,9 @@
     "lint": "eslint --fix --ext '.ts,.js' ./ && solhint 'contracts/**/*.sol' --fix",
     "format": "prettier -w .",
     "prepare": "yarn clean && yarn build",
-    "clean": "rm -rf cache artifacts types/generated dist",
-    "node:fork:kovan": "HARDHAT_DEPLOY_FORK=kovan FORK_NETWORK=kovan FORK_ENABLED=true hardhat node",
+    "clean": "rm -rf cache artifacts types/generated dist deployments/localhost",
+    "node:fork:kovan": "FORK_ENABLED=true FORK_NETWORK=kovan NODE_INTERVAL_MINING=500 hardhat node",
+    "deploy:fork:kovan": "FORK_ENABLED=true FORK_NETWORK=kovan hardhat deploy --network localhost",
     "prepack": "yarn build && rm -rf ./artifacts/contracts/**/*.dbg.json"
   },
   "author": "",
