@@ -1,6 +1,6 @@
 {
   "name": "@equilibria/perennial-examples",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Perennial product examples",
   "files": [
     "contracts/examples",
@@ -31,7 +31,7 @@
   "author": "",
   "license": "APACHE-2.0",
   "dependencies": {
-    "@equilibria/perennial": "0.1.7",
+    "@equilibria/perennial": "0.2.0",
     "@equilibria/root": "0.1.6",
     "@openzeppelin/contracts": "4.6.0"
   },
