@@ -36,8 +36,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   })
 
   const productInfo: IProduct.ProductInfoStruct = {
-    name: 'Squeeth',
-    symbol: 'SQTH',
+    name: 'milli-Squeeth',
+    symbol: 'mSQTH',
     payoffDefinition: createPayoffDefinition({ contractAddress: payoffProvider.address }),
     oracle: (await get('ChainlinkOracle_ETH')).address,
     maintenance: ethers.utils.parseEther('0.30'),
