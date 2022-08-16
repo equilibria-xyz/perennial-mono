@@ -27,7 +27,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const oracle = await getOrNull('ReservoirFeedOracle_BAYC')
   if (oracle == null) {
-    console.log('ReservoirFeedOracle_BAYC deployment not found...skipping')
+    console.log('ReservoirFeedOracle_BAYC deployment not found... skipping')
     return
   }
 
