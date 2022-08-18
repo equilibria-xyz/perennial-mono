@@ -5,7 +5,7 @@ import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { expect, use } from 'chai'
 import HRE, { waffle } from 'hardhat'
 
-import { impersonate } from '../../testutil'
+import { impersonate } from '../../../../common/testutil'
 
 import {
   Product,
@@ -17,7 +17,7 @@ import {
   TestnetContractPayoffProvider,
   TestnetContractPayoffProvider__factory,
 } from '../../../types/generated'
-import { createPayoffDefinition, expectPositionEq, expectPrePositionEq } from '../../testutil/types'
+import { createPayoffDefinition, expectPositionEq, expectPrePositionEq } from '../../../../common/testutil/types'
 
 const { ethers } = HRE
 use(smock.matchers)

@@ -2,11 +2,11 @@ name: Automated Tests and Linting
 
 on:
   push:
-    branches: [ master ]
+    branches: [master]
   pull_request:
     branches:
       - master
-      - product-provider-refactor-base
+      - repo-cleanup-base
 
 env:
   CI: true

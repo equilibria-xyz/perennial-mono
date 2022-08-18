@@ -3,7 +3,8 @@ import 'hardhat'
 import { utils } from 'ethers'
 
 import { InstanceVars, deployProtocol, createProduct, depositTo, createIncentiveProgram } from '../helpers/setupHelpers'
-import { expectPositionEq, expectPrePositionEq } from '../../testutil/types'
+import { time } from '../../../../common/testutil'
+import { expectPositionEq, expectPrePositionEq } from '../../../../common/testutil/types'
 
 const SECONDS_IN_YEAR = 60 * 60 * 24 * 365
 const SECONDS_IN_DAY = 60 * 60 * 24
@@ -23,7 +24,10 @@ describe('Lens', () => {
     // Setup fees
     controller.updateProtocolFee(utils.parseEther('0.25'))
     const product = await createProduct(instanceVars)
+    await time.increase(-SECONDS_IN_YEAR)
     await createIncentiveProgram(instanceVars, product)
+    await time.increase(SECONDS_IN_YEAR)
+
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
     await product.connect(user).openMake(POSITION)
@@ -171,19 +175,26 @@ describe('Lens', () => {
       '4127179883640059',
     )
 
+    await chainlink.next()
+    await product.settle()
+
+    await chainlink.next()
+    await product.settle()
+
+    await product.connect(user).settleAccount(user.address)
     // Incentive Program Rewards are updated
     let incentiveRewards = await lens.callStatic['unclaimedIncentiveRewards(address,address)'](
       user.address,
       product.address,
     )
     expect(incentiveRewards.tokens[0].toLowerCase()).to.equal(incentiveToken.address.toLowerCase())
-    expect(incentiveRewards.amounts[0]).to.equal(0) // TODO: figure out how to get a non-zero number here
+    expect(incentiveRewards.amounts[0]).to.equal('188786008230451956')
     incentiveRewards = await lens.callStatic['unclaimedIncentiveRewards(address,address,uint256[])'](
       user.address,
       product.address,
       [0],
     )
     expect(incentiveRewards.tokens[0].toLowerCase()).to.equal(incentiveToken.address.toLowerCase())
-    expect(incentiveRewards.amounts[0]).to.equal(0) // TODO: figure out how to get a non-zero number here
+    expect(incentiveRewards.amounts[0]).to.equal('188786008230451956')
   })
 })

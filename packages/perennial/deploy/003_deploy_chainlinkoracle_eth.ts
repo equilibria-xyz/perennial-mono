@@ -1,6 +1,6 @@
 import { HardhatRuntimeEnvironment } from 'hardhat/types'
 import { DeployFunction } from 'hardhat-deploy/types'
-import { CHAINLINK_CUSTOM_CURRENCIES } from '../test/integration/helpers/chainlinkHelpers'
+import { CHAINLINK_CUSTOM_CURRENCIES } from '@equilibria/perennial-oracle/util'
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployments, getNamedAccounts } = hre

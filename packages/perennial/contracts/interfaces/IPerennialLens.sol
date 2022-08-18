@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.15;
 
+import "@equilibria/perennial-oracle/contracts/interfaces/IOracleProvider.sol";
 import "./IProduct.sol";
 import "./ICollateral.sol";
 import "./IController.sol";
-import "./IOracleProvider.sol";
 
 interface IPerennialLens {
     function controller() external view returns (IController);

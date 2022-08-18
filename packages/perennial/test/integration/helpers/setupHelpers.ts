@@ -1,8 +1,9 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import HRE from 'hardhat'
 import { BigNumber, utils } from 'ethers'
+import { CHAINLINK_CUSTOM_CURRENCIES, buildChainlinkRoundId } from '@equilibria/perennial-oracle/util'
 
-import { time, impersonate } from '../../testutil'
+import { time, impersonate } from '../../../../common/testutil'
 import {
   Collateral,
   Controller,
@@ -33,8 +34,8 @@ import {
   TransparentUpgradeableProxy__factory,
   ReservoirFeedOracle,
 } from '../../../types/generated'
-import { CHAINLINK_CUSTOM_CURRENCIES, ChainlinkContext } from './chainlinkHelpers'
-import { createPayoffDefinition } from '../../testutil/types'
+import { ChainlinkContext } from './chainlinkHelpers'
+import { createPayoffDefinition } from '../../../../common/testutil/types'
 const { config, deployments, ethers } = HRE
 
 export const INITIAL_PHASE_ID = 1
@@ -76,7 +77,7 @@ export async function deployProtocol(): Promise<InstanceVars> {
   const [owner, pauser, user, userB, userC, userD, treasuryA, treasuryB] = await ethers.getSigners()
 
   // Deploy external deps
-  const initialRoundId = ChainlinkContext.buildRoundId(INITIAL_PHASE_ID, INITIAL_AGGREGATOR_ROUND_ID)
+  const initialRoundId = buildChainlinkRoundId(INITIAL_PHASE_ID, INITIAL_AGGREGATOR_ROUND_ID)
   const chainlink = await new ChainlinkContext(
     CHAINLINK_CUSTOM_CURRENCIES.ETH,
     CHAINLINK_CUSTOM_CURRENCIES.USD,

@@ -1,0 +1,22 @@
+node_modules
+
+#Hardhat files
+cache
+artifacts
+factories
+coverage
+coverage.json
+
+.env
+
+# typechain generated
+types/generated
+deployments/localhost
+
+# eslint cache
+.eslintcache
+
+.vscode
+
+.idea
+dist

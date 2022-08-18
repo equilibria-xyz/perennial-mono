@@ -1,6 +1,6 @@
 import { FakeContract, smock } from '@defi-wonderland/smock'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
-import { nextContractAddress } from '../../testutil/contract'
+import { nextContractAddress } from '../../../../common/testutil/contract'
 import { expect, use } from 'chai'
 import { utils } from 'ethers'
 import HRE from 'hardhat'

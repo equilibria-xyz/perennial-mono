@@ -16,6 +16,16 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     })
   }
 
+  // USDC
+  if ((await getOrNull('USDC')) == null) {
+    await deploy('TestnetUSDC', {
+      from: deployer,
+      skipIfAlreadyDeployed: true,
+      log: true,
+      autoMine: true,
+    })
+  }
+
   // ChainlinkFeedRegistry
   if ((await getOrNull('ChainlinkFeedRegistry')) == null) {
     await deploy('TestnetChainlinkFeedRegistry', {

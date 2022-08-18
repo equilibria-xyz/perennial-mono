@@ -3,7 +3,7 @@ import 'hardhat'
 import { utils } from 'ethers'
 
 import { InstanceVars, deployProtocol, createProduct, depositTo, INITIAL_VERSION } from '../helpers/setupHelpers'
-import { createPayoffDefinition, expectPositionEq, expectPrePositionEq } from '../../testutil/types'
+import { createPayoffDefinition, expectPositionEq, expectPrePositionEq } from '../../../../common/testutil/types'
 
 describe('Happy Path', () => {
   let instanceVars: InstanceVars
