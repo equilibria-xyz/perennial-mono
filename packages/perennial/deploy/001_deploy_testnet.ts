@@ -25,16 +25,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       autoMine: true,
     })
   }
-
-  // ChainlinkFeedRegistry
-  if ((await getOrNull('ChainlinkFeedRegistry')) == null) {
-    await deploy('TestnetChainlinkFeedRegistry', {
-      from: deployer,
-      skipIfAlreadyDeployed: true,
-      log: true,
-      autoMine: true,
-    })
-  }
 }
 
 export default func

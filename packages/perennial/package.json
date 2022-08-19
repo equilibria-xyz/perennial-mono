@@ -1,6 +1,6 @@
 {
   "name": "@equilibria/perennial",
-  "version": "0.1.7",
+  "version": "0.2.0",
   "description": "Perennial Protocol Core",
   "files": [
     "contracts/interfaces",
@@ -20,16 +20,17 @@
     "lint": "eslint --fix --ext '.ts,.js' ./ && solhint 'contracts/**/*.sol' --fix",
     "format": "prettier -w .",
     "prepare": "yarn build",
-    "clean": "rm -rf cache artifacts types/generated",
-    "node:fork:kovan": "HARDHAT_DEPLOY_FORK=kovan FORK_ENABLED=true FORK_NETWORK=kovan NODE_INTERVAL_MINING=200 DEPLOY_EXAMPLES=true hardhat node",
-    "prepack": "yarn build && rm -rf ./artifacts/contracts/**/*.dbg.json"
+    "clean": "rm -rf cache artifacts types/generated deployments/localhost",
+    "node:fork:kovan": "FORK_ENABLED=true FORK_NETWORK=kovan NODE_INTERVAL_MINING=500 hardhat node",
+    "deploy:fork:kovan": "FORK_ENABLED=true FORK_NETWORK=kovan hardhat deploy --network localhost",
+    "prepack": "yarn build && rm -rf artifacts/contracts/**/**/*.dbg.json"
   },
   "author": "",
   "license": "Apache-2.0",
   "dependencies": {
     "@chainlink/contracts": "0.3.1",
     "@equilibria/emptyset-batcher": "0.0.4",
-    "@equilibria/perennial-oracle": "0.0.1",
+    "@equilibria/perennial-oracle": "0.1.0",
     "@equilibria/root": "0.1.6",
     "@openzeppelin/contracts": "4.6.0"
   },

@@ -11,7 +11,7 @@ const EXAMPLE_COORDINATOR_ID = 1
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const coordinatorID = process.env.COORDINATOR_ID ? parseInt(process.env.COORDINATOR_ID) : EXAMPLE_COORDINATOR_ID
   const { deployments, getNamedAccounts, ethers } = hre
-  const { get } = deployments
+  const { get, getOrNull } = deployments
   const { deployer } = await getNamedAccounts()
   const deployerSigner: SignerWithAddress = await ethers.getSigner(deployer)
 
@@ -25,11 +25,17 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     return
   }
 
+  const oracle = await getOrNull('ReservoirFeedOracle_BAYC')
+  if (oracle == null) {
+    console.log('ReservoirFeedOracle_BAYC deployment not found... skipping')
+    return
+  }
+
   const productInfo: IProduct.ProductInfoStruct = {
     name: 'Short Floor BAYC',
     symbol: 'sfBAYC',
     payoffDefinition: createPayoffDefinition({ short: true }),
-    oracle: (await get('ReservoirFeedOracle_BAYC')).address,
+    oracle: oracle.address,
     maintenance: ethers.utils.parseEther('0.30'),
     fundingFee: ethers.utils.parseEther('0.10'),
     makerFee: 0,

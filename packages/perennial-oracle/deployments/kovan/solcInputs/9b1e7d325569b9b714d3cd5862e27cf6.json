@@ -1,0 +1,33 @@
+{
+  "language": "Solidity",
+  "sources": {
+    "contracts/test/TestnetChainlinkFeedRegistry.sol": {
+      "content": "// SPDX-License-Identifier: Apache-2.0\npragma solidity 0.8.15;\n\ncontract TestnetChainlinkFeedRegistry {\n    mapping(address => mapping(address => uint8)) public decimals;\n\n    function registerFeed(address base, address quote, uint8 newDecimals) external {\n        decimals[base][quote] = newDecimals;\n    }\n}\n"
+    }
+  },
+  "settings": {
+    "optimizer": {
+      "enabled": true,
+      "runs": 1000000
+    },
+    "outputSelection": {
+      "*": {
+        "*": [
+          "abi",
+          "evm.bytecode",
+          "evm.deployedBytecode",
+          "evm.methodIdentifiers",
+          "metadata",
+          "devdoc",
+          "userdoc",
+          "storageLayout",
+          "evm.gasEstimates"
+        ],
+        "": ["ast"]
+      }
+    },
+    "metadata": {
+      "useLiteralContent": true
+    }
+  }
+}

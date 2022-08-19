@@ -2,7 +2,7 @@ import { DeploymentsExtension } from 'hardhat-deploy/types'
 import { IController, IProduct, IProduct__factory } from '../types/generated'
 
 export default async function reuseOrDeployProduct(
-  { deployments: { getOrNull, save } }: { deployments: DeploymentsExtension },
+  { deployments: { getOrNull, save, get } }: { deployments: DeploymentsExtension },
   coordinatorId: number,
   controller: IController,
   productInfo: IProduct.ProductInfoStruct,
@@ -14,10 +14,11 @@ export default async function reuseOrDeployProduct(
     process.stdout.write(`creating ${deploymentName}...`)
     productAddress = await controller.callStatic.createProduct(coordinatorId, productInfo)
 
+    const productImpl = await get('Product_Impl')
     const receipt = await (await controller.createProduct(coordinatorId, productInfo)).wait(2)
     await save(deploymentName, {
+      ...productImpl,
       address: productAddress,
-      abi: IProduct__factory.abi,
       receipt,
     })
 
