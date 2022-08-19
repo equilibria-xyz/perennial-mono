@@ -23,7 +23,7 @@
     "clean": "rm -rf cache artifacts types/generated deployments/localhost",
     "node:fork:kovan": "FORK_ENABLED=true FORK_NETWORK=kovan NODE_INTERVAL_MINING=500 hardhat node",
     "deploy:fork:kovan": "FORK_ENABLED=true FORK_NETWORK=kovan hardhat deploy --network localhost",
-    "prepack": "yarn build && rm -rf artifacts/contracts/**/**/*.dbg.json"
+    "prepack": "yarn build && find artifacts/contracts -name '*.dbg.json' -type f -delete"
   },
   "author": "",
   "license": "Apache-2.0",
