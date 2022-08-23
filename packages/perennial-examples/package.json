@@ -22,11 +22,10 @@
     "coverage:integration": "FORK_ENABLED=true FORK_BLOCK_NUMBER=14325080 hardhat coverage --testfiles 'test/integration/*'",
     "lint": "eslint --fix --ext '.ts,.js' ./ && solhint 'contracts/**/*.sol' --fix",
     "format": "prettier -w .",
-    "prepare": "yarn clean && yarn build",
     "clean": "rm -rf cache artifacts types/generated dist deployments/localhost",
     "node:fork:kovan": "FORK_ENABLED=true FORK_NETWORK=kovan NODE_INTERVAL_MINING=500 hardhat node",
     "deploy:fork:kovan": "FORK_ENABLED=true FORK_NETWORK=kovan hardhat deploy --network localhost",
-    "prepack": "yarn build && find artifacts/contracts -name '*.dbg.json' -type f -delete"
+    "prepack": "yarn clean && yarn build && find artifacts/contracts -name '*.dbg.json' -type f -delete"
   },
   "author": "",
   "license": "APACHE-2.0",
