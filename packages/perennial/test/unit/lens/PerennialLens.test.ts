@@ -245,6 +245,19 @@ describe('PerennialLens', () => {
     })
   })
 
+  describe('#priceAtVersion', () => {
+    it('returns the price at version after settle', async () => {
+      const atVersion = {
+        version: 1,
+        timestamp: 456,
+        price: 789,
+      }
+      product.atVersion.whenCalledWith(1).returns(atVersion)
+      expect(await lens.callStatic.priceAtVersion(product.address, 1)).to.equal(789)
+      expect(product.settle).to.have.been.calledOnce
+    })
+  })
+
   describe('#rate', () => {
     it('returns the rate after settle', async () => {
       product['latestVersion()'].returns(100)
