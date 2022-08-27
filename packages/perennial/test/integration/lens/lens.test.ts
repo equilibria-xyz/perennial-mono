@@ -63,6 +63,7 @@ describe('Lens', () => {
     expect(await lens.callStatic.maintenanceRequired(user.address, product.address, 1000)).to.equal('3416489252')
     expect(await lens.callStatic.maintenance(user.address, product.address)).to.equal('341648925295826936134')
     expect(await lens.callStatic.price(product.address)).to.equal('11388297509860897871140900')
+    expect(await lens.callStatic.priceAtVersion(product.address, 2472)).to.equal('11388297509860897871140900')
     expect(await lens.callStatic.rate(product.address)).to.equal(utils.parseEther('5.00').div(SECONDS_IN_YEAR))
     expect(await lens.callStatic.dailyRate(product.address)).to.equal(
       utils.parseEther('5.00').div(SECONDS_IN_YEAR).mul(SECONDS_IN_DAY),
