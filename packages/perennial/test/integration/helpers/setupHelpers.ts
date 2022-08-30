@@ -1,6 +1,6 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import HRE from 'hardhat'
-import { BigNumber, utils } from 'ethers'
+import { BigNumber, ContractTransaction, utils } from 'ethers'
 import { CHAINLINK_CUSTOM_CURRENCIES, buildChainlinkRoundId } from '@equilibria/perennial-oracle/util'
 
 import { time, impersonate } from '../../../../common/testutil'
@@ -261,9 +261,25 @@ export async function depositTo(
   instanceVars: InstanceVars,
   user: SignerWithAddress,
   product: Product,
-  position: BigNumber,
+  amount: BigNumber,
 ): Promise<void> {
   const { dsu, collateral } = instanceVars
-  await dsu.connect(user).approve(collateral.address, position)
-  await collateral.connect(user).depositTo(user.address, product.address, position)
+  await dsu.connect(user).approve(collateral.address, amount)
+  await collateral.connect(user).depositTo(user.address, product.address, amount)
+}
+
+export async function depositAndOpen(
+  instanceVars: InstanceVars,
+  user: SignerWithAddress,
+  product: Product,
+  amount: BigNumber,
+  position: BigNumber,
+  side: 'maker' | 'taker',
+): Promise<ContractTransaction> {
+  const { dsu } = instanceVars
+  await dsu.connect(user).approve(product.address, amount)
+  if (side === 'maker') {
+    return product.connect(user).depositAndOpenMake(amount, position)
+  }
+  return product.connect(user).depositAndOpenTake(amount, position)
 }

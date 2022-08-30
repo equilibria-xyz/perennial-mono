@@ -2,7 +2,14 @@ import { expect } from 'chai'
 import 'hardhat'
 import { utils } from 'ethers'
 
-import { InstanceVars, deployProtocol, createProduct, depositTo, INITIAL_VERSION } from '../helpers/setupHelpers'
+import {
+  InstanceVars,
+  deployProtocol,
+  createProduct,
+  depositTo,
+  INITIAL_VERSION,
+  depositAndOpen,
+} from '../helpers/setupHelpers'
 import { createPayoffDefinition, expectPositionEq, expectPrePositionEq } from '../../../../common/testutil/types'
 
 describe('Happy Path', () => {
@@ -71,6 +78,62 @@ describe('Happy Path', () => {
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
 
     await expect(product.connect(user).openMake(POSITION))
+      .to.emit(product, 'MakeOpened')
+      .withArgs(user.address, INITIAL_VERSION, POSITION)
+
+    // Check user is in the correct state
+    expect(await product.isClosed(user.address)).to.equal(false)
+    expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
+    expectPrePositionEq(await product['pre(address)'](user.address), {
+      oracleVersion: INITIAL_VERSION,
+      openPosition: { maker: POSITION, taker: 0 },
+      closePosition: { maker: 0, taker: 0 },
+    })
+    expect(await product['latestVersion(address)'](user.address)).to.equal(INITIAL_VERSION)
+
+    // Check global state
+    expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION)
+    expectPositionEq(await product.positionAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
+    expectPrePositionEq(await product['pre()'](), {
+      oracleVersion: INITIAL_VERSION,
+      openPosition: { maker: POSITION, taker: 0 },
+      closePosition: { maker: 0, taker: 0 },
+    })
+    expectPositionEq(await product.valueAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
+    expectPositionEq(await product.shareAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
+
+    // Settle the product with a new oracle version
+    await chainlink.next()
+    await product.settle()
+
+    // Check global post-settlement state
+    expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION + 1)
+    expectPositionEq(await product.positionAtVersion(INITIAL_VERSION + 1), { maker: POSITION, taker: 0 })
+    expectPrePositionEq(await product['pre()'](), {
+      oracleVersion: 0,
+      openPosition: { maker: 0, taker: 0 },
+      closePosition: { maker: 0, taker: 0 },
+    })
+
+    // Settle user and check state
+    await product.settleAccount(user.address)
+    expectPositionEq(await product.position(user.address), { maker: POSITION, taker: 0 })
+    expectPrePositionEq(await product['pre(address)'](user.address), {
+      oracleVersion: 0,
+      openPosition: { maker: 0, taker: 0 },
+      closePosition: { maker: 0, taker: 0 },
+    })
+    expect(await product['latestVersion(address)'](user.address)).to.equal(INITIAL_VERSION + 1)
+  })
+
+  it('deposits and opens a make position', async () => {
+    const POSITION = utils.parseEther('0.0001')
+    const { user, chainlink, collateral } = instanceVars
+
+    const product = await createProduct(instanceVars)
+    await expect(depositAndOpen(instanceVars, user, product, utils.parseEther('1000'), POSITION, 'maker'))
+      .to.emit(collateral, 'Deposit')
+      .withArgs(user.address, product.address, utils.parseEther('1000'))
       .to.emit(product, 'MakeOpened')
       .withArgs(user.address, INITIAL_VERSION, POSITION)
 
@@ -263,6 +326,70 @@ describe('Happy Path', () => {
 
     await product.connect(user).openMake(MAKE_POSITION)
     await expect(product.connect(userB).openTake(TAKE_POSITION))
+      .to.emit(product, 'TakeOpened')
+      .withArgs(userB.address, INITIAL_VERSION, TAKE_POSITION)
+
+    // User State
+    expect(await product.isClosed(userB.address)).to.equal(false)
+    expectPositionEq(await product.position(userB.address), { maker: 0, taker: 0 })
+    expectPrePositionEq(await product['pre(address)'](userB.address), {
+      oracleVersion: INITIAL_VERSION,
+      openPosition: { maker: 0, taker: TAKE_POSITION },
+      closePosition: { maker: 0, taker: 0 },
+    })
+    expect(await product['latestVersion(address)'](userB.address)).to.equal(INITIAL_VERSION)
+
+    // Global State
+    expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION)
+    expectPositionEq(await product.positionAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
+    expectPrePositionEq(await product['pre()'](), {
+      oracleVersion: INITIAL_VERSION,
+      openPosition: { maker: MAKE_POSITION, taker: TAKE_POSITION },
+      closePosition: { maker: 0, taker: 0 },
+    })
+    expectPositionEq(await product.valueAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
+    expectPositionEq(await product.shareAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
+
+    // One round
+    await chainlink.next()
+    await chainlinkOracle.sync()
+
+    // Another round
+    await chainlink.next()
+    await product.settle()
+
+    expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION + 2)
+    expectPositionEq(await product.positionAtVersion(INITIAL_VERSION + 2), {
+      maker: MAKE_POSITION,
+      taker: TAKE_POSITION,
+    })
+    expectPrePositionEq(await product['pre()'](), {
+      oracleVersion: 0,
+      openPosition: { maker: 0, taker: 0 },
+      closePosition: { maker: 0, taker: 0 },
+    })
+    await product.settleAccount(userB.address)
+    expectPositionEq(await product.position(userB.address), { maker: 0, taker: TAKE_POSITION })
+    expectPrePositionEq(await product['pre(address)'](userB.address), {
+      oracleVersion: 0,
+      openPosition: { maker: 0, taker: 0 },
+      closePosition: { maker: 0, taker: 0 },
+    })
+    expect(await product['latestVersion(address)'](userB.address)).to.equal(INITIAL_VERSION + 2)
+  })
+
+  it('deposits and opens a take position', async () => {
+    const MAKE_POSITION = utils.parseEther('0.0001')
+    const TAKE_POSITION = utils.parseEther('0.00001')
+    const { user, userB, collateral, chainlink, chainlinkOracle } = instanceVars
+
+    const product = await createProduct(instanceVars)
+    await depositTo(instanceVars, user, product, utils.parseEther('1000'))
+
+    await product.connect(user).openMake(MAKE_POSITION)
+    await expect(depositAndOpen(instanceVars, userB, product, utils.parseEther('1000'), TAKE_POSITION, 'taker'))
+      .to.emit(collateral, 'Deposit')
+      .withArgs(userB.address, product.address, utils.parseEther('1000'))
       .to.emit(product, 'TakeOpened')
       .withArgs(userB.address, INITIAL_VERSION, TAKE_POSITION)
 

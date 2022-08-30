@@ -195,7 +195,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @param amount Amount of the position to open
      */
     function openTake(UFixed18 amount)
-    external
+    public
     nonReentrant
     notPaused
     notClosed
@@ -211,6 +211,19 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         _position.pre.openTake(_latestVersion, amount);
 
         emit TakeOpened(msg.sender, _latestVersion, amount);
+    }
+
+    /**
+     * @notice Deposits collateral and opens a taker position for `msg.sender`
+     * @param collateralAmount Amount of collateral to deposit
+     * @param positionAmount Amount of the position to open
+     */
+    function depositAndOpenTake(UFixed18 collateralAmount, UFixed18 positionAmount) external {
+        ICollateral collateral = controller().collateral();
+        collateral.token().approve(address(collateral), collateralAmount);
+        collateral.token().pull(msg.sender, collateralAmount);
+        collateral.depositTo(msg.sender, this, collateralAmount);
+        openTake(positionAmount);
     }
 
     /**
@@ -242,7 +255,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @param amount Amount of the position to open
      */
     function openMake(UFixed18 amount)
-    external
+    public
     nonReentrant
     notPaused
     notClosed
@@ -259,6 +272,19 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         _position.pre.openMake(_latestVersion, amount);
 
         emit MakeOpened(msg.sender, _latestVersion, amount);
+    }
+
+    /**
+     * @notice Deposits collateral and opens a maker position for `msg.sender`
+     * @param collateralAmount Amount of collateral to deposit
+     * @param positionAmount Amount of the position to open
+     */
+    function depositAndOpenMake(UFixed18 collateralAmount, UFixed18 positionAmount) external {
+        ICollateral collateral = controller().collateral();
+        collateral.token().approve(address(collateral), collateralAmount);
+        collateral.token().pull(msg.sender, collateralAmount);
+        collateral.depositTo(msg.sender, this, collateralAmount);
+        openMake(positionAmount);
     }
 
     /**
