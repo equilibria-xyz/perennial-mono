@@ -16,6 +16,7 @@ import {
   IOracleProvider__factory,
   TestnetContractPayoffProvider,
   TestnetContractPayoffProvider__factory,
+  IERC20Metadata__factory,
 } from '../../../types/generated'
 import { createPayoffDefinition, expectPositionEq, expectPrePositionEq } from '../../../../common/testutil/types'
 
@@ -33,6 +34,7 @@ describe('Product', () => {
   let collateral: MockContract
   let oracle: MockContract
   let incentivizer: MockContract
+  let token: MockContract
 
   let product: Product
 
@@ -69,6 +71,8 @@ describe('Product', () => {
     collateral = await waffle.deployMockContract(owner, Collateral__factory.abi)
     collateralSigner = await impersonate.impersonateWithBalance(collateral.address, utils.parseEther('10'))
 
+    token = await waffle.deployMockContract(owner, IERC20Metadata__factory.abi)
+
     controller = await waffle.deployMockContract(owner, Controller__factory.abi)
     controllerSigner = await impersonate.impersonateWithBalance(controller.address, utils.parseEther('10'))
 
@@ -83,6 +87,10 @@ describe('Product', () => {
     await controller.mock.owner.withArgs(1).returns(owner.address)
 
     await collateral.mock.depositTo.withArgs(user.address, product.address, COLLATERAL).returns()
+    await collateral.mock.token.withArgs().returns(token.address)
+    await token.mock.allowance.withArgs(product.address, collateral.address).returns(0)
+    await token.mock.approve.withArgs(collateral.address, COLLATERAL).returns(true)
+    await token.mock.transferFrom.withArgs(user.address, product.address, COLLATERAL).returns(true)
   })
 
   describe('#initialize', async () => {
@@ -267,10 +275,10 @@ describe('Product', () => {
       Object.entries({
         '#openMake': () => product.connect(user).openMake(POSITION),
         '#depositAndOpenMake': () => product.connect(user).depositAndOpenMake(COLLATERAL, POSITION),
-      }).forEach(([key, testFn]) => {
+      }).forEach(([key, openFn]) => {
         context(key, () => {
           it('opens the position', async () => {
-            await expect(testFn()).to.emit(product, 'MakeOpened').withArgs(user.address, 1, POSITION)
+            await expect(openFn()).to.emit(product, 'MakeOpened').withArgs(user.address, 1, POSITION)
 
             expect(await product.isClosed(user.address)).to.equal(false)
             expect(await product['maintenance(address)'](user.address)).to.equal(0)
@@ -294,7 +302,7 @@ describe('Product', () => {
           })
 
           it('opens the position and settles', async () => {
-            await expect(testFn()).to.emit(product, 'MakeOpened').withArgs(user.address, 1, POSITION)
+            await expect(openFn()).to.emit(product, 'MakeOpened').withArgs(user.address, 1, POSITION)
 
             await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
             await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
@@ -330,9 +338,9 @@ describe('Product', () => {
           })
 
           it('opens a second position (same version)', async () => {
-            await testFn()
+            await openFn()
 
-            await expect(testFn()).to.emit(product, 'MakeOpened').withArgs(user.address, 1, POSITION)
+            await expect(openFn()).to.emit(product, 'MakeOpened').withArgs(user.address, 1, POSITION)
 
             expect(await product.isClosed(user.address)).to.equal(false)
             expect(await product['maintenance(address)'](user.address)).to.equal(0)
@@ -356,9 +364,9 @@ describe('Product', () => {
           })
 
           it('opens a second position and settles (same version)', async () => {
-            await testFn()
+            await openFn()
 
-            await expect(testFn()).to.emit(product, 'MakeOpened').withArgs(user.address, 1, POSITION)
+            await expect(openFn()).to.emit(product, 'MakeOpened').withArgs(user.address, 1, POSITION)
 
             await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
             await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
@@ -394,14 +402,14 @@ describe('Product', () => {
           })
 
           it('opens a second position (next version)', async () => {
-            await testFn()
+            await openFn()
 
             await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
             await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
             await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
             await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_2)
 
-            await expect(testFn()).to.emit(product, 'MakeOpened').withArgs(user.address, 2, POSITION)
+            await expect(openFn()).to.emit(product, 'MakeOpened').withArgs(user.address, 2, POSITION)
 
             expect(await product.isClosed(user.address)).to.equal(false)
             expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('615'))
@@ -426,14 +434,14 @@ describe('Product', () => {
           })
 
           it('opens a second position and settles (next version)', async () => {
-            await testFn()
+            await openFn()
 
             await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
             await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
             await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
             await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_2)
 
-            await expect(testFn()).to.emit(product, 'MakeOpened').withArgs(user.address, 2, POSITION)
+            await expect(openFn()).to.emit(product, 'MakeOpened').withArgs(user.address, 2, POSITION)
 
             await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
             await oracle.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
@@ -469,7 +477,7 @@ describe('Product', () => {
           })
 
           it('opens the position and settles later', async () => {
-            await expect(testFn()).to.emit(product, 'MakeOpened').withArgs(user.address, 1, POSITION)
+            await expect(openFn()).to.emit(product, 'MakeOpened').withArgs(user.address, 1, POSITION)
 
             await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
 
@@ -514,7 +522,7 @@ describe('Product', () => {
             await collateral.mock.settleProduct.withArgs(MAKER_FEE).returns()
             await collateral.mock.settleAccount.withArgs(user.address, MAKER_FEE.mul(-1)).returns()
 
-            await expect(testFn()).to.emit(product, 'MakeOpened').withArgs(user.address, 1, POSITION)
+            await expect(openFn()).to.emit(product, 'MakeOpened').withArgs(user.address, 1, POSITION)
 
             await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
             await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_2)
@@ -554,7 +562,7 @@ describe('Product', () => {
           })
 
           it('opens the position with settle after liquidation', async () => {
-            await testFn()
+            await openFn()
 
             await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
             await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
@@ -564,7 +572,7 @@ describe('Product', () => {
             // Liquidate the user
             await product.connect(collateralSigner).closeAll(user.address)
             // User can't open a new position yet
-            await expect(testFn()).to.be.revertedWith('ProductInLiquidationError()')
+            await expect(openFn()).to.be.revertedWith('ProductInLiquidationError()')
 
             // Advance version
             await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
@@ -573,7 +581,7 @@ describe('Product', () => {
             await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_3)
 
             // Liquidation flag is cleared during settle flow
-            await expect(testFn()).to.emit(product, 'MakeOpened').withArgs(user.address, 3, POSITION)
+            await expect(openFn()).to.emit(product, 'MakeOpened').withArgs(user.address, 3, POSITION)
           })
 
           it('reverts if oracle not bootstrapped', async () => {
@@ -581,40 +589,40 @@ describe('Product', () => {
             await oracle.mock.atVersion.withArgs(0).returns(ORACLE_VERSION_0)
             await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_0)
 
-            await expect(testFn()).to.be.revertedWith('ProductOracleBootstrappingError()')
+            await expect(openFn()).to.be.revertedWith('ProductOracleBootstrappingError()')
           })
 
           it('reverts if can liquidate', async () => {
             await collateral.mock.liquidatableNext.withArgs(user.address, product.address).returns(true)
 
-            await expect(testFn()).to.be.revertedWith('ProductInsufficientCollateralError()')
+            await expect(openFn()).to.be.revertedWith('ProductInsufficientCollateralError()')
           })
 
           it('reverts if double sided position', async () => {
             await product.connect(userB).openMake(POSITION.mul(2))
             await product.connect(user).openTake(POSITION)
 
-            await expect(testFn()).to.be.revertedWith('ProductDoubleSidedError()')
+            await expect(openFn()).to.be.revertedWith('ProductDoubleSidedError()')
           })
 
           it('reverts if in liquidation', async () => {
             await product.connect(collateralSigner).closeAll(user.address)
-            await expect(testFn()).to.be.revertedWith('ProductInLiquidationError()')
+            await expect(openFn()).to.be.revertedWith('ProductInLiquidationError()')
           })
 
           it('reverts if paused', async () => {
             await controller.mock.paused.withArgs().returns(true)
-            await expect(testFn()).to.be.revertedWith('PausedError()')
+            await expect(openFn()).to.be.revertedWith('PausedError()')
           })
 
           it('reverts if over maker limit', async () => {
             await product.updateMakerLimit(POSITION.div(2))
-            await expect(testFn()).to.be.revertedWith('ProductMakerOverLimitError()')
+            await expect(openFn()).to.be.revertedWith('ProductMakerOverLimitError()')
           })
 
           it('reverts if closed', async () => {
             await product.updateClosed(true)
-            await expect(testFn()).to.be.revertedWith('ProductClosedError()')
+            await expect(openFn()).to.be.revertedWith('ProductClosedError()')
           })
         })
       })
@@ -1026,14 +1034,14 @@ describe('Product', () => {
       Object.entries({
         '#openTake': () => product.connect(user).openTake(POSITION),
         '#depositAndOpenTake': () => product.connect(user).depositAndOpenTake(COLLATERAL, POSITION),
-      }).forEach(([key, testFn]) => {
+      }).forEach(([key, openFn]) => {
         context(key, () => {
           beforeEach(async () => {
             await product.connect(userB).openMake(POSITION.mul(2))
           })
 
           it('opens the position', async () => {
-            await expect(testFn()).to.emit(product, 'TakeOpened').withArgs(user.address, 1, POSITION)
+            await expect(openFn()).to.emit(product, 'TakeOpened').withArgs(user.address, 1, POSITION)
 
             expect(await product.isClosed(user.address)).to.equal(false)
             expect(await product['maintenance(address)'](user.address)).to.equal(0)
@@ -1057,7 +1065,7 @@ describe('Product', () => {
           })
 
           it('opens the position and settles', async () => {
-            await expect(testFn()).to.emit(product, 'TakeOpened').withArgs(user.address, 1, POSITION)
+            await expect(openFn()).to.emit(product, 'TakeOpened').withArgs(user.address, 1, POSITION)
 
             await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
             await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
@@ -1093,9 +1101,9 @@ describe('Product', () => {
           })
 
           it('opens a second position (same version)', async () => {
-            await testFn()
+            await openFn()
 
-            await expect(testFn()).to.emit(product, 'TakeOpened').withArgs(user.address, 1, POSITION)
+            await expect(openFn()).to.emit(product, 'TakeOpened').withArgs(user.address, 1, POSITION)
 
             expect(await product.isClosed(user.address)).to.equal(false)
             expect(await product['maintenance(address)'](user.address)).to.equal(0)
@@ -1119,9 +1127,9 @@ describe('Product', () => {
           })
 
           it('opens a second position and settles (same version)', async () => {
-            await testFn()
+            await openFn()
 
-            await expect(testFn()).to.emit(product, 'TakeOpened').withArgs(user.address, 1, POSITION)
+            await expect(openFn()).to.emit(product, 'TakeOpened').withArgs(user.address, 1, POSITION)
 
             await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
             await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
@@ -1157,14 +1165,14 @@ describe('Product', () => {
           })
 
           it('opens a second position (next version)', async () => {
-            await testFn()
+            await openFn()
 
             await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
             await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
             await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
             await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_2)
 
-            await expect(testFn()).to.emit(product, 'TakeOpened').withArgs(user.address, 2, POSITION)
+            await expect(openFn()).to.emit(product, 'TakeOpened').withArgs(user.address, 2, POSITION)
 
             expect(await product.isClosed(user.address)).to.equal(false)
             expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('615'))
@@ -1198,14 +1206,14 @@ describe('Product', () => {
             await collateral.mock.settleProduct.withArgs(EXPECTED_FUNDING_FEE).returns()
             await collateral.mock.settleAccount.withArgs(user.address, EXPECTED_FUNDING.mul(-1)).returns()
 
-            await testFn()
+            await openFn()
 
             await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
             await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
             await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
             await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_2)
 
-            await expect(testFn()).to.emit(product, 'TakeOpened').withArgs(user.address, 2, POSITION)
+            await expect(openFn()).to.emit(product, 'TakeOpened').withArgs(user.address, 2, POSITION)
 
             await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
             await oracle.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
@@ -1256,7 +1264,7 @@ describe('Product', () => {
             await collateral.mock.settleProduct.withArgs(EXPECTED_FUNDING_FEE).returns()
             await collateral.mock.settleAccount.withArgs(user.address, EXPECTED_FUNDING.mul(-1)).returns()
 
-            await expect(testFn()).to.emit(product, 'TakeOpened').withArgs(user.address, 1, POSITION)
+            await expect(openFn()).to.emit(product, 'TakeOpened').withArgs(user.address, 1, POSITION)
 
             await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
 
@@ -1316,7 +1324,7 @@ describe('Product', () => {
               .withArgs(user.address, TAKER_FEE.add(EXPECTED_FUNDING).mul(-1))
               .returns()
 
-            await expect(testFn()).to.emit(product, 'TakeOpened').withArgs(user.address, 1, POSITION)
+            await expect(openFn()).to.emit(product, 'TakeOpened').withArgs(user.address, 1, POSITION)
 
             await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
 
@@ -1361,7 +1369,7 @@ describe('Product', () => {
           })
 
           it('opens the position with settle after liquidation', async () => {
-            await testFn()
+            await openFn()
 
             await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
             await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
@@ -1371,7 +1379,7 @@ describe('Product', () => {
             // Liquidate the user
             await product.connect(collateralSigner).closeAll(user.address)
             // User can't open a new position yet
-            await expect(testFn()).to.be.revertedWith('ProductInLiquidationError()')
+            await expect(openFn()).to.be.revertedWith('ProductInLiquidationError()')
 
             // Advance version
             await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
@@ -1380,7 +1388,7 @@ describe('Product', () => {
             await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_3)
 
             // Liquidation flag is cleared during settle flow
-            await expect(testFn()).to.emit(product, 'TakeOpened').withArgs(user.address, 3, POSITION)
+            await expect(openFn()).to.emit(product, 'TakeOpened').withArgs(user.address, 3, POSITION)
           })
 
           it('reverts if taker > maker', async () => {
@@ -1392,22 +1400,22 @@ describe('Product', () => {
 
           it('reverts if double sided position', async () => {
             await product.connect(user).openMake(POSITION)
-            await expect(testFn()).to.be.revertedWith('ProductDoubleSidedError()')
+            await expect(openFn()).to.be.revertedWith('ProductDoubleSidedError()')
           })
 
           it('reverts if in liquidation', async () => {
             await product.connect(collateralSigner).closeAll(user.address)
-            await expect(testFn()).to.be.revertedWith('ProductInLiquidationError()')
+            await expect(openFn()).to.be.revertedWith('ProductInLiquidationError()')
           })
 
           it('reverts if paused', async () => {
             await controller.mock.paused.withArgs().returns(true)
-            await expect(testFn()).to.be.revertedWith('PausedError()')
+            await expect(openFn()).to.be.revertedWith('PausedError()')
           })
 
           it('reverts if closed', async () => {
             await product.updateClosed(true)
-            await expect(testFn()).to.be.revertedWith('ProductClosedError()')
+            await expect(openFn()).to.be.revertedWith('ProductClosedError()')
           })
         })
       })
@@ -2862,10 +2870,10 @@ describe('Product', () => {
       Object.entries({
         '#openMake': () => product.connect(user).openMake(POSITION),
         '#depositAndOpenMake': () => product.connect(user).depositAndOpenMake(COLLATERAL, POSITION),
-      }).forEach(([key, testFn]) => {
+      }).forEach(([key, openFn]) => {
         context(key, () => {
           it('opens the position', async () => {
-            await expect(testFn()).to.emit(product, 'MakeOpened').withArgs(user.address, 1, POSITION)
+            await expect(openFn()).to.emit(product, 'MakeOpened').withArgs(user.address, 1, POSITION)
 
             expect(await product.isClosed(user.address)).to.equal(false)
             expect(await product['maintenance(address)'](user.address)).to.equal(0)
@@ -2889,7 +2897,7 @@ describe('Product', () => {
           })
 
           it('opens the position and settles', async () => {
-            await expect(testFn()).to.emit(product, 'MakeOpened').withArgs(user.address, 1, POSITION)
+            await expect(openFn()).to.emit(product, 'MakeOpened').withArgs(user.address, 1, POSITION)
 
             await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
             await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
@@ -2925,9 +2933,9 @@ describe('Product', () => {
           })
 
           it('opens a second position (same version)', async () => {
-            await testFn()
+            await openFn()
 
-            await expect(testFn()).to.emit(product, 'MakeOpened').withArgs(user.address, 1, POSITION)
+            await expect(openFn()).to.emit(product, 'MakeOpened').withArgs(user.address, 1, POSITION)
 
             expect(await product.isClosed(user.address)).to.equal(false)
             expect(await product['maintenance(address)'](user.address)).to.equal(0)
@@ -2951,9 +2959,9 @@ describe('Product', () => {
           })
 
           it('opens a second position and settles (same version)', async () => {
-            await testFn()
+            await openFn()
 
-            await expect(testFn()).to.emit(product, 'MakeOpened').withArgs(user.address, 1, POSITION)
+            await expect(openFn()).to.emit(product, 'MakeOpened').withArgs(user.address, 1, POSITION)
 
             await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
             await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
@@ -2989,14 +2997,14 @@ describe('Product', () => {
           })
 
           it('opens a second position (next version)', async () => {
-            await testFn()
+            await openFn()
 
             await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
             await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
             await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
             await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_2)
 
-            await expect(testFn()).to.emit(product, 'MakeOpened').withArgs(user.address, 2, POSITION)
+            await expect(openFn()).to.emit(product, 'MakeOpened').withArgs(user.address, 2, POSITION)
 
             expect(await product.isClosed(user.address)).to.equal(false)
             expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('615'))
@@ -3021,14 +3029,14 @@ describe('Product', () => {
           })
 
           it('opens a second position and settles (next version)', async () => {
-            await testFn()
+            await openFn()
 
             await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
             await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
             await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
             await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_2)
 
-            await expect(testFn()).to.emit(product, 'MakeOpened').withArgs(user.address, 2, POSITION)
+            await expect(openFn()).to.emit(product, 'MakeOpened').withArgs(user.address, 2, POSITION)
 
             await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
             await oracle.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
@@ -3064,7 +3072,7 @@ describe('Product', () => {
           })
 
           it('opens the position and settles later', async () => {
-            await expect(testFn()).to.emit(product, 'MakeOpened').withArgs(user.address, 1, POSITION)
+            await expect(openFn()).to.emit(product, 'MakeOpened').withArgs(user.address, 1, POSITION)
 
             await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
 
@@ -3109,7 +3117,7 @@ describe('Product', () => {
             await collateral.mock.settleProduct.withArgs(MAKER_FEE).returns()
             await collateral.mock.settleAccount.withArgs(user.address, MAKER_FEE.mul(-1)).returns()
 
-            await expect(testFn()).to.emit(product, 'MakeOpened').withArgs(user.address, 1, POSITION)
+            await expect(openFn()).to.emit(product, 'MakeOpened').withArgs(user.address, 1, POSITION)
 
             await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
 
@@ -3148,7 +3156,7 @@ describe('Product', () => {
           })
 
           it('opens the position with settle after liquidation', async () => {
-            await testFn()
+            await openFn()
 
             await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
             await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
@@ -3158,7 +3166,7 @@ describe('Product', () => {
             // Liquidate the user
             await product.connect(collateralSigner).closeAll(user.address)
             // User can't open a new position yet
-            await expect(testFn()).to.be.revertedWith('ProductInLiquidationError()')
+            await expect(openFn()).to.be.revertedWith('ProductInLiquidationError()')
 
             // Advance version
             await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
@@ -3167,47 +3175,47 @@ describe('Product', () => {
             await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_3)
 
             // Liquidation flag is cleared during settle flow
-            await expect(testFn()).to.emit(product, 'MakeOpened').withArgs(user.address, 3, POSITION)
+            await expect(openFn()).to.emit(product, 'MakeOpened').withArgs(user.address, 3, POSITION)
           })
 
           it('reverts if oracle not bootstrapped', async () => {
             await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_0)
             await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_0)
 
-            await expect(testFn()).to.be.revertedWith('ProductOracleBootstrappingError()')
+            await expect(openFn()).to.be.revertedWith('ProductOracleBootstrappingError()')
           })
 
           it('reverts if can liquidate', async () => {
             await collateral.mock.liquidatableNext.withArgs(user.address, product.address).returns(true)
 
-            await expect(testFn()).to.be.revertedWith('ProductInsufficientCollateralError()')
+            await expect(openFn()).to.be.revertedWith('ProductInsufficientCollateralError()')
           })
 
           it('reverts if double sided position', async () => {
             await product.connect(userB).openMake(POSITION.mul(2))
             await product.connect(user).openTake(POSITION)
 
-            await expect(testFn()).to.be.revertedWith('ProductDoubleSidedError()')
+            await expect(openFn()).to.be.revertedWith('ProductDoubleSidedError()')
           })
 
           it('reverts if in liquidation', async () => {
             await product.connect(collateralSigner).closeAll(user.address)
-            await expect(testFn()).to.be.revertedWith('ProductInLiquidationError()')
+            await expect(openFn()).to.be.revertedWith('ProductInLiquidationError()')
           })
 
           it('reverts if paused', async () => {
             await controller.mock.paused.withArgs().returns(true)
-            await expect(testFn()).to.be.revertedWith('PausedError()')
+            await expect(openFn()).to.be.revertedWith('PausedError()')
           })
 
           it('reverts if over maker limit', async () => {
             await product.updateMakerLimit(POSITION.div(2))
-            await expect(testFn()).to.be.revertedWith('ProductMakerOverLimitError()')
+            await expect(openFn()).to.be.revertedWith('ProductMakerOverLimitError()')
           })
 
           it('reverts if closed', async () => {
             await product.updateClosed(true)
-            await expect(testFn()).to.be.revertedWith('ProductClosedError()')
+            await expect(openFn()).to.be.revertedWith('ProductClosedError()')
           })
         })
       })
@@ -3617,14 +3625,14 @@ describe('Product', () => {
       Object.entries({
         '#openTake': () => product.connect(user).openTake(POSITION),
         '#depositAndOpenTake': () => product.connect(user).depositAndOpenTake(COLLATERAL, POSITION),
-      }).forEach(([key, testFn]) => {
+      }).forEach(([key, openFn]) => {
         context(key, () => {
           beforeEach(async () => {
             await product.connect(userB).openMake(POSITION.mul(2))
           })
 
           it('opens the position', async () => {
-            await expect(testFn()).to.emit(product, 'TakeOpened').withArgs(user.address, 1, POSITION)
+            await expect(openFn()).to.emit(product, 'TakeOpened').withArgs(user.address, 1, POSITION)
 
             expect(await product.isClosed(user.address)).to.equal(false)
             expect(await product['maintenance(address)'](user.address)).to.equal(0)
@@ -3648,7 +3656,7 @@ describe('Product', () => {
           })
 
           it('opens the position and settles', async () => {
-            await expect(testFn()).to.emit(product, 'TakeOpened').withArgs(user.address, 1, POSITION)
+            await expect(openFn()).to.emit(product, 'TakeOpened').withArgs(user.address, 1, POSITION)
 
             await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
             await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
@@ -3684,9 +3692,9 @@ describe('Product', () => {
           })
 
           it('opens a second position (same version)', async () => {
-            await testFn()
+            await openFn()
 
-            await expect(testFn()).to.emit(product, 'TakeOpened').withArgs(user.address, 1, POSITION)
+            await expect(openFn()).to.emit(product, 'TakeOpened').withArgs(user.address, 1, POSITION)
 
             expect(await product.isClosed(user.address)).to.equal(false)
             expect(await product['maintenance(address)'](user.address)).to.equal(0)
@@ -3710,9 +3718,9 @@ describe('Product', () => {
           })
 
           it('opens a second position and settles (same version)', async () => {
-            await testFn()
+            await openFn()
 
-            await expect(testFn()).to.emit(product, 'TakeOpened').withArgs(user.address, 1, POSITION)
+            await expect(openFn()).to.emit(product, 'TakeOpened').withArgs(user.address, 1, POSITION)
 
             await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
             await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
@@ -3748,14 +3756,14 @@ describe('Product', () => {
           })
 
           it('opens a second position (next version)', async () => {
-            await testFn()
+            await openFn()
 
             await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
             await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
             await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
             await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_2)
 
-            await expect(testFn()).to.emit(product, 'TakeOpened').withArgs(user.address, 2, POSITION)
+            await expect(openFn()).to.emit(product, 'TakeOpened').withArgs(user.address, 2, POSITION)
 
             expect(await product.isClosed(user.address)).to.equal(false)
             expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('615'))
@@ -3789,14 +3797,14 @@ describe('Product', () => {
             await collateral.mock.settleProduct.withArgs(EXPECTED_FUNDING_FEE).returns()
             await collateral.mock.settleAccount.withArgs(user.address, EXPECTED_FUNDING.mul(-1)).returns()
 
-            await testFn()
+            await openFn()
 
             await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
             await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
             await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
             await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_2)
 
-            await expect(testFn()).to.emit(product, 'TakeOpened').withArgs(user.address, 2, POSITION)
+            await expect(openFn()).to.emit(product, 'TakeOpened').withArgs(user.address, 2, POSITION)
 
             await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
             await oracle.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
@@ -3847,7 +3855,7 @@ describe('Product', () => {
             await collateral.mock.settleProduct.withArgs(EXPECTED_FUNDING_FEE).returns()
             await collateral.mock.settleAccount.withArgs(user.address, EXPECTED_FUNDING.mul(-1)).returns()
 
-            await expect(testFn()).to.emit(product, 'TakeOpened').withArgs(user.address, 1, POSITION)
+            await expect(openFn()).to.emit(product, 'TakeOpened').withArgs(user.address, 1, POSITION)
 
             await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
 
@@ -3907,7 +3915,7 @@ describe('Product', () => {
               .withArgs(user.address, TAKER_FEE.add(EXPECTED_FUNDING).mul(-1))
               .returns()
 
-            await expect(testFn()).to.emit(product, 'TakeOpened').withArgs(user.address, 1, POSITION)
+            await expect(openFn()).to.emit(product, 'TakeOpened').withArgs(user.address, 1, POSITION)
 
             await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
 
@@ -3952,7 +3960,7 @@ describe('Product', () => {
           })
 
           it('opens the position with settle after liquidation', async () => {
-            await testFn()
+            await openFn()
 
             await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
             await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
@@ -3962,7 +3970,7 @@ describe('Product', () => {
             // Liquidate the user
             await product.connect(collateralSigner).closeAll(user.address)
             // User can't open a new position yet
-            await expect(testFn()).to.be.revertedWith('ProductInLiquidationError()')
+            await expect(openFn()).to.be.revertedWith('ProductInLiquidationError()')
 
             // Advance version
             await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
@@ -3971,13 +3979,13 @@ describe('Product', () => {
             await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_3)
 
             // Liquidation flag is cleared during settle flow
-            await expect(testFn()).to.emit(product, 'TakeOpened').withArgs(user.address, 3, POSITION)
+            await expect(openFn()).to.emit(product, 'TakeOpened').withArgs(user.address, 3, POSITION)
           })
 
           it('reverts if can liquidate', async () => {
             await collateral.mock.liquidatableNext.withArgs(user.address, product.address).returns(true)
 
-            await expect(testFn()).to.be.revertedWith('ProductInsufficientCollateralError()')
+            await expect(openFn()).to.be.revertedWith('ProductInsufficientCollateralError()')
           })
 
           it('reverts if taker > maker', async () => {
@@ -3989,22 +3997,22 @@ describe('Product', () => {
 
           it('reverts if double sided position', async () => {
             await product.connect(user).openMake(POSITION)
-            await expect(testFn()).to.be.revertedWith('ProductDoubleSidedError()')
+            await expect(openFn()).to.be.revertedWith('ProductDoubleSidedError()')
           })
 
           it('reverts if in liquidation', async () => {
             await product.connect(collateralSigner).closeAll(user.address)
-            await expect(testFn()).to.be.revertedWith('ProductInLiquidationError()')
+            await expect(openFn()).to.be.revertedWith('ProductInLiquidationError()')
           })
 
           it('reverts if paused', async () => {
             await controller.mock.paused.withArgs().returns(true)
-            await expect(testFn()).to.be.revertedWith('PausedError()')
+            await expect(openFn()).to.be.revertedWith('PausedError()')
           })
 
           it('reverts if closed', async () => {
             await product.updateClosed(true)
-            await expect(testFn()).to.be.revertedWith('ProductClosedError()')
+            await expect(openFn()).to.be.revertedWith('ProductClosedError()')
           })
         })
       })
