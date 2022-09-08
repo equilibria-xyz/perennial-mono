@@ -197,5 +197,8 @@ describe('Lens', () => {
     )
     expect(incentiveRewards.tokens[0].toLowerCase()).to.equal(incentiveToken.address.toLowerCase())
     expect(incentiveRewards.amounts[0]).to.equal('188786008230451956')
+    const prices = await lens.callStatic.pricesAtVersions(product.address, [2472, 2475])
+    expect(prices[0]).to.equal('11388297509860897871140900')
+    expect(prices[1]).to.equal('11628475351618010828602500')
   })
 })

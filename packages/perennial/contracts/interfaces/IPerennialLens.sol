@@ -23,6 +23,8 @@ interface IPerennialLens {
     function userPosition(address account, IProduct product) external returns (PrePosition memory, Position memory);
     function globalPosition(IProduct product) external returns (PrePosition memory, Position memory);
     function price(IProduct product) external returns (Fixed18);
+    function priceAtVersion(IProduct product, uint version) external returns (Fixed18);
+    function pricesAtVersions(IProduct product, uint[] memory versions) external returns (Fixed18[] memory prices);
     function fees(IProduct product) external returns (UFixed18 protocolFees, UFixed18 productFees);
     function fees(address account, IProduct[] memory products) external returns (UFixed18);
     function openInterest(address account, IProduct product) external returns (Position memory);

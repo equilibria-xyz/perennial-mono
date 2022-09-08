@@ -188,6 +188,20 @@ contract PerennialLens is IPerennialLens {
     }
 
     /**
+     * @notice Prices of product at specified versions after settle
+     * @param product Product address
+     * @param versions Oracle versions to query
+     * @return prices Product prices at specified versions
+     */
+    function pricesAtVersions(IProduct product, uint[] memory versions)
+    external settle(product) returns (Fixed18[] memory prices) {
+        prices = new Fixed18[](versions.length);
+        for (uint256 i = 0; i < versions.length; i++) {
+            prices[i] = product.atVersion(versions[i]).price;
+        }
+    }
+
+    /**
      * @notice Fees accumulated by product and protocol treasuries after settle
      * @param product Product address
      * @return protocolFees fees accrued by the protocol
