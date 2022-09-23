@@ -34,41 +34,44 @@ describe('Lens', () => {
     await product.connect(userB).openTake(POSITION)
 
     // Returns the product name
-    expect(await lens.callStatic.name(product.address)).to.equal('Squeeth')
+    const info = await lens.callStatic.info(product.address)
+    expect(info.name).to.equal('Squeeth')
     // Returns the product symbol
-    expect(await lens.callStatic.symbol(product.address)).to.equal('SQTH')
+    expect(info.symbol).to.equal('SQTH')
     // Returns collateral address
     expect(await lens.callStatic['collateral()']()).to.equal(collateral.address)
 
     // PrePositions should exist for user and userB
-    let globalPre = await lens.callStatic['pre(address)'](product.address)
-    let globalPosition = await lens.callStatic.globalPosition(product.address)
+    let productSnapshot = (await lens.callStatic['snapshots(address[])']([product.address]))[0]
+    let globalPre = productSnapshot.pre
+    let globalPosition = productSnapshot.position
     expectPrePositionEq(globalPre, {
       openPosition: { maker: POSITION, taker: POSITION },
       closePosition: { maker: 0, taker: 0 },
       oracleVersion: 2472,
     })
-    expectPrePositionEq(globalPosition[0], globalPre)
-    expectPositionEq(globalPosition[1], { maker: 0, taker: 0 })
+    expectPositionEq(globalPosition, { maker: 0, taker: 0 })
+    expect(productSnapshot.latestVersion.price).to.equal('11388297509860897871140900')
+    expect(productSnapshot.rate).to.equal(utils.parseEther('5.00').div(SECONDS_IN_YEAR))
+    expect(productSnapshot.dailyRate).to.equal(utils.parseEther('5.00').div(SECONDS_IN_YEAR).mul(SECONDS_IN_DAY))
+    expectPositionEq(productSnapshot.openInterest, {
+      maker: 0,
+      taker: 0,
+    })
 
-    let userPre = await lens.callStatic['pre(address,address)'](user.address, product.address)
-    let userPosition = await lens.callStatic.userPosition(user.address, product.address)
+    let userSnapshot = (await lens.callStatic['snapshots(address,address[])'](user.address, [product.address]))[0]
+    let userPre = userSnapshot.pre
+    let userPosition = userSnapshot.position
     expectPrePositionEq(userPre, {
       openPosition: { maker: POSITION, taker: 0 },
       closePosition: { maker: 0, taker: 0 },
       oracleVersion: 2472,
     })
-    expectPrePositionEq(userPosition[0], userPre)
-    expectPositionEq(userPosition[1], { maker: 0, taker: 0 })
+    expectPositionEq(userPosition, { maker: 0, taker: 0 })
+    expect(userSnapshot.maintenance).to.equal('341648925295826936134')
     expect(await lens.callStatic.maintenanceRequired(user.address, product.address, 1000)).to.equal('3416489252')
-    expect(await lens.callStatic.maintenance(user.address, product.address)).to.equal('341648925295826936134')
-    expect(await lens.callStatic.price(product.address)).to.equal('11388297509860897871140900')
-    expect(await lens.callStatic.priceAtVersion(product.address, 2472)).to.equal('11388297509860897871140900')
-    expect(await lens.callStatic.rate(product.address)).to.equal(utils.parseEther('5.00').div(SECONDS_IN_YEAR))
-    expect(await lens.callStatic.dailyRate(product.address)).to.equal(
-      utils.parseEther('5.00').div(SECONDS_IN_YEAR).mul(SECONDS_IN_DAY),
-    )
-    expectPositionEq(await lens.callStatic['openInterest(address,address)'](user.address, product.address), {
+
+    expectPositionEq(userSnapshot.openInterest, {
       maker: 0,
       taker: 0,
     })
@@ -76,53 +79,51 @@ describe('Lens', () => {
       maker: 0,
       taker: 0,
     })
-    expectPositionEq(await lens.callStatic['openInterest(address)'](product.address), {
-      maker: 0,
-      taker: 0,
-    })
 
     await chainlink.next() // Update the price
 
     // PrePositions are zeroed out after price update and settlement
-    globalPre = await lens.callStatic['pre(address)'](product.address)
-    globalPosition = await lens.callStatic.globalPosition(product.address)
+    productSnapshot = await lens.callStatic['snapshot(address)'](product.address)
+    globalPre = productSnapshot.pre
+    globalPosition = productSnapshot.position
     expectPrePositionEq(globalPre, {
       openPosition: { maker: 0, taker: 0 },
       closePosition: { maker: 0, taker: 0 },
       oracleVersion: 0,
     })
-    expectPrePositionEq(globalPosition[0], globalPre)
 
-    userPre = await lens.callStatic['pre(address,address)'](user.address, product.address)
-    userPosition = await lens.callStatic.userPosition(user.address, product.address)
+    userSnapshot = await lens.callStatic['snapshot(address,address)'](user.address, product.address)
+    userPre = userSnapshot.pre
+    userPosition = userSnapshot.position
     expectPrePositionEq(userPre, {
       openPosition: { maker: 0, taker: 0 },
       closePosition: { maker: 0, taker: 0 },
       oracleVersion: 0,
     })
-    expectPrePositionEq(userPosition[0], userPre)
 
     // Pre -> Position
-    expectPositionEq(await lens.callStatic['position(address)'](product.address), {
+    expectPositionEq(globalPosition, {
       maker: POSITION,
       taker: POSITION,
     })
-    expectPositionEq(globalPosition[1], { maker: POSITION, taker: POSITION })
-    expectPositionEq(await lens.callStatic['position(address,address)'](user.address, product.address), {
+    expectPositionEq(userPosition, {
       maker: POSITION,
       taker: 0,
     })
-    expectPositionEq(userPosition[1], { maker: POSITION, taker: 0 })
-    expectPositionEq(await lens.callStatic['position(address,address)'](userB.address, product.address), {
-      maker: 0,
-      taker: POSITION,
+
+    const userBPosition = await lens.callStatic.userPosition(userB.address, product.address)
+    expectPrePositionEq(userBPosition[0], {
+      openPosition: { maker: 0, taker: 0 },
+      closePosition: { maker: 0, taker: 0 },
+      oracleVersion: 0,
     })
+    expectPositionEq(userBPosition[1], { maker: 0, taker: POSITION })
 
     // Maintenance required is updated
     expect(await lens.callStatic.maintenanceRequired(user.address, product.address, 1000)).to.equal('3413894945')
     expect(await lens.callStatic.maintenance(user.address, product.address)).to.equal('341389494586618956214')
     // Price is updated
-    expect(await lens.callStatic.price(product.address)).to.equal('11379649819553965207140100')
+    expect((await lens.callStatic.latestVersion(product.address)).price).to.equal('11379649819553965207140100')
     // Rate is updated
     expect(await lens.callStatic.rate(product.address)).to.equal(utils.parseEther('5.00').div(SECONDS_IN_YEAR))
     expect(await lens.callStatic.dailyRate(product.address)).to.equal(
@@ -150,7 +151,7 @@ describe('Lens', () => {
     let fees = await lens.callStatic['fees(address)'](product.address)
     expect(fees.protocolFees).to.equal(0)
     expect(fees.productFees).to.equal(0)
-    expect(await lens.callStatic['fees(address,address[])'](treasuryA.address, [product.address])).to.equal(0)
+    expect(await lens.callStatic['fees(address,address)'](treasuryA.address, product.address)).to.equal(0)
 
     // Big price change
     await chainlink.nextWithPriceModification(price => price.mul(2))
@@ -172,7 +173,7 @@ describe('Lens', () => {
     fees = await lens.callStatic['fees(address)'](product.address)
     expect(fees.protocolFees).to.equal('4127179883640059')
     expect(fees.productFees).to.equal('12381539650920179')
-    expect(await lens.callStatic['fees(address,address[])'](treasuryA.address, [product.address])).to.equal(
+    expect(await lens.callStatic['fees(address,address)'](treasuryA.address, product.address)).to.equal(
       '4127179883640059',
     )
 
@@ -197,8 +198,8 @@ describe('Lens', () => {
     )
     expect(incentiveRewards.tokens[0].toLowerCase()).to.equal(incentiveToken.address.toLowerCase())
     expect(incentiveRewards.amounts[0]).to.equal('188786008230451956')
-    const prices = await lens.callStatic.pricesAtVersions(product.address, [2472, 2475])
-    expect(prices[0]).to.equal('11388297509860897871140900')
-    expect(prices[1]).to.equal('11628475351618010828602500')
+    const prices = await lens.callStatic.atVersions(product.address, [2472, 2475])
+    expect(prices[0].price).to.equal('11388297509860897871140900')
+    expect(prices[1].price).to.equal('11628475351618010828602500')
   })
 })

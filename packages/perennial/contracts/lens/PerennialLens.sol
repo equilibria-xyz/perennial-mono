@@ -20,24 +20,6 @@ contract PerennialLens is IPerennialLens {
     }
 
     /**
-     * @notice Returns the name of the provided `product`
-     * @param product Product address
-     * @return Name of the product
-     */
-    function name(IProduct product) external view returns (string memory) {
-        return product.name();
-    }
-
-    /**
-     * @notice Returns the symbol of the provided `product`
-     * @param product Product address
-     * @return Symbol of the product
-     */
-    function symbol(IProduct product) external view returns (string memory) {
-        return product.symbol();
-    }
-
-    /**
      * @notice Protocol collateral address
      * @return Protocol collateral address
      */
@@ -46,13 +28,135 @@ contract PerennialLens is IPerennialLens {
     }
 
     /**
-     * @notice User collateral amount for product after settle
-     * @param account Account address
-     * @param product Product address
-     * @return User deposited collateral for product
+     *  Snapshot Functions
      */
-    function collateral(address account, IProduct product) external settleAccount(account, product) returns (UFixed18) {
-        return collateral().collateral(account, product);
+
+    /**
+     * @notice Returns the snapshots of the provided `productAddresses`
+     * @param productAddresses Product addresses
+     * @return Snapshot for each product after settle
+     */
+    function snapshots(IProduct[] calldata productAddresses) public returns (ProductSnapshot[] memory) {
+        ProductSnapshot[] memory _snapshots = new ProductSnapshot[](productAddresses.length);
+        for (uint256 i = 0; i < productAddresses.length; i++) {
+            _snapshots[i] = snapshot(productAddresses[i]);
+        }
+
+        return _snapshots;
+    }
+
+    /**
+     * @notice Returns the snapshot of the provided `product`
+     * @param product Product address
+     * @return Snapshot for the product after settle
+     */
+    function snapshot(IProduct product) public settle(product) returns (ProductSnapshot memory) {
+        ProductSnapshot memory _snapshot;
+
+        _snapshot.productInfo = info(product);
+        _snapshot.productAddress = address(product);
+        _snapshot.rate = rate(product);
+        _snapshot.dailyRate = dailyRate(product);
+        _snapshot.latestVersion = latestVersion(product);
+        _snapshot.maintenance = product.maintenance();
+        _snapshot.collateral = collateral(product);
+        _snapshot.shortfall = shortfall(product);
+        _snapshot.pre = pre(product);
+        _snapshot.position = position(product);
+        (UFixed18 productFee, UFixed18 protocolFee) = fees(product);
+        _snapshot.productFee = productFee;
+        _snapshot.protocolFee = protocolFee;
+        _snapshot.openInterest = openInterest(product);
+
+        return _snapshot;
+    }
+
+    /**
+     * @notice Returns the user snapshots for the provided `productAddresses`
+     * @param account User addresses
+     * @param productAddresses Product addresses
+     * @return UserSnapshot for each product after settle
+     */
+    function snapshots(address account, IProduct[] memory productAddresses)
+        public returns (UserProductSnapshot[] memory)
+    {
+        UserProductSnapshot[] memory _snapshots = new UserProductSnapshot[](productAddresses.length);
+        for (uint256 i = 0; i < productAddresses.length; i++) {
+            _snapshots[i] = snapshot(account, productAddresses[i]);
+        }
+
+        return _snapshots;
+    }
+
+    /**
+     * @notice Returns the user snapshot for the provided `product`
+     * @param account User addresses
+     * @param product Product address
+     * @return UserSnapshot for the product after settle
+     */
+    function snapshot(address account, IProduct product)
+        public
+        settleAccount(account, product)
+        returns (UserProductSnapshot memory)
+    {
+        UserProductSnapshot memory _snapshot;
+
+        _snapshot.productAddress = address(product);
+        _snapshot.userAddress = account;
+        _snapshot.collateral = collateral(account, product);
+        _snapshot.maintenance = maintenance(account, product);
+        _snapshot.pre = pre(account, product);
+        _snapshot.position = position(account, product);
+        _snapshot.liquidatable = liquidatable(account, product);
+        _snapshot.openInterest = openInterest(account, product);
+        _snapshot.fees = fees(account, product);
+        _snapshot.exposure = exposure(account, product);
+
+        return _snapshot;
+    }
+
+    /**
+     *  End Snapshot Functions
+     */
+
+    /**
+     *  Product Individual Fields Functions
+     */
+
+    /**
+     * @notice Returns the name of the provided `product`
+     * @param product Product address
+     * @return Name of the product
+     */
+    function name(IProduct product) public view returns (string memory) {
+        return product.name();
+    }
+
+    /**
+     * @notice Returns the symbol of the provided `product`
+     * @param product Product address
+     * @return Symbol of the product
+     */
+    function symbol(IProduct product) public view returns (string memory) {
+        return product.symbol();
+    }
+
+    /**
+     * @notice Returns the info of the provided `product`
+     * @param product Product address
+     * @return _info of the product
+     */
+    function info(IProduct product) public view returns (IProduct.ProductInfo memory _info) {
+        _info.name = name(product);
+        _info.symbol = symbol(product);
+        _info.payoffDefinition = product.payoffDefinition();
+        _info.oracle = product.oracle();
+        _info.maintenance = product.maintenance();
+        _info.fundingFee = product.fundingFee();
+        _info.makerFee = product.makerFee();
+        _info.takerFee = product.takerFee();
+        _info.makerLimit = product.makerLimit();
+        _info.utilizationCurve = product.utilizationCurve();
     }
 
     /**
@@ -60,7 +164,7 @@ contract PerennialLens is IPerennialLens {
      * @param product Product address
      * @return Total collateral for product
      */
-    function collateral(IProduct product) external settle(product) returns (UFixed18) {
+    function collateral(IProduct product) public settle(product) returns (UFixed18) {
         return collateral().collateral(product);
     }
 
@@ -69,8 +173,123 @@ contract PerennialLens is IPerennialLens {
      * @param product Product address
      * @return Total shortfall for product
      */
-    function shortfall(IProduct product) external settle(product) returns (UFixed18) {
+    function shortfall(IProduct product) public settle(product) returns (UFixed18) {
         return collateral().shortfall(product);
+    }
+
+    /**
+     * @notice Product pre position after settle
+     * @param product Product address
+     * @return Product pre-position
+     */
+    function pre(IProduct product) public settle(product) returns (PrePosition memory) {
+        return product.pre();
+    }
+
+    /**
+     * @notice Product position after settle
+     * @param product Product address
+     * @return product position
+     */
+    function position(IProduct product) public settle(product) returns (Position memory) {
+        return _latestPosition(product);
+    }
+
+    /**
+     * @notice Product pre-position and position after settle
+     * @param product Product address
+     * @return Product pre-position
+     * @return Product position
+     */
+    function globalPosition(IProduct product) public settle(product) returns (PrePosition memory, Position memory) {
+        return (product.pre(), _latestPosition(product));
+    }
+
+    /**
+     * @notice Current price of product after settle
+     * @param product Product address
+     * @return Product latest price
+     */
+    function latestVersion(IProduct product) public settle(product) returns (IOracleProvider.OracleVersion memory) {
+        return _latestVersion(product);
+    }
+
+    /**
+     * @notice Prices of product at specified versions after settle
+     * @param product Product address
+     * @param versions Oracle versions to query
+     * @return prices Product prices at specified versions
+     */
+    function atVersions(IProduct product, uint256[] memory versions)
+        public
+        settle(product)
+        returns (IOracleProvider.OracleVersion[] memory prices)
+    {
+        prices = new IOracleProvider.OracleVersion[](versions.length);
+        for (uint256 i = 0; i < versions.length; i++) {
+            prices[i] = product.atVersion(versions[i]);
+        }
+    }
+
+    /**
+     * @notice Product funding rate after settle
+     * @param product Product address
+     * @return Product current funding rate
+     */
+    function rate(IProduct product) public settle(product) returns (Fixed18) {
+        Position memory position_ = _latestPosition(product);
+        return product.rate(position_);
+    }
+
+    /**
+     * @notice Product funding extrapolated to a daily rate after settle
+     * @param product Product address
+     * @return Product current funding extrapolated to a daily rate
+     */
+    function dailyRate(IProduct product) public settle(product) returns (Fixed18) {
+        Position memory position_ = _latestPosition(product);
+        return product.rate(position_).mul(Fixed18Lib.from(60 * 60 * 24));
+    }
+
+    /**
+     * @notice Fees accumulated by product and protocol treasuries after settle
+     * @param product Product address
+     * @return protocolFees fees accrued by the protocol
+     * @return productFees fees accrued by the product owner
+     */
+    function fees(IProduct product) public settle(product) returns (UFixed18 protocolFees, UFixed18 productFees) {
+        address protocolTreasury = controller.treasury();
+        address productTreasury = controller.treasury(product);
+
+        protocolFees = collateral().fees(protocolTreasury);
+        productFees = collateral().fees(productTreasury);
+    }
+
+    /**
+     * @notice Product total open interest after settle
+     * @param product Product address
+     * @return Product maker and taker position multiplied by latest price after settle
+     */
+    function openInterest(IProduct product) public settle(product) returns (Position memory) {
+        return _latestPosition(product).mul(_latestVersion(product).price.abs());
+    }
+
+    /**
+     *  End Product Individual Fields Functions
+     */
+
+    /**
+     *  UserProduct Individual Fields Functions
+     */
+
+    /**
+     * @notice User collateral amount for product after settle
+     * @param account Account address
+     * @param product Product address
+     * @return User deposited collateral for product
+     */
+    function collateral(address account, IProduct product) public settleAccount(account, product) returns (UFixed18) {
+        return collateral().collateral(account, product);
     }
 
     /**
@@ -79,11 +298,7 @@ contract PerennialLens is IPerennialLens {
      * @param product Product address
      * @return Maximum of user maintenance, and maintenanceNext
      */
-    function maintenance(address account, IProduct product)
-        external
-        settleAccount(account, product)
-        returns (UFixed18)
-    {
+    function maintenance(address account, IProduct product) public settleAccount(account, product) returns (UFixed18) {
         return UFixed18Lib.max(product.maintenance(account), product.maintenanceNext(account));
     }
 
@@ -93,7 +308,7 @@ contract PerennialLens is IPerennialLens {
      * @param product Product address
      * @return Whether or not the user's position eligible to be liquidated
      */
-    function liquidatable(address account, IProduct product) external settleAccount(account, product) returns (bool) {
+    function liquidatable(address account, IProduct product) public settleAccount(account, product) returns (bool) {
         return collateral().liquidatable(account, product);
     }
 
@@ -104,20 +319,11 @@ contract PerennialLens is IPerennialLens {
      * @return User pre-position
      */
     function pre(address account, IProduct product)
-        external
+        public
         settleAccount(account, product)
         returns (PrePosition memory)
     {
         return product.pre(account);
-    }
-
-    /**
-     * @notice Product pre position after settle
-     * @param product Product address
-     * @return Product pre-position
-     */
-    function pre(IProduct product) external settle(product) returns (PrePosition memory) {
-        return product.pre();
     }
 
     /**
@@ -127,20 +333,11 @@ contract PerennialLens is IPerennialLens {
      * @return User position
      */
     function position(address account, IProduct product)
-        external
+        public
         settleAccount(account, product)
         returns (Position memory)
     {
         return product.position(account);
-    }
-
-    /**
-     * @notice Product position after settle
-     * @param product Product address
-     * @return product position
-     */
-    function position(IProduct product) external settle(product) returns (Position memory) {
-        return _latestPosition(product);
     }
 
     /**
@@ -151,7 +348,7 @@ contract PerennialLens is IPerennialLens {
      * @return User position
      */
     function userPosition(address account, IProduct product)
-        external
+        public
         settleAccount(account, product)
         returns (PrePosition memory, Position memory)
     {
@@ -159,73 +356,12 @@ contract PerennialLens is IPerennialLens {
     }
 
     /**
-     * @notice Product pre-position and position after settle
-     * @param product Product address
-     * @return Product pre-position
-     * @return Product position
-     */
-    function globalPosition(IProduct product) external settle(product) returns (PrePosition memory, Position memory) {
-        return (product.pre(), _latestPosition(product));
-    }
-
-    /**
-     * @notice Current price of product after settle
-     * @param product Product address
-     * @return Product latest price
-     */
-    function price(IProduct product) external settle(product) returns (Fixed18) {
-        return _latestVersion(product).price;
-    }
-
-    /**
-     * @notice Current price of product at specified version after settle
-     * @param product Product address
-     * @param version Oracle version
-     * @return Product price at specified version
-     */
-    function priceAtVersion(IProduct product, uint version) external settle(product) returns (Fixed18) {
-        return product.atVersion(version).price;
-    }
-
-    /**
-     * @notice Prices of product at specified versions after settle
-     * @param product Product address
-     * @param versions Oracle versions to query
-     * @return prices Product prices at specified versions
-     */
-    function pricesAtVersions(IProduct product, uint[] memory versions)
-    external settle(product) returns (Fixed18[] memory prices) {
-        prices = new Fixed18[](versions.length);
-        for (uint256 i = 0; i < versions.length; i++) {
-            prices[i] = product.atVersion(versions[i]).price;
-        }
-    }
-
-    /**
-     * @notice Fees accumulated by product and protocol treasuries after settle
-     * @param product Product address
-     * @return protocolFees fees accrued by the protocol
-     * @return productFees fees accrued by the product owner
-     */
-    function fees(IProduct product) external settle(product) returns (UFixed18 protocolFees, UFixed18 productFees) {
-        address protocolTreasury = controller.treasury();
-        address productTreasury = controller.treasury(product);
-
-        protocolFees = collateral().fees(protocolTreasury);
-        productFees = collateral().fees(productTreasury);
-    }
-
-    /**
-     * @notice Fees accumulated by treasury after settle
+     * @notice Fees accumulated by account after settle
      * @param account Account address
-     * @param products Product addresses
+     * @param product Product address
      * @return sum of all fees accrued by the account
      */
-    function fees(address account, IProduct[] memory products) external returns (UFixed18) {
-        for (uint256 i = 0; i < products.length; i++) {
-            products[i].settle();
-        }
-
+    function fees(address account, IProduct product) public settleAccount(account, product) returns (UFixed18) {
         return collateral().fees(account);
     }
 
@@ -236,7 +372,7 @@ contract PerennialLens is IPerennialLens {
      * @return User's maker or taker position multiplied by latest price after settle
      */
     function openInterest(address account, IProduct product)
-        external
+        public
         settleAccount(account, product)
         returns (Position memory)
     {
@@ -244,32 +380,19 @@ contract PerennialLens is IPerennialLens {
     }
 
     /**
-     * @notice Product total open interest after settle
+     * @notice User's exposure in product after settle
+     * @param account Account address
      * @param product Product address
-     * @return Product maker and taker position multiplied by latest price after settle
+     * @return User's exposure (openInterest * utilization) after settle
      */
-    function openInterest(IProduct product) external settle(product) returns (Position memory) {
-        return _latestPosition(product).mul(_latestVersion(product).price.abs());
-    }
+    function exposure(address account, IProduct product) public settleAccount(account, product) returns (UFixed18) {
+        (, Position memory _pos) = globalPosition(product);
+        if (_pos.maker.eq(UFixed18Lib.ZERO)) { return UFixed18Lib.ZERO; }
 
-    /**
-     * @notice Product funding rate after settle
-     * @param product Product address
-     * @return Product current funding rate
-     */
-    function rate(IProduct product) external settle(product) returns (Fixed18) {
-        Position memory position_ = _latestPosition(product);
-        return product.rate(position_);
-    }
+        UFixed18 utilization = _pos.taker.div(_pos.maker);
+        Position memory _openInterest = openInterest(account, product);
 
-    /**
-     * @notice Product funding extrapolated to a daily rate after settle
-     * @param product Product address
-     * @return Product current funding extrapolated to a daily rate
-     */
-    function dailyRate(IProduct product) external settle(product) returns (Fixed18) {
-        Position memory position_ = _latestPosition(product);
-        return product.rate(position_).mul(Fixed18Lib.from(60 * 60 * 24));
+        return utilization.mul(_openInterest.maker.gte(UFixed18Lib.ZERO) ? _openInterest.maker : _openInterest.taker);
     }
 
     /**
@@ -283,7 +406,7 @@ contract PerennialLens is IPerennialLens {
         address account,
         IProduct product,
         UFixed18 positionSize
-    ) external settleAccount(account, product) returns (UFixed18) {
+    ) public settleAccount(account, product) returns (UFixed18) {
         UFixed18 notional = positionSize.mul(_latestVersion(product).price.abs());
         return notional.mul(product.maintenance());
     }
@@ -296,7 +419,7 @@ contract PerennialLens is IPerennialLens {
      * @return amounts Token amounts of unclaimed incentive rewards for given product
      */
     function unclaimedIncentiveRewards(address account, IProduct product)
-        external
+        public
         settleAccount(account, product)
         returns (Token18[] memory tokens, UFixed18[] memory amounts)
     {
@@ -324,7 +447,7 @@ contract PerennialLens is IPerennialLens {
         address account,
         IProduct product,
         uint256[] calldata programIds
-    ) external settleAccount(account, product) returns (Token18[] memory tokens, UFixed18[] memory amounts) {
+    ) public settleAccount(account, product) returns (Token18[] memory tokens, UFixed18[] memory amounts) {
         IIncentivizer incentivizer = controller.incentivizer();
         tokens = new Token18[](programIds.length);
         amounts = new UFixed18[](programIds.length);
@@ -335,7 +458,13 @@ contract PerennialLens is IPerennialLens {
         }
     }
 
-    // TODO: all data for Product, all data for User, batching
+    /**
+     *  End UserProduct Individual Fields Functions
+     */
+
+    /**
+     *  Private Helper Functions
+     */
 
     /**
      * @notice Returns the Product's latest position
@@ -354,8 +483,16 @@ contract PerennialLens is IPerennialLens {
      * @return Latest version for the product
      */
     function _latestVersion(IProduct product) private view returns (IOracleProvider.OracleVersion memory) {
-        return product.currentVersion();
+        return product.atVersion(product.latestVersion());
     }
+
+    /**
+     *  End Private Helper Functions
+     */
+
+    /**
+     *  Modifier Functions
+     */
 
     /// @dev Settles the product
     modifier settle(IProduct product) {
@@ -368,4 +505,8 @@ contract PerennialLens is IPerennialLens {
         product.settleAccount(account);
         _;
     }
+
+    /**
+     *  End Modifier Functions
+     */
 }
