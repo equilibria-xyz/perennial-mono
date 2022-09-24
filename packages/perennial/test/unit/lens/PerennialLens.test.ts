@@ -292,26 +292,52 @@ describe('PerennialLens', () => {
   })
 
   describe('#exposure', () => {
-    it('returns user exposure after settle', async () => {
-      const pre = {
-        oracleVersion: 1,
-        openPosition: { maker: 0, taker: 0 },
-        closePosition: { maker: 0, taker: 0 },
-      }
-      product['pre()'].returns(pre)
-      product['latestVersion()'].returns(100)
-      product.positionAtVersion
-        .whenCalledWith(100)
-        .returns({ maker: ethers.utils.parseEther('100'), taker: ethers.utils.parseEther('50') })
-      const currVersion = {
-        version: 1,
-        timestamp: 456,
-        price: ethers.utils.parseEther('-789'),
-      }
-      product.position.whenCalledWith(user.address).returns({ maker: ethers.utils.parseEther('1'), taker: 0 })
-      product.atVersion.whenCalledWith(100).returns(currVersion)
-      expect(await lens.callStatic.exposure(user.address, product.address)).to.equal(ethers.utils.parseEther('394.5'))
-      expect(product.settleAccount).to.have.been.calledWith(user.address)
+    context('maker, less than 100% utilization', () => {
+      it('returns user exposure after settle', async () => {
+        const pre = {
+          oracleVersion: 1,
+          openPosition: { maker: 0, taker: 0 },
+          closePosition: { maker: 0, taker: 0 },
+        }
+        product['pre()'].returns(pre)
+        product['latestVersion()'].returns(100)
+        product.positionAtVersion
+          .whenCalledWith(100)
+          .returns({ maker: ethers.utils.parseEther('100'), taker: ethers.utils.parseEther('50') })
+        const currVersion = {
+          version: 1,
+          timestamp: 456,
+          price: ethers.utils.parseEther('-789'),
+        }
+        product.position.whenCalledWith(user.address).returns({ maker: ethers.utils.parseEther('1'), taker: 0 })
+        product.atVersion.whenCalledWith(100).returns(currVersion)
+        expect(await lens.callStatic.exposure(user.address, product.address)).to.equal(ethers.utils.parseEther('394.5'))
+        expect(product.settleAccount).to.have.been.calledWith(user.address)
+      })
+    })
+
+    context('taker', () => {
+      it('returns user exposure after settle', async () => {
+        const pre = {
+          oracleVersion: 1,
+          openPosition: { maker: 0, taker: 0 },
+          closePosition: { maker: 0, taker: 0 },
+        }
+        product['pre()'].returns(pre)
+        product['latestVersion()'].returns(100)
+        product.positionAtVersion
+          .whenCalledWith(100)
+          .returns({ maker: ethers.utils.parseEther('100'), taker: ethers.utils.parseEther('50') })
+        const currVersion = {
+          version: 1,
+          timestamp: 456,
+          price: ethers.utils.parseEther('-789'),
+        }
+        product.position.whenCalledWith(user.address).returns({ maker: 0, taker: ethers.utils.parseEther('1') })
+        product.atVersion.whenCalledWith(100).returns(currVersion)
+        expect(await lens.callStatic.exposure(user.address, product.address)).to.equal(ethers.utils.parseEther('789'))
+        expect(product.settleAccount).to.have.been.calledWith(user.address)
+      })
     })
   })
 

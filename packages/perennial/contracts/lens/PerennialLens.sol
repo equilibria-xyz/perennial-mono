@@ -34,25 +34,21 @@ contract PerennialLens is IPerennialLens {
     /**
      * @notice Returns the snapshots of the provided `productAddresses`
      * @param productAddresses Product addresses
-     * @return Snapshot for each product after settle
+     * @return _snapshots a snapshot for each product after settle
      */
-    function snapshots(IProduct[] calldata productAddresses) public returns (ProductSnapshot[] memory) {
-        ProductSnapshot[] memory _snapshots = new ProductSnapshot[](productAddresses.length);
+    function snapshots(IProduct[] calldata productAddresses) public returns (ProductSnapshot[] memory _snapshots) {
+        _snapshots = new ProductSnapshot[](productAddresses.length);
         for (uint256 i = 0; i < productAddresses.length; i++) {
             _snapshots[i] = snapshot(productAddresses[i]);
         }
-
-        return _snapshots;
     }
 
     /**
      * @notice Returns the snapshot of the provided `product`
      * @param product Product address
-     * @return Snapshot for the product after settle
+     * @return _snapshot for the product after settle
      */
-    function snapshot(IProduct product) public settle(product) returns (ProductSnapshot memory) {
-        ProductSnapshot memory _snapshot;
-
+    function snapshot(IProduct product) public settle(product) returns (ProductSnapshot memory _snapshot) {
         _snapshot.productInfo = info(product);
         _snapshot.productAddress = address(product);
         _snapshot.rate = rate(product);
@@ -67,40 +63,34 @@ contract PerennialLens is IPerennialLens {
         _snapshot.productFee = productFee;
         _snapshot.protocolFee = protocolFee;
         _snapshot.openInterest = openInterest(product);
-
-        return _snapshot;
     }
 
     /**
      * @notice Returns the user snapshots for the provided `productAddresses`
      * @param account User addresses
      * @param productAddresses Product addresses
-     * @return UserSnapshot for each product after settle
+     * @return _snapshots UserSnapshot for each product after settle
      */
     function snapshots(address account, IProduct[] memory productAddresses)
-        public returns (UserProductSnapshot[] memory)
+        public returns (UserProductSnapshot[] memory _snapshots)
     {
-        UserProductSnapshot[] memory _snapshots = new UserProductSnapshot[](productAddresses.length);
+        _snapshots = new UserProductSnapshot[](productAddresses.length);
         for (uint256 i = 0; i < productAddresses.length; i++) {
             _snapshots[i] = snapshot(account, productAddresses[i]);
         }
-
-        return _snapshots;
     }
 
     /**
      * @notice Returns the user snapshot for the provided `product`
      * @param account User addresses
      * @param product Product address
-     * @return UserSnapshot for the product after settle
+     * @return _snapshot UserSnapshot for the product after settle
      */
     function snapshot(address account, IProduct product)
         public
         settleAccount(account, product)
-        returns (UserProductSnapshot memory)
+        returns (UserProductSnapshot memory _snapshot)
     {
-        UserProductSnapshot memory _snapshot;
-
         _snapshot.productAddress = address(product);
         _snapshot.userAddress = account;
         _snapshot.collateral = collateral(account, product);
@@ -111,8 +101,6 @@ contract PerennialLens is IPerennialLens {
         _snapshot.openInterest = openInterest(account, product);
         _snapshot.fees = fees(account, product);
         _snapshot.exposure = exposure(account, product);
-
-        return _snapshot;
     }
 
     /**
@@ -386,13 +374,16 @@ contract PerennialLens is IPerennialLens {
      * @return User's exposure (openInterest * utilization) after settle
      */
     function exposure(address account, IProduct product) public settleAccount(account, product) returns (UFixed18) {
+        Position memory _openInterest = openInterest(account, product);
+        if (_openInterest.taker.gt(UFixed18Lib.ZERO)) {
+            return _openInterest.taker; // Taker exposure is always 100% of openInterest
+        }
+
         (, Position memory _pos) = globalPosition(product);
         if (_pos.maker.eq(UFixed18Lib.ZERO)) { return UFixed18Lib.ZERO; }
 
         UFixed18 utilization = _pos.taker.div(_pos.maker);
-        Position memory _openInterest = openInterest(account, product);
-
-        return utilization.mul(_openInterest.maker.gte(UFixed18Lib.ZERO) ? _openInterest.maker : _openInterest.taker);
+        return utilization.mul(_openInterest.maker); // Maker exposure is openInterest * utilization
     }
 
     /**
