@@ -192,6 +192,14 @@ describe('PerennialLens', () => {
     })
   })
 
+  describe('#liquidating', () => {
+    it('returns whether or not the user is being liquidated after settle', async () => {
+      product.isLiquidating.whenCalledWith(user.address).returns(true)
+      expect(await lens.callStatic.liquidating(user.address, product.address)).to.equal(true)
+      expect(product.settleAccount).to.have.been.calledOnceWith(user.address)
+    })
+  })
+
   describe('#pre(address,address)', () => {
     it('returns the user preposition after settle', async () => {
       const pos = {

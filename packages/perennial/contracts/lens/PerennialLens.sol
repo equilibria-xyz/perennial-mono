@@ -98,6 +98,7 @@ contract PerennialLens is IPerennialLens {
         _snapshot.pre = pre(account, product);
         _snapshot.position = position(account, product);
         _snapshot.liquidatable = liquidatable(account, product);
+        _snapshot.liquidating = liquidating(account, product);
         _snapshot.openInterest = openInterest(account, product);
         _snapshot.fees = fees(account, product);
         _snapshot.exposure = exposure(account, product);
@@ -298,6 +299,16 @@ contract PerennialLens is IPerennialLens {
      */
     function liquidatable(address account, IProduct product) public settleAccount(account, product) returns (bool) {
         return collateral().liquidatable(account, product);
+    }
+
+    /**
+     * @notice User liquidating status for product after settle
+     * @param account Account address
+     * @param product Product address
+     * @return Whether or not the user's position is being liquidated
+     */
+    function liquidating(address account, IProduct product) public settleAccount(account, product) returns (bool) {
+        return product.isLiquidating(account);
     }
 
     /**

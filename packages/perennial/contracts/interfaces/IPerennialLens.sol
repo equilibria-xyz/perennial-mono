@@ -37,6 +37,7 @@ interface IPerennialLens {
         PrePosition pre;
         Position position;
         bool liquidatable;
+        bool liquidating;
         Position openInterest;
         UFixed18 fees;
         UFixed18 exposure;
@@ -72,6 +73,7 @@ interface IPerennialLens {
     function collateral(address account, IProduct product) external returns (UFixed18);
     function maintenance(address account, IProduct product) external returns (UFixed18);
     function liquidatable(address account, IProduct product) external returns (bool);
+    function liquidating(address account, IProduct product) external returns (bool);
     function pre(address account, IProduct product) external returns (PrePosition memory);
     function position(address account, IProduct product) external returns (Position memory);
     function userPosition(address account, IProduct product) external returns (PrePosition memory, Position memory);
