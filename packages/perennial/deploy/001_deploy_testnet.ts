@@ -3,12 +3,12 @@ import { DeployFunction } from 'hardhat-deploy/types'
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployments, getNamedAccounts } = hre
-  const { deploy, getOrNull } = deployments
+  const { deploy, get, getOrNull } = deployments
   const { deployer } = await getNamedAccounts()
 
-  // DSU
-  if ((await getOrNull('DSU')) == null) {
-    await deploy('TestnetDSU', {
+  // USDC
+  if ((await getOrNull('USDC')) == null) {
+    await deploy('TestnetUSDC', {
       from: deployer,
       skipIfAlreadyDeployed: true,
       log: true,
@@ -16,9 +16,27 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     })
   }
 
-  // USDC
-  if ((await getOrNull('USDC')) == null) {
-    await deploy('TestnetUSDC', {
+  const USDCAddress = ((await getOrNull('USDC')) || (await get('TestnetUSDC'))).address
+
+  // DSU and ancillary contracts
+  if ((await getOrNull('DSU')) == null) {
+    await deploy('TestnetDSU', {
+      from: deployer,
+      skipIfAlreadyDeployed: true,
+      log: true,
+      autoMine: true,
+    })
+
+    await deploy('TestnetReserve', {
+      args: [(await get('TestnetDSU')).address, USDCAddress],
+      from: deployer,
+      skipIfAlreadyDeployed: true,
+      log: true,
+      autoMine: true,
+    })
+
+    await deploy('TestnetBatcher', {
+      args: [(await get('TestnetReserve')).address],
       from: deployer,
       skipIfAlreadyDeployed: true,
       log: true,

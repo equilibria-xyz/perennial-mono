@@ -7,6 +7,7 @@ const eqPerennialOracleDir = dirname(require.resolve('@equilibria/perennial-orac
 const config = defaultConfig({
   externalDeployments: {
     kovan: [`${eqPerennialDir}/deployments/kovan`, `${eqPerennialOracleDir}/deployments/kovan`],
+    goerli: [`${eqPerennialDir}/deployments/goerli`, `${eqPerennialOracleDir}/deployments/goerli`],
     mainnet: [`${eqPerennialDir}/deployments/mainnet`, `${eqPerennialOracleDir}/deployments/mainnet`],
     hardhat: [`${eqPerennialDir}/deployments/mainnet`, `${eqPerennialOracleDir}/deployments/mainnet`],
     localhost: [`${eqPerennialDir}/deployments/localhost`, `${eqPerennialOracleDir}/deployments/localhost`],

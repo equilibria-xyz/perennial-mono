@@ -24,6 +24,7 @@ const ALCHEMY_MAINNET = process.env.ALCHEMY_MAINNET || ''
 const ALCHEMY_ROPSTEN = process.env.ALCHEMY_ROPSTEN || ''
 const ALCHEMY_KOVAN = process.env.ALCHEMY_KOVAN || ''
 const FORK_ENABLED = process.env.FORK_ENABLED === 'true' || false
+const ALCHEMY_GOERLI = process.env.ALCHEMY_GOERLI || ''
 const FORK_NETWORK = process.env.FORK_NETWORK || 'mainnet'
 const FORK_BLOCK_NUMBER = process.env.FORK_BLOCK_NUMBER ? parseInt(process.env.FORK_BLOCK_NUMBER) : undefined
 const NODE_INTERVAL_MINING = process.env.NODE_INTERVAL_MINING ? parseInt(process.env.NODE_INTERVAL_MINING) : undefined
@@ -40,6 +41,8 @@ function getUrl(networkName: string): string {
       return ALCHEMY_ROPSTEN
     case 'kovan':
       return ALCHEMY_KOVAN
+    case 'goerli':
+      return ALCHEMY_GOERLI
     default:
       return ''
   }
@@ -149,6 +152,7 @@ export default function defaultConfig({
       contracts: [{ artifacts: 'external/contracts' }],
       deployments: {
         kovan: ['external/deployments/kovan', ...(externalDeployments?.kovan || [])],
+        goerli: ['external/deployments/goerli', ...(externalDeployments?.goerli || [])],
         mainnet: ['external/deployments/mainnet', ...(externalDeployments?.mainnet || [])],
         hardhat: [FORK_ENABLED ? `external/deployments/${FORK_NETWORK}` : '', ...(externalDeployments?.hardhat || [])],
         localhost: [

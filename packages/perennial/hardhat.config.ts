@@ -17,6 +17,7 @@ const config = defaultConfig({
   },
   externalDeployments: {
     kovan: [`${eqPerennialOracleDir}/deployments/kovan`],
+    goerli: [`${eqPerennialOracleDir}/deployments/goerli`],
     mainnet: [`${eqPerennialOracleDir}/deployments/mainnet`],
     hardhat: [`${eqPerennialOracleDir}/deployments/mainnet`],
     localhost: [`${eqPerennialOracleDir}/deployments/localhost`],
