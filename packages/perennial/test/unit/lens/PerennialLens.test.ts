@@ -39,7 +39,21 @@ describe('PerennialLens', () => {
 
     controller.collateral.returns(collateral.address)
     controller.incentivizer.returns(incentivizer.address)
+    product.name.returns('Product')
+    product.symbol.returns('PROD')
+    product.oracle.returns('0x52C64b8998eB7C80b6F526E99E29ABdcC86B841b')
     product.payoffDefinition.returns(createPayoffDefinition({ contractAddress: payoffProvider.address }))
+    product['maintenance()'].returns(ethers.utils.parseEther('0.1'))
+    product.fundingFee.returns(ethers.utils.parseEther('0.2'))
+    product.makerFee.returns(ethers.utils.parseEther('0.3'))
+    product.takerFee.returns(ethers.utils.parseEther('0.4'))
+    product.makerLimit.returns(ethers.utils.parseEther('100'))
+    product.utilizationCurve.returns({
+      minRate: ethers.utils.parseEther('0.10'),
+      maxRate: ethers.utils.parseEther('0.10'),
+      targetRate: ethers.utils.parseEther('0.10'),
+      targetUtilization: ethers.utils.parseEther('1'),
+    })
 
     lens = await new PerennialLens__factory(user).deploy(controller.address)
   })
@@ -51,17 +65,82 @@ describe('PerennialLens', () => {
     })
   })
 
+  describe('snapshots(address[])', () => {
+    it('returns the product snapshots', async () => {
+      const product2 = await smock.fake<IProduct>('IProduct')
+      const snapshots = await lens.callStatic['snapshots(address[])']([product.address, product2.address])
+      expect(snapshots[0].productAddress).to.equal(product.address)
+      expect(snapshots[1].productAddress).to.equal(product2.address)
+      expect(product.settle).to.have.be.called
+      expect(product2.settle).to.have.be.called
+    })
+  })
+
+  describe('snapshots(address)', () => {
+    it('returns the product snapshot', async () => {
+      const snapshot = await lens.callStatic['snapshot(address)'](product.address)
+      expect(snapshot.productAddress).to.equal(product.address)
+      expect(product.settle).to.have.be.called
+    })
+  })
+
+  describe('snapshots(address,address[])', () => {
+    it('returns the userproduct snapshots', async () => {
+      const product2 = await smock.fake<IProduct>('IProduct')
+      const snapshots = await lens.callStatic['snapshots(address,address[])'](user.address, [
+        product.address,
+        product2.address,
+      ])
+      expect(snapshots[0].productAddress).to.equal(product.address)
+      expect(snapshots[0].userAddress).to.equal(user.address)
+      expect(snapshots[1].productAddress).to.equal(product2.address)
+      expect(snapshots[1].userAddress).to.equal(user.address)
+      expect(product.settleAccount).to.have.be.calledWith(user.address)
+      expect(product2.settleAccount).to.have.be.calledWith(user.address)
+    })
+  })
+
+  describe('snapshot(address,address)', () => {
+    it('returns the userproduct snapshot', async () => {
+      const snapshot = await lens.callStatic['snapshot(address,address)'](user.address, product.address)
+      expect(snapshot.productAddress).to.equal(product.address)
+      expect(snapshot.userAddress).to.equal(user.address)
+      expect(product.settleAccount).to.have.be.calledWith(user.address)
+    })
+  })
+
   describe('#name', () => {
     it('returns the name of the product', async () => {
-      product.name.returns('MyProduct')
-      expect(await lens.callStatic.name(product.address)).to.equal('MyProduct')
+      expect(await lens.callStatic.name(product.address)).to.equal('Product')
     })
   })
 
   describe('#symbol', () => {
     it('returns the symbol of the product', async () => {
-      product.symbol.returns('PROD')
       expect(await lens.callStatic.symbol(product.address)).to.equal('PROD')
+    })
+  })
+
+  describe('#info', () => {
+    it('returns the info of the product', async () => {
+      const info = await lens.callStatic.info(product.address)
+      expect(info.name).to.equal('Product')
+      expect(info.symbol).to.equal('PROD')
+      expect(info.payoffDefinition.payoffType).to.equal(1)
+      expect(info.payoffDefinition.payoffDirection).to.equal(0)
+      expect(info.payoffDefinition.data).to.equal(
+        `0x00000000000000000000${payoffProvider.address.substring(2).toLowerCase()}`,
+      )
+      expect(info.oracle).to.equal('0x52C64b8998eB7C80b6F526E99E29ABdcC86B841b')
+      expect(info.maintenance).to.equal(ethers.utils.parseEther('0.1'))
+      expect(info.fundingFee).to.equal(ethers.utils.parseEther('0.2'))
+      expect(info.makerFee).to.equal(ethers.utils.parseEther('0.3'))
+      expect(info.takerFee).to.equal(ethers.utils.parseEther('0.4'))
+      expect(info.makerLimit).to.equal(ethers.utils.parseEther('100'))
+      expect(info.utilizationCurve.minRate).to.equal(ethers.utils.parseEther('0.10'))
+      expect(info.utilizationCurve.maxRate).to.equal(ethers.utils.parseEther('0.10'))
+      expect(info.utilizationCurve.targetRate).to.equal(ethers.utils.parseEther('0.10'))
+      expect(info.utilizationCurve.targetUtilization).to.equal(ethers.utils.parseEther('1'))
     })
   })
 
@@ -109,6 +188,14 @@ describe('PerennialLens', () => {
     it('returns whether or not the user is liquidatable after settle', async () => {
       collateral.liquidatable.whenCalledWith(user.address, product.address).returns(true)
       expect(await lens.callStatic.liquidatable(user.address, product.address)).to.equal(true)
+      expect(product.settleAccount).to.have.been.calledOnceWith(user.address)
+    })
+  })
+
+  describe('#liquidating', () => {
+    it('returns whether or not the user is being liquidated after settle', async () => {
+      product.isLiquidating.whenCalledWith(user.address).returns(true)
+      expect(await lens.callStatic.liquidating(user.address, product.address)).to.equal(true)
       expect(product.settleAccount).to.have.been.calledOnceWith(user.address)
     })
   })
@@ -203,12 +290,62 @@ describe('PerennialLens', () => {
         price: -789,
       }
       product.position.whenCalledWith(user.address).returns({ maker: ethers.utils.parseEther('100'), taker: 0 })
-      product.currentVersion.returns(currVersion)
+      product.atVersion.returns(currVersion)
       expectPositionEq(await lens.callStatic['openInterest(address,address)'](user.address, product.address), {
         maker: 78900,
         taker: 0,
       })
       expect(product.settleAccount).to.have.been.calledOnceWith(user.address)
+    })
+  })
+
+  describe('#exposure', () => {
+    context('maker, less than 100% utilization', () => {
+      it('returns user exposure after settle', async () => {
+        const pre = {
+          oracleVersion: 1,
+          openPosition: { maker: 0, taker: 0 },
+          closePosition: { maker: 0, taker: 0 },
+        }
+        product['pre()'].returns(pre)
+        product['latestVersion()'].returns(100)
+        product.positionAtVersion
+          .whenCalledWith(100)
+          .returns({ maker: ethers.utils.parseEther('100'), taker: ethers.utils.parseEther('50') })
+        const currVersion = {
+          version: 1,
+          timestamp: 456,
+          price: ethers.utils.parseEther('-789'),
+        }
+        product.position.whenCalledWith(user.address).returns({ maker: ethers.utils.parseEther('1'), taker: 0 })
+        product.atVersion.whenCalledWith(100).returns(currVersion)
+        expect(await lens.callStatic.exposure(user.address, product.address)).to.equal(ethers.utils.parseEther('394.5'))
+        expect(product.settleAccount).to.have.been.calledWith(user.address)
+      })
+    })
+
+    context('taker', () => {
+      it('returns user exposure after settle', async () => {
+        const pre = {
+          oracleVersion: 1,
+          openPosition: { maker: 0, taker: 0 },
+          closePosition: { maker: 0, taker: 0 },
+        }
+        product['pre()'].returns(pre)
+        product['latestVersion()'].returns(100)
+        product.positionAtVersion
+          .whenCalledWith(100)
+          .returns({ maker: ethers.utils.parseEther('100'), taker: ethers.utils.parseEther('50') })
+        const currVersion = {
+          version: 1,
+          timestamp: 456,
+          price: ethers.utils.parseEther('-789'),
+        }
+        product.position.whenCalledWith(user.address).returns({ maker: 0, taker: ethers.utils.parseEther('1') })
+        product.atVersion.whenCalledWith(100).returns(currVersion)
+        expect(await lens.callStatic.exposure(user.address, product.address)).to.equal(ethers.utils.parseEther('789'))
+        expect(product.settleAccount).to.have.been.calledWith(user.address)
+      })
     })
   })
 
@@ -223,7 +360,7 @@ describe('PerennialLens', () => {
       product.positionAtVersion
         .whenCalledWith(100)
         .returns({ maker: ethers.utils.parseEther('200'), taker: ethers.utils.parseEther('100') })
-      product.currentVersion.returns(currVersion)
+      product.atVersion.returns(currVersion)
       expectPositionEq(await lens.callStatic['openInterest(address)'](product.address), {
         maker: 157800,
         taker: 78900,
@@ -232,28 +369,54 @@ describe('PerennialLens', () => {
     })
   })
 
-  describe('#price', () => {
+  describe('#latestVersion', () => {
     it('returns the price after settle', async () => {
       const currVersion = {
         version: 1,
         timestamp: 456,
         price: 789,
       }
-      product.currentVersion.returns(currVersion)
-      expect(await lens.callStatic.price(product.address)).to.equal(789)
+      product.atVersion.returns(currVersion)
+      const latestVersion = await lens.callStatic.latestVersion(product.address)
+      expect(latestVersion.version).to.equal(1)
+      expect(latestVersion.timestamp).to.equal(456)
+      expect(latestVersion.price).to.equal(789)
       expect(product.settle).to.have.been.calledOnce
     })
   })
 
-  describe('#priceAtVersion', () => {
-    it('returns the price at version after settle', async () => {
-      const atVersion = {
+  describe('#atVersions', () => {
+    it('returns the prices at versions after settle', async () => {
+      const atVersion1 = {
         version: 1,
         timestamp: 456,
         price: 789,
       }
-      product.atVersion.whenCalledWith(1).returns(atVersion)
-      expect(await lens.callStatic.priceAtVersion(product.address, 1)).to.equal(789)
+      const atVersion10 = {
+        version: 10,
+        timestamp: 512,
+        price: 100,
+      }
+      const atVersion21 = {
+        version: 21,
+        timestamp: 620,
+        price: 890,
+      }
+      product.atVersion.whenCalledWith(1).returns(atVersion1)
+      product.atVersion.whenCalledWith(10).returns(atVersion10)
+      product.atVersion.whenCalledWith(21).returns(atVersion21)
+      const prices = await lens.callStatic.atVersions(product.address, [1, 10, 21])
+      expect(prices[0].version).to.equal(1)
+      expect(prices[0].timestamp).to.equal(456)
+      expect(prices[0].price).to.equal(789)
+
+      expect(prices[1].version).to.equal(10)
+      expect(prices[1].timestamp).to.equal(512)
+      expect(prices[1].price).to.equal(100)
+
+      expect(prices[2].version).to.equal(21)
+      expect(prices[2].timestamp).to.equal(620)
+      expect(prices[2].price).to.equal(890)
       expect(product.settle).to.have.been.calledOnce
     })
   })
@@ -285,7 +448,7 @@ describe('PerennialLens', () => {
         timestamp: 456,
         price: -789,
       }
-      product.currentVersion.returns(currVersion)
+      product.atVersion.returns(currVersion)
       product['maintenance()'].returns(ethers.utils.parseEther('0.5'))
       expect(
         await lens.callStatic.maintenanceRequired(user.address, product.address, ethers.utils.parseEther('123')),
@@ -308,15 +471,13 @@ describe('PerennialLens', () => {
     })
   })
 
-  describe('#fees(address[],account)', () => {
-    it('returns the total fees after settling all products', async () => {
-      const product2 = await smock.fake<IProduct>('IProduct')
+  describe('#fees(address,address)', () => {
+    it('returns the total fees after settling', async () => {
       collateral.fees.whenCalledWith(user.address).returns(ethers.utils.parseEther('12345'))
 
-      const fees = await lens.callStatic['fees(address,address[])'](user.address, [product.address, product2.address])
+      const fees = await lens.callStatic['fees(address,address)'](user.address, product.address)
       expect(fees).to.equal(ethers.utils.parseEther('12345'))
-      expect(product.settle).to.have.been.calledOnce
-      expect(product2.settle).to.have.been.calledOnce
+      expect(product.settleAccount).to.have.been.calledOnceWith(user.address)
     })
   })
 
