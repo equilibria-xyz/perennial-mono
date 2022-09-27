@@ -59,9 +59,7 @@ contract PerennialLens is IPerennialLens {
         _snapshot.shortfall = shortfall(product);
         _snapshot.pre = pre(product);
         _snapshot.position = position(product);
-        (UFixed18 productFee, UFixed18 protocolFee) = fees(product);
-        _snapshot.productFee = productFee;
-        _snapshot.protocolFee = protocolFee;
+        (_snapshot.productFee, _snapshot.protocolFee) = fees(product);
         _snapshot.openInterest = openInterest(product);
     }
 
@@ -385,13 +383,13 @@ contract PerennialLens is IPerennialLens {
      * @return User's exposure (openInterest * utilization) after settle
      */
     function exposure(address account, IProduct product) public settleAccount(account, product) returns (UFixed18) {
+        (, Position memory _pos) = globalPosition(product);
+        if (_pos.maker.isZero()) { return UFixed18Lib.ZERO; }
+
         Position memory _openInterest = openInterest(account, product);
-        if (_openInterest.taker.gt(UFixed18Lib.ZERO)) {
+        if (!_openInterest.taker.isZero()) {
             return _openInterest.taker; // Taker exposure is always 100% of openInterest
         }
-
-        (, Position memory _pos) = globalPosition(product);
-        if (_pos.maker.eq(UFixed18Lib.ZERO)) { return UFixed18Lib.ZERO; }
 
         UFixed18 utilization = _pos.taker.div(_pos.maker);
         return utilization.mul(_openInterest.maker); // Maker exposure is openInterest * utilization
