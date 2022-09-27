@@ -82,4 +82,10 @@ describe('TestnetBatcher', () => {
         .withArgs(account.address, utils.parseEther('10'))
     })
   })
+
+  describe('#rebalance', () => {
+    it('reverts', async () => {
+      await expect(batcher.rebalance()).to.be.revertedWith('BatcherNotImplementedError()')
+    })
+  })
 })
