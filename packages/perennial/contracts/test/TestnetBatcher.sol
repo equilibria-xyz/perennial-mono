@@ -10,7 +10,6 @@ import "./TestnetReserve.sol";
 contract TestnetBatcher is IBatcher {
     TestnetReserve public reserve;
 
-    // solhint-disable-next-line no-empty-blocks
     constructor(TestnetReserve reserve_) {
         reserve = reserve_;
 
@@ -30,15 +29,12 @@ contract TestnetBatcher is IBatcher {
         emit Wrap(to, amount);
     }
 
-    // Passthrough to Reserve
-    function unwrap(UFixed18 amount, address to) external {
-        reserve.DSU().pull(msg.sender, amount);
-        reserve.redeem(amount, to);
-
-        emit Unwrap(to, amount);
+    function unwrap(UFixed18, address) external pure {
+        revert BatcherNotImplementedError();
     }
 
+    // No-op
     function rebalance() external pure {
-        revert BatcherNotImplementedError();
+        return;
     }
 }

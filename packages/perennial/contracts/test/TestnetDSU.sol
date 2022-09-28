@@ -7,14 +7,31 @@ import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 contract TestnetDSU is ERC20, ERC20Burnable {
     uint256 private constant LIMIT = 1_000_000e18;
 
+    address public minter;
+
+    error TestnetDSUNotMinterError();
     error TestnetDSUOverLimitError();
 
-    // solhint-disable-next-line no-empty-blocks
-    constructor() ERC20("Digital Standard Unit", "DSU") { }
+    event TestnetDSUMinterUpdated(address indexed newMinter);
 
-    function mint(address account, uint256 amount) external {
+    constructor(address _minter) ERC20("Digital Standard Unit", "DSU") {
+        minter = _minter;
+    }
+
+    function mint(address account, uint256 amount) external onlyMinter {
         if (amount > LIMIT) revert TestnetDSUOverLimitError();
 
         _mint(account, amount);
+    }
+
+    function updateMinter(address newMinter) external onlyMinter {
+        minter = newMinter;
+
+        emit TestnetDSUMinterUpdated(newMinter);
+    }
+
+    modifier onlyMinter() {
+        if (msg.sender != minter) revert TestnetDSUNotMinterError();
+        _;
     }
 }

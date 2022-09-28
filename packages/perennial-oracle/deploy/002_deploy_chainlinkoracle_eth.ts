@@ -6,14 +6,19 @@ import { CHAINLINK_CUSTOM_CURRENCIES } from '../util'
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployments, getNamedAccounts } = hre
-  const { deploy, get, getOrNull, getNetworkName } = deployments
+  const { deploy, getOrNull } = deployments
   const { deployer } = await getNamedAccounts()
 
   // NETWORK CONSTANTS
 
-  // Goerli doesn't have a ChainlinkFeedRegistry yet, so just deploy a passthrough datafeed as oracle instead
-  if (isGoerli(getNetworkName())) {
-    console.log('Detected Goerli network. Using passthrough data feed!')
+  const chainlinkRegistryAddress =
+    (await getOrNull('ChainlinkFeedRegistry'))?.address || (await getOrNull('TestnetChainlinkFeedRegistry'))?.address
+
+  // ORACLE
+
+  // If there is no FeedRegistry, deploy a passthrough datafeed as oracle instead
+  if (!chainlinkRegistryAddress) {
+    console.log('No ChainlinkFeedRegistry found. Using passthrough data feed!')
     const chainlinkETHUSDDataFeedAddress = (await getOrNull('ChainlinkDataFeedETHUSD'))?.address
 
     if (chainlinkETHUSDDataFeedAddress == null) {
@@ -37,12 +42,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     return
   }
 
-  const chainlinkRegistryAddress =
-    (await getOrNull('ChainlinkFeedRegistry'))?.address || (await get('TestnetChainlinkFeedRegistry')).address
-
   console.log('using ChainlinkFeedRegistry address: ' + chainlinkRegistryAddress)
-
-  // ORACLE
 
   await deploy('ChainlinkOracle_ETH', {
     contract: 'ChainlinkOracle',
@@ -52,10 +52,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     log: true,
     autoMine: true,
   })
-}
-
-function isGoerli(networkName: string) {
-  return networkName === 'goerli' || (networkName === 'localhost' && process.env.FORK_NETWORK === 'goerli')
 }
 
 export default func

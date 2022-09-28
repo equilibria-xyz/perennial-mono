@@ -14,7 +14,6 @@ contract TestnetReserve {
     Token18 public immutable DSU; // solhint-disable-line var-name-mixedcase
     Token6 public immutable USDC; // solhint-disable-line var-name-mixedcase
 
-    // solhint-disable-next-line no-empty-blocks
     constructor(Token18 dsu_, Token6 usdc_) {
         DSU = dsu_;
         USDC = usdc_;

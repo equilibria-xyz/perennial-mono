@@ -67,25 +67,16 @@ describe('TestnetBatcher', () => {
   })
 
   describe('#unwrap', () => {
-    it('pulls DSU from the sender, unwraps it to USDC', async () => {
-      dsu.transferFrom.whenCalledWith(user.address, batcher.address, utils.parseEther('10')).returns(true)
-      reserve.redeem.whenCalledWith(utils.parseEther('10'), account.address).returns(true)
-
-      await expect(
-        batcher.connect(user).unwrap(
-          utils.parseEther('10'),
-          account.address,
-          { gasLimit: 30e6 }, // https://github.com/defi-wonderland/smock/issues/99
-        ),
+    it('reverts with NotImplemented', async () => {
+      await expect(batcher.unwrap(utils.parseEther('10'), account.address)).to.be.revertedWith(
+        'BatcherNotImplementedError()',
       )
-        .to.emit(batcher, 'Unwrap')
-        .withArgs(account.address, utils.parseEther('10'))
     })
   })
 
   describe('#rebalance', () => {
-    it('reverts', async () => {
-      await expect(batcher.rebalance()).to.be.revertedWith('BatcherNotImplementedError()')
+    it('returns', async () => {
+      await expect(batcher.rebalance()).to.not.be.reverted
     })
   })
 })
