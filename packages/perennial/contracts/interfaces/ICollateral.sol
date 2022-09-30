@@ -20,12 +20,14 @@ interface ICollateral {
     error CollateralInsufficientCollateralError();
     error CollateralUnderLimitError();
     error CollateralZeroAddressError();
+    error CollateralNotAllowError(address account, address operator);
 
     function token() external view returns (Token18);
     function fees(address account) external view returns (UFixed18);
     function initialize(IController controller_) external;
     function depositTo(address account, IProduct product, UFixed18 amount) external;
     function withdrawTo(address account, IProduct product, UFixed18 amount) external;
+    function withdrawFrom(address from, address account, IProduct product, UFixed18 amount) external;
     function liquidate(address account, IProduct product) external;
     function settleAccount(address account, Fixed18 amount) external;
     function settleProduct(UFixed18 amount) external;

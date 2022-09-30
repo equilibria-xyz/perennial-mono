@@ -69,21 +69,36 @@ contract Collateral is ICollateral, UInitializable, UControllerProvider, UReentr
      * @param product Product to withdraw the collateral from
      * @param amount Amount of collateral to withdraw
      */
-    function withdrawTo(address account, IProduct product, UFixed18 amount)
-    external
+    function withdrawTo(address account, IProduct product, UFixed18 amount) external {
+        withdrawFrom(msg.sender, account, product, amount);
+    }
+
+    /**
+     * @notice Withdraws `amount` collateral from `from`'s `product` account
+     *         and sends it to `account`
+     * @param from Account to withdraw the collateral from
+     * @param account Account to withdraw the collateral to
+     * @param product Product to withdraw the collateral from
+     * @param amount Amount of collateral to withdraw
+     */
+    function withdrawFrom(address from, address account, IProduct product, UFixed18 amount)
+    public
     nonReentrant
     notPaused
     notZeroAddress(account)
     isProduct(product)
-    settleForAccount(msg.sender, product)
-    collateralInvariant(msg.sender, product)
-    maintenanceInvariant(msg.sender, product)
+    settleForAccount(from, product)
+    collateralInvariant(from, product)
+    maintenanceInvariant(from, product)
     {
-        amount = amount.eq(UFixed18Lib.MAX) ? collateral(msg.sender, product) : amount;
-        _products[product].debitAccount(msg.sender, amount);
+        if (!(from == msg.sender || msg.sender == address(controller().multiInvoker()))) {
+            revert CollateralNotAllowError(msg.sender, from);
+        }
+        amount = amount.eq(UFixed18Lib.MAX) ? collateral(from, product) : amount;
+        _products[product].debitAccount(from, amount);
         token.push(account, amount);
 
-        emit Withdrawal(msg.sender, product, amount);
+        emit Withdrawal(from, product, amount);
     }
 
     /**

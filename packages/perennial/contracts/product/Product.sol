@@ -194,12 +194,22 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @notice Opens a taker position for `msg.sender`
      * @param amount Amount of the position to open
      */
-    function openTake(UFixed18 amount)
-    external
+    function openTake(UFixed18 amount) external {
+        openTakeFor(msg.sender, amount);
+    }
+
+    /**
+     * @notice Opens a taker position for `account`
+     * @param account Account to open the position for
+     * @param amount Amount of the position to open
+     */
+    function openTakeFor(address account, UFixed18 amount)
+    public
     nonReentrant
     notPaused
     notClosed
-    settleForAccount(msg.sender)
+    hasPermission(account)
+    settleForAccount(account)
     takerInvariant
     positionInvariant
     liquidationInvariant
@@ -207,25 +217,35 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     {
         uint256 _latestVersion = latestVersion();
 
-        _positions[msg.sender].pre.openTake(_latestVersion, amount);
+        _positions[account].pre.openTake(_latestVersion, amount);
         _position.pre.openTake(_latestVersion, amount);
 
-        emit TakeOpened(msg.sender, _latestVersion, amount);
+        emit TakeOpened(account, _latestVersion, amount);
     }
 
     /**
      * @notice Closes a taker position for `msg.sender`
      * @param amount Amount of the position to close
      */
-    function closeTake(UFixed18 amount)
-    external
+    function closeTake(UFixed18 amount) external {
+        closeTakeFor(msg.sender, amount);
+    }
+
+    /**
+     * @notice Closes a taker position for `account`
+     * @param account Account to close the position for
+     * @param amount Amount of the position to close
+     */
+    function closeTakeFor(address account, UFixed18 amount)
+    public
     nonReentrant
     notPaused
-    settleForAccount(msg.sender)
+    hasPermission(account)
+    settleForAccount(account)
     closeInvariant
     liquidationInvariant
     {
-        _closeTake(msg.sender, amount);
+        _closeTake(account, amount);
     }
 
     function _closeTake(address account, UFixed18 amount) private {
@@ -241,12 +261,22 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @notice Opens a maker position for `msg.sender`
      * @param amount Amount of the position to open
      */
-    function openMake(UFixed18 amount)
-    external
+    function openMake(UFixed18 amount) external {
+        openMakeFor(msg.sender, amount);
+    }
+
+    /**
+     * @notice Opens a maker position for `account`
+     * @param account Account to open position for
+     * @param amount Amount of the position to open
+     */
+    function openMakeFor(address account, UFixed18 amount)
+    public
     nonReentrant
     notPaused
     notClosed
-    settleForAccount(msg.sender)
+    hasPermission(account)
+    settleForAccount(account)
     nonZeroVersionInvariant
     makerInvariant
     positionInvariant
@@ -255,26 +285,36 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     {
         uint256 _latestVersion = latestVersion();
 
-        _positions[msg.sender].pre.openMake(_latestVersion, amount);
+        _positions[account].pre.openMake(_latestVersion, amount);
         _position.pre.openMake(_latestVersion, amount);
 
-        emit MakeOpened(msg.sender, _latestVersion, amount);
+        emit MakeOpened(account, _latestVersion, amount);
     }
 
     /**
      * @notice Closes a maker position for `msg.sender`
      * @param amount Amount of the position to close
      */
-    function closeMake(UFixed18 amount)
-    external
+    function closeMake(UFixed18 amount) external {
+        closeMakeFor(msg.sender, amount);
+    }
+
+    /**
+     * @notice Closes a maker position for `account`
+     * @param account Account to close the position for
+     * @param amount Amount of the position to close
+     */
+    function closeMakeFor(address account, UFixed18 amount)
+    public
     nonReentrant
     notPaused
-    settleForAccount(msg.sender)
+    hasPermission(account)
+    settleForAccount(account)
     takerInvariant
     closeInvariant
     liquidationInvariant
     {
-        _closeMake(msg.sender, amount);
+        _closeMake(account, amount);
     }
 
     function _closeMake(address account, UFixed18 amount) private {
@@ -514,6 +554,14 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     modifier notClosed {
         if (closed()) revert ProductClosedError();
 
+        _;
+    }
+
+    /// @dev Ensure the `msg.sender` has permission to act on behalf of `account
+    modifier hasPermission(address account) {
+        if (!(account == msg.sender || msg.sender == address(controller().multiInvoker()))) {
+            revert ProductNotAllowedError(account, msg.sender);
+        }
         _;
     }
 }
