@@ -22,7 +22,7 @@ export default async function reuseOrDeployProduct(
       receipt,
     })
 
-    process.stdout.write(`created at ${productAddress} with ${receipt.gasUsed} gas`)
+    process.stdout.write(`created at address ${productAddress} with ${receipt.gasUsed} gas\n`)
   } else {
     console.log(`reusing product ${deploymentName} at ${productAddress}`)
   }

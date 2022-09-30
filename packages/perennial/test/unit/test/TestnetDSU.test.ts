@@ -9,11 +9,12 @@ const { ethers } = HRE
 
 describe('TestnetDSU', () => {
   let user: SignerWithAddress
+  let minter: SignerWithAddress
   let testnetDSU: TestnetDSU
 
   beforeEach(async () => {
-    ;[user] = await ethers.getSigners()
-    testnetDSU = await new TestnetDSU__factory(user).deploy()
+    ;[user, minter] = await ethers.getSigners()
+    testnetDSU = await new TestnetDSU__factory(user).deploy(minter.address)
   })
 
   describe('#name', async () => {
@@ -30,15 +31,33 @@ describe('TestnetDSU', () => {
 
   describe('#mint', async () => {
     it('mints tokens to the account', async () => {
-      await testnetDSU.mint(user.address, utils.parseEther('123'))
+      await testnetDSU.connect(minter).mint(user.address, utils.parseEther('123'))
 
       expect(await testnetDSU.balanceOf(user.address)).to.equal(utils.parseEther('123'))
     })
 
     it('reverts if minting over limit', async () => {
-      await expect(testnetDSU.mint(user.address, utils.parseEther('1231231'))).to.be.revertedWith(
+      await expect(testnetDSU.connect(minter).mint(user.address, utils.parseEther('1231231'))).to.be.revertedWith(
         'TestnetDSUOverLimitError()',
       )
+    })
+
+    it('reverts if non-minter calls', async () => {
+      await expect(testnetDSU.mint(user.address, utils.parseEther('1'))).to.be.revertedWith(
+        'TestnetDSUNotMinterError()',
+      )
+    })
+  })
+
+  describe('#updateMinter', async () => {
+    it('sets the new minter', async () => {
+      await expect(testnetDSU.connect(minter).updateMinter(user.address))
+        .to.emit(testnetDSU, 'TestnetDSUMinterUpdated')
+        .withArgs(user.address)
+    })
+
+    it('reverts if not called by minter', async () => {
+      await expect(testnetDSU.updateMinter(user.address)).to.be.revertedWith('TestnetDSUNotMinterError()')
     })
   })
 })

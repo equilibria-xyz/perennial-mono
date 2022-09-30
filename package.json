@@ -10,7 +10,10 @@
   "scripts": {
     "prepare": "husky install",
     "postinstall": "patch-package",
-    "deploy:fork:kovan": "concurrently \"yarn workspace @equilibria/perennial run node:fork:kovan --no-deploy > /dev/null\" \"./scripts/deploy_kovan_fork.sh\""
+    "deploy:goerli": "./scripts/deploy_goerli.sh",
+    "verify:goerli": "yarn workspaces run verify --network goerli",
+    "deploy:fork:kovan": "concurrently \"yarn workspace @equilibria/perennial run node:fork:kovan --no-deploy > /dev/null\" \"./scripts/deploy_kovan_fork.sh\"",
+    "deploy:fork:goerli": "concurrently \"yarn workspace @equilibria/perennial run node:fork:goerli --no-deploy > /dev/null\" \"./scripts/deploy_goerli_fork.sh\""
   },
   "devDependencies": {
     "@codechecks/client": "^0.1.10",

@@ -12,7 +12,12 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   // NETWORK CONSTANTS
   const dsuAddress = (await getOrNull('DSU'))?.address || (await get('TestnetDSU')).address
   const usdcAddress = (await getOrNull('USDC'))?.address || (await get('TestnetUSDC')).address
-  const batcherAddress = (await getOrNull('Batcher'))?.address || (await get('TestnetBatcher')).address
+  const batcherAddress = (await getOrNull('Batcher'))?.address || (await getOrNull('TestnetBatcher'))?.address
+  if (!batcherAddress) {
+    console.log('Batcher not found. Skipping Forwarder deploy')
+    return
+  }
+
   const collateral: Collateral = new Collateral__factory(deployerSigner).attach((await get('Collateral_Proxy')).address)
 
   console.log('using DSU address: ' + dsuAddress)
