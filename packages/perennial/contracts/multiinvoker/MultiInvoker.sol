@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.15;
 
+import "hardhat/console.sol";
 import "@equilibria/root/control/unstructured/UInitializable.sol";
 
 import "../interfaces/IProduct.sol";
+import "../interfaces/ICollateral.sol";
 import "../interfaces/IMultiInvoker.sol";
 
 contract MultiInvoker is IMultiInvoker, UInitializable {
@@ -42,9 +44,6 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
      * @param invocations The list of invocations to execute in order
      */
     function invoke(Invocation[] calldata invocations) external {
-        ICollateral _collateral = controller.collateral();
-        IIncentivizer incentivizer = controller.incentivizer();
-
         for (uint i = 0; i < invocations.length; i++) {
             Invocation memory invocation = invocations[i];
 
@@ -56,7 +55,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
             // Withdraw from `msg.sender`s `product` collateral account to `account`
             } else if (invocation.action == PerennialAction.WITHDRAW) {
                 (address account, uint amount) = abi.decode(invocation.args, (address, uint));
-                _collateral.withdrawFrom(msg.sender, account, invocation.product, UFixed18.wrap(amount));
+                collateral().withdrawFrom(msg.sender, account, invocation.product, UFixed18.wrap(amount));
 
             // Open a take position on behalf of `msg.sender`
             } else if (invocation.action == PerennialAction.OPEN_TAKE) {
@@ -81,7 +80,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
             // Claim `msg.sender`s incentive reward for `product` programs
             } else if (invocation.action == PerennialAction.CLAIM) {
                 (uint[] memory programIds) = abi.decode(invocation.args, (uint[]));
-                incentivizer.claimFor(msg.sender, invocation.product, programIds);
+                incentivizer().claimFor(msg.sender, invocation.product, programIds);
 
             // Wrap `msg.sender`s USDC into DSU and return the DSU to `account`
             } else if (invocation.action == PerennialAction.WRAP) {
@@ -90,6 +89,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
 
             // Unwrap `msg.sender`s DSU into USDC and return the USDC to `account`
             } else if (invocation.action == PerennialAction.UNWRAP) {
+                console.log("here");
                 (address account, uint amount) = abi.decode(invocation.args, (address, uint));
                 unwrap(msg.sender, account, UFixed18.wrap(amount));
             }
@@ -98,6 +98,10 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
 
     function collateral() private view returns (ICollateral) {
         return controller.collateral();
+    }
+
+    function incentivizer() private view returns (IIncentivizer) {
+        return controller.incentivizer();
     }
 
     function depositTo(address from, address account, IProduct product, UFixed18 amount) private {
