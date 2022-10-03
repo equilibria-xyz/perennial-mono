@@ -33,6 +33,8 @@ import {
   ProxyAdmin__factory,
   TransparentUpgradeableProxy__factory,
   ReservoirFeedOracle,
+  MultiInvoker,
+  MultiInvoker__factory,
 } from '../../../types/generated'
 import { ChainlinkContext } from './chainlinkHelpers'
 import { createPayoffDefinition } from '../../../../common/testutil/types'
@@ -65,6 +67,7 @@ export interface InstanceVars {
   chainlinkOracle: ChainlinkOracle
   productBeacon: IBeacon
   productImpl: Product
+  multiInvoker: MultiInvoker
   incentivizer: Incentivizer
   lens: PerennialLens
   batcher: IBatcher
@@ -116,16 +119,33 @@ export async function deployProtocol(): Promise<InstanceVars> {
     [],
   )
 
+  const multiInvokerImpl = await new MultiInvoker__factory(owner).deploy(
+    usdc.address,
+    controllerProxy.address,
+    batcher.address,
+  )
+  const multiInvokerProxy = await new TransparentUpgradeableProxy__factory(owner).deploy(
+    multiInvokerImpl.address,
+    proxyAdmin.address,
+    [],
+  )
+
   const controller = await new Controller__factory(owner).attach(controllerProxy.address)
   const incentivizer = await new Incentivizer__factory(owner).attach(incentivizerProxy.address)
   const collateral = await new Collateral__factory(owner).attach(collateralProxy.address)
 
   const productImpl = await new Product__factory(owner).deploy()
   const productBeacon = await new UpgradeableBeacon__factory(owner).deploy(productImpl.address)
+  const multiInvoker = await new MultiInvoker__factory(owner).attach(multiInvokerProxy.address)
 
   // Init
   await incentivizer.initialize(controller.address)
-  await controller.initialize(collateral.address, incentivizer.address, productBeacon.address)
+  await controller.initialize(
+    collateral.address,
+    incentivizer.address,
+    productBeacon.address,
+    multiInvokerProxy.address,
+  )
   await collateral.initialize(controller.address)
 
   // Params - TODO: finalize before launch
@@ -178,6 +198,7 @@ export async function deployProtocol(): Promise<InstanceVars> {
     controller,
     productBeacon,
     productImpl,
+    multiInvoker,
     incentivizer,
     collateral,
     lens,

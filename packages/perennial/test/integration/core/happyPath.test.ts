@@ -13,10 +13,11 @@ describe('Happy Path', () => {
   })
 
   it('initializes', async () => {
-    const { collateral, controller, dsu } = instanceVars
+    const { collateral, controller, dsu, multiInvoker } = instanceVars
 
     expect((await collateral.controller()).toUpperCase()).to.equal(controller.address.toUpperCase())
     expect((await collateral.token()).toUpperCase()).to.equal(dsu.address.toUpperCase())
+    expect((await controller.multiInvoker()).toUpperCase()).to.equal(multiInvoker.address.toUpperCase())
   })
 
   it('reverts if already initialized', async () => {
