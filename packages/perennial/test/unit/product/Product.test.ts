@@ -2819,7 +2819,7 @@ describe('Product', () => {
       })
     })
 
-    context.only('*For methods', async () => {
+    context('*For methods', async () => {
       describe('#openMakeFor', async () => {
         it('opens the position', async () => {
           await expect(product.connect(multiInvokerMock).openMakeFor(user.address, POSITION))
