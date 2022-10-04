@@ -27,6 +27,7 @@ describe('Product', () => {
   let user: SignerWithAddress
   let userB: SignerWithAddress
   let userC: SignerWithAddress
+  let multiInvokerMock: SignerWithAddress
   let controllerSigner: SignerWithAddress
   let collateralSigner: SignerWithAddress
   let controller: MockContract
@@ -61,7 +62,7 @@ describe('Product', () => {
   }
 
   beforeEach(async () => {
-    ;[owner, user, userB, userC] = await ethers.getSigners()
+    ;[owner, user, userB, userC, multiInvokerMock] = await ethers.getSigners()
     oracle = await waffle.deployMockContract(owner, IOracleProvider__factory.abi)
     incentivizer = await waffle.deployMockContract(owner, Incentivizer__factory.abi)
 
@@ -77,6 +78,7 @@ describe('Product', () => {
 
     await controller.mock.paused.withArgs().returns(false)
     await controller.mock.collateral.withArgs().returns(collateral.address)
+    await controller.mock.multiInvoker.withArgs().returns(multiInvokerMock.address)
     await controller.mock.incentivizer.withArgs().returns(incentivizer.address)
     await controller.mock.coordinatorFor.withArgs(product.address).returns(1)
     await controller.mock.owner.withArgs(1).returns(owner.address)
@@ -2814,6 +2816,113 @@ describe('Product', () => {
       it('reverts if paused', async () => {
         await controller.mock.paused.withArgs().returns(true)
         await expect(product.connect(user).settleAccount(user.address)).to.be.revertedWith('PausedError()')
+      })
+    })
+
+    context.only('*For methods', async () => {
+      describe('#openMakeFor', async () => {
+        it('opens the position', async () => {
+          await expect(product.connect(multiInvokerMock).openMakeFor(user.address, POSITION))
+            .to.emit(product, 'MakeOpened')
+            .withArgs(user.address, 1, POSITION)
+          expect(await product.isClosed(user.address)).to.equal(false)
+          expect(await product['maintenance(address)'](user.address)).to.equal(0)
+          expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('615'))
+          expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
+          expectPrePositionEq(await product['pre(address)'](user.address), {
+            oracleVersion: 1,
+            openPosition: { maker: POSITION, taker: 0 },
+            closePosition: { maker: 0, taker: 0 },
+          })
+        })
+
+        it('reverts if not from multiInvoker or user', async () => {
+          await expect(product.connect(userB).openMakeFor(user.address, POSITION)).to.be.revertedWith(
+            `ProductNotAllowedError("${user.address}", "${userB.address}")`,
+          )
+        })
+      })
+
+      describe('#closeMakeFor', async () => {
+        beforeEach(async () => {
+          await product.connect(user).openMake(POSITION)
+        })
+
+        it('closes the position', async () => {
+          await expect(product.connect(multiInvokerMock).closeMakeFor(user.address, POSITION))
+            .to.emit(product, 'MakeClosed')
+            .withArgs(user.address, 1, POSITION)
+          expect(await product.isClosed(user.address)).to.equal(true)
+          expect(await product['maintenance(address)'](user.address)).to.equal(0)
+          expect(await product.maintenanceNext(user.address)).to.equal(0)
+          expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
+          expectPrePositionEq(await product['pre(address)'](user.address), {
+            oracleVersion: 1,
+            openPosition: { maker: 0, taker: 0 },
+            closePosition: { maker: 0, taker: 0 },
+          })
+        })
+
+        it('reverts if not from multiInvoker or user', async () => {
+          await expect(product.connect(userB).closeTakeFor(user.address, POSITION)).to.be.revertedWith(
+            `ProductNotAllowedError("${user.address}", "${userB.address}")`,
+          )
+        })
+      })
+
+      describe('#openTakeFor', async () => {
+        beforeEach(async () => {
+          await product.connect(userB).openMake(POSITION.mul(2))
+        })
+
+        it('opens the position', async () => {
+          await expect(product.connect(multiInvokerMock).openTakeFor(user.address, POSITION))
+            .to.emit(product, 'TakeOpened')
+            .withArgs(user.address, 1, POSITION)
+          expect(await product.isClosed(user.address)).to.equal(false)
+          expect(await product['maintenance(address)'](user.address)).to.equal(0)
+          expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('615'))
+          expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
+          expectPrePositionEq(await product['pre(address)'](user.address), {
+            oracleVersion: 1,
+            openPosition: { maker: 0, taker: POSITION },
+            closePosition: { maker: 0, taker: 0 },
+          })
+        })
+
+        it('reverts if not from multiInvoker or user', async () => {
+          await expect(product.connect(userB).openTakeFor(user.address, POSITION)).to.be.revertedWith(
+            `ProductNotAllowedError("${user.address}", "${userB.address}")`,
+          )
+        })
+      })
+
+      describe('#closeTakeFor', async () => {
+        beforeEach(async () => {
+          await product.connect(userB).openMake(POSITION.mul(2))
+          await product.connect(user).openTake(POSITION)
+        })
+
+        it('closes the position', async () => {
+          await expect(product.connect(multiInvokerMock).closeTakeFor(user.address, POSITION))
+            .to.emit(product, 'TakeClosed')
+            .withArgs(user.address, 1, POSITION)
+          expect(await product.isClosed(user.address)).to.equal(true)
+          expect(await product['maintenance(address)'](user.address)).to.equal(0)
+          expect(await product.maintenanceNext(user.address)).to.equal(0)
+          expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
+          expectPrePositionEq(await product['pre(address)'](user.address), {
+            oracleVersion: 1,
+            openPosition: { maker: 0, taker: 0 },
+            closePosition: { maker: 0, taker: 0 },
+          })
+        })
+
+        it('reverts if not from multiInvoker or user', async () => {
+          await expect(product.connect(userB).closeTakeFor(user.address, POSITION)).to.be.revertedWith(
+            `ProductNotAllowedError("${user.address}", "${userB.address}")`,
+          )
+        })
       })
     })
   })

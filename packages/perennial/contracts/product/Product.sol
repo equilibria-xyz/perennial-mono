@@ -211,9 +211,9 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     hasPermission(account)
     settleForAccount(account)
     takerInvariant
-    positionInvariant
-    liquidationInvariant
-    maintenanceInvariant
+    positionInvariant(account)
+    liquidationInvariant(account)
+    maintenanceInvariant(account)
     {
         uint256 _latestVersion = latestVersion();
 
@@ -242,8 +242,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     notPaused
     hasPermission(account)
     settleForAccount(account)
-    closeInvariant
-    liquidationInvariant
+    closeInvariant(account)
+    liquidationInvariant(account)
     {
         _closeTake(account, amount);
     }
@@ -279,9 +279,9 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     settleForAccount(account)
     nonZeroVersionInvariant
     makerInvariant
-    positionInvariant
-    liquidationInvariant
-    maintenanceInvariant
+    positionInvariant(account)
+    liquidationInvariant(account)
+    maintenanceInvariant(account)
     {
         uint256 _latestVersion = latestVersion();
 
@@ -311,8 +311,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     hasPermission(account)
     settleForAccount(account)
     takerInvariant
-    closeInvariant
-    liquidationInvariant
+    closeInvariant(account)
+    liquidationInvariant(account)
     {
         _closeMake(account, amount);
     }
@@ -507,30 +507,30 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     }
 
     /// @dev Ensure that the user has only taken a maker or taker position, but not both
-    modifier positionInvariant {
+    modifier positionInvariant(address account) {
         _;
 
-        if (_positions[msg.sender].isDoubleSided()) revert ProductDoubleSidedError();
+        if (_positions[account].isDoubleSided()) revert ProductDoubleSidedError();
     }
 
     /// @dev Ensure that the user hasn't closed more than is open
-    modifier closeInvariant {
+    modifier closeInvariant(address account) {
         _;
 
-        if (_positions[msg.sender].isOverClosed()) revert ProductOverClosedError();
+        if (_positions[account].isOverClosed()) revert ProductOverClosedError();
     }
 
     /// @dev Ensure that the user will have sufficient margin for maintenance after next settlement
-    modifier maintenanceInvariant {
+    modifier maintenanceInvariant(address account) {
         _;
 
-        if (controller().collateral().liquidatableNext(msg.sender, IProduct(this)))
+        if (controller().collateral().liquidatableNext(account, IProduct(this)))
             revert ProductInsufficientCollateralError();
     }
 
     /// @dev Ensure that the user is not currently being liquidated
-    modifier liquidationInvariant {
-        if (_positions[msg.sender].liquidation) revert ProductInLiquidationError();
+    modifier liquidationInvariant(address account) {
+        if (_positions[account].liquidation) revert ProductInLiquidationError();
 
         _;
     }

@@ -83,6 +83,11 @@ describe('MultiInvoker', () => {
 
     beforeEach(() => {
       actions = {
+        NOOP: {
+          action: 0,
+          product: ethers.constants.AddressZero,
+          args: [],
+        },
         DEPOSIT: {
           action: 1,
           product: product.address,
@@ -131,6 +136,10 @@ describe('MultiInvoker', () => {
       }
       dsu.transferFrom.whenCalledWith(user.address, multiInvoker.address, amount).returns(true)
       usdc.transferFrom.whenCalledWith(user.address, multiInvoker.address, usdcAmount).returns(true)
+    })
+
+    it('does nothing on NOOP action', async () => {
+      await expect(multiInvoker.connect(user).invoke([actions.NOOP])).to.not.be.reverted
     })
 
     it('deposits on DEPOSIT action', async () => {

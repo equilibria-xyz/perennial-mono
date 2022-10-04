@@ -89,7 +89,6 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
 
             // Unwrap `msg.sender`s DSU into USDC and return the USDC to `account`
             } else if (invocation.action == PerennialAction.UNWRAP) {
-                console.log("here");
                 (address account, uint amount) = abi.decode(invocation.args, (address, uint));
                 unwrap(msg.sender, account, UFixed18.wrap(amount));
             }
