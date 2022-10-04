@@ -16,7 +16,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
     IController public immutable controller;
 
     /// @dev Batcher address
-    IBatcher public immutable batcher;
+    Batcher public immutable batcher;
 
     /**
      * @notice Initializes the immutable contract state
@@ -25,7 +25,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
      * @param controller_ Protocol Controller address
      * @param batcher_ Protocol Batcher address
      */
-    constructor(Token6 usdc_, IController controller_, IBatcher batcher_) {
+    constructor(Token6 usdc_, IController controller_, Batcher batcher_) {
         USDC = usdc_;
         controller = controller_;
         batcher = batcher_;
@@ -36,6 +36,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
         Token18 token = _collateral.token();
         token.approve(address(_collateral));
         token.approve(address(batcher));
+        token.approve(address(batcher.RESERVE()));
         USDC.approve(address(batcher));
     }
 
@@ -114,8 +115,8 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
     }
 
     function wrap(address from, address account, UFixed18 amount) private {
-        // Pull the token from the account
-        collateral().token().pull(from, amount);
+        // Pull USDC from the account
+        USDC.pull(from, amount, true);
 
         // Wrap the USDC into DSU and return to the account
         batcher.wrap(amount, account);
@@ -123,9 +124,13 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
 
     function unwrap(address from, address account, UFixed18 amount) private {
         // Pull the token from the account
-        USDC.pull(from, amount);
+        collateral().token().pull(from, amount);
 
         // Unwrap the DSU into USDC and return to the account
-        batcher.unwrap(amount, account);
+        // The current batcher does not have UNWRAP functionality yet, so just go directly to the reserve
+        batcher.RESERVE().redeem(amount);
+
+        // Push the amount to the user
+        USDC.push(account, amount);
     }
 }

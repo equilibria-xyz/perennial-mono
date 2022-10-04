@@ -2,7 +2,7 @@
 pragma solidity 0.8.15;
 
 import "@equilibria/root/token/types/Token6.sol";
-import "@equilibria/emptyset-batcher/interfaces/IBatcher.sol";
+import "@equilibria/emptyset-batcher/batcher/Batcher.sol";
 
 import "./IController.sol";
 import "./IProduct.sol";
@@ -31,7 +31,7 @@ interface IMultiInvoker {
 
     function initialize() external;
     function USDC() external view returns (Token6); // solhint-disable-line func-name-mixedcase
-    function batcher() external view returns (IBatcher);
+    function batcher() external view returns (Batcher);
     function controller() external view returns (IController);
     function invoke(Invocation[] calldata invocations) external;
 }

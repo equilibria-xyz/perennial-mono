@@ -8,13 +8,15 @@ import {
   ICollateral,
   IController,
   IERC20,
-  IBatcher,
   MultiInvoker,
   MultiInvoker__factory,
   IProduct,
   IIncentivizer,
+  IEmptySetReserve,
+  Batcher,
 } from '../../../types/generated'
 import { IMultiInvoker } from '../../../types/generated/contracts/interfaces/IMultiInvoker'
+import { InvokerAction, buildInvokerActions } from '../../util'
 
 const { ethers } = HRE
 use(smock.matchers)
@@ -27,8 +29,9 @@ describe('MultiInvoker', () => {
   let product: FakeContract<IProduct>
   let collateral: FakeContract<ICollateral>
   let controller: FakeContract<IController>
-  let batcher: FakeContract<IBatcher>
+  let batcher: FakeContract<Batcher>
   let incentivizer: FakeContract<IIncentivizer>
+  let reserve: FakeContract<IEmptySetReserve>
   let multiInvoker: MultiInvoker
 
   beforeEach(async () => {
@@ -37,14 +40,16 @@ describe('MultiInvoker', () => {
     usdc = await smock.fake<IERC20>('IERC20')
     dsu = await smock.fake<IERC20>('IERC20')
     collateral = await smock.fake<ICollateral>('ICollateral')
-    batcher = await smock.fake<IBatcher>('IBatcher')
+    batcher = await smock.fake<Batcher>('Batcher')
     controller = await smock.fake<IController>('IController')
     incentivizer = await smock.fake<IIncentivizer>('IIncentivizer')
     product = await smock.fake<IProduct>('IProduct')
+    reserve = await smock.fake<IEmptySetReserve>('IEmptySetReserve')
 
     controller.collateral.returns(collateral.address)
     controller.incentivizer.returns(incentivizer.address)
     collateral.token.returns(dsu.address)
+    batcher.RESERVE.returns(reserve.address)
 
     multiInvoker = await new MultiInvoker__factory(owner).deploy(usdc.address, controller.address, batcher.address)
 
@@ -52,6 +57,8 @@ describe('MultiInvoker', () => {
     dsu.approve.whenCalledWith(collateral.address, ethers.constants.MaxUint256).returns(true)
     dsu.allowance.whenCalledWith(multiInvoker.address, batcher.address).returns(0)
     dsu.approve.whenCalledWith(batcher.address, ethers.constants.MaxUint256).returns(true)
+    dsu.allowance.whenCalledWith(multiInvoker.address, reserve.address).returns(0)
+    dsu.approve.whenCalledWith(reserve.address, ethers.constants.MaxUint256).returns(true)
     usdc.allowance.whenCalledWith(multiInvoker.address, batcher.address).returns(0)
     usdc.approve.whenCalledWith(batcher.address, ethers.constants.MaxUint256).returns(true)
 
@@ -75,67 +82,17 @@ describe('MultiInvoker', () => {
   })
 
   describe('#invoke', () => {
-    let actions: { [key: string]: IMultiInvoker.InvocationStruct }
+    let actions: { [action in InvokerAction]: IMultiInvoker.InvocationStruct }
     const amount = utils.parseEther('100')
     const usdcAmount = 100e6
     const position = utils.parseEther('12')
     const programs = [1, 2, 3]
 
     beforeEach(() => {
-      actions = {
-        NOOP: {
-          action: 0,
-          product: ethers.constants.AddressZero,
-          args: [],
-        },
-        DEPOSIT: {
-          action: 1,
-          product: product.address,
-          args: utils.defaultAbiCoder.encode(['address', 'uint'], [user.address, amount]),
-        },
-        WITHDRAW: {
-          action: 2,
-          product: product.address,
-          args: utils.defaultAbiCoder.encode(['address', 'uint'], [user.address, amount]),
-        },
-        OPEN_TAKE: {
-          action: 3,
-          product: product.address,
-          args: utils.defaultAbiCoder.encode(['uint'], [position]),
-        },
-        CLOSE_TAKE: {
-          action: 4,
-          product: product.address,
-          args: utils.defaultAbiCoder.encode(['uint'], [position]),
-        },
-        OPEN_MAKE: {
-          action: 5,
-          product: product.address,
-          args: utils.defaultAbiCoder.encode(['uint'], [position]),
-        },
-        CLOSE_MAKE: {
-          action: 6,
-          product: product.address,
-          args: utils.defaultAbiCoder.encode(['uint'], [position]),
-        },
-        CLAIM: {
-          action: 7,
-          product: product.address,
-          args: utils.defaultAbiCoder.encode(['uint[]'], [programs]),
-        },
-        WRAP: {
-          action: 8,
-          product: ethers.constants.AddressZero,
-          args: utils.defaultAbiCoder.encode(['address', 'uint'], [user.address, amount]),
-        },
-        UNWRAP: {
-          action: 9,
-          product: ethers.constants.AddressZero,
-          args: utils.defaultAbiCoder.encode(['address', 'uint'], [user.address, amount]),
-        },
-      }
+      actions = buildInvokerActions(user.address, product.address, position, amount, programs)
       dsu.transferFrom.whenCalledWith(user.address, multiInvoker.address, amount).returns(true)
       usdc.transferFrom.whenCalledWith(user.address, multiInvoker.address, usdcAmount).returns(true)
+      usdc.transfer.whenCalledWith(user.address, usdcAmount).returns(true)
     })
 
     it('does nothing on NOOP action', async () => {
@@ -185,18 +142,19 @@ describe('MultiInvoker', () => {
       expect(incentivizer.claimFor).to.have.been.calledWith(user.address, product.address, programs)
     })
 
-    it('wraps DSU to USDC on WRAP action', async () => {
+    it('wraps USDC to DSU on WRAP action', async () => {
       await expect(multiInvoker.connect(user).invoke([actions.WRAP])).to.not.be.reverted
 
-      expect(dsu.transferFrom).to.have.been.calledWith(user.address, multiInvoker.address, amount)
+      expect(usdc.transferFrom).to.have.been.calledWith(user.address, multiInvoker.address, usdcAmount)
       expect(batcher.wrap).to.have.been.calledWith(amount, user.address)
     })
 
-    it('unwraps USDC to DSU on UNWRAP action', async () => {
-      await expect(multiInvoker.connect(user).invoke([actions.UNWRAP])).to.not.be.reverted
+    it('unwraps DSU to USDC on UNWRAP action', async () => {
+      await multiInvoker.connect(user).invoke([actions.UNWRAP])
 
-      expect(usdc.transferFrom).to.have.been.calledWith(user.address, multiInvoker.address, usdcAmount)
-      expect(batcher.unwrap).to.have.been.calledWith(amount, user.address)
+      expect(dsu.transferFrom).to.have.been.calledWith(user.address, multiInvoker.address, amount)
+      expect(reserve.redeem).to.have.been.calledWith(amount)
+      expect(usdc.transfer).to.have.been.calledWith(user.address, usdcAmount)
     })
 
     it('performs a multi invoke', async () => {
@@ -217,11 +175,12 @@ describe('MultiInvoker', () => {
 
       // Wrap/Unwrap
       expect(batcher.wrap).to.have.been.calledWith(amount, user.address)
-      expect(batcher.unwrap).to.have.been.calledWith(amount, user.address)
+      expect(reserve.redeem).to.have.been.calledWith(amount)
 
       // Underlying Transfers
       expect(dsu.transferFrom).to.have.been.calledWith(user.address, multiInvoker.address, amount)
       expect(usdc.transferFrom).to.have.been.calledWith(user.address, multiInvoker.address, usdcAmount)
+      expect(usdc.transfer).to.have.been.calledWith(user.address, usdcAmount)
     })
   })
 })

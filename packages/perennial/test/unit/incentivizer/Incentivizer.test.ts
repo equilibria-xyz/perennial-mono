@@ -2311,6 +2311,12 @@ describe('Incentivizer', () => {
       expect(await incentivizer.unclaimed(product.address, user.address, 1)).to.equal(0)
     })
 
+    it('reverts if not called by multiinvoker or user', async () => {
+      await expect(incentivizer.connect(owner).claimFor(user.address, user.address, [2])).to.be.revertedWith(
+        `IncentivizerOperatorNotAllowedError("${user.address}", "${owner.address}")`,
+      )
+    })
+
     it('reverts if not valid product', async () => {
       await controller.mock['isProduct(address)'].withArgs(user.address).returns(false)
       await expect(incentivizer.connect(multiInvokerMock).claimFor(user.address, user.address, [2])).to.be.revertedWith(
