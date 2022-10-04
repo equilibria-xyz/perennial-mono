@@ -284,7 +284,7 @@ describe('Collateral', () => {
       })
     })
 
-    describe.only('#withdrawFrom permissions', () => {
+    describe('#withdrawFrom permissions', () => {
       it('reverts if not from user or multiinvoker', async () => {
         await expect(
           collateral
