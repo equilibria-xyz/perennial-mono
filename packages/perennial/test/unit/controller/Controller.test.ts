@@ -11,10 +11,10 @@ import {
   Controller__factory,
   Product__factory,
   Incentivizer__factory,
+  MultiInvoker__factory,
   IContractPayoffProvider__factory,
   IBeacon__factory,
   IOracleProvider__factory,
-  MultiInvoker__factory,
 } from '../../../types/generated'
 import { createPayoffDefinition } from '../../../../common/testutil/types'
 
@@ -417,6 +417,30 @@ describe('Controller', () => {
 
     it('reverts on invalid address', async () => {
       await expect(controller.updateProductBeacon(user.address)).to.be.revertedWith(
+        'ControllerNotContractAddressError()',
+      )
+    })
+  })
+
+  describe('#updateMultiInvoker', async () => {
+    it('updates the multiInvoker address', async () => {
+      const newMultiInvoker = await waffle.deployMockContract(owner, MultiInvoker__factory.abi)
+      await expect(controller.updateMultiInvoker(newMultiInvoker.address))
+        .to.emit(controller, 'MultiInvokerUpdated')
+        .withArgs(newMultiInvoker.address)
+
+      expect(await controller.multiInvoker()).to.equal(newMultiInvoker.address)
+    })
+
+    it('reverts if not owner', async () => {
+      const newMultiInvoker = await waffle.deployMockContract(owner, MultiInvoker__factory.abi)
+      await expect(controller.connect(user).updateMultiInvoker(newMultiInvoker.address)).to.be.revertedWith(
+        'ControllerNotOwnerError(0)',
+      )
+    })
+
+    it('reverts on invalid address', async () => {
+      await expect(controller.updateMultiInvoker(user.address)).to.be.revertedWith(
         'ControllerNotContractAddressError()',
       )
     })

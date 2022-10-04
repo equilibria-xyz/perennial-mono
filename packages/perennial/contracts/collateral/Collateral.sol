@@ -92,7 +92,7 @@ contract Collateral is ICollateral, UInitializable, UControllerProvider, UReentr
     maintenanceInvariant(from, product)
     {
         if (!(from == msg.sender || msg.sender == address(controller().multiInvoker()))) {
-            revert CollateralNotAllowError(msg.sender, from);
+            revert CollateralNotAllowedError(from, msg.sender);
         }
         amount = amount.eq(UFixed18Lib.MAX) ? collateral(from, product) : amount;
         _products[product].debitAccount(from, amount);

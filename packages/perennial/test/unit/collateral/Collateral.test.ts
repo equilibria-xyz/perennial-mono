@@ -143,24 +143,24 @@ describe('Collateral', () => {
       },
     ]
 
+    beforeEach(async () => {
+      // Mock settle calls
+      await product.mock.settleAccount.withArgs(user.address).returns()
+      await product.mock.settleAccount.withArgs(userB.address).returns()
+
+      // Mock maintenance calls
+      await product.mock.maintenance.withArgs(user.address).returns(0)
+      await product.mock.maintenanceNext.withArgs(user.address).returns(0)
+      await product.mock.maintenance.withArgs(userB.address).returns(0)
+      await product.mock.maintenanceNext.withArgs(userB.address).returns(0)
+
+      //Pre-fill account
+      await token.mock.transferFrom.withArgs(owner.address, collateral.address, 100).returns(true)
+      await collateral.connect(owner).depositTo(user.address, product.address, 100)
+    })
+
     WITHDRAWAL_METHODS.forEach(({ method, fn }) => {
       describe(method, async () => {
-        beforeEach(async () => {
-          // Mock settle calls
-          await product.mock.settleAccount.withArgs(user.address).returns()
-          await product.mock.settleAccount.withArgs(userB.address).returns()
-
-          // Mock maintenance calls
-          await product.mock.maintenance.withArgs(user.address).returns(0)
-          await product.mock.maintenanceNext.withArgs(user.address).returns(0)
-          await product.mock.maintenance.withArgs(userB.address).returns(0)
-          await product.mock.maintenanceNext.withArgs(userB.address).returns(0)
-
-          //Pre-fill account
-          await token.mock.transferFrom.withArgs(owner.address, collateral.address, 100).returns(true)
-          await collateral.connect(owner).depositTo(user.address, product.address, 100)
-        })
-
         it('withdraws from the user account', async () => {
           await token.mock.transfer.withArgs(owner.address, 80).returns(true)
           await expect(fn(owner.address, product.address, 80))
@@ -281,6 +281,16 @@ describe('Collateral', () => {
             await expect(fn(user.address, product.address, 300)).to.be.revertedWith('0x11') // underflow
           })
         })
+      })
+    })
+
+    describe.only('#withdrawFrom permissions', () => {
+      it('reverts if not from user or multiinvoker', async () => {
+        await expect(
+          collateral
+            .connect(userB.address)
+            .withdrawFrom(user.address, userB.address, product.address, utils.parseEther('100')),
+        ).to.be.revertedWith(`CollateralNotAllowedError("${user.address}", "${userB.address}")`)
       })
     })
   })
