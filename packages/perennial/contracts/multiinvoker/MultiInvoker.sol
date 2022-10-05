@@ -54,38 +54,38 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
 
             // Deposit from `msg.sender` into `account`s `product` collateral account
             if (invocation.action == PerennialAction.DEPOSIT) {
-                (address account, uint256 amount) = abi.decode(invocation.args, (address, uint256));
-                depositTo(account, invocation.product, UFixed18.wrap(amount));
+                (address account, IProduct product, UFixed18 amount) = abi.decode(invocation.args, (address, IProduct, UFixed18));
+                depositTo(account, product, amount);
 
             // Withdraw from `msg.sender`s `product` collateral account to `receiver`
             } else if (invocation.action == PerennialAction.WITHDRAW) {
-                (address receiver, uint256 amount) = abi.decode(invocation.args, (address, uint256));
-                controller.collateral().withdrawFrom(msg.sender, receiver, invocation.product, UFixed18.wrap(amount));
+                (address receiver, IProduct product, UFixed18 amount) = abi.decode(invocation.args, (address, IProduct, UFixed18));
+                controller.collateral().withdrawFrom(msg.sender, receiver, product, amount);
 
             // Open a take position on behalf of `msg.sender`
             } else if (invocation.action == PerennialAction.OPEN_TAKE) {
-                (uint256 amount) = abi.decode(invocation.args, (uint256));
-                invocation.product.openTakeFor(msg.sender, UFixed18.wrap(amount));
+                (IProduct product, uint256 amount) = abi.decode(invocation.args, (IProduct, uint256));
+                product.openTakeFor(msg.sender, UFixed18.wrap(amount));
 
             // Close a take position on behalf of `msg.sender`
             } else if (invocation.action == PerennialAction.CLOSE_TAKE) {
-                (uint256 amount) = abi.decode(invocation.args, (uint256));
-                invocation.product.closeTakeFor(msg.sender, UFixed18.wrap(amount));
+                (IProduct product, uint256 amount) = abi.decode(invocation.args, (IProduct, uint256));
+                product.closeTakeFor(msg.sender, UFixed18.wrap(amount));
 
             // Open a make position on behalf of `msg.sender`
             } else if (invocation.action == PerennialAction.OPEN_MAKE) {
-                (uint256 amount) = abi.decode(invocation.args, (uint256));
-                invocation.product.openMakeFor(msg.sender, UFixed18.wrap(amount));
+                (IProduct product, uint256 amount) = abi.decode(invocation.args, (IProduct, uint256));
+                product.openMakeFor(msg.sender, UFixed18.wrap(amount));
 
             // Close a make position on behalf of `msg.sender`
             } else if (invocation.action == PerennialAction.CLOSE_MAKE) {
-                (uint256 amount) = abi.decode(invocation.args, (uint256));
-                invocation.product.closeMakeFor(msg.sender, UFixed18.wrap(amount));
+                (IProduct product, uint256 amount) = abi.decode(invocation.args, (IProduct, uint256));
+                product.closeMakeFor(msg.sender, UFixed18.wrap(amount));
 
             // Claim `msg.sender`s incentive reward for `product` programs
             } else if (invocation.action == PerennialAction.CLAIM) {
-                (uint256[] memory programIds) = abi.decode(invocation.args, (uint256[]));
-                controller.incentivizer().claimFor(msg.sender, invocation.product, programIds);
+                (IProduct product, uint256[] memory programIds) = abi.decode(invocation.args, (IProduct, uint256[]));
+                controller.incentivizer().claimFor(msg.sender, product, programIds);
 
             // Wrap `msg.sender`s USDC into DSU and return the DSU to `account`
             } else if (invocation.action == PerennialAction.WRAP) {

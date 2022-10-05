@@ -25,7 +25,6 @@ interface IMultiInvoker {
     /// @dev Struct for action invocation
     struct Invocation {
         PerennialAction action;
-        IProduct product;
         bytes args;
     }
 

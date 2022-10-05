@@ -1,4 +1,4 @@
-import { constants, utils, BigNumberish } from 'ethers'
+import { utils, BigNumberish } from 'ethers'
 import { IMultiInvoker } from '../types/generated/contracts/interfaces/IMultiInvoker'
 
 export type InvokerAction =
@@ -23,52 +23,42 @@ export const buildInvokerActions = (
   return {
     NOOP: {
       action: 0,
-      product: constants.AddressZero,
       args: '0x',
     },
     DEPOSIT: {
       action: 1,
-      product: productAddress,
-      args: utils.defaultAbiCoder.encode(['address', 'uint'], [userAddress, amount]),
+      args: utils.defaultAbiCoder.encode(['address', 'address', 'uint'], [userAddress, productAddress, amount]),
     },
     WITHDRAW: {
       action: 2,
-      product: productAddress,
-      args: utils.defaultAbiCoder.encode(['address', 'uint'], [userAddress, amount]),
+      args: utils.defaultAbiCoder.encode(['address', 'address', 'uint'], [userAddress, productAddress, amount]),
     },
     OPEN_TAKE: {
       action: 3,
-      product: productAddress,
-      args: utils.defaultAbiCoder.encode(['uint'], [position]),
+      args: utils.defaultAbiCoder.encode(['address', 'uint'], [productAddress, position]),
     },
     CLOSE_TAKE: {
       action: 4,
-      product: productAddress,
-      args: utils.defaultAbiCoder.encode(['uint'], [position]),
+      args: utils.defaultAbiCoder.encode(['address', 'uint'], [productAddress, position]),
     },
     OPEN_MAKE: {
       action: 5,
-      product: productAddress,
-      args: utils.defaultAbiCoder.encode(['uint'], [position]),
+      args: utils.defaultAbiCoder.encode(['address', 'uint'], [productAddress, position]),
     },
     CLOSE_MAKE: {
       action: 6,
-      product: productAddress,
-      args: utils.defaultAbiCoder.encode(['uint'], [position]),
+      args: utils.defaultAbiCoder.encode(['address', 'uint'], [productAddress, position]),
     },
     CLAIM: {
       action: 7,
-      product: productAddress,
-      args: utils.defaultAbiCoder.encode(['uint[]'], [programs]),
+      args: utils.defaultAbiCoder.encode(['address', 'uint[]'], [productAddress, programs]),
     },
     WRAP: {
       action: 8,
-      product: constants.AddressZero,
       args: utils.defaultAbiCoder.encode(['address', 'uint'], [userAddress, amount]),
     },
     UNWRAP: {
       action: 9,
-      product: constants.AddressZero,
       args: utils.defaultAbiCoder.encode(['address', 'uint'], [userAddress, amount]),
     },
   }
