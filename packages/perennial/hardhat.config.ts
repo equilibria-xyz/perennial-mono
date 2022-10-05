@@ -20,6 +20,7 @@ const config = defaultConfig({
     goerli: [`${eqPerennialOracleDir}/deployments/goerli`],
     mainnet: [`${eqPerennialOracleDir}/deployments/mainnet`],
     hardhat: [`${eqPerennialOracleDir}/deployments/mainnet`],
+    optimismGoerli: [`${eqPerennialOracleDir}/deployments/optimismGoerli`],
     localhost: [`${eqPerennialOracleDir}/deployments/localhost`],
   },
   dependencyPaths: [

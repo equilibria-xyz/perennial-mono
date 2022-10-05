@@ -11,6 +11,8 @@ export function getChainId(networkName: string): number {
       return 5
     case 'kovan':
       return 42
+    case 'optimismGoerli':
+      return 420
     case 'hardhat':
       return 31337
     default:
@@ -24,6 +26,7 @@ export function isTestnet(networkName: string): boolean {
     case 'kovan':
     case 'goerli':
     case 'rinkeby':
+    case 'optimismGoerli':
       return true
     default:
       return false

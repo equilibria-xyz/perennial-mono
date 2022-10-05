@@ -23,8 +23,9 @@ const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || ''
 const ALCHEMY_MAINNET = process.env.ALCHEMY_MAINNET || ''
 const ALCHEMY_ROPSTEN = process.env.ALCHEMY_ROPSTEN || ''
 const ALCHEMY_KOVAN = process.env.ALCHEMY_KOVAN || ''
-const FORK_ENABLED = process.env.FORK_ENABLED === 'true' || false
 const ALCHEMY_GOERLI = process.env.ALCHEMY_GOERLI || ''
+const OPTIMISM_GOERLI_URL = process.env.OPTIMISM_GOERLI_URL || ''
+const FORK_ENABLED = process.env.FORK_ENABLED === 'true' || false
 const FORK_NETWORK = process.env.FORK_NETWORK || 'mainnet'
 const FORK_BLOCK_NUMBER = process.env.FORK_BLOCK_NUMBER ? parseInt(process.env.FORK_BLOCK_NUMBER) : undefined
 const NODE_INTERVAL_MINING = process.env.NODE_INTERVAL_MINING ? parseInt(process.env.NODE_INTERVAL_MINING) : undefined
@@ -43,6 +44,8 @@ function getUrl(networkName: string): string {
       return ALCHEMY_KOVAN
     case 'goerli':
       return ALCHEMY_GOERLI
+    case 'optimismGoerli':
+      return OPTIMISM_GOERLI_URL
     default:
       return ''
   }
@@ -96,6 +99,7 @@ export default function defaultConfig({
       rinkeby: createNetworkConfig('rinkeby'),
       ropsten: createNetworkConfig('ropsten'),
       mainnet: createNetworkConfig('mainnet'),
+      optimismGoerli: createNetworkConfig('optimismGoerli'),
     },
     solidity: {
       compilers: [
@@ -154,6 +158,7 @@ export default function defaultConfig({
         kovan: ['external/deployments/kovan', ...(externalDeployments?.kovan || [])],
         goerli: ['external/deployments/goerli', ...(externalDeployments?.goerli || [])],
         mainnet: ['external/deployments/mainnet', ...(externalDeployments?.mainnet || [])],
+        optimismGoerli: ['external/deployments/optimismGoerli', ...(externalDeployments?.optimismGoerli || [])],
         hardhat: [FORK_ENABLED ? `external/deployments/${FORK_NETWORK}` : '', ...(externalDeployments?.hardhat || [])],
         localhost: [
           FORK_ENABLED ? `external/deployments/${FORK_NETWORK}` : '',

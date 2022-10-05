@@ -9,6 +9,10 @@ const config = defaultConfig({
     kovan: [`${eqPerennialDir}/deployments/kovan`, `${eqPerennialOracleDir}/deployments/kovan`],
     goerli: [`${eqPerennialDir}/deployments/goerli`, `${eqPerennialOracleDir}/deployments/goerli`],
     mainnet: [`${eqPerennialDir}/deployments/mainnet`, `${eqPerennialOracleDir}/deployments/mainnet`],
+    optimismGoerli: [
+      `${eqPerennialDir}/deployments/optimismGoerli`,
+      `${eqPerennialOracleDir}/deployments/optimismGoerli`,
+    ],
     hardhat: [`${eqPerennialDir}/deployments/mainnet`, `${eqPerennialOracleDir}/deployments/mainnet`],
     localhost: [`${eqPerennialDir}/deployments/localhost`, `${eqPerennialOracleDir}/deployments/localhost`],
   },
