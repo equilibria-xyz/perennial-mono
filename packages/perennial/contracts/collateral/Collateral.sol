@@ -64,41 +64,39 @@ contract Collateral is ICollateral, UInitializable, UControllerProvider, UReentr
 
     /**
      * @notice Withdraws `amount` collateral from `msg.sender`'s `product` account
-     *         and sends it to `account`
-     * @param account Account to withdraw the collateral to
+     *         and sends it to `receiver`
+     * @param receiver Account to withdraw the collateral to
      * @param product Product to withdraw the collateral from
      * @param amount Amount of collateral to withdraw
      */
-    function withdrawTo(address account, IProduct product, UFixed18 amount) external {
-        withdrawFrom(msg.sender, account, product, amount);
+    function withdrawTo(address receiver, IProduct product, UFixed18 amount) external {
+        withdrawFrom(msg.sender, receiver, product, amount);
     }
 
     /**
-     * @notice Withdraws `amount` collateral from `from`'s `product` account
-     *         and sends it to `account`
-     * @param from Account to withdraw the collateral from
-     * @param account Account to withdraw the collateral to
+     * @notice Withdraws `amount` collateral from `account`'s `product` account
+     *         and sends it to `receiver`
+     * @param account Account to withdraw the collateral from
+     * @param receiver Account to withdraw the collateral to
      * @param product Product to withdraw the collateral from
      * @param amount Amount of collateral to withdraw
      */
-    function withdrawFrom(address from, address account, IProduct product, UFixed18 amount)
+    function withdrawFrom(address account, address receiver, IProduct product, UFixed18 amount)
     public
     nonReentrant
     notPaused
-    notZeroAddress(account)
+    notZeroAddress(receiver)
     isProduct(product)
-    settleForAccount(from, product)
-    collateralInvariant(from, product)
-    maintenanceInvariant(from, product)
+    onlyAccountOrMultiInvoker(account)
+    settleForAccount(account, product)
+    collateralInvariant(account, product)
+    maintenanceInvariant(account, product)
     {
-        if (!(from == msg.sender || msg.sender == address(controller().multiInvoker()))) {
-            revert CollateralNotAllowedError(from, msg.sender);
-        }
-        amount = amount.eq(UFixed18Lib.MAX) ? collateral(from, product) : amount;
-        _products[product].debitAccount(from, amount);
-        token.push(account, amount);
+        amount = amount.eq(UFixed18Lib.MAX) ? collateral(account, product) : amount;
+        _products[product].debitAccount(account, amount);
+        token.push(receiver, amount);
 
-        emit Withdrawal(from, product, amount);
+        emit Withdrawal(account, product, amount);
     }
 
     /**

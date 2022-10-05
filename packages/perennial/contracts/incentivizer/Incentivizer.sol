@@ -152,7 +152,7 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
     function claimFor(address account, IProduct product, uint256[] calldata programIds)
     external
     nonReentrant
-    hasPermission(account)
+    onlyAccountOrMultiInvoker(account)
     {
         _claimProduct(account, product, programIds);
     }
@@ -330,14 +330,6 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
     modifier isProgram(IProduct product, uint256 programId) {
         if (!_products[product].valid(programId)) revert IncentivizerInvalidProgramError(product, programId);
 
-        _;
-    }
-
-    /// @dev Ensure the `msg.sender` has permission to act on behalf of `account
-    modifier hasPermission(address account) {
-        if (!(account == msg.sender || msg.sender == address(controller().multiInvoker()))) {
-            revert IncentivizerOperatorNotAllowedError(account, msg.sender);
-        }
         _;
     }
 }

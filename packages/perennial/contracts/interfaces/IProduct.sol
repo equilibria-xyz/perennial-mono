@@ -62,7 +62,6 @@ interface IProduct is IPayoffProvider, IParamProvider {
     error ProductNotOwnerError();
     error ProductInvalidOracle();
     error ProductClosedError();
-    error ProductNotAllowedError(address account, address operator);
 
     function name() external view returns (string memory);
     function symbol() external view returns (string memory);

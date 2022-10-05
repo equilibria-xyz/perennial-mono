@@ -208,7 +208,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     nonReentrant
     notPaused
     notClosed
-    hasPermission(account)
+    onlyAccountOrMultiInvoker(account)
     settleForAccount(account)
     takerInvariant
     positionInvariant(account)
@@ -240,7 +240,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     public
     nonReentrant
     notPaused
-    hasPermission(account)
+    onlyAccountOrMultiInvoker(account)
     settleForAccount(account)
     closeInvariant(account)
     liquidationInvariant(account)
@@ -275,7 +275,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     nonReentrant
     notPaused
     notClosed
-    hasPermission(account)
+    onlyAccountOrMultiInvoker(account)
     settleForAccount(account)
     nonZeroVersionInvariant
     makerInvariant
@@ -308,7 +308,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     public
     nonReentrant
     notPaused
-    hasPermission(account)
+    onlyAccountOrMultiInvoker(account)
     settleForAccount(account)
     takerInvariant
     closeInvariant(account)
@@ -554,14 +554,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     modifier notClosed {
         if (closed()) revert ProductClosedError();
 
-        _;
-    }
-
-    /// @dev Ensure the `msg.sender` has permission to act on behalf of `account
-    modifier hasPermission(address account) {
-        if (!(account == msg.sender || msg.sender == address(controller().multiInvoker()))) {
-            revert ProductNotAllowedError(account, msg.sender);
-        }
         _;
     }
 }

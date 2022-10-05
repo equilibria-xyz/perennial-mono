@@ -2313,7 +2313,7 @@ describe('Incentivizer', () => {
 
     it('reverts if not called by multiinvoker or user', async () => {
       await expect(incentivizer.connect(owner).claimFor(user.address, user.address, [2])).to.be.revertedWith(
-        `IncentivizerOperatorNotAllowedError("${user.address}", "${owner.address}")`,
+        `NotAccountOrMultiInvokerError("${user.address}", "${owner.address}")`,
       )
     })
 

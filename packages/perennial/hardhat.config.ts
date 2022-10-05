@@ -10,7 +10,7 @@ const config = defaultConfig({
       settings: {
         optimizer: {
           enabled: OPTIMIZER_ENABLED,
-          runs: 3200, // Maximum value as of commit e6b7ab7
+          runs: 5800, // Maximum value as of commit e6b7ab7
         },
       },
     },

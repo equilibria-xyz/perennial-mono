@@ -26,8 +26,8 @@ contract Controller is IController, UInitializable {
     function productBeacon() public view returns (IBeacon) { return IBeacon(_productBeacon.read()); }
 
     /// @dev MultiInvoker contract address for the protocol
-    AddressStorage private constant _mutliInvoker = AddressStorage.wrap(keccak256("equilibria.perennial.Controller.multiInvoker"));
-    function multiInvoker() public view returns (IMultiInvoker) { return IMultiInvoker(_mutliInvoker.read()); }
+    AddressStorage private constant _multiInvoker = AddressStorage.wrap(keccak256("equilibria.perennial.Controller.multiInvoker"));
+    function multiInvoker() public view returns (IMultiInvoker) { return IMultiInvoker(_multiInvoker.read()); }
 
     /// @dev Percent of collected fees that go to the protocol treasury vs the product treasury
     UFixed18Storage private constant _protocolFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.Controller.protocolFee"));
@@ -214,7 +214,7 @@ contract Controller is IController, UInitializable {
      */
     function updateMultiInvoker(IMultiInvoker newMultiInvoker) public onlyOwner(0) {
         if (!Address.isContract(address(newMultiInvoker))) revert ControllerNotContractAddressError();
-        _mutliInvoker.store(address(newMultiInvoker));
+        _multiInvoker.store(address(newMultiInvoker));
         emit MultiInvokerUpdated(newMultiInvoker);
     }
 

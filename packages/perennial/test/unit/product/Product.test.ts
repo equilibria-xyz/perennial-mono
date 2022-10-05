@@ -2838,7 +2838,7 @@ describe('Product', () => {
 
         it('reverts if not from multiInvoker or user', async () => {
           await expect(product.connect(userB).openMakeFor(user.address, POSITION)).to.be.revertedWith(
-            `ProductNotAllowedError("${user.address}", "${userB.address}")`,
+            `NotAccountOrMultiInvokerError("${user.address}", "${userB.address}")`,
           )
         })
       })
@@ -2865,7 +2865,7 @@ describe('Product', () => {
 
         it('reverts if not from multiInvoker or user', async () => {
           await expect(product.connect(userB).closeTakeFor(user.address, POSITION)).to.be.revertedWith(
-            `ProductNotAllowedError("${user.address}", "${userB.address}")`,
+            `NotAccountOrMultiInvokerError("${user.address}", "${userB.address}")`,
           )
         })
       })
@@ -2892,7 +2892,7 @@ describe('Product', () => {
 
         it('reverts if not from multiInvoker or user', async () => {
           await expect(product.connect(userB).openTakeFor(user.address, POSITION)).to.be.revertedWith(
-            `ProductNotAllowedError("${user.address}", "${userB.address}")`,
+            `NotAccountOrMultiInvokerError("${user.address}", "${userB.address}")`,
           )
         })
       })
@@ -2920,7 +2920,7 @@ describe('Product', () => {
 
         it('reverts if not from multiInvoker or user', async () => {
           await expect(product.connect(userB).closeTakeFor(user.address, POSITION)).to.be.revertedWith(
-            `ProductNotAllowedError("${user.address}", "${userB.address}")`,
+            `NotAccountOrMultiInvokerError("${user.address}", "${userB.address}")`,
           )
         })
       })

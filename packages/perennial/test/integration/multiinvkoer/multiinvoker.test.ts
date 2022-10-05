@@ -20,7 +20,7 @@ describe('MultiInvoker', () => {
       const { multiInvoker, usdc, dsu, batcher, collateral } = instanceVars
 
       expect(await dsu.allowance(multiInvoker.address, collateral.address)).to.equal(constants.MaxUint256)
-      expect(await dsu.allowance(multiInvoker.address, batcher.address)).to.equal(constants.MaxUint256)
+      expect(await dsu.allowance(multiInvoker.address, await batcher.RESERVE())).to.equal(constants.MaxUint256)
       expect(await usdc.allowance(multiInvoker.address, batcher.address)).to.equal(constants.MaxUint256)
     })
 

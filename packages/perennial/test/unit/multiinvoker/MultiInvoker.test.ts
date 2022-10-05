@@ -76,7 +76,7 @@ describe('MultiInvoker', () => {
   describe('#initialize', () => {
     it('initializes correctly', async () => {
       expect(dsu.approve).to.be.calledWith(collateral.address, ethers.constants.MaxUint256)
-      expect(dsu.approve).to.be.calledWith(batcher.address, ethers.constants.MaxUint256)
+      expect(dsu.approve).to.be.calledWith(reserve.address, ethers.constants.MaxUint256)
       expect(usdc.approve).to.be.calledWith(batcher.address, ethers.constants.MaxUint256)
     })
   })

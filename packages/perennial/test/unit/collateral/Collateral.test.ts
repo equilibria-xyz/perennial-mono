@@ -290,7 +290,7 @@ describe('Collateral', () => {
           collateral
             .connect(userB.address)
             .withdrawFrom(user.address, userB.address, product.address, utils.parseEther('100')),
-        ).to.be.revertedWith(`CollateralNotAllowedError("${user.address}", "${userB.address}")`)
+        ).to.be.revertedWith(`NotAccountOrMultiInvokerError("${user.address}", "${userB.address}")`)
       })
     })
   })
