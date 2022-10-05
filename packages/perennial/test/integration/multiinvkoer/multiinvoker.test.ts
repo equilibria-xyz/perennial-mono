@@ -2,7 +2,6 @@ import { expect } from 'chai'
 import { BigNumber, constants, utils } from 'ethers'
 import { time } from '../../../../common/testutil'
 import { Product } from '../../../types/generated'
-import { collateral } from '../../../types/generated/contracts'
 import { IMultiInvoker } from '../../../types/generated/contracts/interfaces/IMultiInvoker'
 import { buildInvokerActions, InvokerAction } from '../../util'
 import { YEAR } from '../core/incentivizer.test'
@@ -57,6 +56,15 @@ describe('MultiInvoker', () => {
       programs = [PROGRAM_ID.toNumber()]
       actions = buildInvokerActions(user.address, product.address, position, amount, programs)
       partialActions = buildInvokerActions(user.address, product.address, position.div(2), amount.div(2), programs)
+    })
+
+    it('does nothing on NOOP', async () => {
+      const { user, multiInvoker } = instanceVars
+
+      const tx = await multiInvoker.connect(user).invoke([actions.NOOP])
+      const receipt = await tx.wait()
+      expect(receipt.status).to.equal(1)
+      expect(receipt.logs.length).to.equal(0)
     })
 
     it('performs a WRAP, DEPOSIT, and OPEN_MAKE chain', async () => {
