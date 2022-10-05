@@ -64,23 +64,23 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
 
             // Open a take position on behalf of `msg.sender`
             } else if (invocation.action == PerennialAction.OPEN_TAKE) {
-                (IProduct product, uint256 amount) = abi.decode(invocation.args, (IProduct, uint256));
-                product.openTakeFor(msg.sender, UFixed18.wrap(amount));
+                (IProduct product, UFixed18 amount) = abi.decode(invocation.args, (IProduct, UFixed18));
+                product.openTakeFor(msg.sender, amount);
 
             // Close a take position on behalf of `msg.sender`
             } else if (invocation.action == PerennialAction.CLOSE_TAKE) {
-                (IProduct product, uint256 amount) = abi.decode(invocation.args, (IProduct, uint256));
-                product.closeTakeFor(msg.sender, UFixed18.wrap(amount));
+                (IProduct product, UFixed18 amount) = abi.decode(invocation.args, (IProduct, UFixed18));
+                product.closeTakeFor(msg.sender, amount);
 
             // Open a make position on behalf of `msg.sender`
             } else if (invocation.action == PerennialAction.OPEN_MAKE) {
-                (IProduct product, uint256 amount) = abi.decode(invocation.args, (IProduct, uint256));
-                product.openMakeFor(msg.sender, UFixed18.wrap(amount));
+                (IProduct product, UFixed18 amount) = abi.decode(invocation.args, (IProduct, UFixed18));
+                product.openMakeFor(msg.sender, amount);
 
             // Close a make position on behalf of `msg.sender`
             } else if (invocation.action == PerennialAction.CLOSE_MAKE) {
-                (IProduct product, uint256 amount) = abi.decode(invocation.args, (IProduct, uint256));
-                product.closeMakeFor(msg.sender, UFixed18.wrap(amount));
+                (IProduct product, UFixed18 amount) = abi.decode(invocation.args, (IProduct, UFixed18));
+                product.closeMakeFor(msg.sender, amount);
 
             // Claim `msg.sender`s incentive reward for `product` programs
             } else if (invocation.action == PerennialAction.CLAIM) {
@@ -89,13 +89,13 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
 
             // Wrap `msg.sender`s USDC into DSU and return the DSU to `account`
             } else if (invocation.action == PerennialAction.WRAP) {
-                (address receiver, uint256 amount) = abi.decode(invocation.args, (address, uint256));
-                wrap(receiver, UFixed18.wrap(amount));
+                (address receiver, UFixed18 amount) = abi.decode(invocation.args, (address, UFixed18));
+                wrap(receiver, amount);
 
             // Unwrap `msg.sender`s DSU into USDC and return the USDC to `account`
             } else if (invocation.action == PerennialAction.UNWRAP) {
-                (address receiver, uint256 amount) = abi.decode(invocation.args, (address, uint256));
-                unwrap(receiver, UFixed18.wrap(amount));
+                (address receiver, UFixed18 amount) = abi.decode(invocation.args, (address, UFixed18));
+                unwrap(receiver, amount);
             }
         }
     }
