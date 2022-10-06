@@ -25,7 +25,7 @@ describe('MultiInvoker', () => {
     })
 
     it('reverts if already initialized', async () => {
-      await expect(instanceVars.multiInvoker.initialize()).to.be.revertedWith(
+      await expect(instanceVars.multiInvoker.initialize(instanceVars.controller.address)).to.be.revertedWith(
         'UInitializableAlreadyInitializedError(1)',
       )
     })

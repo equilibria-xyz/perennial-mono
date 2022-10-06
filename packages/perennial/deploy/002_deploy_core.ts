@@ -65,6 +65,15 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     autoMine: true,
   })
 
+  const multiInvokerImpl: Deployment = await deploy('MultiInvoker_Impl', {
+    contract: 'MultiInvoker',
+    args: [usdcAddress, batcherAddress],
+    from: deployer,
+    skipIfAlreadyDeployed: true,
+    log: true,
+    autoMine: true,
+  })
+
   const controllerImpl: Deployment = await deploy('Controller_Impl', {
     contract: 'Controller',
     from: deployer,
@@ -122,29 +131,18 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     autoMine: true,
   })
 
-  const controllerProxyDeploy = await deploy('Controller_Proxy', {
-    contract: 'TransparentUpgradeableProxy',
-    args: [controllerImpl.address, proxyAdmin.address, '0x'],
-    from: deployer,
-    skipIfAlreadyDeployed: true,
-    log: true,
-    autoMine: true,
-  })
-
-  // MULTIINVOKER
-
-  const multiInvokerImpl: Deployment = await deploy('MultiInvoker_Impl', {
-    contract: 'MultiInvoker',
-    args: [usdcAddress, controllerProxyDeploy.address, batcherAddress],
-    from: deployer,
-    skipIfAlreadyDeployed: true,
-    log: true,
-    autoMine: true,
-  })
-
   await deploy('MultiInvoker_Proxy', {
     contract: 'TransparentUpgradeableProxy',
     args: [multiInvokerImpl.address, proxyAdmin.address, '0x'],
+    from: deployer,
+    skipIfAlreadyDeployed: true,
+    log: true,
+    autoMine: true,
+  })
+
+  await deploy('Controller_Proxy', {
+    contract: 'TransparentUpgradeableProxy',
+    args: [controllerImpl.address, proxyAdmin.address, '0x'],
     from: deployer,
     skipIfAlreadyDeployed: true,
     log: true,
@@ -186,12 +184,11 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     process.stdout.write('complete.\n')
   }
 
-  const DSU = IERC20__factory.connect(dsuAddress, deployerSigner)
-  if ((await DSU.allowance(multiInvoker.address, collateral.address)).eq(ethers.constants.MaxUint256)) {
+  if ((await multiInvoker.controller()) === controller.address) {
     console.log('MultiInvoker already initialized.')
   } else {
     process.stdout.write('initializing MultiInvoker... ')
-    await (await multiInvoker.initialize()).wait(2)
+    await (await multiInvoker.initialize(controller.address)).wait(2)
     process.stdout.write('complete.\n')
   }
 

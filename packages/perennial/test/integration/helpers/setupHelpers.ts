@@ -102,6 +102,7 @@ export async function deployProtocol(): Promise<InstanceVars> {
   const controllerImpl = await new Controller__factory(owner).deploy()
   const incentivizerImpl = await new Incentivizer__factory(owner).deploy()
   const collateralImpl = await new Collateral__factory(owner).deploy(dsu.address)
+  const multiInvokerImpl = await new MultiInvoker__factory(owner).deploy(usdc.address, batcher.address)
 
   const controllerProxy = await new TransparentUpgradeableProxy__factory(owner).deploy(
     controllerImpl.address,
@@ -113,19 +114,13 @@ export async function deployProtocol(): Promise<InstanceVars> {
     proxyAdmin.address,
     [],
   )
-  const collateralProxy = await new TransparentUpgradeableProxy__factory(owner).deploy(
-    collateralImpl.address,
+  const multiInvokerProxy = await new TransparentUpgradeableProxy__factory(owner).deploy(
+    multiInvokerImpl.address,
     proxyAdmin.address,
     [],
   )
-
-  const multiInvokerImpl = await new MultiInvoker__factory(owner).deploy(
-    usdc.address,
-    controllerProxy.address,
-    batcher.address,
-  )
-  const multiInvokerProxy = await new TransparentUpgradeableProxy__factory(owner).deploy(
-    multiInvokerImpl.address,
+  const collateralProxy = await new TransparentUpgradeableProxy__factory(owner).deploy(
+    collateralImpl.address,
     proxyAdmin.address,
     [],
   )
@@ -140,14 +135,9 @@ export async function deployProtocol(): Promise<InstanceVars> {
 
   // Init
   await incentivizer.initialize(controller.address)
-  await controller.initialize(
-    collateral.address,
-    incentivizer.address,
-    productBeacon.address,
-    multiInvokerProxy.address,
-  )
+  await controller.initialize(collateral.address, incentivizer.address, productBeacon.address, multiInvoker.address)
   await collateral.initialize(controller.address)
-  await multiInvoker.initialize()
+  await multiInvoker.initialize(controller.address)
 
   // Params - TODO: finalize before launch
   await controller.updatePauser(pauser.address)

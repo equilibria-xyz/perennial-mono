@@ -28,9 +28,8 @@ interface IMultiInvoker {
         bytes args;
     }
 
-    function initialize() external;
+    function initialize(IController controller_) external;
     function USDC() external view returns (Token6); // solhint-disable-line func-name-mixedcase
     function batcher() external view returns (Batcher);
-    function controller() external view returns (IController);
     function invoke(Invocation[] calldata invocations) external;
 }

@@ -4,16 +4,14 @@ pragma solidity 0.8.15;
 import "hardhat/console.sol";
 import "@equilibria/root/control/unstructured/UInitializable.sol";
 
+import "../controller/UControllerProvider.sol";
 import "../interfaces/IProduct.sol";
 import "../interfaces/ICollateral.sol";
 import "../interfaces/IMultiInvoker.sol";
 
-contract MultiInvoker is IMultiInvoker, UInitializable {
+contract MultiInvoker is IMultiInvoker, UInitializable, UControllerProvider {
     /// @dev USDC stablecoin address
     Token6 public immutable USDC;
-
-    /// @dev Controller address
-    IController public immutable controller;
 
     /// @dev Batcher address
     Batcher public immutable batcher;
@@ -22,12 +20,10 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
      * @notice Initializes the immutable contract state
      * @dev Called at implementation instantiate and constant for that implementation.
      * @param usdc_ USDC stablecoin address
-     * @param controller_ Protocol Controller address
      * @param batcher_ Protocol Batcher address
      */
-    constructor(Token6 usdc_, IController controller_, Batcher batcher_) {
+    constructor(Token6 usdc_, Batcher batcher_) {
         USDC = usdc_;
-        controller = controller_;
         batcher = batcher_;
     }
 
@@ -35,9 +31,12 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
      * @notice Initializes the contract state
      * @dev Must be called atomically as part of the upgradeable proxy deployment to
      *      avoid front-running
+     * @param controller_ Controller contract address
      */
-    function initialize() external initializer(1) {
-        ICollateral _collateral = controller.collateral();
+    function initialize(IController controller_) external initializer(1) {
+        __UControllerProvider__initialize(controller_);
+
+        ICollateral _collateral = controller().collateral();
         Token18 token = _collateral.token();
         token.approve(address(_collateral));
         token.approve(address(batcher.RESERVE()));
@@ -60,7 +59,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
             // Withdraw from `msg.sender`s `product` collateral account to `receiver`
             } else if (invocation.action == PerennialAction.WITHDRAW) {
                 (address receiver, IProduct product, UFixed18 amount) = abi.decode(invocation.args, (address, IProduct, UFixed18));
-                controller.collateral().withdrawFrom(msg.sender, receiver, product, amount);
+                controller().collateral().withdrawFrom(msg.sender, receiver, product, amount);
 
             // Open a take position on behalf of `msg.sender`
             } else if (invocation.action == PerennialAction.OPEN_TAKE) {
@@ -85,7 +84,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
             // Claim `msg.sender`s incentive reward for `product` programs
             } else if (invocation.action == PerennialAction.CLAIM) {
                 (IProduct product, uint256[] memory programIds) = abi.decode(invocation.args, (IProduct, uint256[]));
-                controller.incentivizer().claimFor(msg.sender, product, programIds);
+                controller().incentivizer().claimFor(msg.sender, product, programIds);
 
             // Wrap `msg.sender`s USDC into DSU and return the DSU to `account`
             } else if (invocation.action == PerennialAction.WRAP) {
@@ -107,7 +106,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
      * @param amount Amount of DSU to deposit into the collateral account
      */
     function depositTo(address account, IProduct product, UFixed18 amount) private {
-        ICollateral _collateral = controller.collateral();
+        ICollateral _collateral = controller().collateral();
 
         // Pull the token from the `msg.sender`
         _collateral.token().pull(msg.sender, amount);
@@ -136,7 +135,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
      */
     function unwrap(address receiver, UFixed18 amount) private {
         // Pull the token from the `msg.sender`
-        controller.collateral().token().pull(msg.sender, amount);
+        controller().collateral().token().pull(msg.sender, amount);
 
         // Unwrap the DSU into USDC and return to the receiver
         // The current batcher does not have UNWRAP functionality yet, so just go directly to the reserve
