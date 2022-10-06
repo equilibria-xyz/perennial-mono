@@ -501,4 +501,22 @@ describe('Happy Path', () => {
     await expect(product.settle()).to.be.revertedWith('PausedError()')
     await expect(product.settleAccount(user.address)).to.be.revertedWith('PausedError()')
   })
+
+  it('reverts when calling "*For" methods from non-account and non-multiinvoker', async () => {
+    const { incentivizer, collateral, user, userB } = instanceVars
+    const product = await createProduct(instanceVars)
+
+    await expect(product.connect(user).openMakeFor(userB.address, utils.parseEther('0.001'))).to.be.revertedWith(
+      `NotAccountOrMultiInvokerError("${userB.address}", "${user.address}")`,
+    )
+    await expect(product.connect(user).openMakeFor(userB.address, utils.parseEther('0.001'))).to.be.revertedWith(
+      `NotAccountOrMultiInvokerError("${userB.address}", "${user.address}")`,
+    )
+    await expect(
+      collateral.connect(user).withdrawFrom(userB.address, user.address, product.address, utils.parseEther('100')),
+    ).to.be.revertedWith(`NotAccountOrMultiInvokerError("${userB.address}", "${user.address}")`)
+    await expect(incentivizer.connect(user).claimFor(userB.address, product.address, [1])).to.be.revertedWith(
+      `NotAccountOrMultiInvokerError("${userB.address}", "${user.address}")`,
+    )
+  })
 })
