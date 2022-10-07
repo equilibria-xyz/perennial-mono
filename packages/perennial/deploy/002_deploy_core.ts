@@ -192,6 +192,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     process.stdout.write('complete.\n')
   }
 
+  // TRANSFER OWNERSHIP
+
   if ((await proxyAdmin.owner()) === timelockController.address) {
     console.log(`proxyAdmin owner already set to ${timelockController.address}`)
   } else {

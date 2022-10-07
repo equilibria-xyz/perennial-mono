@@ -509,7 +509,7 @@ describe('Happy Path', () => {
     await expect(product.connect(user).openMakeFor(userB.address, utils.parseEther('0.001'))).to.be.revertedWith(
       `NotAccountOrMultiInvokerError("${userB.address}", "${user.address}")`,
     )
-    await expect(product.connect(user).openMakeFor(userB.address, utils.parseEther('0.001'))).to.be.revertedWith(
+    await expect(product.connect(user).openTakeFor(userB.address, utils.parseEther('0.001'))).to.be.revertedWith(
       `NotAccountOrMultiInvokerError("${userB.address}", "${user.address}")`,
     )
     await expect(
