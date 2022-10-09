@@ -3,23 +3,25 @@ pragma solidity 0.8.15;
 
 import "../../../interfaces/IProduct.sol";
 import "../../../interfaces/types/Accumulator.sol";
-import "../position/VersionedPosition.sol";
 
-/// @dev VersionedAccumulator type
-struct VersionedAccumulator {
-    /// @dev Latest synced oracle version
-    uint256 latestVersion;
+/// @dev VersionedHistory type
+struct VersionedHistory {
+    /// @dev Current global pending-settlement position delta
+    PrePosition pre;
 
     /// @dev Mapping of accumulator value at each settled oracle version
     mapping(uint256 => PackedAccumulator) _valueAtVersion;
 
     /// @dev Mapping of accumulator share at each settled oracle version
     mapping(uint256 => PackedAccumulator) _shareAtVersion;
+    
+    /// @dev Mapping of global position at each version
+    mapping(uint256 => PackedPosition) _positionAtVersion;
 }
-using VersionedAccumulatorLib for VersionedAccumulator global;
+using VersionedHistoryLib for VersionedHistory global;
 
 /**
- * @title VersionedAccumulatorLib
+ * @title VersionedHistoryLib
  * @notice Library that manages global versioned accumulator state.
  * @dev Manages two accumulators: value and share. The value accumulator measures the change in position value
  *      over time. The share accumulator measures the change in liquidity ownership over time (for tracking
@@ -29,14 +31,14 @@ using VersionedAccumulatorLib for VersionedAccumulator global;
  *      the delayed-position accounting. It is not guaranteed that every version will have a value stamped, but
  *      only versions when a settlement occurred are needed for this historical computation.
  */
-library VersionedAccumulatorLib {
+library VersionedHistoryLib {
     /**
      * @notice Returns the stamped value accumulator at `oracleVersion`
      * @param self The struct to operate on
      * @param oracleVersion The oracle version to retrieve the value at
      * @return The stamped value accumulator at the requested version
      */
-    function valueAtVersion(VersionedAccumulator storage self, uint256 oracleVersion) internal view returns (Accumulator memory) {
+    function valueAtVersion(VersionedHistory storage self, uint256 oracleVersion) internal view returns (Accumulator memory) {
         return self._valueAtVersion[oracleVersion].unpack();
     }
 
@@ -46,27 +48,33 @@ library VersionedAccumulatorLib {
      * @param oracleVersion The oracle version to retrieve the share at
      * @return The stamped share accumulator at the requested version
      */
-    function shareAtVersion(VersionedAccumulator storage self, uint256 oracleVersion) internal view returns (Accumulator memory) {
+    function shareAtVersion(VersionedHistory storage self, uint256 oracleVersion) internal view returns (Accumulator memory) {
         return self._shareAtVersion[oracleVersion].unpack();
     }
 
     /**
-     * @notice Globally accumulates all value (position + funding) and share since last oracle update
-     * @param self The struct to operate on
-     * @param fundingFee The funding fee rate for the product
-     * @param position Pointer to global position
-     * @param latestOracleVersion The oracle version to accumulate from
-     * @param toOracleVersion The oracle version to accumulate to
-     * @return accumulatedFee The total fee accrued from accumulation
+     * @notice Returns the current global position
+     * @return Current global position
      */
-    function accumulate(
-        VersionedAccumulator storage self,
-        UFixed18 fundingFee,
-        VersionedPosition storage position,
+    function positionAtVersion(VersionedHistory storage self, uint256 oracleVersion) internal view returns (Position memory) {
+        return self._positionAtVersion[oracleVersion].unpack();
+    }
+    
+    /**
+     * @notice Settles the global state for the period from `latestOracleVersion` to `toOracleVersion`
+     * @param self The struct to operate on
+     * @param latestOracleVersion The latest settled oracle version
+     * @param toOracleVersion The oracle version to settle to
+     * @param fundingFee The funding fee parameter
+     * @return accumulatedFee The fee accrued from opening or closing a new position
+     */
+    function settle(
+        VersionedHistory storage self,
         IOracleProvider.OracleVersion memory latestOracleVersion,
-        IOracleProvider.OracleVersion memory toOracleVersion
+        IOracleProvider.OracleVersion memory toOracleVersion,
+        UFixed18 fundingFee
     ) internal returns (UFixed18 accumulatedFee) {
-        Position memory latestPosition = position.positionAtVersion(latestOracleVersion.version);
+        Position memory latestPosition = positionAtVersion(self, latestOracleVersion.version);
 
         // accumulate funding
         Accumulator memory accumulatedPosition;
@@ -81,6 +89,12 @@ library VersionedAccumulatorLib {
         Accumulator memory accumulatedShare =
             _accumulateShare(latestPosition, latestOracleVersion, toOracleVersion);
 
+        // accumulate position
+        (Position memory newPosition, UFixed18 positionFee, bool settled) =
+            latestPosition.settled(self.pre, toOracleVersion);
+        accumulatedFee = accumulatedFee.add(positionFee);
+        if (settled) delete self.pre;
+
         // save update
         self._valueAtVersion[toOracleVersion.version] = valueAtVersion(self, latestOracleVersion.version)
             .add(accumulatedPosition)
@@ -88,7 +102,9 @@ library VersionedAccumulatorLib {
         self._shareAtVersion[toOracleVersion.version] = shareAtVersion(self, latestOracleVersion.version)
             .add(accumulatedShare)
             .pack();
-        self.latestVersion = toOracleVersion.version;
+        self._positionAtVersion[toOracleVersion.version] = newPosition.pack();
+        
+        return positionFee;
     }
 
     /**
@@ -182,7 +198,7 @@ library VersionedAccumulatorLib {
             Fixed18Lib.from(UFixed18Lib.from(elapsed).div(latestPosition.taker));
     }
 
-    function _product() private view returns (IProduct) {
+    function _product() private view returns (IProduct) { //TODO take in anywhere this is read
         return IProduct(address(this));
     }
 }

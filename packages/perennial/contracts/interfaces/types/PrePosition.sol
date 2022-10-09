@@ -154,7 +154,7 @@ library PrePositionLib {
             Fixed18Lib.from(positionDelta.taker).mul(toOracleVersion.price).abs()
         );
 
-        IProduct product = IProduct(address(this));
+        IProduct product = IProduct(address(this)); //TODO: take state in
         return makerNotional.mul(product.makerFee()).add(takerNotional.mul(product.takerFee()));
     }
 

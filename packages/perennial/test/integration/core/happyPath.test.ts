@@ -5,7 +5,7 @@ import { utils } from 'ethers'
 import { InstanceVars, deployProtocol, createProduct, depositTo, INITIAL_VERSION } from '../helpers/setupHelpers'
 import { createPayoffDefinition, expectPositionEq, expectPrePositionEq } from '../../../../common/testutil/types'
 
-describe('Happy Path', () => {
+describe.only('Happy Path', () => {
   let instanceVars: InstanceVars
 
   beforeEach(async () => {

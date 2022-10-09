@@ -3,7 +3,7 @@ pragma solidity 0.8.15;
 
 import "../../../interfaces/types/Accumulator.sol";
 import "../position/AccountPosition.sol";
-import "./VersionedAccumulator.sol";
+import "./VersionedHistory.sol";
 
 /// @dev AccountAccumulator type
 struct AccountAccumulator {
@@ -27,7 +27,7 @@ library AccountAccumulatorLib {
      */
     function syncTo(
         AccountAccumulator storage self,
-        VersionedAccumulator storage global,
+        VersionedHistory storage global,
         AccountPosition storage position,
         uint256 versionTo
     ) internal returns (Accumulator memory value) {
