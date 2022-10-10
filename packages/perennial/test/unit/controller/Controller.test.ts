@@ -11,6 +11,7 @@ import {
   Controller__factory,
   Product__factory,
   Incentivizer__factory,
+  MultiInvoker__factory,
   IContractPayoffProvider__factory,
   IBeacon__factory,
   IOracleProvider__factory,
@@ -34,6 +35,7 @@ describe('Controller', () => {
   let oracle: MockContract
   let incentivizer: MockContract
   let productBeacon: MockContract
+  let multiInvoker: MockContract
 
   let controller: Controller
   let productImpl: Product
@@ -54,13 +56,14 @@ describe('Controller', () => {
     payoffProvider = await waffle.deployMockContract(owner, IContractPayoffProvider__factory.abi)
     oracle = await waffle.deployMockContract(owner, IOracleProvider__factory.abi)
     incentivizer = await waffle.deployMockContract(owner, Incentivizer__factory.abi)
+    multiInvoker = await waffle.deployMockContract(owner, MultiInvoker__factory.abi)
 
     productBeacon = await waffle.deployMockContract(owner, IBeacon__factory.abi)
     productImpl = await new Product__factory(owner).deploy()
     await productBeacon.mock.implementation.withArgs().returns(productImpl.address)
 
     controller = await new Controller__factory(owner).deploy()
-    await controller.initialize(collateral.address, incentivizer.address, productBeacon.address)
+    await controller.initialize(collateral.address, incentivizer.address, productBeacon.address, multiInvoker.address)
   })
 
   describe('#initialize', async () => {
@@ -74,6 +77,7 @@ describe('Controller', () => {
       expect(await controller.collateral()).to.equal(collateral.address)
       expect(await controller.incentivizer()).to.equal(incentivizer.address)
       expect(await controller.productBeacon()).to.equal(productBeacon.address)
+      expect(await controller.multiInvoker()).to.equal(multiInvoker.address)
       expect(await controller['owner()']()).to.equal(owner.address)
       expect(await controller['owner(uint256)'](0)).to.equal(owner.address)
       expect(await controller['pendingOwner()']()).to.equal(ethers.constants.AddressZero)
@@ -92,7 +96,7 @@ describe('Controller', () => {
 
     it('reverts if already initialized', async () => {
       await expect(
-        controller.initialize(collateral.address, incentivizer.address, productBeacon.address),
+        controller.initialize(collateral.address, incentivizer.address, productBeacon.address, multiInvoker.address),
       ).to.be.revertedWith('UInitializableAlreadyInitializedError(1)')
     })
   })
@@ -413,6 +417,30 @@ describe('Controller', () => {
 
     it('reverts on invalid address', async () => {
       await expect(controller.updateProductBeacon(user.address)).to.be.revertedWith(
+        'ControllerNotContractAddressError()',
+      )
+    })
+  })
+
+  describe('#updateMultiInvoker', async () => {
+    it('updates the multiInvoker address', async () => {
+      const newMultiInvoker = await waffle.deployMockContract(owner, MultiInvoker__factory.abi)
+      await expect(controller.updateMultiInvoker(newMultiInvoker.address))
+        .to.emit(controller, 'MultiInvokerUpdated')
+        .withArgs(newMultiInvoker.address)
+
+      expect(await controller.multiInvoker()).to.equal(newMultiInvoker.address)
+    })
+
+    it('reverts if not owner', async () => {
+      const newMultiInvoker = await waffle.deployMockContract(owner, MultiInvoker__factory.abi)
+      await expect(controller.connect(user).updateMultiInvoker(newMultiInvoker.address)).to.be.revertedWith(
+        'ControllerNotOwnerError(0)',
+      )
+    })
+
+    it('reverts on invalid address', async () => {
+      await expect(controller.updateMultiInvoker(user.address)).to.be.revertedWith(
         'ControllerNotContractAddressError()',
       )
     })

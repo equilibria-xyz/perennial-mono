@@ -69,9 +69,13 @@ interface IProduct is IPayoffProvider, IParamProvider {
     function settle() external;
     function settleAccount(address account) external;
     function openTake(UFixed18 amount) external;
+    function openTakeFor(address account, UFixed18 amount) external;
     function closeTake(UFixed18 amount) external;
+    function closeTakeFor(address account, UFixed18 amount) external;
     function openMake(UFixed18 amount) external;
+    function openMakeFor(address account, UFixed18 amount) external;
     function closeMake(UFixed18 amount) external;
+    function closeMakeFor(address account, UFixed18 amount) external;
     function closeAll(address account) external;
     function maintenance(address account) external view returns (UFixed18);
     function maintenanceNext(address account) external view returns (UFixed18);

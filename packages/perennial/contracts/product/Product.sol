@@ -194,38 +194,58 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @notice Opens a taker position for `msg.sender`
      * @param amount Amount of the position to open
      */
-    function openTake(UFixed18 amount)
-    external
+    function openTake(UFixed18 amount) external {
+        openTakeFor(msg.sender, amount);
+    }
+
+    /**
+     * @notice Opens a taker position for `account`
+     * @param account Account to open the position for
+     * @param amount Amount of the position to open
+     */
+    function openTakeFor(address account, UFixed18 amount)
+    public
     nonReentrant
     notPaused
     notClosed
-    settleForAccount(msg.sender)
+    onlyAccountOrMultiInvoker(account)
+    settleForAccount(account)
     takerInvariant
-    positionInvariant
-    liquidationInvariant
-    maintenanceInvariant
+    positionInvariant(account)
+    liquidationInvariant(account)
+    maintenanceInvariant(account)
     {
         uint256 _latestVersion = latestVersion();
 
-        _positions[msg.sender].pre.openTake(_latestVersion, amount);
+        _positions[account].pre.openTake(_latestVersion, amount);
         _position.pre.openTake(_latestVersion, amount);
 
-        emit TakeOpened(msg.sender, _latestVersion, amount);
+        emit TakeOpened(account, _latestVersion, amount);
     }
 
     /**
      * @notice Closes a taker position for `msg.sender`
      * @param amount Amount of the position to close
      */
-    function closeTake(UFixed18 amount)
-    external
+    function closeTake(UFixed18 amount) external {
+        closeTakeFor(msg.sender, amount);
+    }
+
+    /**
+     * @notice Closes a taker position for `account`
+     * @param account Account to close the position for
+     * @param amount Amount of the position to close
+     */
+    function closeTakeFor(address account, UFixed18 amount)
+    public
     nonReentrant
     notPaused
-    settleForAccount(msg.sender)
-    closeInvariant
-    liquidationInvariant
+    onlyAccountOrMultiInvoker(account)
+    settleForAccount(account)
+    closeInvariant(account)
+    liquidationInvariant(account)
     {
-        _closeTake(msg.sender, amount);
+        _closeTake(account, amount);
     }
 
     function _closeTake(address account, UFixed18 amount) private {
@@ -241,40 +261,60 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @notice Opens a maker position for `msg.sender`
      * @param amount Amount of the position to open
      */
-    function openMake(UFixed18 amount)
-    external
+    function openMake(UFixed18 amount) external {
+        openMakeFor(msg.sender, amount);
+    }
+
+    /**
+     * @notice Opens a maker position for `account`
+     * @param account Account to open position for
+     * @param amount Amount of the position to open
+     */
+    function openMakeFor(address account, UFixed18 amount)
+    public
     nonReentrant
     notPaused
     notClosed
-    settleForAccount(msg.sender)
+    onlyAccountOrMultiInvoker(account)
+    settleForAccount(account)
     nonZeroVersionInvariant
     makerInvariant
-    positionInvariant
-    liquidationInvariant
-    maintenanceInvariant
+    positionInvariant(account)
+    liquidationInvariant(account)
+    maintenanceInvariant(account)
     {
         uint256 _latestVersion = latestVersion();
 
-        _positions[msg.sender].pre.openMake(_latestVersion, amount);
+        _positions[account].pre.openMake(_latestVersion, amount);
         _position.pre.openMake(_latestVersion, amount);
 
-        emit MakeOpened(msg.sender, _latestVersion, amount);
+        emit MakeOpened(account, _latestVersion, amount);
     }
 
     /**
      * @notice Closes a maker position for `msg.sender`
      * @param amount Amount of the position to close
      */
-    function closeMake(UFixed18 amount)
-    external
+    function closeMake(UFixed18 amount) external {
+        closeMakeFor(msg.sender, amount);
+    }
+
+    /**
+     * @notice Closes a maker position for `account`
+     * @param account Account to close the position for
+     * @param amount Amount of the position to close
+     */
+    function closeMakeFor(address account, UFixed18 amount)
+    public
     nonReentrant
     notPaused
-    settleForAccount(msg.sender)
+    onlyAccountOrMultiInvoker(account)
+    settleForAccount(account)
     takerInvariant
-    closeInvariant
-    liquidationInvariant
+    closeInvariant(account)
+    liquidationInvariant(account)
     {
-        _closeMake(msg.sender, amount);
+        _closeMake(account, amount);
     }
 
     function _closeMake(address account, UFixed18 amount) private {
@@ -467,30 +507,30 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     }
 
     /// @dev Ensure that the user has only taken a maker or taker position, but not both
-    modifier positionInvariant {
+    modifier positionInvariant(address account) {
         _;
 
-        if (_positions[msg.sender].isDoubleSided()) revert ProductDoubleSidedError();
+        if (_positions[account].isDoubleSided()) revert ProductDoubleSidedError();
     }
 
     /// @dev Ensure that the user hasn't closed more than is open
-    modifier closeInvariant {
+    modifier closeInvariant(address account) {
         _;
 
-        if (_positions[msg.sender].isOverClosed()) revert ProductOverClosedError();
+        if (_positions[account].isOverClosed()) revert ProductOverClosedError();
     }
 
     /// @dev Ensure that the user will have sufficient margin for maintenance after next settlement
-    modifier maintenanceInvariant {
+    modifier maintenanceInvariant(address account) {
         _;
 
-        if (controller().collateral().liquidatableNext(msg.sender, IProduct(this)))
+        if (controller().collateral().liquidatableNext(account, IProduct(this)))
             revert ProductInsufficientCollateralError();
     }
 
     /// @dev Ensure that the user is not currently being liquidated
-    modifier liquidationInvariant {
-        if (_positions[msg.sender].liquidation) revert ProductInLiquidationError();
+    modifier liquidationInvariant(address account) {
+        if (_positions[account].liquidation) revert ProductInLiquidationError();
 
         _;
     }

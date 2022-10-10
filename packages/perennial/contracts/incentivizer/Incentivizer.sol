@@ -140,7 +140,21 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
     external
     nonReentrant
     {
-        _claimProduct(product, programIds);
+        _claimProduct(msg.sender, product, programIds);
+    }
+
+    /**
+     * @notice Claims all of `account`'s rewards for `product` programs
+     * @param account Account to claim rewards for
+     * @param product Product to claim rewards for
+     * @param programIds Programs to claim rewards for
+     */
+    function claimFor(address account, IProduct product, uint256[] calldata programIds)
+    external
+    nonReentrant
+    onlyAccountOrMultiInvoker(account)
+    {
+        _claimProduct(account, product, programIds);
     }
 
     /**
@@ -154,41 +168,43 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
     {
         if (products.length != programIds.length) revert IncentivizerBatchClaimArgumentMismatchError();
         for (uint256 i; i < products.length; i++) {
-            _claimProduct(products[i], programIds[i]);
+            _claimProduct(msg.sender, products[i], programIds[i]);
         }
     }
 
     /**
      * @notice Claims all of `msg.sender`'s rewards for `product` programs
      * @dev Internal helper with validation checks
+     * @param account Account to claim rewards for
      * @param product Product to claim rewards for
      * @param programIds Programs to claim rewards for
      */
-    function _claimProduct(IProduct product, uint256[] memory programIds)
+    function _claimProduct(address account, IProduct product, uint256[] memory programIds)
     private
     isProduct(product)
     notPaused
-    settleForAccount(msg.sender, product)
+    settleForAccount(account, product)
     {
         for (uint256 i; i < programIds.length; i++) {
-            _claimProgram(product, programIds[i]);
+            _claimProgram(account, product, programIds[i]);
         }
     }
 
     /**
      * @notice Claims all of `msg.sender`'s rewards for `programId` on `product`
      * @dev Internal helper with validation checks
+     * @param account Account to claim rewards for
      * @param product Product to claim rewards for
      * @param programId Program to claim rewards for
      */
-    function _claimProgram(IProduct product, uint256 programId)
+    function _claimProgram(address account, IProduct product, uint256 programId)
     private
     isProgram(product, programId)
     {
         ProductManager storage productManager = _products[product];
-        UFixed18 claimAmount = productManager.claim(msg.sender, programId);
-        productManager.token(programId).push(msg.sender, claimAmount);
-        emit Claim(product, msg.sender, programId, claimAmount);
+        UFixed18 claimAmount = productManager.claim(account, programId);
+        productManager.token(programId).push(account, claimAmount);
+        emit Claim(product, account, programId, claimAmount);
     }
 
     /**

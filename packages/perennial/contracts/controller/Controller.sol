@@ -25,6 +25,10 @@ contract Controller is IController, UInitializable {
     AddressStorage private constant _productBeacon = AddressStorage.wrap(keccak256("equilibria.perennial.Controller.productBeacon"));
     function productBeacon() public view returns (IBeacon) { return IBeacon(_productBeacon.read()); }
 
+    /// @dev MultiInvoker contract address for the protocol
+    AddressStorage private constant _multiInvoker = AddressStorage.wrap(keccak256("equilibria.perennial.Controller.multiInvoker"));
+    function multiInvoker() public view returns (IMultiInvoker) { return IMultiInvoker(_multiInvoker.read()); }
+
     /// @dev Percent of collected fees that go to the protocol treasury vs the product treasury
     UFixed18Storage private constant _protocolFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.Controller.protocolFee"));
     function protocolFee() public view returns (UFixed18) { return _protocolFee.read(); }
@@ -73,17 +77,20 @@ contract Controller is IController, UInitializable {
      * @param collateral_ Collateral contract address
      * @param incentivizer_ Incentivizer contract address
      * @param productBeacon_ Product implementation beacon address
+     * @param multiInvoker_ MultiINvoker contract address
      */
     function initialize(
         ICollateral collateral_,
         IIncentivizer incentivizer_,
-        IBeacon productBeacon_
+        IBeacon productBeacon_,
+        IMultiInvoker multiInvoker_
     ) external initializer(1) {
         _createCoordinator();
 
         updateCollateral(collateral_);
         updateIncentivizer(incentivizer_);
         updateProductBeacon(productBeacon_);
+        updateMultiInvoker(multiInvoker_);
     }
 
     /**
@@ -199,6 +206,16 @@ contract Controller is IController, UInitializable {
         if (!Address.isContract(address(newProductBeacon))) revert ControllerNotContractAddressError();
         _productBeacon.store(address(newProductBeacon));
         emit ProductBeaconUpdated(newProductBeacon);
+    }
+
+    /**
+     * @notice Updates the MultiInvoker contract address
+     * @param newMultiInvoker New MultiInvoker contract address
+     */
+    function updateMultiInvoker(IMultiInvoker newMultiInvoker) public onlyOwner(0) {
+        if (!Address.isContract(address(newMultiInvoker))) revert ControllerNotContractAddressError();
+        _multiInvoker.store(address(newMultiInvoker));
+        emit MultiInvokerUpdated(newMultiInvoker);
     }
 
     /**
