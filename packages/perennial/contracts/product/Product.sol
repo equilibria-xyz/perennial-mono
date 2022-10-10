@@ -20,7 +20,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         BoolStorage.wrap(keccak256("equilibria.perennial.Product.closed"));
     function closed() public view returns (bool) { return _closed.read(); }
 
-
     /// @dev The name of the product
     string public name;
 
@@ -36,7 +35,9 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     /// @dev The global accumulator state for the product
     VersionedHistory private _versions;
 
-    uint256 public _latestVersion;
+    PrePosition private _pre;
+
+    uint256 private _latestVersion;
 
     /**
      * @notice Initializes the contract state
@@ -89,13 +90,19 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         _controller.incentivizer().sync(currentOracleVersion);
 
         // Settle periods
-        bool closed_ = closed();
-        FeeDefinition memory feeDefinition = FeeDefinition(fundingFee(), makerFee(), takerFee());
-        JumpRateUtilizationCurve memory utilizationCurve_ = utilizationCurve();
+        AccumulatorParams memory params = AccumulatorParams(
+            utilizationCurve(),
+            fundingFee(),
+            makerFee(),
+            takerFee(),
+            closed()
+        );
         UFixed18 accumulatedFee;
-        for (uint256 i; i < periods.length; i++)
-            accumulatedFee = accumulatedFee
-                .add(_versions.settle(periods[i], utilizationCurve_, feeDefinition, closed_));
+        for (uint256 i; i < periods.length; i++) {
+            (UFixed18 fee, bool settled) = _versions.settle(pre(), periods[i], params);
+            accumulatedFee = accumulatedFee.add(fee);
+            if (settled) delete _pre;
+        }
         _latestVersion = currentOracleVersion.version;
 
         // Settle collateral
@@ -114,7 +121,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         IOracleProvider.OracleVersion memory latestOracleVersion = atVersion(_latestVersion);
 
         // Get settle oracle version
-        uint256 _settleVersion = _versions.pre.settleVersion(currentOracleVersion.version);
+        uint256 _settleVersion = _pre.settleVersion(currentOracleVersion.version);
         if (_settleVersion == currentOracleVersion.version) { // one period if b == c
             periods = new Period[](1);
             periods[0] = Period(latestOracleVersion, currentOracleVersion);
@@ -209,7 +216,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     maintenanceInvariant
     {
         _positions[msg.sender].pre.openTake(_latestVersion, amount);
-        _versions.pre.openTake(_latestVersion, amount);
+        _pre.openTake(_latestVersion, amount);
 
         emit TakeOpened(msg.sender, _latestVersion, amount);
     }
@@ -231,7 +238,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
     function _closeTake(address account, UFixed18 amount) private {
         _positions[account].pre.closeTake(_latestVersion, amount);
-        _versions.pre.closeTake(_latestVersion, amount);
+        _pre.closeTake(_latestVersion, amount);
 
         emit TakeClosed(account, _latestVersion, amount);
     }
@@ -253,7 +260,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     maintenanceInvariant
     {
         _positions[msg.sender].pre.openMake(_latestVersion, amount);
-        _versions.pre.openMake(_latestVersion, amount);
+        _pre.openMake(_latestVersion, amount);
 
         emit MakeOpened(msg.sender, _latestVersion, amount);
     }
@@ -276,7 +283,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
     function _closeMake(address account, UFixed18 amount) private {
         _positions[account].pre.closeMake(_latestVersion, amount);
-        _versions.pre.closeMake(_latestVersion, amount);
+        _pre.closeMake(_latestVersion, amount);
 
         emit MakeClosed(account, _latestVersion, amount);
     }
@@ -375,8 +382,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @notice Returns the current global pending-settlement position
      * @return Global pending-settlement position
      */
-    function pre() external view returns (PrePosition memory) {
-        return _versions.pre;
+    function pre() public view returns (PrePosition memory) {
+        return _pre;
     }
 
     /**
@@ -423,7 +430,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     modifier makerInvariant {
         _;
 
-        Position memory next = positionAtVersion(_latestVersion).next(_versions.pre);
+        Position memory next = positionAtVersion(_latestVersion).next(_pre);
 
         if (next.maker.gt(makerLimit())) revert ProductMakerOverLimitError();
     }
@@ -434,7 +441,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
         if (closed()) return;
 
-        Position memory next = positionAtVersion(_latestVersion).next(_versions.pre);
+        Position memory next = positionAtVersion(_latestVersion).next(_pre);
         UFixed18 socializationFactor = next.socializationFactor();
 
         if (socializationFactor.lt(UFixed18Lib.ONE)) revert ProductInsufficientLiquidityError(socializationFactor);

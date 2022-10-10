@@ -3,14 +3,11 @@ pragma solidity 0.8.15;
 
 import "../../../interfaces/IProduct.sol";
 import "../../../interfaces/types/Accumulator.sol";
-import "../FeeDefinition.sol";
+import "../AccumulatorParams.sol";
 import "../Period.sol";
 
 /// @dev VersionedHistory type
 struct VersionedHistory {
-    /// @dev Current global pending-settlement position delta
-    PrePosition pre;
-
     /// @dev Mapping of accumulator value at each settled oracle version
     mapping(uint256 => PackedAccumulator) _valueAtVersion;
 
@@ -66,36 +63,33 @@ library VersionedHistoryLib {
      * @notice Settles the global state for the period from `period.fromVersion` to `period.toVersion`
      * @param self The struct to operate on
      * @param period The oracle version period to settle for
-     * @param utilizationCurve The utilization curve for the funding computation
-     * @param feeDefinition The current set of protocol fees
-     * @param closed Whether the product is closed
+     * @param params The current set of market parameters
      * @return accumulatedFee The fee accrued from opening or closing a new position
      */
     function settle(
         VersionedHistory storage self,
+        PrePosition memory pre,
         Period memory period,
-        JumpRateUtilizationCurve memory utilizationCurve,
-        FeeDefinition memory feeDefinition,
-        bool closed
-    ) internal returns (UFixed18 accumulatedFee) {
+        AccumulatorParams memory params
+    ) internal returns (UFixed18 accumulatedFee, bool settled) {
         Position memory latestPosition = positionAtVersion(self, period.fromVersion.version);
 
         // accumulate funding
         Accumulator memory accumulatedPosition;
         (accumulatedPosition, accumulatedFee) =
-            _accumulateFunding(feeDefinition.funding, latestPosition, period, utilizationCurve, closed);
+            _accumulateFunding(params.funding, latestPosition, period, params.utilizationCurve, params.closed);
 
         // accumulate position
-        accumulatedPosition = accumulatedPosition.add(_accumulatePosition(latestPosition, period, closed));
+        accumulatedPosition = accumulatedPosition.add(_accumulatePosition(latestPosition, period, params.closed));
 
         // accumulate share
         Accumulator memory accumulatedShare = _accumulateShare(latestPosition, period);
 
         // accumulate position
-        (Position memory newPosition, UFixed18 positionFee, bool settled) =
-            latestPosition.settled(self.pre, period.toVersion, feeDefinition.maker, feeDefinition.taker);
+        Position memory newPosition;
+        UFixed18 positionFee;
+        (newPosition, positionFee, settled) = latestPosition.settled(pre, period.toVersion, params.maker, params.taker);
         accumulatedFee = accumulatedFee.add(positionFee);
-        if (settled) delete self.pre;
 
         // save update
         self._valueAtVersion[period.toVersion.version] = valueAtVersion(self, period.fromVersion.version)
@@ -105,8 +99,6 @@ library VersionedHistoryLib {
             .add(accumulatedShare)
             .pack();
         self._positionAtVersion[period.toVersion.version] = newPosition.pack();
-        
-        return accumulatedFee;
     }
 
     /**
