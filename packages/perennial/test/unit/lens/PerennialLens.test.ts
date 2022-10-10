@@ -39,6 +39,12 @@ describe('PerennialLens', () => {
 
     controller.collateral.returns(collateral.address)
     controller.incentivizer.returns(incentivizer.address)
+    controller.protocolFee.returns(ethers.utils.parseEther('0.01'))
+    controller.liquidationFee.returns(ethers.utils.parseEther('0.05'))
+    controller.minCollateral.returns(ethers.utils.parseEther('1000'))
+
+    collateral.token.returns('0x605D26FBd5be761089281d5cec2Ce86eeA667109')
+
     product.name.returns('Product')
     product.symbol.returns('PROD')
     product.oracle.returns('0x52C64b8998eB7C80b6F526E99E29ABdcC86B841b')
@@ -62,6 +68,21 @@ describe('PerennialLens', () => {
     it('constructs correctly', async () => {
       expect(await lens.controller()).to.equal(controller.address)
       expect(await lens['collateral()']()).to.equal(collateral.address)
+    })
+  })
+
+  describe('snapshot', () => {
+    it('returns the protocol snapshot', async () => {
+      controller.paused.returns(true)
+
+      const snapshot = await lens.callStatic['snapshot()']()
+      expect(snapshot.collateral).to.equal(collateral.address)
+      expect(snapshot.incentivizer).to.equal(incentivizer.address)
+      expect(snapshot.collateralToken).to.equal('0x605D26FBd5be761089281d5cec2Ce86eeA667109')
+      expect(snapshot.protocolFee).to.equal(ethers.utils.parseEther('0.01'))
+      expect(snapshot.liquidationFee).to.equal(ethers.utils.parseEther('0.05'))
+      expect(snapshot.minCollateral).to.equal(ethers.utils.parseEther('1000'))
+      expect(snapshot.paused).to.be.true
     })
   })
 
