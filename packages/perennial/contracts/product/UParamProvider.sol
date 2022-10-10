@@ -47,7 +47,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
 
     /// @dev The funding fee value
     UFixed18Storage private constant _fundingFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.fundingFee"));
-    function fundingFee() public view returns (UFixed18) { return _fundingFee.read(); }
+    function fundingFee() public view returns (UFixed18) { return _fundingFee.read().max(controller().minFundingFee()); }
 
     /// @dev The maker fee value
     UFixed18Storage private constant _makerFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.makerFee"));

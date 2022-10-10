@@ -3,6 +3,7 @@ pragma solidity 0.8.15;
 
 import "../../../interfaces/IProduct.sol";
 import "../../../interfaces/types/Accumulator.sol";
+import "../FeeDefinition.sol";
 import "../Period.sol";
 
 /// @dev VersionedHistory type
@@ -66,7 +67,7 @@ library VersionedHistoryLib {
      * @param self The struct to operate on
      * @param period The oracle version period to settle for
      * @param utilizationCurve The utilization curve for the funding computation
-     * @param fundingFee The funding fee parameter
+     * @param feeDefinition The current set of protocol fees
      * @param closed Whether the product is closed
      * @return accumulatedFee The fee accrued from opening or closing a new position
      */
@@ -74,7 +75,7 @@ library VersionedHistoryLib {
         VersionedHistory storage self,
         Period memory period,
         JumpRateUtilizationCurve memory utilizationCurve,
-        UFixed18 fundingFee,
+        FeeDefinition memory feeDefinition,
         bool closed
     ) internal returns (UFixed18 accumulatedFee) {
         Position memory latestPosition = positionAtVersion(self, period.fromVersion.version);
@@ -82,7 +83,7 @@ library VersionedHistoryLib {
         // accumulate funding
         Accumulator memory accumulatedPosition;
         (accumulatedPosition, accumulatedFee) =
-            _accumulateFunding(fundingFee, latestPosition, period, utilizationCurve, closed);
+            _accumulateFunding(feeDefinition.funding, latestPosition, period, utilizationCurve, closed);
 
         // accumulate position
         accumulatedPosition = accumulatedPosition.add(_accumulatePosition(latestPosition, period, closed));
@@ -92,7 +93,7 @@ library VersionedHistoryLib {
 
         // accumulate position
         (Position memory newPosition, UFixed18 positionFee, bool settled) =
-            latestPosition.settled(self.pre, period.toVersion);
+            latestPosition.settled(self.pre, period.toVersion, feeDefinition.maker, feeDefinition.taker);
         accumulatedFee = accumulatedFee.add(positionFee);
         if (settled) delete self.pre;
 
@@ -105,7 +106,7 @@ library VersionedHistoryLib {
             .pack();
         self._positionAtVersion[period.toVersion.version] = newPosition.pack();
         
-        return positionFee;
+        return accumulatedFee;
     }
 
     /**

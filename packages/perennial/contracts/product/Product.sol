@@ -8,7 +8,6 @@ import "./UPayoffProvider.sol";
 import "./UParamProvider.sol";
 import "./types/position/AccountPosition.sol";
 import "./types/accumulator/AccountAccumulator.sol";
-import "./types/Period.sol";
 
 /**
  * @title Product
@@ -91,11 +90,12 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
         // Settle periods
         bool closed_ = closed();
-        UFixed18 fundingFee_ = _boundedFundingFee();
+        FeeDefinition memory feeDefinition = FeeDefinition(fundingFee(), makerFee(), takerFee());
         JumpRateUtilizationCurve memory utilizationCurve_ = utilizationCurve();
         UFixed18 accumulatedFee;
         for (uint256 i; i < periods.length; i++)
-            accumulatedFee = accumulatedFee.add(_versions.settle(periods[i], utilizationCurve_, fundingFee_, closed_));
+            accumulatedFee = accumulatedFee
+                .add(_versions.settle(periods[i], utilizationCurve_, feeDefinition, closed_));
         _latestVersion = currentOracleVersion.version;
 
         // Settle collateral
@@ -138,6 +138,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
     /**
      * @notice Core account settlement flywheel
+     * @notice Core account settlement flywheel
      * @param account Account to settle
      * @dev
      *  a) last settle oracle version
@@ -162,6 +163,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
             atVersion(_settleVersion);
 
         // initialize
+        UFixed18 makerFee_ = makerFee();
+        UFixed18 takerFee_ = takerFee();
         Fixed18 accumulated;
 
         // sync incentivizer before accumulator
@@ -172,7 +175,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
             _accumulators[account].syncTo(_versions, _positions[account], settleOracleVersion.version).sum());
 
         // position a->b
-        accumulated = accumulated.sub(Fixed18Lib.from(_positions[account].settle(settleOracleVersion)));
+        accumulated = accumulated.sub(Fixed18Lib.from(_positions[account].settle(settleOracleVersion, makerFee_, takerFee_)));
 
         // short-circuit from a->c if b == c
         if (settleOracleVersion.version != currentOracleVersion.version) {
@@ -403,26 +406,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      */
     function latestVersion(address account) public view returns (uint256) {
         return _accumulators[account].latestVersion;
-    }
-
-    /**
-     * @notice Returns The per-second rate based on the provided `position`
-     * @dev Handles 0-maker/taker edge cases
-     * @param position_ Position to base utilization on
-     * @return The per-second rate
-     */
-    function rate(Position calldata position_) public view returns (Fixed18) {
-        Fixed18 annualizedRate = utilizationCurve().compute(position_.utilization());
-        return annualizedRate.div(Fixed18Lib.from(365 days));
-    }
-
-    /**
-     * @notice Returns the minimum funding fee parameter with a capped range for safety
-     * @dev Caps controller.minFundingFee() <= fundingFee() <= 1
-     * @return Safe minimum funding fee parameter
-     */
-    function _boundedFundingFee() private view returns (UFixed18) {
-        return fundingFee().max(controller().minFundingFee());
     }
 
     /**

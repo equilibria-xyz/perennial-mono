@@ -141,12 +141,16 @@ library PrePositionLib {
      * @dev Must be called from a valid product to get the proper fee amounts
      * @param self The struct to operate on
      * @param toOracleVersion The oracle version at which settlement takes place
+     * @param makerFee The fee for opening or closing a maker position
+     * @param takerFee The fee for opening or closing a taker position
      * @return positionFee The maker / taker fee incurred
      */
     function computeFee(
         PrePosition memory self,
-        IOracleProvider.OracleVersion memory toOracleVersion
-    ) internal view returns (UFixed18) {
+        IOracleProvider.OracleVersion memory toOracleVersion,
+        UFixed18 makerFee,
+        UFixed18 takerFee
+    ) internal pure returns (UFixed18) {
         Position memory positionDelta = self.openPosition.add(self.closePosition);
 
         (UFixed18 makerNotional, UFixed18 takerNotional) = (
@@ -154,8 +158,7 @@ library PrePositionLib {
             Fixed18Lib.from(positionDelta.taker).mul(toOracleVersion.price).abs()
         );
 
-        IProduct product = IProduct(address(this)); //TODO: take state in
-        return makerNotional.mul(product.makerFee()).add(takerNotional.mul(product.takerFee()));
+        return makerNotional.mul(makerFee).add(takerNotional.mul(takerFee));
     }
 
     /**

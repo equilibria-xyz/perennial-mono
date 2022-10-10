@@ -133,6 +133,8 @@ library PositionLib {
      * @param self The current Position
      * @param pre The pending-settlement position delta
      * @param toOracleVersion The oracle version to settle to
+     * @param makerFee The fee for opening or closing a maker position
+     * @param takerFee The fee for opening or closing a taker position
      * @return Settled position at oracle version
      * @return Fee accrued from opening or closing the position
      * @return Whether a new position was settled
@@ -140,9 +142,13 @@ library PositionLib {
     function settled(
         Position memory self,
         PrePosition memory pre,
-        IOracleProvider.OracleVersion memory toOracleVersion
-    ) internal view returns (Position memory, UFixed18, bool) {
-        return pre.canSettle(toOracleVersion) ? (next(self, pre), pre.computeFee(toOracleVersion), true) : (self, UFixed18Lib.ZERO, false);
+        IOracleProvider.OracleVersion memory toOracleVersion,
+        UFixed18 makerFee,
+        UFixed18 takerFee
+    ) internal pure returns (Position memory, UFixed18, bool) {
+        return pre.canSettle(toOracleVersion) ?
+            (next(self, pre), pre.computeFee(toOracleVersion, makerFee, takerFee), true) :
+            (self, UFixed18Lib.ZERO, false);
     }
 
 

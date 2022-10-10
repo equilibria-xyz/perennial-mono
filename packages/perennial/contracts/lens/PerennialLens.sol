@@ -225,7 +225,8 @@ contract PerennialLens is IPerennialLens {
      */
     function rate(IProduct product) public settle(product) returns (Fixed18) {
         Position memory position_ = _latestPosition(product);
-        return product.rate(position_);
+        JumpRateUtilizationCurve memory utilizationCurve_ = product.utilizationCurve();
+        return utilizationCurve_.compute(position_.utilization()).div(Fixed18Lib.from(365 days));
     }
 
     /**
@@ -235,7 +236,8 @@ contract PerennialLens is IPerennialLens {
      */
     function dailyRate(IProduct product) public settle(product) returns (Fixed18) {
         Position memory position_ = _latestPosition(product);
-        return product.rate(position_).mul(Fixed18Lib.from(60 * 60 * 24));
+        JumpRateUtilizationCurve memory utilizationCurve_ = product.utilizationCurve();
+        return utilizationCurve_.compute(position_.utilization()).div(Fixed18Lib.from(365));
     }
 
     /**
