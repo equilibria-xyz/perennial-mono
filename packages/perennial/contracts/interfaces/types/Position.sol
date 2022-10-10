@@ -145,6 +145,16 @@ library PositionLib {
         return pre.canSettle(toOracleVersion) ? (next(self, pre), pre.computeFee(toOracleVersion), true) : (self, UFixed18Lib.ZERO, false);
     }
 
+
+    /**
+     * @notice Returns the utilization ratio for the current position
+     * @param self The Position to operate on
+     * @return utilization ratio
+     */
+    function utilization(Position memory self) internal pure returns (UFixed18) {
+        return self.taker.unsafeDiv(self.maker);
+    }
+
     /**
      * @notice Returns the socialization factor for the current position
      * @dev Socialization account for the case where `taker` > `maker` temporarily due to a liquidation

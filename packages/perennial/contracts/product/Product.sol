@@ -8,6 +8,7 @@ import "./UPayoffProvider.sol";
 import "./UParamProvider.sol";
 import "./types/position/AccountPosition.sol";
 import "./types/accumulator/AccountAccumulator.sol";
+import "./types/Period.sol";
 
 /**
  * @title Product
@@ -89,10 +90,12 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         _controller.incentivizer().sync(currentOracleVersion);
 
         // Settle periods
-        UFixed18 boundedFundingFee = _boundedFundingFee();
+        bool closed_ = closed();
+        UFixed18 fundingFee_ = _boundedFundingFee();
+        JumpRateUtilizationCurve memory utilizationCurve_ = utilizationCurve();
         UFixed18 accumulatedFee;
         for (uint256 i; i < periods.length; i++)
-            accumulatedFee = accumulatedFee.add(_versions.settle(periods[i].fromVersion, periods[i].toVersion, boundedFundingFee));
+            accumulatedFee = accumulatedFee.add(_versions.settle(periods[i], utilizationCurve_, fundingFee_, closed_));
         _latestVersion = currentOracleVersion.version;
 
         // Settle collateral
@@ -102,11 +105,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
             periods.length > 0 ? periods[0].toVersion.version : currentOracleVersion.version,
             periods.length > 1 ? periods[1].toVersion.version : periods.length > 0 ? periods[0].toVersion.version : currentOracleVersion.version
         );
-    }
-
-    struct Period {
-        IOracleProvider.OracleVersion fromVersion;
-        IOracleProvider.OracleVersion toVersion;
     }
 
     function _periodsToSettle(IOracleProvider.OracleVersion memory currentOracleVersion)
@@ -414,8 +412,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @return The per-second rate
      */
     function rate(Position calldata position_) public view returns (Fixed18) {
-        UFixed18 utilization = position_.taker.unsafeDiv(position_.maker);
-        Fixed18 annualizedRate = utilizationCurve().compute(utilization);
+        Fixed18 annualizedRate = utilizationCurve().compute(position_.utilization());
         return annualizedRate.div(Fixed18Lib.from(365 days));
     }
 

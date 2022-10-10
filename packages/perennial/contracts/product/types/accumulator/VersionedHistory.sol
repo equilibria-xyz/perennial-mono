@@ -3,6 +3,7 @@ pragma solidity 0.8.15;
 
 import "../../../interfaces/IProduct.sol";
 import "../../../interfaces/types/Accumulator.sol";
+import "../Period.sol";
 
 /// @dev VersionedHistory type
 struct VersionedHistory {
@@ -61,48 +62,48 @@ library VersionedHistoryLib {
     }
     
     /**
-     * @notice Settles the global state for the period from `latestOracleVersion` to `toOracleVersion`
+     * @notice Settles the global state for the period from `period.fromVersion` to `period.toVersion`
      * @param self The struct to operate on
-     * @param latestOracleVersion The latest settled oracle version
-     * @param toOracleVersion The oracle version to settle to
+     * @param period The oracle version period to settle for
+     * @param utilizationCurve The utilization curve for the funding computation
      * @param fundingFee The funding fee parameter
+     * @param closed Whether the product is closed
      * @return accumulatedFee The fee accrued from opening or closing a new position
      */
     function settle(
         VersionedHistory storage self,
-        IOracleProvider.OracleVersion memory latestOracleVersion,
-        IOracleProvider.OracleVersion memory toOracleVersion,
-        UFixed18 fundingFee
+        Period memory period,
+        JumpRateUtilizationCurve memory utilizationCurve,
+        UFixed18 fundingFee,
+        bool closed
     ) internal returns (UFixed18 accumulatedFee) {
-        Position memory latestPosition = positionAtVersion(self, latestOracleVersion.version);
+        Position memory latestPosition = positionAtVersion(self, period.fromVersion.version);
 
         // accumulate funding
         Accumulator memory accumulatedPosition;
         (accumulatedPosition, accumulatedFee) =
-            _accumulateFunding(fundingFee, latestPosition, latestOracleVersion, toOracleVersion);
+            _accumulateFunding(fundingFee, latestPosition, period, utilizationCurve, closed);
 
         // accumulate position
-        accumulatedPosition = accumulatedPosition.add(
-            _accumulatePosition(latestPosition, latestOracleVersion, toOracleVersion));
+        accumulatedPosition = accumulatedPosition.add(_accumulatePosition(latestPosition, period, closed));
 
         // accumulate share
-        Accumulator memory accumulatedShare =
-            _accumulateShare(latestPosition, latestOracleVersion, toOracleVersion);
+        Accumulator memory accumulatedShare = _accumulateShare(latestPosition, period);
 
         // accumulate position
         (Position memory newPosition, UFixed18 positionFee, bool settled) =
-            latestPosition.settled(self.pre, toOracleVersion);
+            latestPosition.settled(self.pre, period.toVersion);
         accumulatedFee = accumulatedFee.add(positionFee);
         if (settled) delete self.pre;
 
         // save update
-        self._valueAtVersion[toOracleVersion.version] = valueAtVersion(self, latestOracleVersion.version)
+        self._valueAtVersion[period.toVersion.version] = valueAtVersion(self, period.fromVersion.version)
             .add(accumulatedPosition)
             .pack();
-        self._shareAtVersion[toOracleVersion.version] = shareAtVersion(self, latestOracleVersion.version)
+        self._shareAtVersion[period.toVersion.version] = shareAtVersion(self, period.fromVersion.version)
             .add(accumulatedShare)
             .pack();
-        self._positionAtVersion[toOracleVersion.version] = newPosition.pack();
+        self._positionAtVersion[period.toVersion.version] = newPosition.pack();
         
         return positionFee;
     }
@@ -114,28 +115,28 @@ library VersionedHistoryLib {
      *      This is an acceptable approximation.
      * @param fundingFee The funding fee rate for the product
      * @param latestPosition The latest global position
-     * @param latestOracleVersion The oracle version to accumulate from
-     * @param toOracleVersion The oracle version to accumulate to
+     * @param period The oracle version period to settle for
+     * @param closed Whether the product is closed
      * @return accumulatedFunding The total amount accumulated from funding
      * @return accumulatedFee The total fee accrued from funding accumulation
      */
     function _accumulateFunding(
         UFixed18 fundingFee,
         Position memory latestPosition,
-        IOracleProvider.OracleVersion memory latestOracleVersion,
-        IOracleProvider.OracleVersion memory toOracleVersion
-    ) private view returns (Accumulator memory accumulatedFunding, UFixed18 accumulatedFee) {
-        if (_product().closed()) return (Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO), UFixed18Lib.ZERO);
+        Period memory period,
+        JumpRateUtilizationCurve memory utilizationCurve,
+        bool closed
+    ) private pure returns (Accumulator memory accumulatedFunding, UFixed18 accumulatedFee) {
+        if (closed) return (Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO), UFixed18Lib.ZERO);
         if (latestPosition.taker.isZero()) return (Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO), UFixed18Lib.ZERO);
         if (latestPosition.maker.isZero()) return (Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO), UFixed18Lib.ZERO);
 
-        uint256 elapsed = toOracleVersion.timestamp - latestOracleVersion.timestamp;
-
-        UFixed18 takerNotional = Fixed18Lib.from(latestPosition.taker).mul(latestOracleVersion.price).abs();
+        UFixed18 takerNotional = Fixed18Lib.from(latestPosition.taker).mul(period.fromVersion.price).abs();
         UFixed18 socializedNotional = takerNotional.mul(latestPosition.socializationFactor());
 
-        Fixed18 rateAccumulated = _product().rate(latestPosition)
-            .mul(Fixed18Lib.from(UFixed18Lib.from(elapsed)));
+        Fixed18 rateAccumulated = utilizationCurve.compute(latestPosition.utilization())
+            .mul(Fixed18Lib.from(period.timestampDelta()))
+            .div(Fixed18Lib.from(365 days));
         Fixed18 fundingAccumulated = rateAccumulated.mul(Fixed18Lib.from(socializedNotional));
         accumulatedFee = fundingAccumulated.abs().mul(fundingFee);
 
@@ -154,21 +155,20 @@ library VersionedHistoryLib {
     /**
      * @notice Globally accumulates position PNL since last oracle update
      * @param latestPosition The latest global position
-     * @param latestOracleVersion The oracle version to accumulate from
-     * @param toOracleVersion The oracle version to accumulate to
+     * @param period The oracle version period to settle for
+     * @param closed Whether the product is closed
      * @return accumulatedPosition The total amount accumulated from position PNL
      */
     function _accumulatePosition(
         Position memory latestPosition,
-        IOracleProvider.OracleVersion memory latestOracleVersion,
-        IOracleProvider.OracleVersion memory toOracleVersion
-    ) private view returns (Accumulator memory accumulatedPosition) {
-        if (_product().closed()) return Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO);
+        Period memory period,
+        bool closed
+    ) private pure returns (Accumulator memory accumulatedPosition) {
+        if (closed) return Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO);
         if (latestPosition.taker.isZero()) return Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO);
         if (latestPosition.maker.isZero()) return Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO);
 
-        Fixed18 oracleDelta = toOracleVersion.price.sub(latestOracleVersion.price);
-        Fixed18 totalTakerDelta = oracleDelta.mul(Fixed18Lib.from(latestPosition.taker));
+        Fixed18 totalTakerDelta = period.priceDelta().mul(Fixed18Lib.from(latestPosition.taker));
         Fixed18 socializedTakerDelta = totalTakerDelta.mul(Fixed18Lib.from(latestPosition.socializationFactor()));
 
         accumulatedPosition.maker = socializedTakerDelta.div(Fixed18Lib.from(latestPosition.maker)).mul(Fixed18Lib.NEG_ONE);
@@ -179,16 +179,14 @@ library VersionedHistoryLib {
      * @notice Globally accumulates position's share of the total market since last oracle update
      * @dev This is used to compute incentivization rewards based on market participation
      * @param latestPosition The latest global position
-     * @param latestOracleVersion The oracle version to accumulate from
-     * @param toOracleVersion The oracle version to accumulate to
+     * @param period The oracle version period to settle for
      * @return accumulatedShare The total share amount accumulated per position
      */
     function _accumulateShare(
         Position memory latestPosition,
-        IOracleProvider.OracleVersion memory latestOracleVersion,
-        IOracleProvider.OracleVersion memory toOracleVersion
+        Period memory period
     ) private pure returns (Accumulator memory accumulatedShare) {
-        uint256 elapsed = toOracleVersion.timestamp - latestOracleVersion.timestamp;
+        uint256 elapsed = period.toVersion.timestamp - period.fromVersion.timestamp;
 
         accumulatedShare.maker = latestPosition.maker.isZero() ?
             Fixed18Lib.ZERO :
@@ -196,9 +194,5 @@ library VersionedHistoryLib {
         accumulatedShare.taker = latestPosition.taker.isZero() ?
             Fixed18Lib.ZERO :
             Fixed18Lib.from(UFixed18Lib.from(elapsed).div(latestPosition.taker));
-    }
-
-    function _product() private view returns (IProduct) { //TODO take in anywhere this is read
-        return IProduct(address(this));
     }
 }
