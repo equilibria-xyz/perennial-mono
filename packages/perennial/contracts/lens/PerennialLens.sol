@@ -32,6 +32,20 @@ contract PerennialLens is IPerennialLens {
      */
 
     /**
+     * @notice Returns the snapshot of the protocol
+     * @return _snapshot a snapshot of protocol values
+     */
+    function snapshot() public view returns (ProtocolSnapshot memory _snapshot) {
+        _snapshot.collateral = collateral();
+        _snapshot.incentivizer = controller.incentivizer();
+        _snapshot.collateralToken = collateral().token();
+        _snapshot.protocolFee = controller.protocolFee();
+        _snapshot.liquidationFee = controller.liquidationFee();
+        _snapshot.minCollateral = controller.minCollateral();
+        _snapshot.paused = controller.paused();
+    }
+
+    /**
      * @notice Returns the snapshots of the provided `productAddresses`
      * @param productAddresses Product addresses
      * @return _snapshots a snapshot for each product after settle
