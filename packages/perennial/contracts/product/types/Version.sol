@@ -65,18 +65,53 @@ library VersionLib {
      * @param params The current set of market parameters
      * @return accumulatedVersion The resulting version after accumulation
      * @return accumulatedFee The fee accrued from opening or closing a new position
-     * @return settled Whether the pre position should be cleared
      */
-    function accumulate(
+    function accumulateAndSettle(
         Version memory self,
         PrePosition memory pre,
         Period memory period,
         AccumulatorParams memory params
-    ) internal pure returns (Version memory accumulatedVersion, UFixed18 accumulatedFee, bool settled) {
+    ) internal pure returns (Version memory accumulatedVersion, UFixed18 accumulatedFee) {
+        Accumulator memory accumulatedPosition;
+        Accumulator memory accumulatedShare;
+        (accumulatedPosition, accumulatedShare, accumulatedFee) = _accumulate(self, period, params);
+
+        // accumulate position
+        accumulatedFee = accumulatedFee.add(pre.computeFee(period.toVersion, params.maker, params.taker));
+
+        // save update
+        accumulatedVersion = Version(
+            self.value().add(accumulatedPosition).pack(),
+            self.share().add(accumulatedShare).pack(),
+            self.position().next(pre).pack()
+        );
+    }
+
+    function accumulate(
+        Version memory self,
+        Period memory period,
+        AccumulatorParams memory params
+    ) internal pure returns (Version memory accumulatedVersion, UFixed18 accumulatedFee) {
+        Accumulator memory accumulatedPosition;
+        Accumulator memory accumulatedShare;
+        (accumulatedPosition, accumulatedShare, accumulatedFee) = _accumulate(self, period, params);
+
+        // save update
+        accumulatedVersion = Version(
+            self.value().add(accumulatedPosition).pack(),
+            self.share().add(accumulatedShare).pack(),
+            self._position
+        );
+    }
+
+    function _accumulate(
+        Version memory self,
+        Period memory period,
+        AccumulatorParams memory params
+    ) private pure returns (Accumulator memory accumulatedPosition, Accumulator memory accumulatedShare, UFixed18 accumulatedFee) {
         Position memory latestPosition = self.position();
 
         // accumulate funding
-        Accumulator memory accumulatedPosition;
         (accumulatedPosition, accumulatedFee) =
             _accumulateFunding(params.funding, latestPosition, period, params.utilizationCurve, params.closed);
 
@@ -84,20 +119,7 @@ library VersionLib {
         accumulatedPosition = accumulatedPosition.add(_accumulatePosition(latestPosition, period, params.closed));
 
         // accumulate share
-        Accumulator memory accumulatedShare = _accumulateShare(latestPosition, period);
-
-        // accumulate position
-        Position memory newPosition;
-        UFixed18 positionFee;
-        (newPosition, positionFee, settled) = latestPosition.settled(pre, period.toVersion, params.maker, params.taker);
-        accumulatedFee = accumulatedFee.add(positionFee);
-
-        // save update
-        accumulatedVersion = Version(
-            self.value().add(accumulatedPosition).pack(),
-            self.share().add(accumulatedShare).pack(),
-            newPosition.pack()
-        );
+        accumulatedShare = _accumulateShare(latestPosition, period);
     }
 
     /**

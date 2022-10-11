@@ -48,7 +48,6 @@ describe('Lens', () => {
     expectPrePositionEq(globalPre, {
       openPosition: { maker: POSITION, taker: POSITION },
       closePosition: { maker: 0, taker: 0 },
-      oracleVersion: 2472,
     })
     expectPositionEq(globalPosition, { maker: 0, taker: 0 })
     expect(productSnapshot.latestVersion.price).to.equal('11388297509860897871140900')
@@ -65,7 +64,6 @@ describe('Lens', () => {
     expectPrePositionEq(userPre, {
       openPosition: { maker: POSITION, taker: 0 },
       closePosition: { maker: 0, taker: 0 },
-      oracleVersion: 2472,
     })
     expectPositionEq(userPosition, { maker: 0, taker: 0 })
     expect(userSnapshot.maintenance).to.equal('341648925295826936134')
@@ -89,7 +87,6 @@ describe('Lens', () => {
     expectPrePositionEq(globalPre, {
       openPosition: { maker: 0, taker: 0 },
       closePosition: { maker: 0, taker: 0 },
-      oracleVersion: 0,
     })
 
     userSnapshot = await lens.callStatic['snapshot(address,address)'](user.address, product.address)
@@ -98,7 +95,6 @@ describe('Lens', () => {
     expectPrePositionEq(userPre, {
       openPosition: { maker: 0, taker: 0 },
       closePosition: { maker: 0, taker: 0 },
-      oracleVersion: 0,
     })
 
     // Pre -> Position
@@ -115,7 +111,6 @@ describe('Lens', () => {
     expectPrePositionEq(userBPosition[0], {
       openPosition: { maker: 0, taker: 0 },
       closePosition: { maker: 0, taker: 0 },
-      oracleVersion: 0,
     })
     expectPositionEq(userBPosition[1], { maker: 0, taker: POSITION })
 

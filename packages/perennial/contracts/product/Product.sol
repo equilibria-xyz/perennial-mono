@@ -81,14 +81,21 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     function _settle() private returns (IOracleProvider.OracleVersion memory currentOracleVersion) {
         // Determine periods to settle
         currentOracleVersion = _sync();
-        Period[] memory periods = _periodsToSettle(currentOracleVersion);
-        if (periods.length == 0) return currentOracleVersion;
+        if (currentOracleVersion.version == _latestVersion) return currentOracleVersion; // zero periods if a == c
 
         // Sync incentivizer programs
         IController _controller = controller();
         _controller.incentivizer().sync(currentOracleVersion);
 
-        // Settle periods
+        // Load version data into memory
+        Version memory operatingVersion = _versions[_latestVersion];
+        IOracleProvider.OracleVersion memory latestOracleVersion = atVersion(_latestVersion);
+        IOracleProvider.OracleVersion memory settleOracleVersion =
+            _latestVersion + 1 == currentOracleVersion.version ?
+                currentOracleVersion :
+                atVersion(_latestVersion + 1);
+
+        // Load parameters
         AccumulatorParams memory params = AccumulatorParams(
             utilizationCurve(),
             fundingFee(),
@@ -97,45 +104,29 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
             closed()
         );
         UFixed18 accumulatedFee;
-        Version memory currentVersion = _versions[periods[0].fromVersion.version];
-        for (uint256 i; i < periods.length; i++) {
-            (Version memory version, UFixed18 fee, bool settled) = currentVersion.accumulate(pre(), periods[i], params);
+        UFixed18 fee;
 
-            currentVersion = version;
-            _versions[periods[i].toVersion.version] = version;
+        // a->b (and settle)
+        (operatingVersion, accumulatedFee) =
+            operatingVersion.accumulateAndSettle(pre(), Period(latestOracleVersion, settleOracleVersion), params);
+        _versions[settleOracleVersion.version] = operatingVersion;
+        delete _pre;
 
+        // b->c
+        if (settleOracleVersion.version != currentOracleVersion.version) { // skip is b == c
+            (operatingVersion, fee) =
+                operatingVersion.accumulate(Period(settleOracleVersion, currentOracleVersion), params);
+            _versions[currentOracleVersion.version] = operatingVersion;
             accumulatedFee = accumulatedFee.add(fee);
-            if (settled) delete _pre;
         }
-        _latestVersion = currentOracleVersion.version;
 
         // Settle collateral
         _controller.collateral().settleProduct(accumulatedFee);
 
-        emit Settle(
-            periods.length > 0 ? periods[0].toVersion.version : currentOracleVersion.version,
-            periods.length > 1 ? periods[1].toVersion.version : periods.length > 0 ? periods[0].toVersion.version : currentOracleVersion.version
-        );
-    }
+        // Save settled version
+        _latestVersion = currentOracleVersion.version;
 
-    function _periodsToSettle(IOracleProvider.OracleVersion memory currentOracleVersion)
-    private view returns (Period[] memory periods) {
-        // Get latest oracle version
-        if (_latestVersion == currentOracleVersion.version) return periods; // zero periods if a == c
-        IOracleProvider.OracleVersion memory latestOracleVersion = atVersion(_latestVersion);
-
-        // Get settle oracle version
-        uint256 _settleVersion = _pre.settleVersion(currentOracleVersion.version);
-        if (_settleVersion == currentOracleVersion.version) { // one period if b == c
-            periods = new Period[](1);
-            periods[0] = Period(latestOracleVersion, currentOracleVersion);
-        } else { // default to two periods: a->b, b->c
-            IOracleProvider.OracleVersion memory settleOracleVersion = atVersion(_settleVersion);
-
-            periods = new Period[](2);
-            periods[0] = Period(latestOracleVersion, settleOracleVersion);
-            periods[1] = Period(settleOracleVersion, currentOracleVersion);
-        }
+        emit Settle(settleOracleVersion.version, currentOracleVersion.version);
     }
 
     /**
@@ -168,10 +159,11 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         if (latestVersion(account) == currentOracleVersion.version) return; // short circuit entirely if a == c
 
         // Get settle oracle version
-        uint256 _settleVersion = _accounts[account].pre.settleVersion(currentOracleVersion.version);
-        IOracleProvider.OracleVersion memory settleOracleVersion = _settleVersion == currentOracleVersion.version ?
-            currentOracleVersion : // if b == c, don't re-call provider for oracle version
-            atVersion(_settleVersion);
+        uint256 _settleVersion = latestVersion(account) + 1;
+        IOracleProvider.OracleVersion memory settleOracleVersion =
+            _settleVersion == currentOracleVersion.version ?
+                currentOracleVersion : // if b == c, don't re-call provider for oracle version
+                atVersion(_settleVersion);
 
         // initialize
         UFixed18 makerFee_ = makerFee();
@@ -182,7 +174,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         _controller.incentivizer().syncAccount(account, settleOracleVersion);
 
         // account a->b
-        accumulated = accumulated.add(_accounts[account].settle(_versions, settleOracleVersion, makerFee_, takerFee_));
+        accumulated = accumulated.add(_accounts[account].accumulateAndSettle(_versions, settleOracleVersion, makerFee_, takerFee_));
 
         // short-circuit from a->c if b == c
         if (settleOracleVersion.version != currentOracleVersion.version) {
@@ -190,7 +182,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
             _controller.incentivizer().syncAccount(account, currentOracleVersion);
 
             // account b->c
-            accumulated = accumulated.add(_accounts[account].settle(_versions, currentOracleVersion, makerFee_, takerFee_));
+            accumulated = accumulated.add(_accounts[account].accumulate(_versions, currentOracleVersion));
         }
 
         // settle collateral
@@ -214,8 +206,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     liquidationInvariant
     maintenanceInvariant
     {
-        _accounts[msg.sender].pre.openTake(_latestVersion, amount);
-        _pre.openTake(_latestVersion, amount);
+        _accounts[msg.sender].pre.openTake(amount);
+        _pre.openTake(amount);
 
         emit TakeOpened(msg.sender, _latestVersion, amount);
     }
@@ -236,8 +228,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     }
 
     function _closeTake(address account, UFixed18 amount) private {
-        _accounts[account].pre.closeTake(_latestVersion, amount);
-        _pre.closeTake(_latestVersion, amount);
+        _accounts[account].pre.closeTake(amount);
+        _pre.closeTake(amount);
 
         emit TakeClosed(account, _latestVersion, amount);
     }
@@ -258,8 +250,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     liquidationInvariant
     maintenanceInvariant
     {
-        _accounts[msg.sender].pre.openMake(_latestVersion, amount);
-        _pre.openMake(_latestVersion, amount);
+        _accounts[msg.sender].pre.openMake(amount);
+        _pre.openMake(amount);
 
         emit MakeOpened(msg.sender, _latestVersion, amount);
     }
@@ -281,8 +273,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     }
 
     function _closeMake(address account, UFixed18 amount) private {
-        _accounts[account].pre.closeMake(_latestVersion, amount);
-        _pre.closeMake(_latestVersion, amount);
+        _accounts[account].pre.closeMake(amount);
+        _pre.closeMake(amount);
 
         emit MakeClosed(account, _latestVersion, amount);
     }

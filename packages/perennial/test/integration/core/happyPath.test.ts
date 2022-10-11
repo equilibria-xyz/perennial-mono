@@ -78,7 +78,6 @@ describe.only('Happy Path', () => {
     expect(await product.isClosed(user.address)).to.equal(false)
     expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre(address)'](user.address), {
-      oracleVersion: INITIAL_VERSION,
       openPosition: { maker: POSITION, taker: 0 },
       closePosition: { maker: 0, taker: 0 },
     })
@@ -88,7 +87,6 @@ describe.only('Happy Path', () => {
     expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION)
     expectPositionEq(await product.positionAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre()'](), {
-      oracleVersion: INITIAL_VERSION,
       openPosition: { maker: POSITION, taker: 0 },
       closePosition: { maker: 0, taker: 0 },
     })
@@ -103,7 +101,6 @@ describe.only('Happy Path', () => {
     expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION + 1)
     expectPositionEq(await product.positionAtVersion(INITIAL_VERSION + 1), { maker: POSITION, taker: 0 })
     expectPrePositionEq(await product['pre()'](), {
-      oracleVersion: 0,
       openPosition: { maker: 0, taker: 0 },
       closePosition: { maker: 0, taker: 0 },
     })
@@ -112,7 +109,6 @@ describe.only('Happy Path', () => {
     await product.settleAccount(user.address)
     expectPositionEq(await product.position(user.address), { maker: POSITION, taker: 0 })
     expectPrePositionEq(await product['pre(address)'](user.address), {
-      oracleVersion: 0,
       openPosition: { maker: 0, taker: 0 },
       closePosition: { maker: 0, taker: 0 },
     })
@@ -136,7 +132,6 @@ describe.only('Happy Path', () => {
     expect(await product.isClosed(user.address)).to.equal(false)
     expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre(address)'](user.address), {
-      oracleVersion: INITIAL_VERSION,
       openPosition: { maker: POSITION, taker: 0 },
       closePosition: { maker: 0, taker: 0 },
     })
@@ -146,7 +141,6 @@ describe.only('Happy Path', () => {
     expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION)
     expectPositionEq(await product.positionAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre()'](), {
-      oracleVersion: INITIAL_VERSION,
       openPosition: { maker: POSITION, taker: 0 },
       closePosition: { maker: 0, taker: 0 },
     })
@@ -161,7 +155,6 @@ describe.only('Happy Path', () => {
     expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION + 1)
     expectPositionEq(await product.positionAtVersion(INITIAL_VERSION + 1), { maker: POSITION, taker: 0 })
     expectPrePositionEq(await product['pre()'](), {
-      oracleVersion: 0,
       openPosition: { maker: 0, taker: 0 },
       closePosition: { maker: 0, taker: 0 },
     })
@@ -170,7 +163,6 @@ describe.only('Happy Path', () => {
     await product.settleAccount(user.address)
     expectPositionEq(await product.position(user.address), { maker: POSITION, taker: 0 })
     expectPrePositionEq(await product['pre(address)'](user.address), {
-      oracleVersion: 0,
       openPosition: { maker: 0, taker: 0 },
       closePosition: { maker: 0, taker: 0 },
     })
@@ -196,7 +188,6 @@ describe.only('Happy Path', () => {
     expect(await product.maintenanceNext(user.address)).to.equal(0)
     expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre(address)'](user.address), {
-      oracleVersion: INITIAL_VERSION,
       openPosition: { maker: 0, taker: 0 },
       closePosition: { maker: 0, taker: 0 },
     })
@@ -206,7 +197,6 @@ describe.only('Happy Path', () => {
     expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION)
     expectPositionEq(await product.positionAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre()'](), {
-      oracleVersion: INITIAL_VERSION,
       openPosition: { maker: 0, taker: 0 },
       closePosition: { maker: 0, taker: 0 },
     })
@@ -234,7 +224,6 @@ describe.only('Happy Path', () => {
     expect(await product.maintenanceNext(user.address)).to.equal(0)
     expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre(address)'](user.address), {
-      oracleVersion: INITIAL_VERSION,
       openPosition: { maker: 0, taker: 0 },
       closePosition: { maker: 0, taker: 0 },
     })
@@ -244,7 +233,6 @@ describe.only('Happy Path', () => {
     expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION)
     expectPositionEq(await product.positionAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre()'](), {
-      oracleVersion: INITIAL_VERSION,
       openPosition: { maker: 0, taker: 0 },
       closePosition: { maker: 0, taker: 0 },
     })
@@ -270,7 +258,6 @@ describe.only('Happy Path', () => {
     expect(await product.isClosed(userB.address)).to.equal(false)
     expectPositionEq(await product.position(userB.address), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre(address)'](userB.address), {
-      oracleVersion: INITIAL_VERSION,
       openPosition: { maker: 0, taker: TAKE_POSITION },
       closePosition: { maker: 0, taker: 0 },
     })
@@ -280,7 +267,6 @@ describe.only('Happy Path', () => {
     expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION)
     expectPositionEq(await product.positionAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre()'](), {
-      oracleVersion: INITIAL_VERSION,
       openPosition: { maker: MAKE_POSITION, taker: TAKE_POSITION },
       closePosition: { maker: 0, taker: 0 },
     })
@@ -301,14 +287,12 @@ describe.only('Happy Path', () => {
       taker: TAKE_POSITION,
     })
     expectPrePositionEq(await product['pre()'](), {
-      oracleVersion: 0,
       openPosition: { maker: 0, taker: 0 },
       closePosition: { maker: 0, taker: 0 },
     })
     await product.settleAccount(userB.address)
     expectPositionEq(await product.position(userB.address), { maker: 0, taker: TAKE_POSITION })
     expectPrePositionEq(await product['pre(address)'](userB.address), {
-      oracleVersion: 0,
       openPosition: { maker: 0, taker: 0 },
       closePosition: { maker: 0, taker: 0 },
     })
@@ -335,7 +319,6 @@ describe.only('Happy Path', () => {
     expect(await product.isClosed(userB.address)).to.equal(false)
     expectPositionEq(await product.position(userB.address), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre(address)'](userB.address), {
-      oracleVersion: INITIAL_VERSION,
       openPosition: { maker: 0, taker: TAKE_POSITION },
       closePosition: { maker: 0, taker: 0 },
     })
@@ -345,7 +328,6 @@ describe.only('Happy Path', () => {
     expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION)
     expectPositionEq(await product.positionAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre()'](), {
-      oracleVersion: INITIAL_VERSION,
       openPosition: { maker: MAKE_POSITION, taker: TAKE_POSITION },
       closePosition: { maker: 0, taker: 0 },
     })
@@ -366,14 +348,12 @@ describe.only('Happy Path', () => {
       taker: TAKE_POSITION,
     })
     expectPrePositionEq(await product['pre()'](), {
-      oracleVersion: 0,
       openPosition: { maker: 0, taker: 0 },
       closePosition: { maker: 0, taker: 0 },
     })
     await product.settleAccount(userB.address)
     expectPositionEq(await product.position(userB.address), { maker: 0, taker: TAKE_POSITION })
     expectPrePositionEq(await product['pre(address)'](userB.address), {
-      oracleVersion: 0,
       openPosition: { maker: 0, taker: 0 },
       closePosition: { maker: 0, taker: 0 },
     })
@@ -406,7 +386,6 @@ describe.only('Happy Path', () => {
     expect(await product.maintenanceNext(userB.address)).to.equal(0)
     expectPositionEq(await product.position(userB.address), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre(address)'](userB.address), {
-      oracleVersion: INITIAL_VERSION,
       openPosition: { maker: 0, taker: 0 },
       closePosition: { maker: 0, taker: 0 },
     })
@@ -416,7 +395,6 @@ describe.only('Happy Path', () => {
     expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION)
     expectPositionEq(await product.positionAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre()'](), {
-      oracleVersion: INITIAL_VERSION,
       openPosition: { maker: OPEN_MAKE_POSITION, taker: 0 },
       closePosition: { maker: 0, taker: 0 },
     })
@@ -451,7 +429,6 @@ describe.only('Happy Path', () => {
     expect(await product.maintenanceNext(userB.address)).to.equal(0)
     expectPositionEq(await product.position(userB.address), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre(address)'](userB.address), {
-      oracleVersion: INITIAL_VERSION,
       openPosition: { maker: 0, taker: 0 },
       closePosition: { maker: 0, taker: 0 },
     })
@@ -461,7 +438,6 @@ describe.only('Happy Path', () => {
     expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION)
     expectPositionEq(await product.positionAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre()'](), {
-      oracleVersion: INITIAL_VERSION,
       openPosition: { maker: OPEN_MAKE_POSITION, taker: 0 },
       closePosition: { maker: 0, taker: 0 },
     })

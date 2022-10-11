@@ -7,7 +7,6 @@ export interface Position {
 }
 
 export interface PrePosition {
-  oracleVersion: BigNumberish
   openPosition: Position
   closePosition: Position
 }
@@ -29,7 +28,6 @@ export function expectPositionEq(a: Position, b: Position): void {
 }
 
 export function expectPrePositionEq(a: PrePosition, b: PrePosition): void {
-  expect(a.oracleVersion).to.equal(b.oracleVersion)
   expectPositionEq(a.openPosition, b.openPosition)
   expectPositionEq(a.closePosition, b.closePosition)
 }
