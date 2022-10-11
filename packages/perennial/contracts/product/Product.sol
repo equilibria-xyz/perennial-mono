@@ -8,6 +8,9 @@ import "./UPayoffProvider.sol";
 import "./UParamProvider.sol";
 import "./types/Account.sol";
 
+// TODO: position needs less settle on the second period for both global and account
+// TODO: lots of params can be passed in from global settle to account settle
+
 /**
  * @title Product
  * @notice Manages logic and state for a single product market.
@@ -178,21 +181,16 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         // sync incentivizer before accumulator
         _controller.incentivizer().syncAccount(account, settleOracleVersion);
 
-        // value a->b
-        accumulated = accumulated.add(
-            _accounts[account].syncTo(_versions, _accounts[account], settleOracleVersion.version).sum());
-
-        // position a->b
-        accumulated = accumulated.sub(Fixed18Lib.from(_accounts[account].settle(settleOracleVersion, makerFee_, takerFee_)));
+        // account a->b
+        accumulated = accumulated.add(_accounts[account].settle(_versions, settleOracleVersion, makerFee_, takerFee_));
 
         // short-circuit from a->c if b == c
         if (settleOracleVersion.version != currentOracleVersion.version) {
             // sync incentivizer before accumulator
             _controller.incentivizer().syncAccount(account, currentOracleVersion);
 
-            // value b->c
-            accumulated = accumulated.add(
-                _accounts[account].syncTo(_versions, _accounts[account], currentOracleVersion.version).sum());
+            // account b->c
+            accumulated = accumulated.add(_accounts[account].settle(_versions, currentOracleVersion, makerFee_, takerFee_));
         }
 
         // settle collateral
@@ -312,7 +310,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @return The current maintenance requirement
      */
     function maintenance(address account) external view returns (UFixed18) {
-        return _accounts[account].maintenance();
+        return _accounts[account].maintenance(currentVersion(), maintenance());
     }
 
     /**
@@ -322,7 +320,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @return The next maintenance requirement
      */
     function maintenanceNext(address account) external view returns (UFixed18) {
-        return _accounts[account].maintenanceNext();
+        return _accounts[account].maintenanceNext(currentVersion(), maintenance());
     }
 
     /**

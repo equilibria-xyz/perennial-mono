@@ -32,38 +32,30 @@ library AccountLib {
      * @param toOracleVersion The oracle version to accumulate to
      * @param makerFee The fee for opening or closing a maker position
      * @param takerFee The fee for opening or closing a taker position
-     * @return positionFee The fee accrued from opening or closing a new position
+     * @return accumulated The value accrued from settling the position
      */
     function settle(
         Account storage self,
+        mapping(uint256 => Version) storage versions,
         IOracleProvider.OracleVersion memory toOracleVersion,
         UFixed18 makerFee,
         UFixed18 takerFee
-    ) internal returns (UFixed18 positionFee) {
-        bool settled;
-        (self.position, positionFee, settled) = self.position.settled(self.pre, toOracleVersion, makerFee, takerFee);
+    ) internal returns (Fixed18 accumulated) {
+        accumulated = self.position
+            .mul(versions[toOracleVersion.version].value().sub(versions[self.latestVersion].value()))
+            .sum();
+
+        (Position memory newPosition, UFixed18 positionFee, bool settled) =
+            self.position.settled(self.pre, toOracleVersion, makerFee, takerFee);
+        self.position = newPosition;
+        accumulated = accumulated.sub(Fixed18Lib.from(positionFee));
+
         if (settled) {
             delete self.pre;
             self.liquidation = false;
         }
-    }
 
-    /**
-     * @notice Syncs the account to oracle version `versionTo`
-     * @param self The struct to operate on
-     * @param versions Pointer to the global versions mapping
-     * @param position Pointer to global position
-     * @param versionTo Oracle version to sync account to
-     * @return value The value accumulated sync last sync
-     */
-    function syncTo(
-        Account storage self,
-        mapping(uint256 => Version) storage versions,
-        Account storage position,
-        uint256 versionTo
-    ) internal returns (Accumulator memory value) {
-        value = position.position.mul(versions[versionTo].value().sub(versions[self.latestVersion].value()));
-        self.latestVersion = versionTo;
+        self.latestVersion = toOracleVersion.version;
     }
 
     /**
@@ -72,9 +64,13 @@ library AccountLib {
      * @param self The struct to operate on
      * @return Current maintenance requirement for the account
      */
-    function maintenance(Account storage self) internal view returns (UFixed18) {
+    function maintenance(
+        Account memory self,
+        IOracleProvider.OracleVersion memory currentOracleVersion,
+        UFixed18 maintenanceRatio
+    ) internal pure returns (UFixed18) {
         if (self.liquidation) return UFixed18Lib.ZERO;
-        return _maintenance(self.position);
+        return _maintenance(self.position, currentOracleVersion, maintenanceRatio);
     }
 
     /**
@@ -83,8 +79,12 @@ library AccountLib {
      * @param self The struct to operate on
      * @return Next maintenance requirement for the account
      */
-    function maintenanceNext(Account storage self) internal view returns (UFixed18) {
-        return _maintenance(self.position.next(self.pre));
+    function maintenanceNext(
+        Account memory self,
+        IOracleProvider.OracleVersion memory currentOracleVersion,
+        UFixed18 maintenanceRatio
+    ) internal pure returns (UFixed18) {
+        return _maintenance(self.position.next(self.pre), currentOracleVersion, maintenanceRatio);
     }
 
     /**
@@ -93,11 +93,14 @@ library AccountLib {
      * @param position The position to compete the maintenance requirement for
      * @return Next maintenance requirement for the account
      */
-    function _maintenance(Position memory position) private view returns (UFixed18) {
-        IProduct product = IProduct(address(this));
-        Fixed18 oraclePrice = product.currentVersion().price;
+    function _maintenance(
+        Position memory position,
+        IOracleProvider.OracleVersion memory currentOracleVersion,
+        UFixed18 maintenanceRatio
+    ) private pure returns (UFixed18) {
+        Fixed18 oraclePrice = currentOracleVersion.price;
         UFixed18 notionalMax = Fixed18Lib.from(position.max()).mul(oraclePrice).abs();
-        return notionalMax.mul(product.maintenance());
+        return notionalMax.mul(maintenanceRatio);
     }
 
     /**
@@ -116,7 +119,7 @@ library AccountLib {
      * @param self The struct to operate on
      * @return Whether the account is currently doubled sided
      */
-    function isDoubleSided(Account storage self) internal view returns (bool) {
+    function isDoubleSided(Account memory self) internal pure returns (bool) {
         bool makerEmpty = self.position.maker.isZero() && self.pre.openPosition.maker.isZero() && self.pre.closePosition.maker.isZero();
         bool takerEmpty = self.position.taker.isZero() && self.pre.openPosition.taker.isZero() && self.pre.closePosition.taker.isZero();
 
@@ -129,7 +132,7 @@ library AccountLib {
      * @param self The struct to operate on
      * @return Whether the account is currently over closed
      */
-    function isOverClosed(Account storage self) internal view returns (bool) {
+    function isOverClosed(Account memory self) internal pure returns (bool) {
         Position memory nextOpen = self.position.add(self.pre.openPosition);
 
         return  self.pre.closePosition.maker.gt(nextOpen.maker) || self.pre.closePosition.taker.gt(nextOpen.taker);
