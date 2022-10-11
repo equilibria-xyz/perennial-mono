@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.15;
 
-import "../../../interfaces/IProduct.sol";
-import "../../../interfaces/types/PrePosition.sol";
+import "../../interfaces/IProduct.sol";
+import "../../interfaces/types/PrePosition.sol";
+import "./Version.sol";
 
-/// @dev AccountPosition type
-struct AccountPosition {
+/// @dev Account type
+struct Account {
+    /// @dev latest version that the account was synced too
+    uint256 latestVersion;
+
     /// @dev The current settled position of the account
     Position position;
 
@@ -15,13 +19,13 @@ struct AccountPosition {
     /// @dev Whether the account is currently locked for liquidation
     bool liquidation;
 }
-using AccountPositionLib for AccountPosition global;
+using AccountLib for Account global;
 
 /**
- * @title AccountPositionLib
+ * @title AccountLib
  * @notice Library that manages an account-level position.
  */
-library AccountPositionLib {
+library AccountLib {
     /**
      * @notice Settled the account's position to oracle version `toOracleVersion`
      * @param self The struct to operate on
@@ -31,7 +35,7 @@ library AccountPositionLib {
      * @return positionFee The fee accrued from opening or closing a new position
      */
     function settle(
-        AccountPosition storage self,
+        Account storage self,
         IOracleProvider.OracleVersion memory toOracleVersion,
         UFixed18 makerFee,
         UFixed18 takerFee
@@ -45,12 +49,30 @@ library AccountPositionLib {
     }
 
     /**
+     * @notice Syncs the account to oracle version `versionTo`
+     * @param self The struct to operate on
+     * @param versions Pointer to the global versions mapping
+     * @param position Pointer to global position
+     * @param versionTo Oracle version to sync account to
+     * @return value The value accumulated sync last sync
+     */
+    function syncTo(
+        Account storage self,
+        mapping(uint256 => Version) storage versions,
+        Account storage position,
+        uint256 versionTo
+    ) internal returns (Accumulator memory value) {
+        value = position.position.mul(versions[versionTo].value().sub(versions[self.latestVersion].value()));
+        self.latestVersion = versionTo;
+    }
+
+    /**
      * @notice Returns the current maintenance requirement for the account
      * @dev Must be called from a valid product to get the proper maintenance value
      * @param self The struct to operate on
      * @return Current maintenance requirement for the account
      */
-    function maintenance(AccountPosition storage self) internal view returns (UFixed18) {
+    function maintenance(Account storage self) internal view returns (UFixed18) {
         if (self.liquidation) return UFixed18Lib.ZERO;
         return _maintenance(self.position);
     }
@@ -61,7 +83,7 @@ library AccountPositionLib {
      * @param self The struct to operate on
      * @return Next maintenance requirement for the account
      */
-    function maintenanceNext(AccountPosition storage self) internal view returns (UFixed18) {
+    function maintenanceNext(Account storage self) internal view returns (UFixed18) {
         return _maintenance(self.position.next(self.pre));
     }
 
@@ -83,7 +105,7 @@ library AccountPositionLib {
      * @param self The struct to operate on
      * @return Whether the account is closed
      */
-    function isClosed(AccountPosition memory self) internal pure returns (bool) {
+    function isClosed(Account memory self) internal pure returns (bool) {
         return self.pre.isEmpty() && self.position.isEmpty();
     }
 
@@ -94,7 +116,7 @@ library AccountPositionLib {
      * @param self The struct to operate on
      * @return Whether the account is currently doubled sided
      */
-    function isDoubleSided(AccountPosition storage self) internal view returns (bool) {
+    function isDoubleSided(Account storage self) internal view returns (bool) {
         bool makerEmpty = self.position.maker.isZero() && self.pre.openPosition.maker.isZero() && self.pre.closePosition.maker.isZero();
         bool takerEmpty = self.position.taker.isZero() && self.pre.openPosition.taker.isZero() && self.pre.closePosition.taker.isZero();
 
@@ -107,7 +129,7 @@ library AccountPositionLib {
      * @param self The struct to operate on
      * @return Whether the account is currently over closed
      */
-    function isOverClosed(AccountPosition storage self) internal view returns (bool) {
+    function isOverClosed(Account storage self) internal view returns (bool) {
         Position memory nextOpen = self.position.add(self.pre.openPosition);
 
         return  self.pre.closePosition.maker.gt(nextOpen.maker) || self.pre.closePosition.taker.gt(nextOpen.taker);

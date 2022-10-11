@@ -6,8 +6,7 @@ import "@equilibria/root/control/unstructured/UReentrancyGuard.sol";
 import "../controller/UControllerProvider.sol";
 import "./UPayoffProvider.sol";
 import "./UParamProvider.sol";
-import "./types/position/AccountPosition.sol";
-import "./types/accumulator/AccountAccumulator.sol";
+import "./types/Account.sol";
 
 /**
  * @title Product
@@ -26,11 +25,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     /// @dev The symbol of the product
     string public symbol;
 
-    /// @dev The individual position state for each account
-    mapping(address => AccountPosition) private _positions;
-
-    /// @dev The individual accumulator state for each account
-    mapping(address => AccountAccumulator) private _accumulators;
+    /// @dev The individual state for each account
+    mapping(address => Account) private _accounts;
 
     /// @dev Mapping of the historical version data
     mapping(uint256 => Version) _versions;
@@ -169,7 +165,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         if (latestVersion(account) == currentOracleVersion.version) return; // short circuit entirely if a == c
 
         // Get settle oracle version
-        uint256 _settleVersion = _positions[account].pre.settleVersion(currentOracleVersion.version);
+        uint256 _settleVersion = _accounts[account].pre.settleVersion(currentOracleVersion.version);
         IOracleProvider.OracleVersion memory settleOracleVersion = _settleVersion == currentOracleVersion.version ?
             currentOracleVersion : // if b == c, don't re-call provider for oracle version
             atVersion(_settleVersion);
@@ -184,10 +180,10 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
         // value a->b
         accumulated = accumulated.add(
-            _accumulators[account].syncTo(_versions, _positions[account], settleOracleVersion.version).sum());
+            _accounts[account].syncTo(_versions, _accounts[account], settleOracleVersion.version).sum());
 
         // position a->b
-        accumulated = accumulated.sub(Fixed18Lib.from(_positions[account].settle(settleOracleVersion, makerFee_, takerFee_)));
+        accumulated = accumulated.sub(Fixed18Lib.from(_accounts[account].settle(settleOracleVersion, makerFee_, takerFee_)));
 
         // short-circuit from a->c if b == c
         if (settleOracleVersion.version != currentOracleVersion.version) {
@@ -196,7 +192,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
             // value b->c
             accumulated = accumulated.add(
-                _accumulators[account].syncTo(_versions, _positions[account], currentOracleVersion.version).sum());
+                _accounts[account].syncTo(_versions, _accounts[account], currentOracleVersion.version).sum());
         }
 
         // settle collateral
@@ -220,7 +216,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     liquidationInvariant
     maintenanceInvariant
     {
-        _positions[msg.sender].pre.openTake(_latestVersion, amount);
+        _accounts[msg.sender].pre.openTake(_latestVersion, amount);
         _pre.openTake(_latestVersion, amount);
 
         emit TakeOpened(msg.sender, _latestVersion, amount);
@@ -242,7 +238,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     }
 
     function _closeTake(address account, UFixed18 amount) private {
-        _positions[account].pre.closeTake(_latestVersion, amount);
+        _accounts[account].pre.closeTake(_latestVersion, amount);
         _pre.closeTake(_latestVersion, amount);
 
         emit TakeClosed(account, _latestVersion, amount);
@@ -264,7 +260,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     liquidationInvariant
     maintenanceInvariant
     {
-        _positions[msg.sender].pre.openMake(_latestVersion, amount);
+        _accounts[msg.sender].pre.openMake(_latestVersion, amount);
         _pre.openMake(_latestVersion, amount);
 
         emit MakeOpened(msg.sender, _latestVersion, amount);
@@ -287,7 +283,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     }
 
     function _closeMake(address account, UFixed18 amount) private {
-        _positions[account].pre.closeMake(_latestVersion, amount);
+        _accounts[account].pre.closeMake(_latestVersion, amount);
         _pre.closeMake(_latestVersion, amount);
 
         emit MakeClosed(account, _latestVersion, amount);
@@ -299,15 +295,15 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @param account Account to close out
      */
     function closeAll(address account) external onlyCollateral notClosed settleForAccount(account) {
-        AccountPosition storage accountPosition = _positions[account];
-        Position memory p = accountPosition.position.next(_positions[account].pre);
+        Account storage account_ = _accounts[account];
+        Position memory position_ = account_.position.next(_accounts[account].pre);
 
         // Close all positions
-        _closeMake(account, p.maker);
-        _closeTake(account, p.taker);
+        _closeMake(account, position_.maker);
+        _closeTake(account, position_.taker);
 
         // Mark liquidation to lock position
-        accountPosition.liquidation = true;
+        account_.liquidation = true;
     }
 
     /**
@@ -316,7 +312,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @return The current maintenance requirement
      */
     function maintenance(address account) external view returns (UFixed18) {
-        return _positions[account].maintenance();
+        return _accounts[account].maintenance();
     }
 
     /**
@@ -326,7 +322,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @return The next maintenance requirement
      */
     function maintenanceNext(address account) external view returns (UFixed18) {
-        return _positions[account].maintenanceNext();
+        return _accounts[account].maintenanceNext();
     }
 
     /**
@@ -335,7 +331,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @return The the account is closed
      */
     function isClosed(address account) external view returns (bool) {
-        return _positions[account].isClosed();
+        return _accounts[account].isClosed();
     }
 
     /**
@@ -344,7 +340,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @return Whether the account is in liquidation
      */
     function isLiquidating(address account) external view returns (bool) {
-        return _positions[account].liquidation;
+        return _accounts[account].liquidation;
     }
 
     /**
@@ -353,7 +349,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @return Current position of the account
      */
     function position(address account) external view returns (Position memory) {
-        return _positions[account].position;
+        return _accounts[account].position;
     }
 
     /**
@@ -362,7 +358,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @return Current pre-position of the account
      */
     function pre(address account) external view returns (PrePosition memory) {
-        return _positions[account].pre;
+        return _accounts[account].pre;
     }
 
     /**
@@ -417,7 +413,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @return Latest settled oracle version of the account
      */
     function latestVersion(address account) public view returns (uint256) {
-        return _accumulators[account].latestVersion;
+        return _accounts[account].latestVersion;
     }
 
     /**
@@ -456,14 +452,14 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     modifier positionInvariant {
         _;
 
-        if (_positions[msg.sender].isDoubleSided()) revert ProductDoubleSidedError();
+        if (_accounts[msg.sender].isDoubleSided()) revert ProductDoubleSidedError();
     }
 
     /// @dev Ensure that the user hasn't closed more than is open
     modifier closeInvariant {
         _;
 
-        if (_positions[msg.sender].isOverClosed()) revert ProductOverClosedError();
+        if (_accounts[msg.sender].isOverClosed()) revert ProductOverClosedError();
     }
 
     /// @dev Ensure that the user will have sufficient margin for maintenance after next settlement
@@ -476,7 +472,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
     /// @dev Ensure that the user is not currently being liquidated
     modifier liquidationInvariant {
-        if (_positions[msg.sender].liquidation) revert ProductInLiquidationError();
+        if (_accounts[msg.sender].liquidation) revert ProductInLiquidationError();
 
         _;
     }

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.15;
 
-import "../../../interfaces/IProduct.sol";
-import "../../../interfaces/types/Accumulator.sol";
-import "../AccumulatorParams.sol";
-import "../Period.sol";
+import "../../interfaces/IProduct.sol";
+import "../../interfaces/types/Accumulator.sol";
+import "./AccumulatorParams.sol";
+import "./Period.sol";
 
 /// @dev Version type
 struct Version {
