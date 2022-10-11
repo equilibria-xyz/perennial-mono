@@ -525,6 +525,7 @@ describe('Product', () => {
         await expect(product.connect(user).openMake(POSITION))
           .to.emit(product, 'MakeOpened')
           .withArgs(user.address, 1, POSITION)
+        expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('615').add(MAKER_FEE))
 
         await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
         await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_2)
@@ -1338,6 +1339,7 @@ describe('Product', () => {
         await expect(product.connect(user).openTake(POSITION))
           .to.emit(product, 'TakeOpened')
           .withArgs(user.address, 1, POSITION)
+        expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('615').add(TAKER_FEE))
 
         await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
 
@@ -2925,6 +2927,166 @@ describe('Product', () => {
         })
       })
     })
+
+    context('multiple position changes before settle', async () => {
+      beforeEach(async () => {
+        await product.updateUtilizationCurve({
+          // Force a 0.0 rate to make tests simpler
+          minRate: 0,
+          maxRate: 0,
+          targetRate: 0,
+          targetUtilization: utils.parseEther('1'),
+        })
+      })
+
+      describe('single user, maker positions', () => {
+        it('charges the MakerFee for each position change', async () => {
+          await product.updateMakerFee(utils.parseEther('0.01'))
+          const MAKER_FEE = utils.parseEther('24.6') // 2 * position * maker fee * price
+          await collateral.mock.settleProduct.withArgs(MAKER_FEE).returns()
+          await collateral.mock.settleAccount.withArgs(user.address, MAKER_FEE.mul(-1)).returns()
+
+          await expect(product.connect(user).openMake(POSITION))
+            .to.emit(product, 'MakeOpened')
+            .withArgs(user.address, 1, POSITION)
+          await expect(product.connect(user).closeMake(POSITION))
+            .to.emit(product, 'MakeClosed')
+            .withArgs(user.address, 1, POSITION)
+
+          await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
+          await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
+          await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
+          await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_2)
+
+          await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
+          await oracle.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
+          await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
+          await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_3)
+
+          await expect(product.connect(user).settleAccount(user.address))
+            .to.emit(product, 'AccountSettle')
+            .withArgs(user.address, 2, 3)
+        })
+      })
+
+      describe('multiple users, make positions', () => {
+        it('charges the MakerFee for each position change', async () => {
+          await expect(product.connect(user).openMake(POSITION))
+            .to.emit(product, 'MakeOpened')
+            .withArgs(user.address, 1, POSITION)
+
+          await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
+          await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
+          await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
+          await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_2)
+
+          await expect(product.connect(user).settleAccount(user.address))
+            .to.emit(product, 'AccountSettle')
+            .withArgs(user.address, 2, 2)
+
+          await product.updateMakerFee(utils.parseEther('0.01'))
+          const MAKER_FEE = utils.parseEther('24.6') // 2 * position * maker fee * price
+          await collateral.mock.settleProduct.withArgs(MAKER_FEE).returns()
+          await collateral.mock.settleAccount.withArgs(user.address, MAKER_FEE.div(-2)).returns()
+          await collateral.mock.settleAccount.withArgs(userB.address, MAKER_FEE.div(-2)).returns()
+
+          await expect(product.connect(user).closeMake(POSITION))
+            .to.emit(product, 'MakeClosed')
+            .withArgs(user.address, 2, POSITION)
+          await expect(product.connect(userB).openMake(POSITION))
+            .to.emit(product, 'MakeOpened')
+            .withArgs(userB.address, 2, POSITION)
+
+          await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
+          await oracle.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
+          await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
+          await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_3)
+
+          await expect(product.connect(user).settleAccount(user.address))
+            .to.emit(product, 'AccountSettle')
+            .withArgs(user.address, 3, 3)
+          await expect(product.connect(userB).settleAccount(userB.address))
+            .to.emit(product, 'AccountSettle')
+            .withArgs(userB.address, 3, 3)
+        })
+      })
+
+      describe('single user, taker positions', () => {
+        it('charges the TakerFee for each position change', async () => {
+          await product.connect(userC).openMake(POSITION.mul(2))
+
+          await product.updateTakerFee(utils.parseEther('0.01'))
+          const TAKER_FEE = utils.parseEther('24.6') // 2 * position * maker fee * price
+          await collateral.mock.settleProduct.withArgs(TAKER_FEE).returns()
+          await collateral.mock.settleAccount.withArgs(user.address, TAKER_FEE.mul(-1)).returns()
+
+          await expect(product.connect(user).openTake(POSITION))
+            .to.emit(product, 'TakeOpened')
+            .withArgs(user.address, 1, POSITION)
+          await expect(product.connect(user).closeTake(POSITION))
+            .to.emit(product, 'TakeClosed')
+            .withArgs(user.address, 1, POSITION)
+
+          await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
+          await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
+          await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
+          await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_2)
+
+          await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
+          await oracle.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
+          await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
+          await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_3)
+
+          await expect(product.connect(user).settleAccount(user.address))
+            .to.emit(product, 'AccountSettle')
+            .withArgs(user.address, 2, 3)
+        })
+      })
+
+      describe('multiple users, taker positions', () => {
+        it('charges the TakerFee for each position change', async () => {
+          await product.connect(userC).openMake(POSITION.mul(2))
+
+          await expect(product.connect(user).openTake(POSITION))
+            .to.emit(product, 'TakeOpened')
+            .withArgs(user.address, 1, POSITION)
+
+          await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
+          await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
+          await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
+          await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_2)
+
+          await expect(product.connect(user).settleAccount(user.address))
+            .to.emit(product, 'AccountSettle')
+            .withArgs(user.address, 2, 2)
+
+          await product.updateTakerFee(utils.parseEther('0.01'))
+          const TAKER_FEE = utils.parseEther('24.6') // 2 * position * maker fee * price
+          await collateral.mock.settleProduct.withArgs(TAKER_FEE).returns()
+          await collateral.mock.settleAccount.withArgs(user.address, TAKER_FEE.div(-2)).returns()
+          await collateral.mock.settleAccount.withArgs(userB.address, TAKER_FEE.div(-2)).returns()
+
+          await expect(product.connect(user).closeTake(POSITION))
+            .to.emit(product, 'TakeClosed')
+            .withArgs(user.address, 2, POSITION)
+          await expect(product.connect(userB).openTake(POSITION))
+            .to.emit(product, 'TakeOpened')
+            .withArgs(userB.address, 2, POSITION)
+
+          await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
+          await oracle.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
+          await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
+          await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_3)
+
+          await expect(product.connect(user).settleAccount(user.address))
+            .to.emit(product, 'AccountSettle')
+            .withArgs(user.address, 3, 3)
+          await expect(product.connect(userB).settleAccount(userB.address))
+            .to.emit(product, 'AccountSettle')
+            .withArgs(userB.address, 3, 3)
+        })
+      })
+    })
   })
 
   describe('negative price market', async () => {
@@ -3249,6 +3411,7 @@ describe('Product', () => {
         await expect(product.connect(user).openMake(POSITION))
           .to.emit(product, 'MakeOpened')
           .withArgs(user.address, 1, POSITION)
+        expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('615').add(MAKER_FEE))
 
         await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
 
@@ -4058,6 +4221,7 @@ describe('Product', () => {
         await expect(product.connect(user).openTake(POSITION))
           .to.emit(product, 'TakeOpened')
           .withArgs(user.address, 1, POSITION)
+        expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('615').add(TAKER_FEE))
 
         await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
 
@@ -5542,6 +5706,166 @@ describe('Product', () => {
       it('reverts if paused', async () => {
         await controller.mock.paused.withArgs().returns(true)
         await expect(product.connect(user).settleAccount(user.address)).to.be.revertedWith('PausedError()')
+      })
+    })
+
+    context('multiple position changes before settle', async () => {
+      beforeEach(async () => {
+        await product.updateUtilizationCurve({
+          // Force a 0.0 rate to make tests simpler
+          minRate: 0,
+          maxRate: 0,
+          targetRate: 0,
+          targetUtilization: utils.parseEther('1'),
+        })
+      })
+
+      describe('single user, maker positions', () => {
+        it('charges the MakerFee for each position change', async () => {
+          await product.updateMakerFee(utils.parseEther('0.01'))
+          const MAKER_FEE = utils.parseEther('24.6') // 2 * position * maker fee * price
+          await collateral.mock.settleProduct.withArgs(MAKER_FEE).returns()
+          await collateral.mock.settleAccount.withArgs(user.address, MAKER_FEE.mul(-1)).returns()
+
+          await expect(product.connect(user).openMake(POSITION))
+            .to.emit(product, 'MakeOpened')
+            .withArgs(user.address, 1, POSITION)
+          await expect(product.connect(user).closeMake(POSITION))
+            .to.emit(product, 'MakeClosed')
+            .withArgs(user.address, 1, POSITION)
+
+          await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
+          await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
+          await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
+          await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_2)
+
+          await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
+          await oracle.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
+          await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
+          await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_3)
+
+          await expect(product.connect(user).settleAccount(user.address))
+            .to.emit(product, 'AccountSettle')
+            .withArgs(user.address, 2, 3)
+        })
+      })
+
+      describe('multiple users, maker positions', () => {
+        it('charges the MakerFee for each position change', async () => {
+          await expect(product.connect(user).openMake(POSITION))
+            .to.emit(product, 'MakeOpened')
+            .withArgs(user.address, 1, POSITION)
+
+          await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
+          await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
+          await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
+          await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_2)
+
+          await expect(product.connect(user).settleAccount(user.address))
+            .to.emit(product, 'AccountSettle')
+            .withArgs(user.address, 2, 2)
+
+          await product.updateMakerFee(utils.parseEther('0.01'))
+          const MAKER_FEE = utils.parseEther('24.6') // 2 * position * maker fee * price
+          await collateral.mock.settleProduct.withArgs(MAKER_FEE).returns()
+          await collateral.mock.settleAccount.withArgs(user.address, MAKER_FEE.div(-2)).returns()
+          await collateral.mock.settleAccount.withArgs(userB.address, MAKER_FEE.div(-2)).returns()
+
+          await expect(product.connect(user).closeMake(POSITION))
+            .to.emit(product, 'MakeClosed')
+            .withArgs(user.address, 2, POSITION)
+          await expect(product.connect(userB).openMake(POSITION))
+            .to.emit(product, 'MakeOpened')
+            .withArgs(userB.address, 2, POSITION)
+
+          await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
+          await oracle.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
+          await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
+          await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_3)
+
+          await expect(product.connect(user).settleAccount(user.address))
+            .to.emit(product, 'AccountSettle')
+            .withArgs(user.address, 3, 3)
+          await expect(product.connect(userB).settleAccount(userB.address))
+            .to.emit(product, 'AccountSettle')
+            .withArgs(userB.address, 3, 3)
+        })
+      })
+
+      describe('single user, taker positions', () => {
+        it('charges the TakerFee for each position change', async () => {
+          await product.connect(userC).openMake(POSITION.mul(2))
+
+          await product.updateTakerFee(utils.parseEther('0.01'))
+          const TAKER_FEE = utils.parseEther('24.6') // 2 * position * maker fee * price
+          await collateral.mock.settleProduct.withArgs(TAKER_FEE).returns()
+          await collateral.mock.settleAccount.withArgs(user.address, TAKER_FEE.mul(-1)).returns()
+
+          await expect(product.connect(user).openTake(POSITION))
+            .to.emit(product, 'TakeOpened')
+            .withArgs(user.address, 1, POSITION)
+          await expect(product.connect(user).closeTake(POSITION))
+            .to.emit(product, 'TakeClosed')
+            .withArgs(user.address, 1, POSITION)
+
+          await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
+          await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
+          await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
+          await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_2)
+
+          await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
+          await oracle.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
+          await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
+          await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_3)
+
+          await expect(product.connect(user).settleAccount(user.address))
+            .to.emit(product, 'AccountSettle')
+            .withArgs(user.address, 2, 3)
+        })
+      })
+
+      describe('multiple users, taker positions', () => {
+        it('charges the TakerFee for each position change', async () => {
+          await product.connect(userC).openMake(POSITION.mul(2))
+
+          await expect(product.connect(user).openTake(POSITION))
+            .to.emit(product, 'TakeOpened')
+            .withArgs(user.address, 1, POSITION)
+
+          await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
+          await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
+          await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
+          await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_2)
+
+          await expect(product.connect(user).settleAccount(user.address))
+            .to.emit(product, 'AccountSettle')
+            .withArgs(user.address, 2, 2)
+
+          await product.updateTakerFee(utils.parseEther('0.01'))
+          const TAKER_FEE = utils.parseEther('24.6') // 2 * position * maker fee * price
+          await collateral.mock.settleProduct.withArgs(TAKER_FEE).returns()
+          await collateral.mock.settleAccount.withArgs(user.address, TAKER_FEE.div(-2)).returns()
+          await collateral.mock.settleAccount.withArgs(userB.address, TAKER_FEE.div(-2)).returns()
+
+          await expect(product.connect(user).closeTake(POSITION))
+            .to.emit(product, 'TakeClosed')
+            .withArgs(user.address, 2, POSITION)
+          await expect(product.connect(userB).openTake(POSITION))
+            .to.emit(product, 'TakeOpened')
+            .withArgs(userB.address, 2, POSITION)
+
+          await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
+          await oracle.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
+          await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
+          await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_3)
+
+          await expect(product.connect(user).settleAccount(user.address))
+            .to.emit(product, 'AccountSettle')
+            .withArgs(user.address, 3, 3)
+          await expect(product.connect(userB).settleAccount(userB.address))
+            .to.emit(product, 'AccountSettle')
+            .withArgs(userB.address, 3, 3)
+        })
       })
     })
   })

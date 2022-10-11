@@ -58,7 +58,7 @@ library AccountPositionLib {
      * @return Next maintenance requirement for the account
      */
     function maintenanceNext(AccountPosition storage self) internal view returns (UFixed18) {
-        return _maintenance(self.position.next(self.pre));
+        return _maintenance(self.position.next(self.pre)).add(_feeNext(self));
     }
 
     /**
@@ -72,6 +72,17 @@ library AccountPositionLib {
         Fixed18 oraclePrice = product.currentVersion().price;
         UFixed18 notionalMax = Fixed18Lib.from(position.max()).mul(oraclePrice).abs();
         return notionalMax.mul(product.maintenance());
+    }
+
+    /**
+     * @notice Returns the estimated fee to be charged on the `pre`
+     * @dev Assumes no price change
+     * @param self The struct to operate on
+     * @return Estimated fee to be charged for the `pre` position change
+     */
+    function _feeNext(AccountPosition storage self) private view returns (UFixed18) {
+        IProduct product = IProduct(address(this));
+        return self.pre.computeFee(product.currentVersion());
     }
 
     /**
