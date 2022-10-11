@@ -6,21 +6,21 @@ import "../../../interfaces/types/Accumulator.sol";
 import "../AccumulatorParams.sol";
 import "../Period.sol";
 
-/// @dev VersionedHistory type
-struct VersionedHistory {
-    /// @dev Mapping of accumulator value at each settled oracle version
-    mapping(uint256 => PackedAccumulator) _valueAtVersion;
+/// @dev Version type
+struct Version {
+    /// @dev Accumulator value at each settled oracle version
+    PackedAccumulator _value;
 
-    /// @dev Mapping of accumulator share at each settled oracle version
-    mapping(uint256 => PackedAccumulator) _shareAtVersion;
+    /// @dev Accumulator share at each settled oracle version
+    PackedAccumulator _share;
     
-    /// @dev Mapping of global position at each version
-    mapping(uint256 => PackedPosition) _positionAtVersion;
+    /// @dev Global position at each version
+    PackedPosition _position;
 }
-using VersionedHistoryLib for VersionedHistory global;
+using VersionLib for Version global;
 
 /**
- * @title VersionedHistoryLib
+ * @title VersionLib
  * @notice Library that manages global versioned accumulator state.
  * @dev Manages two accumulators: value and share. The value accumulator measures the change in position value
  *      over time. The share accumulator measures the change in liquidity ownership over time (for tracking
@@ -30,49 +30,50 @@ using VersionedHistoryLib for VersionedHistory global;
  *      the delayed-position accounting. It is not guaranteed that every version will have a value stamped, but
  *      only versions when a settlement occurred are needed for this historical computation.
  */
-library VersionedHistoryLib {
+library VersionLib {
     /**
-     * @notice Returns the stamped value accumulator at `oracleVersion`
+     * @notice Returns the value accumulator
      * @param self The struct to operate on
-     * @param oracleVersion The oracle version to retrieve the value at
      * @return The stamped value accumulator at the requested version
      */
-    function valueAtVersion(VersionedHistory storage self, uint256 oracleVersion) internal view returns (Accumulator memory) {
-        return self._valueAtVersion[oracleVersion].unpack();
+    function value(Version memory self) internal pure returns (Accumulator memory) {
+        return self._value.unpack();
     }
 
     /**
-     * @notice Returns the stamped share accumulator at `oracleVersion`
+     * @notice Returns the share accumulator
      * @param self The struct to operate on
-     * @param oracleVersion The oracle version to retrieve the share at
      * @return The stamped share accumulator at the requested version
      */
-    function shareAtVersion(VersionedHistory storage self, uint256 oracleVersion) internal view returns (Accumulator memory) {
-        return self._shareAtVersion[oracleVersion].unpack();
+    function share(Version memory self) internal pure returns (Accumulator memory) {
+        return self._share.unpack();
     }
 
     /**
-     * @notice Returns the current global position
+     * @notice Returns the global position
+     * @param self The struct to operate on
      * @return Current global position
      */
-    function positionAtVersion(VersionedHistory storage self, uint256 oracleVersion) internal view returns (Position memory) {
-        return self._positionAtVersion[oracleVersion].unpack();
+    function position(Version memory self) internal pure returns (Position memory) {
+        return self._position.unpack();
     }
     
     /**
-     * @notice Settles the global state for the period from `period.fromVersion` to `period.toVersion`
+     * @notice Accumulates the global state for the period from `period.fromVersion` to `period.toVersion`
      * @param self The struct to operate on
      * @param period The oracle version period to settle for
      * @param params The current set of market parameters
+     * @return accumulatedVersion The resulting version after accumulation
      * @return accumulatedFee The fee accrued from opening or closing a new position
+     * @return settled Whether the pre position should be cleared
      */
-    function settle(
-        VersionedHistory storage self,
+    function accumulate(
+        Version memory self,
         PrePosition memory pre,
         Period memory period,
         AccumulatorParams memory params
-    ) internal returns (UFixed18 accumulatedFee, bool settled) {
-        Position memory latestPosition = positionAtVersion(self, period.fromVersion.version);
+    ) internal pure returns (Version memory accumulatedVersion, UFixed18 accumulatedFee, bool settled) {
+        Position memory latestPosition = self.position();
 
         // accumulate funding
         Accumulator memory accumulatedPosition;
@@ -92,13 +93,11 @@ library VersionedHistoryLib {
         accumulatedFee = accumulatedFee.add(positionFee);
 
         // save update
-        self._valueAtVersion[period.toVersion.version] = valueAtVersion(self, period.fromVersion.version)
-            .add(accumulatedPosition)
-            .pack();
-        self._shareAtVersion[period.toVersion.version] = shareAtVersion(self, period.fromVersion.version)
-            .add(accumulatedShare)
-            .pack();
-        self._positionAtVersion[period.toVersion.version] = newPosition.pack();
+        accumulatedVersion = Version(
+            self.value().add(accumulatedPosition).pack(),
+            self.share().add(accumulatedShare).pack(),
+            newPosition.pack()
+        );
     }
 
     /**

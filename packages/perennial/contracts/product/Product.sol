@@ -32,8 +32,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     /// @dev The individual accumulator state for each account
     mapping(address => AccountAccumulator) private _accumulators;
 
-    /// @dev The global accumulator state for the product
-    VersionedHistory private _versions;
+    /// @dev Mapping of the historical version data
+    mapping(uint256 => Version) _versions;
 
     PrePosition private _pre;
 
@@ -98,8 +98,13 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
             closed()
         );
         UFixed18 accumulatedFee;
+        Version memory currentVersion = _versions[periods[0].fromVersion.version];
         for (uint256 i; i < periods.length; i++) {
-            (UFixed18 fee, bool settled) = _versions.settle(pre(), periods[i], params);
+            (Version memory version, UFixed18 fee, bool settled) = currentVersion.accumulate(pre(), periods[i], params);
+
+            currentVersion = version;
+            _versions[periods[i].toVersion.version] = version;
+
             accumulatedFee = accumulatedFee.add(fee);
             if (settled) delete _pre;
         }
@@ -375,7 +380,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @return Global position at oracle version
      */
     function positionAtVersion(uint256 oracleVersion) public view returns (Position memory) {
-        return _versions.positionAtVersion(oracleVersion);
+        return _versions[oracleVersion].position();
     }
 
     /**
@@ -393,7 +398,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @return Global accumulator value at oracle version
      */
     function valueAtVersion(uint256 oracleVersion) external view returns (Accumulator memory) {
-        return _versions.valueAtVersion(oracleVersion);
+        return _versions[oracleVersion].value();
     }
 
     /**
@@ -403,7 +408,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @return Global accumulator share at oracle version
      */
     function shareAtVersion(uint256 oracleVersion) external view returns (Accumulator memory) {
-        return _versions.shareAtVersion(oracleVersion);
+        return _versions[oracleVersion].share();
     }
 
     /**
