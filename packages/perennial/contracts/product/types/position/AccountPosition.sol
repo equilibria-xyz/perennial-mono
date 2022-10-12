@@ -33,7 +33,8 @@ library AccountPositionLib {
         IOracleProvider.OracleVersion memory toOracleVersion
     ) internal returns (UFixed18 positionFee) {
         bool settled;
-        (self.position, positionFee, settled) = self.position.settled(self.pre, toOracleVersion);
+        positionFee = self.pre.computeFee(toOracleVersion).sum();
+        (self.position, settled) = self.position.settled(self.pre, toOracleVersion);
         if (settled) {
             delete self.pre;
             self.liquidation = false;

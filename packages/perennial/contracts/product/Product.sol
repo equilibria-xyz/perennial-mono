@@ -107,7 +107,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         );
 
         // position a->b
-        accumulatedFee = accumulatedFee.add(_position.settle(_latestVersion, settleOracleVersion));
+        _position.settle(_latestVersion, settleOracleVersion);
 
         // short-circuit from a->c if b == c
         if (settleOracleVersion.version != currentOracleVersion.version) {

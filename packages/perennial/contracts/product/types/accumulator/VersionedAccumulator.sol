@@ -77,6 +77,12 @@ library VersionedAccumulatorLib {
         accumulatedPosition = accumulatedPosition.add(
             _accumulatePosition(latestPosition, latestOracleVersion, toOracleVersion));
 
+        // accumulate funding
+        (Accumulator memory accumulatedPositionFee, UFixed18 positionFee) =
+            _accumulatePositionFee(latestPosition, position.pre, toOracleVersion);
+        accumulatedPosition = accumulatedPosition.add(accumulatedPositionFee);
+        accumulatedFee = accumulatedFee.add(positionFee);
+
         // accumulate share
         Accumulator memory accumulatedShare =
             _accumulateShare(latestPosition, latestOracleVersion, toOracleVersion);
@@ -90,6 +96,7 @@ library VersionedAccumulatorLib {
             .pack();
         self.latestVersion = toOracleVersion.version;
     }
+
 
     /**
      * @notice Globally accumulates all funding since last oracle update
@@ -157,6 +164,25 @@ library VersionedAccumulatorLib {
 
         accumulatedPosition.maker = socializedTakerDelta.div(Fixed18Lib.from(latestPosition.maker)).mul(Fixed18Lib.NEG_ONE);
         accumulatedPosition.taker = socializedTakerDelta.div(Fixed18Lib.from(latestPosition.taker));
+    }
+
+    //TODO: docs
+    function _accumulatePositionFee(
+        Position memory latestPosition,
+        PrePosition memory pre,
+        IOracleProvider.OracleVersion memory toOracleVersion
+    ) private view returns (Accumulator memory accumulatedPosition, UFixed18 fee) {
+        if (pre.isEmpty()) return (accumulatedPosition, fee);
+        if (latestPosition.taker.isZero()) return (accumulatedPosition, fee);
+        if (latestPosition.maker.isZero()) return (accumulatedPosition, fee);
+
+        Position memory positionFee = pre.computeFee(toOracleVersion);
+        Position memory protocolFee = positionFee.mul(_product().positionFee());
+        positionFee = positionFee.sub(positionFee);
+        fee = protocolFee.sum();
+
+        accumulatedPosition.maker = Fixed18Lib.from(positionFee.taker.div(latestPosition.maker));
+        accumulatedPosition.taker = Fixed18Lib.from(positionFee.maker.div(latestPosition.taker));
     }
 
     /**
