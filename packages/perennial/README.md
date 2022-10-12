@@ -1,10 +1,12 @@
 # Perennial Protocol
 
-Perpetual synthetics protocol.
+Smart contracts for the core perennial protocol.
 
 ## Usage
 
 ### Pre Requisites
+
+This repo works best with Node.js v16.x.x, this is preconfigured for users of [asdf](https://asdf-vm.com/).
 
 Before running any command, make sure to install dependencies:
 
@@ -14,13 +16,11 @@ $ yarn
 
 ### Compile
 
-Compile the smart contracts with Hardhat:
+Compile the smart contracts with Hardhat and Typechain:
 
 ```sh
 $ yarn compile
 ```
-
-This also generates the Typechain types
 
 ### Test
 
@@ -30,15 +30,15 @@ Run the Mocha tests:
 $ yarn test
 ```
 
-To run tests against a Mainnet fork, set your `ALCHEMY_KEY` in `.env` and run
+To run integration tests against a Mainnet fork, set your `ALCHEMY_MAINNET` in `.env` and run
 
 ```sh
-$ yarn test-integration
+$ yarn test:integration
 ```
 
 ### Gas Report
 
-To get a gas report based on unit test calls:
+To get a gas report based on integration test calls:
 
 ```sh
 $ yarn gasReport
@@ -46,17 +46,13 @@ $ yarn gasReport
 
 ### Deploy contract to netowrk (requires Mnemonic and infura API key)
 
-```
-npx hardhat run --network rinkeby ./scripts/deploy.ts
+```sh
+$ yarn deploy --network <network>
 ```
 
 ### Validate a contract with etherscan (requires API ke)
 
-```
-npx hardhat verify --network <network> <DEPLOYED_CONTRACT_ADDRESS> "Constructor argument 1"
+```sh
+$ yarn verify --network <network>
 ```
 
-### Added plugins
-
-- Gas reporter [hardhat-gas-reporter](https://hardhat.org/plugins/hardhat-gas-reporter.html)
-- Etherscan [hardhat-etherscan](https://hardhat.org/plugins/nomiclabs-hardhat-etherscan.html)
