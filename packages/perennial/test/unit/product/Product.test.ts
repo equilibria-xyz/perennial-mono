@@ -525,7 +525,8 @@ describe('Product', () => {
         await expect(product.connect(user).openMake(POSITION))
           .to.emit(product, 'MakeOpened')
           .withArgs(user.address, 1, POSITION)
-        expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('615').add(MAKER_FEE))
+        const MAINTENANCE_NEXT = utils.parseEther((615 + 12.3 * 1.5).toString()) // maintenance + fees * (1 + maintenanceRatio)
+        expect(await product.maintenanceNext(user.address)).to.equal(MAINTENANCE_NEXT)
 
         await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
         await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_2)
@@ -649,15 +650,15 @@ describe('Product', () => {
         expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
           oracleVersion: 1,
-          openPosition: { maker: POSITION.div(2), taker: 0 },
-          closePosition: { maker: 0, taker: 0 },
+          openPosition: { maker: POSITION, taker: 0 },
+          closePosition: { maker: POSITION.div(2), taker: 0 },
         })
         expect(await product['latestVersion()']()).to.equal(ORACLE_VERSION)
         expectPositionEq(await product.positionAtVersion(ORACLE_VERSION), { maker: 0, taker: 0 })
         expectPrePositionEq(await product['pre()'](), {
           oracleVersion: 1,
-          openPosition: { maker: POSITION.div(2), taker: 0 },
-          closePosition: { maker: 0, taker: 0 },
+          openPosition: { maker: POSITION, taker: 0 },
+          closePosition: { maker: POSITION.div(2), taker: 0 },
         })
         expectPositionEq(await product.valueAtVersion(ORACLE_VERSION), { maker: 0, taker: 0 })
         expectPositionEq(await product.shareAtVersion(ORACLE_VERSION), { maker: 0, taker: 0 })
@@ -669,21 +670,21 @@ describe('Product', () => {
           .to.emit(product, 'MakeClosed')
           .withArgs(user.address, 1, POSITION)
 
-        expect(await product.isClosed(user.address)).to.equal(true)
+        expect(await product.isClosed(user.address)).to.equal(false)
         expect(await product['maintenance(address)'](user.address)).to.equal(0)
         expect(await product.maintenanceNext(user.address)).to.equal(0)
         expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
           oracleVersion: 1,
-          openPosition: { maker: 0, taker: 0 },
-          closePosition: { maker: 0, taker: 0 },
+          openPosition: { maker: POSITION, taker: 0 },
+          closePosition: { maker: POSITION, taker: 0 },
         })
         expect(await product['latestVersion()']()).to.equal(ORACLE_VERSION)
         expectPositionEq(await product.positionAtVersion(ORACLE_VERSION), { maker: 0, taker: 0 })
         expectPrePositionEq(await product['pre()'](), {
           oracleVersion: 1,
-          openPosition: { maker: 0, taker: 0 },
-          closePosition: { maker: 0, taker: 0 },
+          openPosition: { maker: POSITION, taker: 0 },
+          closePosition: { maker: POSITION, taker: 0 },
         })
         expectPositionEq(await product.valueAtVersion(ORACLE_VERSION), { maker: 0, taker: 0 })
         expectPositionEq(await product.shareAtVersion(ORACLE_VERSION), { maker: 0, taker: 0 })
@@ -1339,7 +1340,8 @@ describe('Product', () => {
         await expect(product.connect(user).openTake(POSITION))
           .to.emit(product, 'TakeOpened')
           .withArgs(user.address, 1, POSITION)
-        expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('615').add(TAKER_FEE))
+        const MAINTENANCE_NEXT = utils.parseEther((615 + 12.3 * 1.5).toString()) // maintenance + fees * (1 + maintenanceRatio)
+        expect(await product.maintenanceNext(user.address)).to.equal(MAINTENANCE_NEXT)
 
         await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
 
@@ -1453,15 +1455,15 @@ describe('Product', () => {
         expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
           oracleVersion: 1,
-          openPosition: { maker: 0, taker: POSITION.div(2) },
-          closePosition: { maker: 0, taker: 0 },
+          openPosition: { maker: 0, taker: POSITION },
+          closePosition: { maker: 0, taker: POSITION.div(2) },
         })
         expect(await product['latestVersion()']()).to.equal(ORACLE_VERSION)
         expectPositionEq(await product.positionAtVersion(ORACLE_VERSION), { maker: 0, taker: 0 })
         expectPrePositionEq(await product['pre()'](), {
           oracleVersion: 1,
-          openPosition: { maker: POSITION.mul(2), taker: POSITION.div(2) },
-          closePosition: { maker: 0, taker: 0 },
+          openPosition: { maker: POSITION.mul(2), taker: POSITION },
+          closePosition: { maker: 0, taker: POSITION.div(2) },
         })
         expectPositionEq(await product.valueAtVersion(ORACLE_VERSION), { maker: 0, taker: 0 })
         expectPositionEq(await product.shareAtVersion(ORACLE_VERSION), { maker: 0, taker: 0 })
@@ -1473,21 +1475,21 @@ describe('Product', () => {
           .to.emit(product, 'TakeClosed')
           .withArgs(user.address, 1, POSITION)
 
-        expect(await product.isClosed(user.address)).to.equal(true)
+        expect(await product.isClosed(user.address)).to.equal(false)
         expect(await product['maintenance(address)'](user.address)).to.equal(0)
         expect(await product.maintenanceNext(user.address)).to.equal(0)
         expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
           oracleVersion: 1,
-          openPosition: { maker: 0, taker: 0 },
-          closePosition: { maker: 0, taker: 0 },
+          openPosition: { maker: 0, taker: POSITION },
+          closePosition: { maker: 0, taker: POSITION },
         })
         expect(await product['latestVersion()']()).to.equal(ORACLE_VERSION)
         expectPositionEq(await product.positionAtVersion(ORACLE_VERSION), { maker: 0, taker: 0 })
         expectPrePositionEq(await product['pre()'](), {
           oracleVersion: 1,
-          openPosition: { maker: POSITION.mul(2), taker: 0 },
-          closePosition: { maker: 0, taker: 0 },
+          openPosition: { maker: POSITION.mul(2), taker: POSITION },
+          closePosition: { maker: 0, taker: POSITION },
         })
         expectPositionEq(await product.valueAtVersion(ORACLE_VERSION), { maker: 0, taker: 0 })
         expectPositionEq(await product.shareAtVersion(ORACLE_VERSION), { maker: 0, taker: 0 })
@@ -1937,15 +1939,15 @@ describe('Product', () => {
         expectPositionEq(await product.positionAtVersion(2), { maker: POSITION, taker: 0 })
         expectPrePositionEq(await product['pre()'](), {
           oracleVersion: 2,
-          openPosition: { maker: 0, taker: 0 },
-          closePosition: { maker: POSITION, taker: 0 },
+          openPosition: { maker: POSITION, taker: 0 },
+          closePosition: { maker: POSITION.mul(2), taker: 0 },
         })
 
         expectPositionEq(await product.position(user.address), { maker: POSITION, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
           oracleVersion: 2,
-          openPosition: { maker: 0, taker: 0 },
-          closePosition: { maker: POSITION, taker: 0 },
+          openPosition: { maker: POSITION, taker: 0 },
+          closePosition: { maker: POSITION.mul(2), taker: 0 },
         })
         expect(await product.isLiquidating(user.address)).to.equal(true)
         expect(await product['maintenance(address)'](user.address)).to.equal(0)
@@ -1970,15 +1972,15 @@ describe('Product', () => {
         expectPositionEq(await product.positionAtVersion(2), { maker: POSITION.mul(2), taker: POSITION })
         expectPrePositionEq(await product['pre()'](), {
           oracleVersion: 2,
-          openPosition: { maker: 0, taker: 0 },
-          closePosition: { maker: 0, taker: POSITION },
+          openPosition: { maker: 0, taker: POSITION },
+          closePosition: { maker: 0, taker: POSITION.mul(2) },
         })
 
         expectPositionEq(await product.position(user.address), { maker: 0, taker: POSITION })
         expectPrePositionEq(await product['pre(address)'](user.address), {
           oracleVersion: 2,
-          openPosition: { maker: 0, taker: 0 },
-          closePosition: { maker: 0, taker: POSITION },
+          openPosition: { maker: 0, taker: POSITION },
+          closePosition: { maker: 0, taker: POSITION.mul(2) },
         })
         expect(await product.isLiquidating(user.address)).to.equal(true)
         expect(await product['maintenance(address)'](user.address)).to.equal(0)
@@ -3411,7 +3413,8 @@ describe('Product', () => {
         await expect(product.connect(user).openMake(POSITION))
           .to.emit(product, 'MakeOpened')
           .withArgs(user.address, 1, POSITION)
-        expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('615').add(MAKER_FEE))
+        const MAINTENANCE_NEXT = utils.parseEther((615 + 12.3 * 1.5).toString()) // maintenance + fees * (1 + maintenanceRatio)
+        expect(await product.maintenanceNext(user.address)).to.equal(MAINTENANCE_NEXT)
 
         await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
 
@@ -3533,15 +3536,15 @@ describe('Product', () => {
         expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
           oracleVersion: 1,
-          openPosition: { maker: POSITION.div(2), taker: 0 },
-          closePosition: { maker: 0, taker: 0 },
+          openPosition: { maker: POSITION, taker: 0 },
+          closePosition: { maker: POSITION.div(2), taker: 0 },
         })
         expect(await product['latestVersion()']()).to.equal(ORACLE_VERSION)
         expectPositionEq(await product.positionAtVersion(ORACLE_VERSION), { maker: 0, taker: 0 })
         expectPrePositionEq(await product['pre()'](), {
           oracleVersion: 1,
-          openPosition: { maker: POSITION.div(2), taker: 0 },
-          closePosition: { maker: 0, taker: 0 },
+          openPosition: { maker: POSITION, taker: 0 },
+          closePosition: { maker: POSITION.div(2), taker: 0 },
         })
         expectPositionEq(await product.valueAtVersion(ORACLE_VERSION), { maker: 0, taker: 0 })
         expectPositionEq(await product.shareAtVersion(ORACLE_VERSION), { maker: 0, taker: 0 })
@@ -3553,21 +3556,21 @@ describe('Product', () => {
           .to.emit(product, 'MakeClosed')
           .withArgs(user.address, 1, POSITION)
 
-        expect(await product.isClosed(user.address)).to.be.true
+        expect(await product.isClosed(user.address)).to.be.false
         expect(await product['maintenance(address)'](user.address)).to.equal(0)
         expect(await product.maintenanceNext(user.address)).to.equal(0)
         expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
           oracleVersion: 1,
-          openPosition: { maker: 0, taker: 0 },
-          closePosition: { maker: 0, taker: 0 },
+          openPosition: { maker: POSITION, taker: 0 },
+          closePosition: { maker: POSITION, taker: 0 },
         })
         expect(await product['latestVersion()']()).to.equal(ORACLE_VERSION)
         expectPositionEq(await product.positionAtVersion(ORACLE_VERSION), { maker: 0, taker: 0 })
         expectPrePositionEq(await product['pre()'](), {
           oracleVersion: 1,
-          openPosition: { maker: 0, taker: 0 },
-          closePosition: { maker: 0, taker: 0 },
+          openPosition: { maker: POSITION, taker: 0 },
+          closePosition: { maker: POSITION, taker: 0 },
         })
         expectPositionEq(await product.valueAtVersion(ORACLE_VERSION), { maker: 0, taker: 0 })
         expectPositionEq(await product.shareAtVersion(ORACLE_VERSION), { maker: 0, taker: 0 })
@@ -4221,7 +4224,8 @@ describe('Product', () => {
         await expect(product.connect(user).openTake(POSITION))
           .to.emit(product, 'TakeOpened')
           .withArgs(user.address, 1, POSITION)
-        expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('615').add(TAKER_FEE))
+        const MAINTENANCE_NEXT = utils.parseEther((615 + 12.3 * 1.5).toString()) // maintenance + fees * (1 + maintenanceRatio)
+        expect(await product.maintenanceNext(user.address)).to.equal(MAINTENANCE_NEXT)
 
         await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
 
@@ -4343,15 +4347,15 @@ describe('Product', () => {
         expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
           oracleVersion: 1,
-          openPosition: { maker: 0, taker: POSITION.div(2) },
-          closePosition: { maker: 0, taker: 0 },
+          openPosition: { maker: 0, taker: POSITION },
+          closePosition: { maker: 0, taker: POSITION.div(2) },
         })
         expect(await product['latestVersion()']()).to.equal(ORACLE_VERSION)
         expectPositionEq(await product.positionAtVersion(ORACLE_VERSION), { maker: 0, taker: 0 })
         expectPrePositionEq(await product['pre()'](), {
           oracleVersion: 1,
-          openPosition: { maker: POSITION.mul(2), taker: POSITION.div(2) },
-          closePosition: { maker: 0, taker: 0 },
+          openPosition: { maker: POSITION.mul(2), taker: POSITION },
+          closePosition: { maker: 0, taker: POSITION.div(2) },
         })
         expectPositionEq(await product.valueAtVersion(ORACLE_VERSION), { maker: 0, taker: 0 })
         expectPositionEq(await product.shareAtVersion(ORACLE_VERSION), { maker: 0, taker: 0 })
@@ -4363,21 +4367,21 @@ describe('Product', () => {
           .to.emit(product, 'TakeClosed')
           .withArgs(user.address, 1, POSITION)
 
-        expect(await product.isClosed(user.address)).to.equal(true)
+        expect(await product.isClosed(user.address)).to.equal(false)
         expect(await product['maintenance(address)'](user.address)).to.equal(0)
         expect(await product.maintenanceNext(user.address)).to.equal(0)
         expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
           oracleVersion: 1,
-          openPosition: { maker: 0, taker: 0 },
-          closePosition: { maker: 0, taker: 0 },
+          openPosition: { maker: 0, taker: POSITION },
+          closePosition: { maker: 0, taker: POSITION },
         })
         expect(await product['latestVersion()']()).to.equal(ORACLE_VERSION)
         expectPositionEq(await product.positionAtVersion(ORACLE_VERSION), { maker: 0, taker: 0 })
         expectPrePositionEq(await product['pre()'](), {
           oracleVersion: 1,
-          openPosition: { maker: POSITION.mul(2), taker: 0 },
-          closePosition: { maker: 0, taker: 0 },
+          openPosition: { maker: POSITION.mul(2), taker: POSITION },
+          closePosition: { maker: 0, taker: POSITION },
         })
         expectPositionEq(await product.valueAtVersion(ORACLE_VERSION), { maker: 0, taker: 0 })
         expectPositionEq(await product.shareAtVersion(ORACLE_VERSION), { maker: 0, taker: 0 })
@@ -4827,15 +4831,15 @@ describe('Product', () => {
         expectPositionEq(await product.positionAtVersion(2), { maker: POSITION, taker: 0 })
         expectPrePositionEq(await product['pre()'](), {
           oracleVersion: 2,
-          openPosition: { maker: 0, taker: 0 },
-          closePosition: { maker: POSITION, taker: 0 },
+          openPosition: { maker: POSITION, taker: 0 },
+          closePosition: { maker: POSITION.mul(2), taker: 0 },
         })
 
         expectPositionEq(await product.position(user.address), { maker: POSITION, taker: 0 })
         expectPrePositionEq(await product['pre(address)'](user.address), {
           oracleVersion: 2,
-          openPosition: { maker: 0, taker: 0 },
-          closePosition: { maker: POSITION, taker: 0 },
+          openPosition: { maker: POSITION, taker: 0 },
+          closePosition: { maker: POSITION.mul(2), taker: 0 },
         })
         expect(await product.isLiquidating(user.address)).to.equal(true)
         expect(await product['maintenance(address)'](user.address)).to.equal(0)
@@ -4860,15 +4864,15 @@ describe('Product', () => {
         expectPositionEq(await product.positionAtVersion(2), { maker: POSITION.mul(2), taker: POSITION })
         expectPrePositionEq(await product['pre()'](), {
           oracleVersion: 2,
-          openPosition: { maker: 0, taker: 0 },
-          closePosition: { maker: 0, taker: POSITION },
+          openPosition: { maker: 0, taker: POSITION },
+          closePosition: { maker: 0, taker: POSITION.mul(2) },
         })
 
         expectPositionEq(await product.position(user.address), { maker: 0, taker: POSITION })
         expectPrePositionEq(await product['pre(address)'](user.address), {
           oracleVersion: 2,
-          openPosition: { maker: 0, taker: 0 },
-          closePosition: { maker: 0, taker: POSITION },
+          openPosition: { maker: 0, taker: POSITION },
+          closePosition: { maker: 0, taker: POSITION.mul(2) },
         })
         expect(await product.isLiquidating(user.address)).to.equal(true)
         expect(await product['maintenance(address)'](user.address)).to.equal(0)
