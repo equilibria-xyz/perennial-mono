@@ -147,7 +147,7 @@ describe('Product', () => {
     it('correctly updates the params', async () => {
       await product.updateMaintenance(utils.parseEther('0.1'))
       await product.updateFundingFee(utils.parseEther('0.2'))
-      // TODO: Re-enable when we allow non-zero fees
+      // TODO: Re-enable when we allow non-zero position fees
       // await product.updateMakerFee(utils.parseEther('0.3'))
       // await product.updateTakerFee(utils.parseEther('0.4'))
       await product.updateMakerLimit(utils.parseEther('0.5'))
@@ -160,7 +160,7 @@ describe('Product', () => {
 
       expect(await product['maintenance()']()).to.equal(utils.parseEther('0.1'))
       expect(await product.fundingFee()).to.equal(utils.parseEther('0.2'))
-      // TODO: Re-enable when we allow non-zero fees
+      // TODO: Re-enable when we allow non-zero position fees
       // expect(await product.makerFee()).to.equal(utils.parseEther('0.3'))
       // expect(await product.takerFee()).to.equal(utils.parseEther('0.4'))
       expect(await product.makerLimit()).to.equal(utils.parseEther('0.5'))
@@ -515,7 +515,7 @@ describe('Product', () => {
         expect(await product['latestVersion(address)'](user.address)).to.equal(3)
       })
 
-      // TODO: Re-enable when we allow non-zero fees
+      // TODO: Re-enable when we allow non-zero position fees
       /* it('opens the position and settles later with fee', async () => {
         await product.updateMakerFee(utils.parseEther('0.01'))
 
@@ -954,7 +954,7 @@ describe('Product', () => {
           expect(await product['latestVersion(address)'](user.address)).to.equal(4)
         })
 
-        // TODO: Re-enable when we allow non-zero fees
+        // TODO: Re-enable when we allow non-zero position fees
         /* it('closes the position and settles later with fee', async () => {
           await product.updateMakerFee(utils.parseEther('0.01'))
 
@@ -1323,7 +1323,7 @@ describe('Product', () => {
         expect(await product['latestVersion(address)'](user.address)).to.equal(3)
       })
 
-      // TODO: Re-enable when we allow non-zero fees
+      // TODO: Re-enable when we allow non-zero position fees
       /* it('opens the position and settles later with fee', async () => {
         await product.updateTakerFee(utils.parseEther('0.01'))
 
@@ -1843,7 +1843,7 @@ describe('Product', () => {
           expect(await product['latestVersion(address)'](user.address)).to.equal(4)
         })
 
-        // TODO: Re-enable when we allow non-zero fees
+        // TODO: Re-enable when we allow non-zero position fees
         /* it('closes the position and settles later with fee', async () => {
           await product.updateTakerFee(utils.parseEther('0.01'))
 
@@ -3136,7 +3136,7 @@ describe('Product', () => {
         expect(await product['latestVersion(address)'](user.address)).to.equal(3)
       })
 
-      // TODO: Re-enable when we allow non-zero fees
+      // TODO: Re-enable when we allow non-zero position fees
       /* it('opens the position and settles later with fee', async () => {
         await product.updateMakerFee(utils.parseEther('0.01'))
 
@@ -3572,7 +3572,7 @@ describe('Product', () => {
           expect(await product['latestVersion(address)'](user.address)).to.equal(4)
         })
 
-        // TODO: Re-enable when we allow non-zero fees
+        // TODO: Re-enable when we allow non-zero position fees
         /* it('closes the position and settles later with fee', async () => {
           await product.updateMakerFee(utils.parseEther('0.01'))
 
@@ -3940,7 +3940,7 @@ describe('Product', () => {
         expect(await product['latestVersion(address)'](user.address)).to.equal(3)
       })
 
-      // TODO: Re-enable when we allow non-zero fees
+      // TODO: Re-enable when we allow non-zero position fees
       /* it('opens the position and settles later with fee', async () => {
         await product.updateTakerFee(utils.parseEther('0.01'))
 
@@ -4468,7 +4468,7 @@ describe('Product', () => {
           expect(await product['latestVersion(address)'](user.address)).to.equal(4)
         })
 
-        // TODO: Re-enable when we allow non-zero fees
+        // TODO: Re-enable when we allow non-zero position fees
         /* it('closes the position and settles later with fee', async () => {
           await product.updateTakerFee(utils.parseEther('0.01'))
 
