@@ -172,7 +172,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
             _accumulators[account].syncTo(_accumulator, _positions[account], settleOracleVersion.version).sum());
 
         // position a->b
-        accumulated = accumulated.sub(Fixed18Lib.from(_positions[account].settle(settleOracleVersion)));
+        _positions[account].settle(settleOracleVersion);
 
         // short-circuit from a->c if b == c
         if (settleOracleVersion.version != currentOracleVersion.version) {
@@ -205,12 +205,15 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     liquidationInvariant
     maintenanceInvariant
     {
-        uint256 _latestVersion = latestVersion();
+        IOracleProvider.OracleVersion memory latestOracleVersion = atVersion(latestVersion());
 
-        _positions[msg.sender].pre.openTake(_latestVersion, amount);
-        _position.pre.openTake(_latestVersion, amount);
+        _positions[msg.sender].pre.openTake(latestOracleVersion.version, amount);
+        _position.pre.openTake(latestOracleVersion.version, amount);
 
-        emit TakeOpened(msg.sender, _latestVersion, amount);
+        UFixed18 positionFee = amount.mul(latestOracleVersion.price.abs()).mul(takerFee());
+        controller().collateral().settleAccount(msg.sender, Fixed18Lib.from(-1, positionFee));
+
+        emit TakeOpened(msg.sender, latestOracleVersion.version, amount);
     }
 
     /**
@@ -229,12 +232,15 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     }
 
     function _closeTake(address account, UFixed18 amount) private {
-        uint256 _latestVersion = latestVersion();
+        IOracleProvider.OracleVersion memory latestOracleVersion = atVersion(latestVersion());
 
-        _positions[account].pre.closeTake(_latestVersion, amount);
-        _position.pre.closeTake(_latestVersion, amount);
+        _positions[account].pre.closeTake(latestOracleVersion.version, amount);
+        _position.pre.closeTake(latestOracleVersion.version, amount);
 
-        emit TakeClosed(account, _latestVersion, amount);
+        UFixed18 positionFee = amount.mul(latestOracleVersion.price.abs()).mul(takerFee());
+        controller().collateral().settleAccount(msg.sender, Fixed18Lib.from(-1, positionFee));
+
+        emit TakeClosed(account, latestOracleVersion.version, amount);
     }
 
     /**
@@ -253,12 +259,15 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     liquidationInvariant
     maintenanceInvariant
     {
-        uint256 _latestVersion = latestVersion();
+        IOracleProvider.OracleVersion memory latestOracleVersion = atVersion(latestVersion());
 
-        _positions[msg.sender].pre.openMake(_latestVersion, amount);
-        _position.pre.openMake(_latestVersion, amount);
+        _positions[msg.sender].pre.openMake(latestOracleVersion.version, amount);
+        _position.pre.openMake(latestOracleVersion.version, amount);
 
-        emit MakeOpened(msg.sender, _latestVersion, amount);
+        UFixed18 positionFee = amount.mul(latestOracleVersion.price.abs()).mul(makerFee());
+        controller().collateral().settleAccount(msg.sender, Fixed18Lib.from(-1, positionFee));
+
+        emit MakeOpened(msg.sender, latestOracleVersion.version, amount);
     }
 
     /**
@@ -278,12 +287,15 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     }
 
     function _closeMake(address account, UFixed18 amount) private {
-        uint256 _latestVersion = latestVersion();
+        IOracleProvider.OracleVersion memory latestOracleVersion = atVersion(latestVersion());
 
-        _positions[account].pre.closeMake(_latestVersion, amount);
-        _position.pre.closeMake(_latestVersion, amount);
+        _positions[account].pre.closeMake(latestOracleVersion.version, amount);
+        _position.pre.closeMake(latestOracleVersion.version, amount);
 
-        emit MakeClosed(account, _latestVersion, amount);
+        UFixed18 positionFee = amount.mul(latestOracleVersion.price.abs()).mul(makerFee());
+        controller().collateral().settleAccount(msg.sender, Fixed18Lib.from(-1, positionFee));
+
+        emit MakeClosed(account, latestOracleVersion.version, amount);
     }
 
     /**

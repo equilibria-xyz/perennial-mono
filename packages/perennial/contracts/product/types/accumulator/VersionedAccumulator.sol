@@ -79,7 +79,7 @@ library VersionedAccumulatorLib {
 
         // accumulate funding
         (Accumulator memory accumulatedPositionFee, UFixed18 positionFee) =
-            _accumulatePositionFee(latestPosition, position.pre, toOracleVersion);
+            _accumulatePositionFee(latestPosition, position.pre, latestOracleVersion);
         accumulatedPosition = accumulatedPosition.add(accumulatedPositionFee);
         accumulatedFee = accumulatedFee.add(positionFee);
 
@@ -170,13 +170,13 @@ library VersionedAccumulatorLib {
     function _accumulatePositionFee(
         Position memory latestPosition,
         PrePosition memory pre,
-        IOracleProvider.OracleVersion memory toOracleVersion
+        IOracleProvider.OracleVersion memory latestOracleVersion // This is safe because for a->b: a is always b - 1, and for b->c: pre is always empty so this is skipped TODO document this well
     ) private view returns (Accumulator memory accumulatedPosition, UFixed18 fee) {
         if (pre.isEmpty()) return (accumulatedPosition, fee);
         if (latestPosition.taker.isZero()) return (accumulatedPosition, fee);
         if (latestPosition.maker.isZero()) return (accumulatedPosition, fee);
 
-        Position memory positionFee = pre.computeFee(toOracleVersion);
+        Position memory positionFee = pre.computeFee(latestOracleVersion);
         Position memory protocolFee = positionFee.mul(_product().positionFee());
         positionFee = positionFee.sub(positionFee);
         fee = protocolFee.sum();
