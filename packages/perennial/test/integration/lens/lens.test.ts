@@ -18,7 +18,8 @@ describe('Lens', () => {
 
   it('returns correct lens values', async () => {
     const POSITION = utils.parseEther('0.0001')
-    const { user, userB, collateral, chainlink, lens, controller, treasuryA, incentiveToken } = instanceVars
+    const { user, userB, collateral, chainlink, lens, controller, treasuryA, incentivizer, incentiveToken } =
+      instanceVars
 
     expect(await lens.callStatic.controller()).to.equal(controller.address)
     // Setup fees
@@ -32,6 +33,15 @@ describe('Lens', () => {
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
     await product.connect(user).openMake(POSITION)
     await product.connect(userB).openTake(POSITION)
+
+    // Protocol Snapshot
+    const protocolSnapshot = await lens.callStatic['snapshot()']()
+    expect(protocolSnapshot.collateral).to.equal(collateral.address)
+    expect(protocolSnapshot.incentivizer).to.equal(incentivizer.address)
+    expect(protocolSnapshot.protocolFee).to.equal(utils.parseEther('0.25'))
+    expect(protocolSnapshot.liquidationFee).to.equal(utils.parseEther('0.50'))
+    expect(protocolSnapshot.minCollateral).to.equal(utils.parseEther('500'))
+    expect(protocolSnapshot.paused).to.be.false
 
     // Returns the product name
     const info = await lens.callStatic.info(product.address)

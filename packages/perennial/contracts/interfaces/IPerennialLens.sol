@@ -11,6 +11,17 @@ import "./IController.sol";
  * @notice All functions should be called using `callStatic`
  */
 interface IPerennialLens {
+    /// @dev Snapshot of Protocol information
+    struct ProtocolSnapshot {
+        ICollateral collateral;
+        IIncentivizer incentivizer;
+        Token18 collateralToken;
+        UFixed18 protocolFee;
+        UFixed18 liquidationFee;
+        UFixed18 minCollateral;
+        bool paused;
+    }
+
     /// @dev Snapshot of Product information
     struct ProductSnapshot {
         IProduct.ProductInfo productInfo;
@@ -48,6 +59,7 @@ interface IPerennialLens {
     function collateral() external view returns (ICollateral);
 
     // Snapshot Functions for batch values
+    function snapshot() external returns (ProtocolSnapshot memory);
     function snapshots(IProduct[] calldata productAddresses) external returns (ProductSnapshot[] memory);
     function snapshot(IProduct product) external returns (ProductSnapshot memory);
     function snapshots(address account, IProduct[] calldata productAddresses) external returns (UserProductSnapshot[] memory);
