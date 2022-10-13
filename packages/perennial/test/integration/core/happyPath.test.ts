@@ -1,9 +1,10 @@
 import { expect } from 'chai'
 import 'hardhat'
-import { utils } from 'ethers'
+import { utils, constants } from 'ethers'
 
 import { InstanceVars, deployProtocol, createProduct, depositTo, INITIAL_VERSION } from '../helpers/setupHelpers'
 import { createPayoffDefinition, expectPositionEq, expectPrePositionEq } from '../../../../common/testutil/types'
+import { Product } from '../../../types/generated'
 
 describe('Happy Path', () => {
   let instanceVars: InstanceVars
@@ -622,5 +623,149 @@ describe('Happy Path', () => {
     await expect(incentivizer.connect(user).claimFor(userB.address, product.address, [1])).to.be.revertedWith(
       `NotAccountOrMultiInvokerError("${userB.address}", "${user.address}")`,
     )
+  })
+
+  describe('maker and taker fee calculations', () => {
+    let product: Product
+    const MAKE_POSITION = utils.parseEther('0.0001')
+    const TAKE_POSITION = utils.parseEther('0.00001')
+    const DEPOSIT_AMOUNT = utils.parseEther('10000')
+
+    beforeEach(async () => {
+      const { user, userB, controller } = instanceVars
+      // Send all fees to product
+      await controller.updateProtocolFee(0)
+      product = await createProduct(instanceVars)
+      // Force a 0.0 rate to make tests simpler
+      await product.updateUtilizationCurve({
+        minRate: 0,
+        maxRate: 0,
+        targetRate: 0,
+        targetUtilization: utils.parseEther('1'),
+      })
+      await product.updateMakerFee(utils.parseEther('0.5'))
+      await product.updateTakerFee(utils.parseEther('0.5'))
+      await depositTo(instanceVars, user, product, DEPOSIT_AMOUNT)
+      await depositTo(instanceVars, userB, product, DEPOSIT_AMOUNT)
+    })
+
+    it('charges the fees for each position change', async () => {
+      const { user, userB, chainlink, collateral, treasuryB } = instanceVars
+
+      let currentVersion = await product.currentVersion()
+      let makerFees = currentVersion.price.mul(MAKE_POSITION).div(2).div(constants.WeiPerEther)
+      let takerFees = currentVersion.price.mul(TAKE_POSITION).div(2).div(constants.WeiPerEther)
+
+      await product.connect(user).openMake(MAKE_POSITION.div(2))
+      await product.connect(userB).openTake(TAKE_POSITION.div(2))
+      await product.connect(userB).closeTake(TAKE_POSITION.div(2))
+      await product.connect(user).closeMake(MAKE_POSITION.div(2))
+
+      // Expect the maintenanceNext to equal the fees incurred
+      expect(await product.maintenanceNext(user.address)).to.equal(
+        makerFees.mul(utils.parseEther('1.3')).div(constants.WeiPerEther),
+      )
+      expect(await product.maintenanceNext(userB.address)).to.equal(
+        takerFees.mul(utils.parseEther('1.3')).div(constants.WeiPerEther),
+      )
+
+      await chainlink.next()
+      await product.settle()
+
+      currentVersion = await product.currentVersion()
+      makerFees = currentVersion.price.mul(MAKE_POSITION).div(2).div(constants.WeiPerEther)
+      takerFees = currentVersion.price.mul(TAKE_POSITION).div(2).div(constants.WeiPerEther)
+      const totalFees = makerFees.add(takerFees)
+
+      // 0.0001 * productPrice * 0.5 + 0.00001 * productPrice * 0.5
+      expect(await collateral.fees(treasuryB.address)).to.equal(totalFees)
+
+      await product.settleAccount(user.address)
+      expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(
+        DEPOSIT_AMOUNT.sub(makerFees),
+      )
+      await product.settleAccount(userB.address)
+      expect(await collateral['collateral(address,address)'](userB.address, product.address)).to.equal(
+        DEPOSIT_AMOUNT.sub(takerFees),
+      )
+    })
+
+    it('charges global fees when global position nets out (maker)', async () => {
+      const { user, userB, chainlink, collateral, treasuryB } = instanceVars
+
+      // Don't charge a fee here
+      await product.updateMakerFee(0)
+      await product.connect(user).openMake(MAKE_POSITION)
+
+      await chainlink.next()
+      await product.settle()
+      await product.settleAccount(user.address)
+
+      // Charge a maker fee for future position changes
+      await product.updateMakerFee(utils.parseEther('0.5'))
+      await product.connect(user).closeMake(MAKE_POSITION)
+      await product.connect(userB).openMake(MAKE_POSITION)
+
+      await chainlink.next()
+      await product.settle()
+
+      const currentVersion = await product.currentVersion()
+      const makerFeePerPosition = currentVersion.price.mul(MAKE_POSITION).div(2).div(constants.WeiPerEther)
+      const totalFees = makerFeePerPosition.mul(2) // 2 total position changes
+
+      expect((await collateral.fees(treasuryB.address)).sub(totalFees)).to.be.within(0, 1)
+
+      await product.settleAccount(user.address)
+      expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(
+        DEPOSIT_AMOUNT.sub(makerFeePerPosition),
+      )
+      await product.settleAccount(userB.address)
+      expect(await collateral['collateral(address,address)'](userB.address, product.address)).to.equal(
+        DEPOSIT_AMOUNT.sub(makerFeePerPosition),
+      )
+    })
+
+    it('charges global fees when global position nets out (taker)', async () => {
+      const { user, userB, userC, chainlink, collateral, treasuryB } = instanceVars
+      await depositTo(instanceVars, userC, product, utils.parseEther('10000'))
+
+      // Don't charge a fee here
+      await product.updateMakerFee(0)
+      await product.updateTakerFee(0)
+      await product.connect(userC).openMake(MAKE_POSITION)
+      await product.connect(user).openTake(TAKE_POSITION)
+
+      await chainlink.next()
+      await product.settle()
+      await product.settleAccount(userC.address)
+      await product.settleAccount(user.address)
+      const currentPrice = (await product.currentVersion()).price
+
+      // Charge a taker fee for future position changes
+      await product.updateTakerFee(utils.parseEther('0.5'))
+      await product.connect(user).closeTake(TAKE_POSITION)
+      await product.connect(userB).openTake(TAKE_POSITION)
+
+      // Return the same price so there is no PnL
+      await chainlink.next()
+      await product.settle()
+
+      const currentVersion = await product.currentVersion()
+      const takerFeePerPosition = currentVersion.price.mul(TAKE_POSITION).div(2).div(constants.WeiPerEther)
+      const totalFees = takerFeePerPosition.mul(2) // 2 total position changes
+      const takerPnL = currentVersion.price.sub(currentPrice).mul(TAKE_POSITION).div(constants.WeiPerEther).mul(-1)
+
+      expect((await collateral.fees(treasuryB.address)).sub(totalFees)).to.be.within(0, 1)
+
+      await product.settleAccount(user.address)
+      expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(
+        DEPOSIT_AMOUNT.sub(takerFeePerPosition.add(takerPnL)),
+      )
+
+      await product.settleAccount(userB.address)
+      expect(await collateral['collateral(address,address)'](userB.address, product.address)).to.equal(
+        DEPOSIT_AMOUNT.sub(takerFeePerPosition),
+      )
+    })
   })
 })
