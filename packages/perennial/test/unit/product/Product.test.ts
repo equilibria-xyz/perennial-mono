@@ -147,8 +147,9 @@ describe('Product', () => {
     it('correctly updates the params', async () => {
       await product.updateMaintenance(utils.parseEther('0.1'))
       await product.updateFundingFee(utils.parseEther('0.2'))
-      await product.updateMakerFee(utils.parseEther('0.3'))
-      await product.updateTakerFee(utils.parseEther('0.4'))
+      // TODO: Re-enable when we allow non-zero fees
+      // await product.updateMakerFee(utils.parseEther('0.3'))
+      // await product.updateTakerFee(utils.parseEther('0.4'))
       await product.updateMakerLimit(utils.parseEther('0.5'))
       await product.updateUtilizationCurve({
         minRate: utils.parseEther('0.10'),
@@ -159,8 +160,9 @@ describe('Product', () => {
 
       expect(await product['maintenance()']()).to.equal(utils.parseEther('0.1'))
       expect(await product.fundingFee()).to.equal(utils.parseEther('0.2'))
-      expect(await product.makerFee()).to.equal(utils.parseEther('0.3'))
-      expect(await product.takerFee()).to.equal(utils.parseEther('0.4'))
+      // TODO: Re-enable when we allow non-zero fees
+      // expect(await product.makerFee()).to.equal(utils.parseEther('0.3'))
+      // expect(await product.takerFee()).to.equal(utils.parseEther('0.4'))
       expect(await product.makerLimit()).to.equal(utils.parseEther('0.5'))
 
       const curve = await product.utilizationCurve()
@@ -513,7 +515,8 @@ describe('Product', () => {
         expect(await product['latestVersion(address)'](user.address)).to.equal(3)
       })
 
-      it('opens the position and settles later with fee', async () => {
+      // TODO: Re-enable when we allow non-zero fees
+      /* it('opens the position and settles later with fee', async () => {
         await product.updateMakerFee(utils.parseEther('0.01'))
 
         const MAKER_FEE = utils.parseEther('12.3') // position * maker fee * price
@@ -559,7 +562,7 @@ describe('Product', () => {
           closePosition: { maker: 0, taker: 0 },
         })
         expect(await product['latestVersion(address)'](user.address)).to.equal(3)
-      })
+      }) */
 
       it('opens the position with settle after liquidation', async () => {
         await product.connect(user).openMake(POSITION)
@@ -951,7 +954,8 @@ describe('Product', () => {
           expect(await product['latestVersion(address)'](user.address)).to.equal(4)
         })
 
-        it('closes the position and settles later', async () => {
+        // TODO: Re-enable when we allow non-zero fees
+        /* it('closes the position and settles later with fee', async () => {
           await product.updateMakerFee(utils.parseEther('0.01'))
 
           const MAKER_FEE = utils.parseEther('12.3') // position * maker fee * price
@@ -997,7 +1001,7 @@ describe('Product', () => {
             closePosition: { maker: 0, taker: 0 },
           })
           expect(await product['latestVersion(address)'](user.address)).to.equal(4)
-        })
+        }) */
 
         it('closes the position if taker > maker and product is closed', async () => {
           await product.connect(userB).openTake(POSITION)
@@ -1319,7 +1323,8 @@ describe('Product', () => {
         expect(await product['latestVersion(address)'](user.address)).to.equal(3)
       })
 
-      it('opens the position and settles later with fee', async () => {
+      // TODO: Re-enable when we allow non-zero fees
+      /* it('opens the position and settles later with fee', async () => {
         await product.updateTakerFee(utils.parseEther('0.01'))
 
         const TAKER_FEE = utils.parseEther('12.3') // position * taker fee * price
@@ -1377,7 +1382,7 @@ describe('Product', () => {
           closePosition: { maker: 0, taker: 0 },
         })
         expect(await product['latestVersion(address)'](user.address)).to.equal(3)
-      })
+      }) */
 
       it('opens the position with settle after liquidation', async () => {
         await product.connect(user).openTake(POSITION)
@@ -1838,7 +1843,8 @@ describe('Product', () => {
           expect(await product['latestVersion(address)'](user.address)).to.equal(4)
         })
 
-        it('closes the position and settles later', async () => {
+        // TODO: Re-enable when we allow non-zero fees
+        /* it('closes the position and settles later with fee', async () => {
           await product.updateTakerFee(utils.parseEther('0.01'))
 
           const TAKER_FEE = utils.parseEther('12.3') // position * taker fee * price
@@ -1896,7 +1902,7 @@ describe('Product', () => {
             closePosition: { maker: 0, taker: 0 },
           })
           expect(await product['latestVersion(address)'](user.address)).to.equal(4)
-        })
+        }) */
 
         it('reverts if underflow', async () => {
           await expect(product.connect(user).closeTake(POSITION.mul(2))).to.be.revertedWith('ProductOverClosedError()')
@@ -3130,7 +3136,8 @@ describe('Product', () => {
         expect(await product['latestVersion(address)'](user.address)).to.equal(3)
       })
 
-      it('opens the position and settles later with fee', async () => {
+      // TODO: Re-enable when we allow non-zero fees
+      /* it('opens the position and settles later with fee', async () => {
         await product.updateMakerFee(utils.parseEther('0.01'))
 
         const MAKER_FEE = utils.parseEther('12.3') // position * maker fee * price
@@ -3175,7 +3182,7 @@ describe('Product', () => {
           closePosition: { maker: 0, taker: 0 },
         })
         expect(await product['latestVersion(address)'](user.address)).to.equal(3)
-      })
+      }) */
 
       it('opens the position with settle after liquidation', async () => {
         await product.connect(user).openMake(POSITION)
@@ -3565,7 +3572,8 @@ describe('Product', () => {
           expect(await product['latestVersion(address)'](user.address)).to.equal(4)
         })
 
-        it('closes the position and settles later', async () => {
+        // TODO: Re-enable when we allow non-zero fees
+        /* it('closes the position and settles later with fee', async () => {
           await product.updateMakerFee(utils.parseEther('0.01'))
 
           const MAKER_FEE = utils.parseEther('12.3') // position * maker fee * price
@@ -3610,7 +3618,7 @@ describe('Product', () => {
             closePosition: { maker: 0, taker: 0 },
           })
           expect(await product['latestVersion(address)'](user.address)).to.equal(4)
-        })
+        }) */
 
         it('closes the position if taker > maker and product is closed', async () => {
           await product.connect(userB).openTake(POSITION)
@@ -3932,7 +3940,8 @@ describe('Product', () => {
         expect(await product['latestVersion(address)'](user.address)).to.equal(3)
       })
 
-      it('opens the position and settles later with fee', async () => {
+      // TODO: Re-enable when we allow non-zero fees
+      /* it('opens the position and settles later with fee', async () => {
         await product.updateTakerFee(utils.parseEther('0.01'))
 
         const TAKER_FEE = utils.parseEther('12.3') // position * taker fee * price
@@ -3990,7 +3999,7 @@ describe('Product', () => {
           closePosition: { maker: 0, taker: 0 },
         })
         expect(await product['latestVersion(address)'](user.address)).to.equal(3)
-      })
+      }) */
 
       it('opens the position with settle after liquidation', async () => {
         await product.connect(user).openTake(POSITION)
@@ -4459,7 +4468,8 @@ describe('Product', () => {
           expect(await product['latestVersion(address)'](user.address)).to.equal(4)
         })
 
-        it('closes the position and settles later', async () => {
+        // TODO: Re-enable when we allow non-zero fees
+        /* it('closes the position and settles later with fee', async () => {
           await product.updateTakerFee(utils.parseEther('0.01'))
 
           const TAKER_FEE = utils.parseEther('12.3') // position * taker fee * price
@@ -4517,7 +4527,7 @@ describe('Product', () => {
             closePosition: { maker: 0, taker: 0 },
           })
           expect(await product['latestVersion(address)'](user.address)).to.equal(4)
-        })
+        }) */
 
         it('reverts if underflow', async () => {
           await expect(product.connect(user).closeTake(POSITION.mul(2))).to.be.revertedWith('ProductOverClosedError()')

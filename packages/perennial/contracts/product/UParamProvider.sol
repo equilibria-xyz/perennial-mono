@@ -108,12 +108,12 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
      * @param newMakerFee new maker fee value
      */
     function _updateMakerFee(UFixed18 newMakerFee) private {
-        if (newMakerFee.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidMakerFee();
+        if (newMakerFee.gt(UFixed18Lib.ZERO)) revert ParamProviderInvalidMakerFee();
         _makerFee.store(newMakerFee);
         emit MakerFeeUpdated(newMakerFee);
     }
 
-     /**
+    /**
      * @notice Updates the maker fee to `newMakerFee`
      * @dev only callable by product owner
      * @param newMakerFee new maker fee value
@@ -127,7 +127,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
      * @param newTakerFee new taker fee value
      */
     function _updateTakerFee(UFixed18 newTakerFee) private {
-        if (newTakerFee.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidTakerFee();
+        if (newTakerFee.gt(UFixed18Lib.ZERO)) revert ParamProviderInvalidTakerFee();
         _takerFee.store(newTakerFee);
         emit TakerFeeUpdated(newTakerFee);
     }
