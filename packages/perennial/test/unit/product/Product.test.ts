@@ -525,8 +525,7 @@ describe('Product', () => {
         await expect(product.connect(user).openMake(POSITION))
           .to.emit(product, 'MakeOpened')
           .withArgs(user.address, 1, POSITION)
-        const MAINTENANCE_NEXT = utils.parseEther((615 + 12.3 * 1.5).toString()) // maintenance + fees * (1 + maintenanceRatio)
-        expect(await product.maintenanceNext(user.address)).to.equal(MAINTENANCE_NEXT)
+        expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('615'))
 
         await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
         await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_2)
@@ -1340,8 +1339,7 @@ describe('Product', () => {
         await expect(product.connect(user).openTake(POSITION))
           .to.emit(product, 'TakeOpened')
           .withArgs(user.address, 1, POSITION)
-        const MAINTENANCE_NEXT = utils.parseEther((615 + 12.3 * 1.5).toString()) // maintenance + fees * (1 + maintenanceRatio)
-        expect(await product.maintenanceNext(user.address)).to.equal(MAINTENANCE_NEXT)
+        expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('615'))
 
         await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
 
@@ -3413,8 +3411,7 @@ describe('Product', () => {
         await expect(product.connect(user).openMake(POSITION))
           .to.emit(product, 'MakeOpened')
           .withArgs(user.address, 1, POSITION)
-        const MAINTENANCE_NEXT = utils.parseEther((615 + 12.3 * 1.5).toString()) // maintenance + fees * (1 + maintenanceRatio)
-        expect(await product.maintenanceNext(user.address)).to.equal(MAINTENANCE_NEXT)
+        expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('615'))
 
         await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
 
@@ -4224,8 +4221,7 @@ describe('Product', () => {
         await expect(product.connect(user).openTake(POSITION))
           .to.emit(product, 'TakeOpened')
           .withArgs(user.address, 1, POSITION)
-        const MAINTENANCE_NEXT = utils.parseEther((615 + 12.3 * 1.5).toString()) // maintenance + fees * (1 + maintenanceRatio)
-        expect(await product.maintenanceNext(user.address)).to.equal(MAINTENANCE_NEXT)
+        expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('615'))
 
         await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
 

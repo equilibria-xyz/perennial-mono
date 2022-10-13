@@ -661,14 +661,6 @@ describe('Happy Path', () => {
       await product.connect(userB).closeTake(TAKE_POSITION.div(2))
       await product.connect(user).closeMake(MAKE_POSITION.div(2))
 
-      // Expect the maintenanceNext to equal the fees incurred
-      expect(await product.maintenanceNext(user.address)).to.equal(
-        makerFees.mul(utils.parseEther('1.3')).div(constants.WeiPerEther),
-      )
-      expect(await product.maintenanceNext(userB.address)).to.equal(
-        takerFees.mul(utils.parseEther('1.3')).div(constants.WeiPerEther),
-      )
-
       await chainlink.next()
       await product.settle()
 
