@@ -13,10 +13,11 @@ describe('Happy Path', () => {
   })
 
   it('initializes', async () => {
-    const { collateral, controller, dsu } = instanceVars
+    const { collateral, controller, dsu, multiInvoker } = instanceVars
 
     expect((await collateral.controller()).toUpperCase()).to.equal(controller.address.toUpperCase())
     expect((await collateral.token()).toUpperCase()).to.equal(dsu.address.toUpperCase())
+    expect((await controller.multiInvoker()).toUpperCase()).to.equal(multiInvoker.address.toUpperCase())
   })
 
   it('reverts if already initialized', async () => {
@@ -499,5 +500,23 @@ describe('Happy Path', () => {
     await expect(product.closeTake(utils.parseEther('0.001'))).to.be.revertedWith('PausedError()')
     await expect(product.settle()).to.be.revertedWith('PausedError()')
     await expect(product.settleAccount(user.address)).to.be.revertedWith('PausedError()')
+  })
+
+  it('reverts when calling "*For" methods from non-account and non-multiinvoker', async () => {
+    const { incentivizer, collateral, user, userB } = instanceVars
+    const product = await createProduct(instanceVars)
+
+    await expect(product.connect(user).openMakeFor(userB.address, utils.parseEther('0.001'))).to.be.revertedWith(
+      `NotAccountOrMultiInvokerError("${userB.address}", "${user.address}")`,
+    )
+    await expect(product.connect(user).openTakeFor(userB.address, utils.parseEther('0.001'))).to.be.revertedWith(
+      `NotAccountOrMultiInvokerError("${userB.address}", "${user.address}")`,
+    )
+    await expect(
+      collateral.connect(user).withdrawFrom(userB.address, user.address, product.address, utils.parseEther('100')),
+    ).to.be.revertedWith(`NotAccountOrMultiInvokerError("${userB.address}", "${user.address}")`)
+    await expect(incentivizer.connect(user).claimFor(userB.address, product.address, [1])).to.be.revertedWith(
+      `NotAccountOrMultiInvokerError("${userB.address}", "${user.address}")`,
+    )
   })
 })

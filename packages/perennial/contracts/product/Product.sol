@@ -16,10 +16,11 @@ import "./types/accumulator/AccountAccumulator.sol";
  */
 contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, UReentrancyGuard {
     /// @dev Whether or not the product is closed
-    BoolStorage private constant _closed =
-        BoolStorage.wrap(keccak256("equilibria.perennial.Product.closed"));
-    function closed() public view returns (bool) { return _closed.read(); }
+    BoolStorage private constant _closed = BoolStorage.wrap(keccak256("equilibria.perennial.Product.closed"));
 
+    function closed() public view returns (bool) {
+        return _closed.read();
+    }
 
     /// @dev The name of the product
     string public name;
@@ -92,9 +93,9 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
         // Get settle oracle version
         uint256 _settleVersion = _position.pre.settleVersion(currentOracleVersion.version);
-        IOracleProvider.OracleVersion memory settleOracleVersion = _settleVersion == currentOracleVersion.version ?
-            currentOracleVersion : // if b == c, don't re-call provider for oracle version
-            atVersion(_settleVersion);
+        IOracleProvider.OracleVersion memory settleOracleVersion = _settleVersion == currentOracleVersion.version
+            ? currentOracleVersion // if b == c, don't re-call provider for oracle version
+            : atVersion(_settleVersion);
 
         // Initiate
         _controller.incentivizer().sync(currentOracleVersion);
@@ -111,7 +112,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
         // short-circuit from a->c if b == c
         if (settleOracleVersion.version != currentOracleVersion.version) {
-
             // value b->c
             accumulatedFee = accumulatedFee.add(
                 _accumulator.accumulate(boundedFundingFee, _position, settleOracleVersion, currentOracleVersion)
@@ -157,9 +157,9 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
         // Get settle oracle version
         uint256 _settleVersion = _positions[account].pre.settleVersion(currentOracleVersion.version);
-        IOracleProvider.OracleVersion memory settleOracleVersion = _settleVersion == currentOracleVersion.version ?
-            currentOracleVersion : // if b == c, don't re-call provider for oracle version
-            atVersion(_settleVersion);
+        IOracleProvider.OracleVersion memory settleOracleVersion = _settleVersion == currentOracleVersion.version
+            ? currentOracleVersion // if b == c, don't re-call provider for oracle version
+            : atVersion(_settleVersion);
 
         // initialize
         Fixed18 accumulated;
@@ -169,7 +169,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
         // value a->b
         accumulated = accumulated.add(
-            _accumulators[account].syncTo(_accumulator, _positions[account], settleOracleVersion.version).sum());
+            _accumulators[account].syncTo(_accumulator, _positions[account], settleOracleVersion.version).sum()
+        );
 
         // position a->b
         _positions[account].settle(settleOracleVersion);
@@ -181,7 +182,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
             // value b->c
             accumulated = accumulated.add(
-                _accumulators[account].syncTo(_accumulator, _positions[account], currentOracleVersion.version).sum());
+                _accumulators[account].syncTo(_accumulator, _positions[account], currentOracleVersion.version).sum()
+            );
         }
 
         // settle collateral
@@ -194,41 +196,61 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @notice Opens a taker position for `msg.sender`
      * @param amount Amount of the position to open
      */
-    function openTake(UFixed18 amount)
-    external
-    nonReentrant
-    notPaused
-    notClosed
-    settleForAccount(msg.sender)
-    takerInvariant
-    positionInvariant
-    liquidationInvariant
-    maintenanceInvariant
+    function openTake(UFixed18 amount) external {
+        openTakeFor(msg.sender, amount);
+    }
+
+    /**
+     * @notice Opens a taker position for `account`
+     * @param account Account to open the position for
+     * @param amount Amount of the position to open
+     */
+    function openTakeFor(address account, UFixed18 amount)
+        public
+        nonReentrant
+        notPaused
+        notClosed
+        onlyAccountOrMultiInvoker(account)
+        settleForAccount(account)
+        takerInvariant
+        positionInvariant(account)
+        liquidationInvariant(account)
+        maintenanceInvariant(account)
     {
         IOracleProvider.OracleVersion memory latestOracleVersion = atVersion(latestVersion());
 
-        _positions[msg.sender].pre.openTake(latestOracleVersion.version, amount);
+        _positions[account].pre.openTake(latestOracleVersion.version, amount);
         _position.pre.openTake(latestOracleVersion.version, amount);
 
         UFixed18 positionFee = amount.mul(latestOracleVersion.price.abs()).mul(takerFee());
-        controller().collateral().settleAccount(msg.sender, Fixed18Lib.from(-1, positionFee));
+        controller().collateral().settleAccount(account, Fixed18Lib.from(-1, positionFee));
 
-        emit TakeOpened(msg.sender, latestOracleVersion.version, amount);
+        emit TakeOpened(account, latestOracleVersion.version, amount);
     }
 
     /**
      * @notice Closes a taker position for `msg.sender`
      * @param amount Amount of the position to close
      */
-    function closeTake(UFixed18 amount)
-    external
-    nonReentrant
-    notPaused
-    settleForAccount(msg.sender)
-    closeInvariant
-    liquidationInvariant
+    function closeTake(UFixed18 amount) external {
+        closeTakeFor(msg.sender, amount);
+    }
+
+    /**
+     * @notice Closes a taker position for `account`
+     * @param account Account to close the position for
+     * @param amount Amount of the position to close
+     */
+    function closeTakeFor(address account, UFixed18 amount)
+        public
+        nonReentrant
+        notPaused
+        onlyAccountOrMultiInvoker(account)
+        settleForAccount(account)
+        closeInvariant(account)
+        liquidationInvariant(account)
     {
-        _closeTake(msg.sender, amount);
+        _closeTake(account, amount);
     }
 
     function _closeTake(address account, UFixed18 amount) private {
@@ -247,43 +269,63 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @notice Opens a maker position for `msg.sender`
      * @param amount Amount of the position to open
      */
-    function openMake(UFixed18 amount)
-    external
-    nonReentrant
-    notPaused
-    notClosed
-    settleForAccount(msg.sender)
-    nonZeroVersionInvariant
-    makerInvariant
-    positionInvariant
-    liquidationInvariant
-    maintenanceInvariant
+    function openMake(UFixed18 amount) external {
+        openMakeFor(msg.sender, amount);
+    }
+
+    /**
+     * @notice Opens a maker position for `account`
+     * @param account Account to open position for
+     * @param amount Amount of the position to open
+     */
+    function openMakeFor(address account, UFixed18 amount)
+        public
+        nonReentrant
+        notPaused
+        notClosed
+        onlyAccountOrMultiInvoker(account)
+        settleForAccount(account)
+        nonZeroVersionInvariant
+        makerInvariant
+        positionInvariant(account)
+        liquidationInvariant(account)
+        maintenanceInvariant(account)
     {
         IOracleProvider.OracleVersion memory latestOracleVersion = atVersion(latestVersion());
 
-        _positions[msg.sender].pre.openMake(latestOracleVersion.version, amount);
+        _positions[account].pre.openMake(latestOracleVersion.version, amount);
         _position.pre.openMake(latestOracleVersion.version, amount);
 
         UFixed18 positionFee = amount.mul(latestOracleVersion.price.abs()).mul(makerFee());
-        controller().collateral().settleAccount(msg.sender, Fixed18Lib.from(-1, positionFee));
+        controller().collateral().settleAccount(account, Fixed18Lib.from(-1, positionFee));
 
-        emit MakeOpened(msg.sender, latestOracleVersion.version, amount);
+        emit MakeOpened(account, latestOracleVersion.version, amount);
     }
 
     /**
      * @notice Closes a maker position for `msg.sender`
      * @param amount Amount of the position to close
      */
-    function closeMake(UFixed18 amount)
-    external
-    nonReentrant
-    notPaused
-    settleForAccount(msg.sender)
-    takerInvariant
-    closeInvariant
-    liquidationInvariant
+    function closeMake(UFixed18 amount) external {
+        closeMakeFor(msg.sender, amount);
+    }
+
+    /**
+     * @notice Closes a maker position for `account`
+     * @param account Account to close the position for
+     * @param amount Amount of the position to close
+     */
+    function closeMakeFor(address account, UFixed18 amount)
+        public
+        nonReentrant
+        notPaused
+        onlyAccountOrMultiInvoker(account)
+        settleForAccount(account)
+        takerInvariant
+        closeInvariant(account)
+        liquidationInvariant(account)
     {
-        _closeMake(msg.sender, amount);
+        _closeMake(account, amount);
     }
 
     function _closeMake(address account, UFixed18 amount) private {
@@ -458,7 +500,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     }
 
     /// @dev Limit total maker for guarded rollouts
-    modifier makerInvariant {
+    modifier makerInvariant() {
         _;
 
         Position memory next = positionAtVersion(latestVersion()).next(_position.pre);
@@ -467,7 +509,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     }
 
     /// @dev Limit maker short exposure to the range 0.0-1.0x of their position. Does not apply when in closeOnly state
-    modifier takerInvariant {
+    modifier takerInvariant() {
         _;
 
         if (closed()) return;
@@ -479,30 +521,30 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     }
 
     /// @dev Ensure that the user has only taken a maker or taker position, but not both
-    modifier positionInvariant {
+    modifier positionInvariant(address account) {
         _;
 
-        if (_positions[msg.sender].isDoubleSided()) revert ProductDoubleSidedError();
+        if (_positions[account].isDoubleSided()) revert ProductDoubleSidedError();
     }
 
     /// @dev Ensure that the user hasn't closed more than is open
-    modifier closeInvariant {
+    modifier closeInvariant(address account) {
         _;
 
-        if (_positions[msg.sender].isOverClosed()) revert ProductOverClosedError();
+        if (_positions[account].isOverClosed()) revert ProductOverClosedError();
     }
 
     /// @dev Ensure that the user will have sufficient margin for maintenance after next settlement
-    modifier maintenanceInvariant {
+    modifier maintenanceInvariant(address account) {
         _;
 
-        if (controller().collateral().liquidatableNext(msg.sender, IProduct(this)))
+        if (controller().collateral().liquidatableNext(account, IProduct(this)))
             revert ProductInsufficientCollateralError();
     }
 
     /// @dev Ensure that the user is not currently being liquidated
-    modifier liquidationInvariant {
-        if (_positions[msg.sender].liquidation) revert ProductInLiquidationError();
+    modifier liquidationInvariant(address account) {
+        if (_positions[account].liquidation) revert ProductInLiquidationError();
 
         _;
     }
@@ -516,14 +558,14 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     }
 
     /// @dev Ensure we have bootstraped the oracle before creating positions
-    modifier nonZeroVersionInvariant {
+    modifier nonZeroVersionInvariant() {
         if (latestVersion() == 0) revert ProductOracleBootstrappingError();
 
         _;
     }
 
     /// @dev Ensure the product is not closed
-    modifier notClosed {
+    modifier notClosed() {
         if (closed()) revert ProductClosedError();
 
         _;
