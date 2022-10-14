@@ -186,7 +186,7 @@ library VersionedAccumulatorLib {
         if (pre.isEmpty()) return (accumulatedPosition, fee);
 
         Position memory positionFee = pre.computeFee(latestOracleVersion);
-        Position memory protocolFee = positionFee.mul(_product().positionFeeShare());
+        Position memory protocolFee = positionFee.mul(_product().positionFee());
         positionFee = positionFee.sub(protocolFee);
         fee = protocolFee.sum();
 

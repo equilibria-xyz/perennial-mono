@@ -53,7 +53,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
             productInfo_.fundingFee,
             productInfo_.makerFee,
             productInfo_.takerFee,
-            productInfo_.positionFeeShare,
+            productInfo_.positionFee,
             productInfo_.makerLimit,
             productInfo_.utilizationCurve
         );

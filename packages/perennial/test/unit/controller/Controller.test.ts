@@ -309,7 +309,7 @@ describe('Controller', () => {
       fundingFee: ethers.constants.Zero,
       makerFee: ethers.constants.Zero,
       takerFee: ethers.constants.Zero,
-      positionFeeShare: ethers.constants.Zero,
+      positionFee: ethers.constants.Zero,
       makerLimit: ethers.constants.Zero,
       utilizationCurve: {
         minRate: utils.parseEther('0.10'),

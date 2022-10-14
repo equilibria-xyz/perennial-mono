@@ -20,7 +20,7 @@ interface IParamProvider {
 
     error ParamProviderInvalidMakerFee();
     error ParamProviderInvalidTakerFee();
-    error ParamProviderInvalidPositionFeeShare();
+    error ParamProviderInvalidPositionFee();
     error ParamProviderInvalidFundingFee();
 
     function maintenance() external view returns (UFixed18);
@@ -31,8 +31,8 @@ interface IParamProvider {
     function updateMakerFee(UFixed18 newMakerFee) external;
     function takerFee() external view returns (UFixed18);
     function updateTakerFee(UFixed18 newTakerFee) external;
-    function positionFeeShare() external view returns (UFixed18);
-    function updatePositionFeeShare(UFixed18 newPositionFeeShare) external;
+    function positionFee() external view returns (UFixed18);
+    function updatePositionFee(UFixed18 newPositionFee) external;
     function makerLimit() external view returns (UFixed18);
     function updateMakerLimit(UFixed18 newMakerLimit) external;
     function utilizationCurve() external view returns (JumpRateUtilizationCurve memory);

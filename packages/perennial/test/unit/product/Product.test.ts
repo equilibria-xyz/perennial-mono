@@ -53,7 +53,7 @@ describe('Product', () => {
     fundingFee: FUNDING_FEE,
     makerFee: MAKER_FEE,
     takerFee: TAKER_FEE,
-    positionFeeShare: POSITION_FEE_SHARE,
+    positionFee: POSITION_FEE_SHARE,
     makerLimit: POSITION.mul(10),
     utilizationCurve: {
       // Force a 0.10 rate to make tests simpler
