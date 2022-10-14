@@ -22,6 +22,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
         UFixed18 fundingFee_,
         UFixed18 makerFee_,
         UFixed18 takerFee_,
+        UFixed18 positionFeeShare_,
         UFixed18 makerLimit_,
         JumpRateUtilizationCurve memory utilizationCurve_
     ) internal onlyInitializer {
@@ -29,6 +30,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
         _updateFundingFee(fundingFee_);
         _updateMakerFee(makerFee_);
         _updateTakerFee(takerFee_);
+        _updatePositionFeeShare(positionFeeShare_);
         _updateMakerLimit(makerLimit_);
         _updateUtilizationCurve(utilizationCurve_);
     }
@@ -57,9 +59,9 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
     UFixed18Storage private constant _takerFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.takerFee"));
     function takerFee() public view returns (UFixed18) { return _takerFee.read(); }
 
-    /// @dev The taker fee value
-    UFixed18Storage private constant _positionFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.positionFee"));
-    function positionFee() public view returns (UFixed18) { return _positionFee.read(); }
+    /// @dev The positon fee share value
+    UFixed18Storage private constant _positionFeeShare = UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.positionFeeShare"));
+    function positionFeeShare() public view returns (UFixed18) { return _positionFeeShare.read(); }
 
     /// @dev The maker limit value
     UFixed18Storage private constant _makerLimit = UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.makerLimit"));
@@ -117,7 +119,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
         emit MakerFeeUpdated(newMakerFee);
     }
 
-     /**
+    /**
      * @notice Updates the maker fee to `newMakerFee`
      * @dev only callable by product owner
      * @param newMakerFee new maker fee value
@@ -146,22 +148,22 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
     }
 
     /**
-     * @notice Updates the position fee to `newPositionFee`
-     * @param newPositionFee new position fee value
+     * @notice Updates the position fee to `newPositionFeeShare`
+     * @param newPositionFeeShare new position fee value
      */
-    function _updatePositionFee(UFixed18 newPositionFee) private {
-        if (newPositionFee.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidPositionFee();
-        _positionFee.store(newPositionFee);
-        emit PositionFeeUpdated(newPositionFee);
+    function _updatePositionFeeShare(UFixed18 newPositionFeeShare) private {
+        if (newPositionFeeShare.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidPositionFeeShare();
+        _positionFeeShare.store(newPositionFeeShare);
+        emit PositionFeeUpdated(newPositionFeeShare);
     }
 
     /**
-     * @notice Updates the position fee to `newPositionFee`
+     * @notice Updates the position fee to `newPositionFeeShare`
      * @dev only callable by product owner
-     * @param newPositionFee new position fee value
+     * @param newPositionFeeShare new position fee value
      */
-    function updatePositionFee(UFixed18 newPositionFee) external onlyProductOwner {
-        _updatePositionFee(newPositionFee);
+    function updatePositionFeeShare(UFixed18 newPositionFeeShare) external onlyProductOwner {
+        _updatePositionFeeShare(newPositionFeeShare);
     }
 
     /**

@@ -37,6 +37,9 @@ interface IProduct is IPayoffProvider, IParamProvider {
         /// @dev product taker fee
         UFixed18 takerFee;
 
+        /// @dev product position fee share
+        UFixed18 positionFeeShare;
+
         /// @dev product maker limit
         UFixed18 makerLimit;
 

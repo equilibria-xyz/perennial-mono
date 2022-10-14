@@ -53,6 +53,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
             productInfo_.fundingFee,
             productInfo_.makerFee,
             productInfo_.takerFee,
+            productInfo_.positionFeeShare,
             productInfo_.makerLimit,
             productInfo_.utilizationCurve
         );
@@ -201,7 +202,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     }
 
     /**
-     * @notice Opens a taker position for `account`
+     * @notice Opens a taker position for `account`. Deducts position fee based on notional value at `latestVersion`
      * @param account Account to open the position for
      * @param amount Amount of the position to open
      */
@@ -223,7 +224,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         _position.pre.openTake(latestOracleVersion.version, amount);
 
         UFixed18 positionFee = amount.mul(latestOracleVersion.price.abs()).mul(takerFee());
-        controller().collateral().settleAccount(account, Fixed18Lib.from(-1, positionFee));
+        if (!positionFee.isZero()) controller().collateral().settleAccount(account, Fixed18Lib.from(-1, positionFee));
 
         emit TakeOpened(account, latestOracleVersion.version, amount);
     }
@@ -237,7 +238,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     }
 
     /**
-     * @notice Closes a taker position for `account`
+     * @notice Closes a taker position for `account`. Deducts position fee based on notional value at `latestVersion`
      * @param account Account to close the position for
      * @param amount Amount of the position to close
      */
@@ -260,7 +261,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         _position.pre.closeTake(latestOracleVersion.version, amount);
 
         UFixed18 positionFee = amount.mul(latestOracleVersion.price.abs()).mul(takerFee());
-        controller().collateral().settleAccount(msg.sender, Fixed18Lib.from(-1, positionFee));
+        if (!positionFee.isZero()) controller().collateral().settleAccount(account, Fixed18Lib.from(-1, positionFee));
 
         emit TakeClosed(account, latestOracleVersion.version, amount);
     }
@@ -274,7 +275,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     }
 
     /**
-     * @notice Opens a maker position for `account`
+     * @notice Opens a maker position for `account`. Deducts position fee based on notional value at `latestVersion`
      * @param account Account to open position for
      * @param amount Amount of the position to open
      */
@@ -297,7 +298,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         _position.pre.openMake(latestOracleVersion.version, amount);
 
         UFixed18 positionFee = amount.mul(latestOracleVersion.price.abs()).mul(makerFee());
-        controller().collateral().settleAccount(account, Fixed18Lib.from(-1, positionFee));
+        if (!positionFee.isZero()) controller().collateral().settleAccount(account, Fixed18Lib.from(-1, positionFee));
 
         emit MakeOpened(account, latestOracleVersion.version, amount);
     }
@@ -311,7 +312,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     }
 
     /**
-     * @notice Closes a maker position for `account`
+     * @notice Closes a maker position for `account`. Deducts position fee based on notional value at `latestVersion`
      * @param account Account to close the position for
      * @param amount Amount of the position to close
      */
@@ -335,7 +336,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         _position.pre.closeMake(latestOracleVersion.version, amount);
 
         UFixed18 positionFee = amount.mul(latestOracleVersion.price.abs()).mul(makerFee());
-        controller().collateral().settleAccount(msg.sender, Fixed18Lib.from(-1, positionFee));
+        if (!positionFee.isZero()) controller().collateral().settleAccount(account, Fixed18Lib.from(-1, positionFee));
 
         emit MakeClosed(account, latestOracleVersion.version, amount);
     }
