@@ -3,7 +3,6 @@ pragma solidity 0.8.15;
 
 import "../../interfaces/IProduct.sol";
 import "../../interfaces/types/Accumulator.sol";
-import "./AccumulatorParams.sol";
 import "./Period.sol";
 
 /// @dev Version type
@@ -62,7 +61,6 @@ library VersionLib {
      * @notice Accumulates the global state for the period from `period.fromVersion` to `period.toVersion`
      * @param self The struct to operate on
      * @param period The oracle version period to settle for
-     * @param params The current set of market parameters
      * @return accumulatedVersion The resulting version after accumulation
      * @return accumulatedFee The fee accrued from opening or closing a new position
      */
@@ -70,14 +68,18 @@ library VersionLib {
         Version memory self,
         PrePosition memory pre,
         Period memory period,
-        AccumulatorParams memory params
+        JumpRateUtilizationCurve memory utilizationCurve,
+        UFixed18 fundingFee,
+        UFixed18 makerFee,
+        UFixed18 takerFee,
+        bool closed
     ) internal pure returns (Version memory accumulatedVersion, UFixed18 accumulatedFee) {
         Accumulator memory accumulatedPosition;
         Accumulator memory accumulatedShare;
-        (accumulatedPosition, accumulatedShare, accumulatedFee) = _accumulate(self, period, params);
+        (accumulatedPosition, accumulatedShare, accumulatedFee) = _accumulate(self, period, utilizationCurve, fundingFee, closed);
 
         // accumulate position
-        accumulatedFee = accumulatedFee.add(pre.computeFee(period.toVersion, params.maker, params.taker));
+        accumulatedFee = accumulatedFee.add(pre.computeFee(period.toVersion, makerFee, takerFee));
 
         // save update
         accumulatedVersion = Version(
@@ -90,11 +92,13 @@ library VersionLib {
     function accumulate(
         Version memory self,
         Period memory period,
-        AccumulatorParams memory params
+        JumpRateUtilizationCurve memory utilizationCurve,
+        UFixed18 fundingFee,
+        bool closed
     ) internal pure returns (Version memory accumulatedVersion, UFixed18 accumulatedFee) {
         Accumulator memory accumulatedPosition;
         Accumulator memory accumulatedShare;
-        (accumulatedPosition, accumulatedShare, accumulatedFee) = _accumulate(self, period, params);
+        (accumulatedPosition, accumulatedShare, accumulatedFee) = _accumulate(self, period, utilizationCurve, fundingFee, closed);
 
         // save update
         accumulatedVersion = Version(
@@ -107,16 +111,18 @@ library VersionLib {
     function _accumulate(
         Version memory self,
         Period memory period,
-        AccumulatorParams memory params
+        JumpRateUtilizationCurve memory utilizationCurve,
+        UFixed18 fundingFee,
+        bool closed
     ) private pure returns (Accumulator memory accumulatedPosition, Accumulator memory accumulatedShare, UFixed18 accumulatedFee) {
         Position memory latestPosition = self.position();
 
         // accumulate funding
         (accumulatedPosition, accumulatedFee) =
-            _accumulateFunding(params.funding, latestPosition, period, params.utilizationCurve, params.closed);
+            _accumulateFunding(fundingFee, latestPosition, period, utilizationCurve, closed);
 
         // accumulate position
-        accumulatedPosition = accumulatedPosition.add(_accumulatePosition(latestPosition, period, params.closed));
+        accumulatedPosition = accumulatedPosition.add(_accumulatePosition(latestPosition, period, closed));
 
         // accumulate share
         accumulatedShare = _accumulateShare(latestPosition, period);

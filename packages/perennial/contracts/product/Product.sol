@@ -96,26 +96,30 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
                 atVersion(_latestVersion + 1);
 
         // Load parameters
-        AccumulatorParams memory params = AccumulatorParams(
+        UFixed18 accumulatedFee;
+        UFixed18 fee;
+
+        // a->b (and settle)
+        (operatingVersion, accumulatedFee) = operatingVersion.accumulateAndSettle(
+            pre(),
+            Period(latestOracleVersion, settleOracleVersion),
             utilizationCurve(),
             fundingFee(),
             makerFee(),
             takerFee(),
             closed()
         );
-        UFixed18 accumulatedFee;
-        UFixed18 fee;
-
-        // a->b (and settle)
-        (operatingVersion, accumulatedFee) =
-            operatingVersion.accumulateAndSettle(pre(), Period(latestOracleVersion, settleOracleVersion), params);
         _versions[settleOracleVersion.version] = operatingVersion;
         delete _pre;
 
         // b->c
         if (settleOracleVersion.version != currentOracleVersion.version) { // skip is b == c
-            (operatingVersion, fee) =
-                operatingVersion.accumulate(Period(settleOracleVersion, currentOracleVersion), params);
+            (operatingVersion, fee) = operatingVersion.accumulate(
+                Period(settleOracleVersion, currentOracleVersion),
+                utilizationCurve(),
+                fundingFee(),
+                closed()
+            );
             _versions[currentOracleVersion.version] = operatingVersion;
             accumulatedFee = accumulatedFee.add(fee);
         }
