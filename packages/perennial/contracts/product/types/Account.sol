@@ -7,14 +7,8 @@ import "./Version.sol";
 
 /// @dev Account type
 struct Account {
-    /// @dev latest version that the account was synced too
-    uint256 latestVersion;
-
     /// @dev The current settled position of the account
     Position position;
-
-    /// @dev The current position delta pending-settlement
-    PrePosition pre;
 
     /// @dev Whether the account is currently locked for liquidation
     bool liquidation;
@@ -28,42 +22,31 @@ using AccountLib for Account global;
 library AccountLib {
     /**
      * @notice Settled the account's position to oracle version `toOracleVersion`
-     * @param self The struct to operate on
-     * @param toOracleVersion The oracle version to accumulate to
-     * @return accumulated The value accrued from settling the position
+     * @param account The struct to operate on
      */
     function accumulateAndSettle(
-        Account storage self,
-        mapping(uint256 => Version) storage versions,
-        IOracleProvider.OracleVersion memory toOracleVersion
-    ) internal returns (Fixed18 accumulated) {
-        accumulated = self.position
-            .mul(versions[toOracleVersion.version].value().sub(versions[self.latestVersion].value()))
-            .sum();
-
-        self.position = self.position.next(self.pre);
-        delete self.pre;
-        self.liquidation = false;
-
-        self.latestVersion = toOracleVersion.version; //TODO: move outside
+        Account memory account,
+        Fixed18 valueAccumulator,
+        PrePosition memory pre,
+        Version memory fromVersion,
+        Version memory toVersion
+    ) internal pure returns (Account memory newAccount, Fixed18 newValueAccumulator) {
+        newValueAccumulator = valueAccumulator.add(account.position.mul(toVersion.value().sub(fromVersion.value())).sum());
+        newAccount = Account(account.position.next(pre), false);
     }
 
     /**
      * @notice Settled the account's position to oracle version `toOracleVersion`
-     * @param self The struct to operate on
-     * @param toOracleVersion The oracle version to accumulate to
-     * @return accumulated The value accrued from settling the position
+     * @param account The struct to operate on
+     * @return newValueAccumulator The value accrued from settling the position
      */
     function accumulate(
-        Account storage self,
-        mapping(uint256 => Version) storage versions,
-        IOracleProvider.OracleVersion memory toOracleVersion
-    ) internal returns (Fixed18 accumulated) {
-        accumulated = self.position
-            .mul(versions[toOracleVersion.version].value().sub(versions[self.latestVersion].value()))
-            .sum();
-
-        self.latestVersion = toOracleVersion.version;
+        Account memory account,
+        Fixed18 valueAccumulator,
+        Version memory fromVersion,
+        Version memory toVersion
+    ) internal pure returns (Fixed18 newValueAccumulator) {
+        newValueAccumulator = valueAccumulator.add(account.position.mul(toVersion.value().sub(fromVersion.value())).sum());
     }
 
     /**
@@ -89,10 +72,11 @@ library AccountLib {
      */
     function maintenanceNext(
         Account memory self,
+        PrePosition memory pre,
         IOracleProvider.OracleVersion memory currentOracleVersion,
         UFixed18 maintenanceRatio
     ) internal pure returns (UFixed18) {
-        return _maintenance(self.position.next(self.pre), currentOracleVersion, maintenanceRatio);
+        return _maintenance(self.position.next(pre), currentOracleVersion, maintenanceRatio);
     }
 
     /**
@@ -118,9 +102,9 @@ library AccountLib {
      * @param self The struct to operate on
      * @return Whether the account is currently doubled sided
      */
-    function isDoubleSided(Account memory self) internal pure returns (bool) {
-        bool makerEmpty = self.position.maker.isZero() && self.pre.openPosition.maker.isZero() && self.pre.closePosition.maker.isZero();
-        bool takerEmpty = self.position.taker.isZero() && self.pre.openPosition.taker.isZero() && self.pre.closePosition.taker.isZero();
+    function isDoubleSided(Account memory self, PrePosition memory pre) internal pure returns (bool) {
+        bool makerEmpty = self.position.maker.isZero() && pre.openPosition.maker.isZero() && pre.closePosition.maker.isZero();
+        bool takerEmpty = self.position.taker.isZero() && pre.openPosition.taker.isZero() && pre.closePosition.taker.isZero();
 
         return !makerEmpty && !takerEmpty;
     }
@@ -131,9 +115,9 @@ library AccountLib {
      * @param self The struct to operate on
      * @return Whether the account is currently over closed
      */
-    function isOverClosed(Account memory self) internal pure returns (bool) {
-        Position memory nextOpen = self.position.add(self.pre.openPosition);
+    function isOverClosed(Account memory self, PrePosition memory pre) internal pure returns (bool) {
+        Position memory nextOpen = self.position.add(pre.openPosition);
 
-        return  self.pre.closePosition.maker.gt(nextOpen.maker) || self.pre.closePosition.taker.gt(nextOpen.taker);
+        return  pre.closePosition.maker.gt(nextOpen.maker) || pre.closePosition.taker.gt(nextOpen.taker);
     }
 }

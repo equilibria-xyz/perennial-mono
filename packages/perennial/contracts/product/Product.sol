@@ -35,8 +35,10 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     mapping(uint256 => Version) _versions;
 
     PrePosition private _pre;
+    mapping(address => PrePosition) private _pres;
 
     uint256 private _latestVersion;
+    mapping(address => uint256) private _latestVersions;
 
     /**
      * @notice Initializes the contract state
@@ -96,12 +98,12 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
         // Load parameters
         Version memory operatingVersion = _versions[_latestVersion];
-        UFixed18 accumulatedFee;
+        UFixed18 feeAccumulator;
         VersionLib.ProductParams memory params = VersionLib.ProductParams(utilizationCurve(), fundingFee(), closed());
 
         // a->b (and settle)
-        (operatingVersion, accumulatedFee) = operatingVersion.accumulateAndSettle(
-            accumulatedFee,
+        (operatingVersion, feeAccumulator) = operatingVersion.accumulateAndSettle(
+            feeAccumulator,
             pre(),
             Period(latestOracleVersion, settleOracleVersion),
             makerFee(),
@@ -110,22 +112,22 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
             params
         );
         _versions[settleOracleVersion.version] = operatingVersion;
-        delete _pre;
 
         // b->c
         if (settleOracleVersion.version != currentOracleVersion.version) { // skip is b == c
-            (_versions[currentOracleVersion.version], accumulatedFee) = operatingVersion.accumulate(
-                accumulatedFee,
+            (_versions[currentOracleVersion.version], feeAccumulator) = operatingVersion.accumulate(
+                feeAccumulator,
                 Period(settleOracleVersion, currentOracleVersion),
                 params
             );
         }
 
         // Settle collateral
-        _controller.collateral().settleProduct(accumulatedFee);
+        _controller.collateral().settleProduct(feeAccumulator);
 
-        // Save settled version
+        // Save state
         _latestVersion = currentOracleVersion.version;
+        delete _pre;
 
         emit Settle(settleOracleVersion.version, currentOracleVersion.version);
     }
@@ -157,23 +159,26 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         IController _controller = controller();
 
         // Get latest oracle version
-        if (latestVersion(account) == currentOracleVersion.version) return; // short circuit entirely if a == c
+        uint256 latestVersion_ = latestVersion(account);
+        if (latestVersion_ == currentOracleVersion.version) return; // short circuit entirely if a == c
 
         // Get settle oracle version
-        uint256 _settleVersion = latestVersion(account) + 1;
+        uint256 _settleVersion = latestVersion_ + 1;
         IOracleProvider.OracleVersion memory settleOracleVersion =
             _settleVersion == currentOracleVersion.version ?
                 currentOracleVersion : // if b == c, don't re-call provider for oracle version
                 atVersion(_settleVersion);
+        Version memory settleVersion = _versions[_settleVersion];
 
         // initialize
-        Fixed18 accumulated;
+        Fixed18 valueAccumulator;
 
         // sync incentivizer before accumulator
         _controller.incentivizer().syncAccount(account, settleOracleVersion);
 
         // account a->b
-        accumulated = accumulated.add(_accounts[account].accumulateAndSettle(_versions, settleOracleVersion));
+        (_accounts[account], valueAccumulator) =
+            _accounts[account].accumulateAndSettle(valueAccumulator, _pres[account], _versions[latestVersion_], settleVersion);
 
         // short-circuit from a->c if b == c
         if (settleOracleVersion.version != currentOracleVersion.version) {
@@ -181,11 +186,15 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
             _controller.incentivizer().syncAccount(account, currentOracleVersion);
 
             // account b->c
-            accumulated = accumulated.add(_accounts[account].accumulate(_versions, currentOracleVersion));
+            (valueAccumulator) = _accounts[account].accumulate(valueAccumulator, settleVersion, _versions[currentOracleVersion.version]);
         }
 
         // settle collateral
-        _controller.collateral().settleAccount(account, accumulated);
+        _controller.collateral().settleAccount(account, valueAccumulator);
+
+        // save state
+        _latestVersions[account] = currentOracleVersion.version;
+        delete _pres[account];
 
         emit AccountSettle(account, settleOracleVersion.version, currentOracleVersion.version);
     }
@@ -207,7 +216,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     {
         IOracleProvider.OracleVersion memory latestOracleVersion = atVersion(latestVersion());
 
-        _accounts[msg.sender].pre.openTake(amount);
+        _pres[msg.sender].openTake(amount);
         _pre.openTake(amount);
 
         UFixed18 positionFee = amount.mul(latestOracleVersion.price.abs()).mul(takerFee());
@@ -234,7 +243,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     function _closeTake(address account, UFixed18 amount) private {
         IOracleProvider.OracleVersion memory latestOracleVersion = atVersion(latestVersion());
 
-        _accounts[account].pre.closeTake(amount);
+        _pres[account].closeTake(amount);
         _pre.closeTake(amount);
 
         UFixed18 positionFee = amount.mul(latestOracleVersion.price.abs()).mul(takerFee());
@@ -261,7 +270,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     {
         IOracleProvider.OracleVersion memory latestOracleVersion = atVersion(latestVersion());
 
-        _accounts[msg.sender].pre.openMake(amount);
+        _pres[msg.sender].openMake(amount);
         _pre.openMake(amount);
 
         UFixed18 positionFee = amount.mul(latestOracleVersion.price.abs()).mul(makerFee());
@@ -289,7 +298,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     function _closeMake(address account, UFixed18 amount) private {
         IOracleProvider.OracleVersion memory latestOracleVersion = atVersion(latestVersion());
 
-        _accounts[account].pre.closeMake(amount);
+        _pres[account].closeMake(amount);
         _pre.closeMake(amount);
 
         UFixed18 positionFee = amount.mul(latestOracleVersion.price.abs()).mul(makerFee());
@@ -305,7 +314,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      */
     function closeAll(address account) external onlyCollateral notClosed settleForAccount(account) {
         Account storage account_ = _accounts[account];
-        Position memory position_ = account_.position.next(_accounts[account].pre);
+        Position memory position_ = account_.position.next(_pres[account]);
 
         // Close all positions
         _closeMake(account, position_.maker);
@@ -331,7 +340,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @return The next maintenance requirement
      */
     function maintenanceNext(address account) external view returns (UFixed18) {
-        return _accounts[account].maintenanceNext(currentVersion(), maintenance());
+        return _accounts[account].maintenanceNext(_pres[account], currentVersion(), maintenance());
     }
 
     /**
@@ -358,7 +367,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @return Current pre-position of the account
      */
     function pre(address account) external view returns (PrePosition memory) {
-        return _accounts[account].pre;
+        return _pres[account];
     }
 
     /**
@@ -413,7 +422,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @return Latest settled oracle version of the account
      */
     function latestVersion(address account) public view returns (uint256) {
-        return _accounts[account].latestVersion;
+        return _latestVersions[account];
     }
 
     /**
@@ -452,14 +461,14 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     modifier positionInvariant {
         _;
 
-        if (_accounts[msg.sender].isDoubleSided()) revert ProductDoubleSidedError();
+        if (_accounts[msg.sender].isDoubleSided(_pres[msg.sender])) revert ProductDoubleSidedError();
     }
 
     /// @dev Ensure that the user hasn't closed more than is open
     modifier closeInvariant {
         _;
 
-        if (_accounts[msg.sender].isOverClosed()) revert ProductOverClosedError();
+        if (_accounts[msg.sender].isOverClosed(_pres[msg.sender])) revert ProductOverClosedError();
     }
 
     /// @dev Ensure that the user will have sufficient margin for maintenance after next settlement
