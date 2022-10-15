@@ -17,22 +17,15 @@ interface IParamProvider {
         Fixed18 targetRate,
         UFixed18 targetUtilization
     );
-
-    error ParamProviderInvalidMakerFee();
-    error ParamProviderInvalidTakerFee();
-    error ParamProviderInvalidPositionFee();
-    error ParamProviderInvalidFundingFee();
     
-    function maintenance() external view returns (UFixed18);
-    function updateMaintenance(UFixed18 newMaintenance) external;
-    function fundingFee() external view returns (UFixed18);
-    function updateFundingFee(UFixed18 newFundingFee) external;
-    function makerFee() external view returns (UFixed18);
-    function updateMakerFee(UFixed18 newMakerFee) external;
-    function takerFee() external view returns (UFixed18);
-    function updateTakerFee(UFixed18 newTakerFee) external;
-    function positionFee() external view returns (UFixed18);
-    function updatePositionFee(UFixed18 newPositionFee) external;
+    function parameter() external view returns (UFixed18, UFixed18, UFixed18, UFixed18, UFixed18);
+    function updateParameter(
+        UFixed18 newMaintenance,
+        UFixed18 newFundingFee,
+        UFixed18 newMakerFee,
+        UFixed18 newTakerFee,
+        UFixed18 newPositionFee
+    ) external;
     function makerLimit() external view returns (UFixed18);
     function updateMakerLimit(UFixed18 newMakerLimit) external;
     function utilizationCurve() external view returns (JumpRateUtilizationCurve memory);

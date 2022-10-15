@@ -24,6 +24,7 @@ const PRODUCT_INFO = {
   fundingFee: utils.parseEther('0.1'),
   makerFee: 0,
   takerFee: 0,
+  positionFee: 0,
   makerLimit: utils.parseEther('1'),
   utilizationCurve: {
     minRate: 0,
@@ -195,7 +196,7 @@ describe('Reservoir Oracle Product', () => {
       .withArgs(user.address, INITIAL_VERSION, CLOSE_POSITION)
 
     // User state
-    expect(await product['maintenance(address)'](user.address)).to.equal(0)
+    expect(await product.maintenance(user.address)).to.equal(0)
     expect(await product.maintenanceNext(user.address)).to.equal(0)
     expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -230,7 +231,7 @@ describe('Reservoir Oracle Product', () => {
       .withArgs(user.address, INITIAL_VERSION, CLOSE_POSITION.div(2))
 
     // User state
-    expect(await product['maintenance(address)'](user.address)).to.equal(0)
+    expect(await product.maintenance(user.address)).to.equal(0)
     expect(await product.maintenanceNext(user.address)).to.equal(0)
     expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre(address)'](user.address), {
@@ -389,7 +390,7 @@ describe('Reservoir Oracle Product', () => {
       .withArgs(userB.address, INITIAL_VERSION, CLOSE_TAKE_POSITION)
 
     // User State
-    expect(await product['maintenance(address)'](userB.address)).to.equal(0)
+    expect(await product.maintenance(userB.address)).to.equal(0)
     expect(await product.maintenanceNext(userB.address)).to.equal(0)
     expectPositionEq(await product.position(userB.address), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre(address)'](userB.address), {
@@ -431,7 +432,7 @@ describe('Reservoir Oracle Product', () => {
       .withArgs(userB.address, INITIAL_VERSION, CLOSE_TAKE_POSITION.div(2))
 
     // User State
-    expect(await product['maintenance(address)'](userB.address)).to.equal(0)
+    expect(await product.maintenance(userB.address)).to.equal(0)
     expect(await product.maintenanceNext(userB.address)).to.equal(0)
     expectPositionEq(await product.position(userB.address), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre(address)'](userB.address), {

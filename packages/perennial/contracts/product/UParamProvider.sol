@@ -5,6 +5,7 @@ import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "../controller/UControllerProvider.sol";
 import "../interfaces/IParamProvider.sol";
 import "../interfaces/IProduct.sol";
+import "./types/Parameter.sol";
 
 abstract contract UParamProvider is IParamProvider, UControllerProvider {
     /**
@@ -13,6 +14,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
      * @param fundingFee_ product funding fee
      * @param makerFee_ product maker fee
      * @param takerFee_ product taker fee
+     * @param positionFee_ product position fee
      * @param makerLimit_ product maker limit
      * @param utilizationCurve_ utulization curve definition
      */
@@ -22,13 +24,11 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
         UFixed18 fundingFee_,
         UFixed18 makerFee_,
         UFixed18 takerFee_,
+        UFixed18 positionFee_,
         UFixed18 makerLimit_,
         JumpRateUtilizationCurve memory utilizationCurve_
     ) internal onlyInitializer {
-        _updateMaintenance(maintenance_);
-        _updateFundingFee(fundingFee_);
-        _updateMakerFee(makerFee_);
-        _updateTakerFee(takerFee_);
+        _updateParameter(maintenance_, fundingFee_, makerFee_, takerFee_, positionFee_);
         _updateMakerLimit(makerLimit_);
         _updateUtilizationCurve(utilizationCurve_);
     }
@@ -41,25 +41,12 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
         _;
     }
 
-    /// @dev The maintenance value
-    UFixed18Storage private constant _maintenance = UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.maintenance"));
-    function maintenance() public view returns (UFixed18) { return _maintenance.read(); }
-
-    /// @dev The funding fee value
-    UFixed18Storage private constant _fundingFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.fundingFee"));
-    function fundingFee() public view returns (UFixed18) { return _fundingFee.read().max(controller().minFundingFee()); }
-
-    /// @dev The maker fee value
-    UFixed18Storage private constant _makerFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.makerFee"));
-    function makerFee() public view returns (UFixed18) { return _makerFee.read(); }
-
-    /// @dev The taker fee value
-    UFixed18Storage private constant _takerFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.takerFee"));
-    function takerFee() public view returns (UFixed18) { return _takerFee.read(); }
-
-    /// @dev The position fee value
-    UFixed18Storage private constant _positionFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.positionFee"));
-    function positionFee() public view returns (UFixed18) { return _positionFee.read(); }
+    /// @dev The parameter values
+    ParameterStorage private constant _parameter = ParameterStorage.wrap(keccak256("equilibria.perennial.UParamProvider.parameter"));
+    function parameter() public view returns (UFixed18 maintenance, UFixed18 fundingFee, UFixed18 makerFee, UFixed18 takerFee, UFixed18 positionFee) {
+        (maintenance, fundingFee, makerFee, takerFee, positionFee) = _parameter.read();
+        fundingFee = UFixed18Lib.max(fundingFee, controller().minFundingFee());
+    }
 
     /// @dev The maker limit value
     UFixed18Storage private constant _makerLimit = UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.makerLimit"));
@@ -70,98 +57,30 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
         JumpRateUtilizationCurveStorage.wrap(keccak256("equilibria.perennial.UParamProvider.jumpRateUtilizationCurve"));
     function utilizationCurve() public view returns (JumpRateUtilizationCurve memory) { return _utilizationCurve.read(); }
 
-    /**
-     * @notice Updates the maintenance to `newMaintenance`
-     * @param newMaintenance new maintenance value
-     */
-    function _updateMaintenance(UFixed18 newMaintenance) private {
-        _maintenance.store(newMaintenance);
-        emit MaintenanceUpdated(newMaintenance);
-    }
+    function _updateParameter(
+        UFixed18 newMaintenance,
+        UFixed18 newFundingFee,
+        UFixed18 newMakerFee,
+        UFixed18 newTakerFee,
+        UFixed18 newPositionFee
+    ) private {
+        _parameter.store(newMaintenance, newFundingFee, newMakerFee, newTakerFee, newPositionFee);
 
-    /**
-     * @notice Updates the maintenance to `newMaintenance`
-     * @dev only callable by product owner
-     * @param newMaintenance new maintenance value
-     */
-    function updateMaintenance(UFixed18 newMaintenance) external onlyProductOwner {
-        _updateMaintenance(newMaintenance);
-    }
-
-    /**
-     * @notice Updates the funding fee to `newFundingFee`
-     * @param newFundingFee new funding fee value
-     */
-    function _updateFundingFee(UFixed18 newFundingFee) private {
-        if (newFundingFee.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidFundingFee();
-        _fundingFee.store(newFundingFee);
+        emit MaintenanceUpdated(newFundingFee);
         emit FundingFeeUpdated(newFundingFee);
-    }
-
-    /**
-     * @notice Updates the funding fee to `newFundingFee`
-     * @dev only callable by product owner
-     * @param newFundingFee new funding fee value
-     */
-    function updateFundingFee(UFixed18 newFundingFee) external onlyProductOwner {
-        _updateFundingFee(newFundingFee);
-    }
-
-    /**
-     * @notice Updates the maker fee to `newMakerFee`
-     * @param newMakerFee new maker fee value
-     */
-    function _updateMakerFee(UFixed18 newMakerFee) private {
-        if (newMakerFee.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidMakerFee();
-        _makerFee.store(newMakerFee);
         emit MakerFeeUpdated(newMakerFee);
-    }
-
-     /**
-     * @notice Updates the maker fee to `newMakerFee`
-     * @dev only callable by product owner
-     * @param newMakerFee new maker fee value
-     */
-    function updateMakerFee(UFixed18 newMakerFee) external onlyProductOwner {
-        _updateMakerFee(newMakerFee);
-    }
-
-    /**
-     * @notice Updates the taker fee to `newTakerFee`
-     * @param newTakerFee new taker fee value
-     */
-    function _updateTakerFee(UFixed18 newTakerFee) private {
-        if (newTakerFee.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidTakerFee();
-        _takerFee.store(newTakerFee);
         emit TakerFeeUpdated(newTakerFee);
-    }
-
-    /**
-     * @notice Updates the taker fee to `newTakerFee`
-     * @dev only callable by product owner
-     * @param newTakerFee new taker fee value
-     */
-    function updateTakerFee(UFixed18 newTakerFee) external onlyProductOwner {
-        _updateTakerFee(newTakerFee);
-    }
-
-    /**
-     * @notice Updates the position fee to `newPositionFee`
-     * @param newPositionFee new position fee value
-     */
-    function _updatePositionFee(UFixed18 newPositionFee) private {
-        if (newPositionFee.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidPositionFee();
-        _positionFee.store(newPositionFee);
         emit PositionFeeUpdated(newPositionFee);
     }
 
-    /**
-     * @notice Updates the position fee to `newPositionFee`
-     * @dev only callable by product owner
-     * @param newPositionFee new position fee value
-     */
-    function updatePositionFee(UFixed18 newPositionFee) external onlyProductOwner {
-        _updatePositionFee(newPositionFee);
+    function updateParameter(
+        UFixed18 newMaintenance,
+        UFixed18 newFundingFee,
+        UFixed18 newMakerFee,
+        UFixed18 newTakerFee,
+        UFixed18 newPositionFee
+    ) external onlyProductOwner {
+        _updateParameter(newMaintenance, newFundingFee, newMakerFee, newTakerFee, newPositionFee);
     }
 
     /**
