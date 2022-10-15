@@ -80,10 +80,14 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      *
      *  Syncs each to instantaneously after the oracle update.
      */
-    function _settle() private returns (IOracleProvider.OracleVersion memory currentOracleVersion) {
+    function _settle() private returns (
+        IOracleProvider.OracleVersion memory currentOracleVersion,
+        Version memory operatingVersion
+    ) {
         // Determine periods to settle
         currentOracleVersion = _sync();
-        if (currentOracleVersion.version == _latestVersion) return currentOracleVersion; // zero periods if a == c
+        operatingVersion = _versions[_latestVersion];
+        if (currentOracleVersion.version == _latestVersion) return (currentOracleVersion, operatingVersion); // zero periods if a == c
 
         // Sync incentivizer programs
         IController _controller = controller();
@@ -97,7 +101,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
                 atVersion(_latestVersion + 1);
 
         // Load parameters
-        Version memory operatingVersion = _versions[_latestVersion];
+
         UFixed18 feeAccumulator;
         VersionLib.ProductParams memory params = VersionLib.ProductParams(utilizationCurve(), fundingFee(), closed());
 
@@ -115,11 +119,12 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
         // b->c
         if (settleOracleVersion.version != currentOracleVersion.version) { // skip is b == c
-            (_versions[currentOracleVersion.version], feeAccumulator) = operatingVersion.accumulate(
+            (operatingVersion, feeAccumulator) = operatingVersion.accumulate(
                 feeAccumulator,
                 Period(settleOracleVersion, currentOracleVersion),
                 params
             );
+            _versions[currentOracleVersion.version] = operatingVersion;
         }
 
         // Settle collateral
@@ -137,8 +142,11 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @param account Account to settle
      */
     function settleAccount(address account) external nonReentrant notPaused {
-        IOracleProvider.OracleVersion memory currentOracleVersion = _settle();
-        _settleAccount(account, currentOracleVersion);
+        (
+            IOracleProvider.OracleVersion memory currentOracleVersion,
+            Version memory currentVersion
+        ) = _settle();
+        _settleAccount(account, currentOracleVersion, currentVersion);
     }
 
     /**
@@ -155,7 +163,11 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      *
      *  Syncs each to instantaneously after the oracle update.
      */
-    function _settleAccount(address account, IOracleProvider.OracleVersion memory currentOracleVersion) private {
+    function _settleAccount(
+        address account,
+        IOracleProvider.OracleVersion memory currentOracleVersion,
+        Version memory currentVersion
+    ) private {
         IController _controller = controller();
 
         // Get latest oracle version
@@ -186,7 +198,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
             _controller.incentivizer().syncAccount(account, currentOracleVersion);
 
             // account b->c
-            (valueAccumulator) = _accounts[account].accumulate(valueAccumulator, settleVersion, _versions[currentOracleVersion.version]);
+            (valueAccumulator) = _accounts[account].accumulate(valueAccumulator, settleVersion, currentVersion);
         }
 
         // settle collateral
@@ -431,7 +443,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @param newClosed new closed value
      */
     function updateClosed(bool newClosed) external onlyProductOwner {
-        IOracleProvider.OracleVersion memory oracleVersion = _settle();
+        (IOracleProvider.OracleVersion memory oracleVersion, ) = _settle();
         _closed.store(newClosed);
         emit ClosedUpdated(newClosed, oracleVersion.version);
     }
@@ -488,8 +500,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
     /// @dev Helper to fully settle an account's state
     modifier settleForAccount(address account) {
-        IOracleProvider.OracleVersion memory _currentVersion = _settle();
-        _settleAccount(account, _currentVersion);
+        (IOracleProvider.OracleVersion memory currentOracleVersion, Version memory currentVersion) = _settle();
+        _settleAccount(account, currentOracleVersion, currentVersion);
 
         _;
     }
