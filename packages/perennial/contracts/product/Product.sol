@@ -88,7 +88,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         _controller.incentivizer().sync(currentOracleVersion);
 
         // Load version data into memory
-        Version memory operatingVersion = _versions[_latestVersion];
         IOracleProvider.OracleVersion memory latestOracleVersion = atVersion(_latestVersion);
         IOracleProvider.OracleVersion memory settleOracleVersion =
             _latestVersion + 1 == currentOracleVersion.version ?
@@ -96,17 +95,19 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
                 atVersion(_latestVersion + 1);
 
         // Load parameters
+        Version memory operatingVersion = _versions[_latestVersion];
         UFixed18 accumulatedFee;
-        UFixed18 fee;
 
         // a->b (and settle)
         (operatingVersion, accumulatedFee) = operatingVersion.accumulateAndSettle(
+            accumulatedFee,
             pre(),
             Period(latestOracleVersion, settleOracleVersion),
             utilizationCurve(),
             fundingFee(),
             makerFee(),
             takerFee(),
+            positionFee(),
             closed()
         );
         _versions[settleOracleVersion.version] = operatingVersion;
@@ -114,14 +115,13 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
         // b->c
         if (settleOracleVersion.version != currentOracleVersion.version) { // skip is b == c
-            (operatingVersion, fee) = operatingVersion.accumulate(
+            (_versions[currentOracleVersion.version], accumulatedFee) = operatingVersion.accumulate(
+                accumulatedFee,
                 Period(settleOracleVersion, currentOracleVersion),
                 utilizationCurve(),
                 fundingFee(),
                 closed()
             );
-            _versions[currentOracleVersion.version] = operatingVersion;
-            accumulatedFee = accumulatedFee.add(fee);
         }
 
         // Settle collateral
@@ -170,15 +170,13 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
                 atVersion(_settleVersion);
 
         // initialize
-        UFixed18 makerFee_ = makerFee();
-        UFixed18 takerFee_ = takerFee();
         Fixed18 accumulated;
 
         // sync incentivizer before accumulator
         _controller.incentivizer().syncAccount(account, settleOracleVersion);
 
         // account a->b
-        accumulated = accumulated.add(_accounts[account].accumulateAndSettle(_versions, settleOracleVersion, makerFee_, takerFee_));
+        accumulated = accumulated.add(_accounts[account].accumulateAndSettle(_versions, settleOracleVersion));
 
         // short-circuit from a->c if b == c
         if (settleOracleVersion.version != currentOracleVersion.version) {
@@ -210,8 +208,13 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     liquidationInvariant
     maintenanceInvariant
     {
+        IOracleProvider.OracleVersion memory latestOracleVersion = atVersion(latestVersion());
+
         _accounts[msg.sender].pre.openTake(amount);
         _pre.openTake(amount);
+
+        UFixed18 positionFee = amount.mul(latestOracleVersion.price.abs()).mul(takerFee());
+        if (!positionFee.isZero()) controller().collateral().settleAccount(msg.sender, Fixed18Lib.from(-1, positionFee));
 
         emit TakeOpened(msg.sender, _latestVersion, amount);
     }
@@ -232,8 +235,13 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     }
 
     function _closeTake(address account, UFixed18 amount) private {
+        IOracleProvider.OracleVersion memory latestOracleVersion = atVersion(latestVersion());
+
         _accounts[account].pre.closeTake(amount);
         _pre.closeTake(amount);
+
+        UFixed18 positionFee = amount.mul(latestOracleVersion.price.abs()).mul(takerFee());
+        if (!positionFee.isZero()) controller().collateral().settleAccount(account, Fixed18Lib.from(-1, positionFee));
 
         emit TakeClosed(account, _latestVersion, amount);
     }
@@ -254,8 +262,13 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     liquidationInvariant
     maintenanceInvariant
     {
+        IOracleProvider.OracleVersion memory latestOracleVersion = atVersion(latestVersion());
+
         _accounts[msg.sender].pre.openMake(amount);
         _pre.openMake(amount);
+
+        UFixed18 positionFee = amount.mul(latestOracleVersion.price.abs()).mul(makerFee());
+        if (!positionFee.isZero()) controller().collateral().settleAccount(msg.sender, Fixed18Lib.from(-1, positionFee));
 
         emit MakeOpened(msg.sender, _latestVersion, amount);
     }
@@ -277,8 +290,13 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     }
 
     function _closeMake(address account, UFixed18 amount) private {
+        IOracleProvider.OracleVersion memory latestOracleVersion = atVersion(latestVersion());
+
         _accounts[account].pre.closeMake(amount);
         _pre.closeMake(amount);
+
+        UFixed18 positionFee = amount.mul(latestOracleVersion.price.abs()).mul(makerFee());
+        if (!positionFee.isZero()) controller().collateral().settleAccount(account, Fixed18Lib.from(-1, positionFee));
 
         emit MakeClosed(account, _latestVersion, amount);
     }
@@ -350,7 +368,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @notice Returns the global latest settled oracle version
      * @return Latest settled oracle version of the product
      */
-    function latestVersion() external view returns (uint256) {
+    function latestVersion() public view returns (uint256) {
         return _latestVersion;
     }
 

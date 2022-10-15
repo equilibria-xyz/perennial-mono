@@ -30,25 +30,18 @@ library AccountLib {
      * @notice Settled the account's position to oracle version `toOracleVersion`
      * @param self The struct to operate on
      * @param toOracleVersion The oracle version to accumulate to
-     * @param makerFee The fee for opening or closing a maker position
-     * @param takerFee The fee for opening or closing a taker position
      * @return accumulated The value accrued from settling the position
      */
     function accumulateAndSettle(
         Account storage self,
         mapping(uint256 => Version) storage versions,
-        IOracleProvider.OracleVersion memory toOracleVersion,
-        UFixed18 makerFee,
-        UFixed18 takerFee
+        IOracleProvider.OracleVersion memory toOracleVersion
     ) internal returns (Fixed18 accumulated) {
         accumulated = self.position
             .mul(versions[toOracleVersion.version].value().sub(versions[self.latestVersion].value()))
             .sum();
 
         self.position = self.position.next(self.pre);
-        UFixed18 positionFee = self.pre.computeFee(toOracleVersion, makerFee, takerFee);
-        accumulated = accumulated.sub(Fixed18Lib.from(positionFee));
-
         delete self.pre;
         self.liquidation = false;
 

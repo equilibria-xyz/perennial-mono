@@ -57,6 +57,10 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
     UFixed18Storage private constant _takerFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.takerFee"));
     function takerFee() public view returns (UFixed18) { return _takerFee.read(); }
 
+    /// @dev The position fee value
+    UFixed18Storage private constant _positionFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.positionFee"));
+    function positionFee() public view returns (UFixed18) { return _positionFee.read(); }
+
     /// @dev The maker limit value
     UFixed18Storage private constant _makerLimit = UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.makerLimit"));
     function makerLimit() public view returns (UFixed18) { return _makerLimit.read(); }
@@ -139,6 +143,25 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
      */
     function updateTakerFee(UFixed18 newTakerFee) external onlyProductOwner {
         _updateTakerFee(newTakerFee);
+    }
+
+    /**
+     * @notice Updates the position fee to `newPositionFee`
+     * @param newPositionFee new position fee value
+     */
+    function _updatePositionFee(UFixed18 newPositionFee) private {
+        if (newPositionFee.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidPositionFee();
+        _positionFee.store(newPositionFee);
+        emit PositionFeeUpdated(newPositionFee);
+    }
+
+    /**
+     * @notice Updates the position fee to `newPositionFee`
+     * @dev only callable by product owner
+     * @param newPositionFee new position fee value
+     */
+    function updatePositionFee(UFixed18 newPositionFee) external onlyProductOwner {
+        _updatePositionFee(newPositionFee);
     }
 
     /**

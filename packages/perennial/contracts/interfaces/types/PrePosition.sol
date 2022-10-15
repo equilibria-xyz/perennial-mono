@@ -93,7 +93,7 @@ library PrePositionLib {
         IOracleProvider.OracleVersion memory toOracleVersion,
         UFixed18 makerFee,
         UFixed18 takerFee
-    ) internal pure returns (UFixed18) {
+    ) internal pure returns (Position memory) {
         Position memory positionDelta = self.openPosition.add(self.closePosition);
 
         (UFixed18 makerNotional, UFixed18 takerNotional) = (
@@ -101,6 +101,6 @@ library PrePositionLib {
             Fixed18Lib.from(positionDelta.taker).mul(toOracleVersion.price).abs()
         );
 
-        return makerNotional.mul(makerFee).add(takerNotional.mul(takerFee));
+        return Position(makerNotional.mul(makerFee), takerNotional.mul(takerFee));
     }
 }
