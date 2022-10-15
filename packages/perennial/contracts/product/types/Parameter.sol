@@ -10,6 +10,7 @@ struct Parameter {
     uint48 makerFee;
     uint48 takerFee;
     uint48 positionFee;
+    bool closed;
 }
 type ParameterStorage is bytes32;
 using ParameterStorageLib for ParameterStorage global;
@@ -24,7 +25,8 @@ library ParameterStorageLib {
         UFixed18 fundingFee,
         UFixed18 makerFee,
         UFixed18 takerFee,
-        UFixed18 positionFee
+        UFixed18 positionFee,
+        bool closed
     ) {
         Parameter memory value;
         assembly {
@@ -35,7 +37,8 @@ library ParameterStorageLib {
             UFixed18.wrap(uint256(value.fundingFee) * OFFSET),
             UFixed18.wrap(uint256(value.makerFee) * OFFSET),
             UFixed18.wrap(uint256(value.takerFee) * OFFSET),
-            UFixed18.wrap(uint256(value.positionFee) * OFFSET)
+            UFixed18.wrap(uint256(value.positionFee) * OFFSET),
+            value.closed
         );
     }
 
@@ -45,7 +48,8 @@ library ParameterStorageLib {
         UFixed18 fundingFee,
         UFixed18 makerFee,
         UFixed18 takerFee,
-        UFixed18 positionFee
+        UFixed18 positionFee,
+        bool closed
     ) internal {
         if (maintenance.gt(UFixed18Lib.ONE)) revert ParameterStorageOverflowError();
         if (fundingFee.gt(UFixed18Lib.ONE)) revert ParameterStorageOverflowError();
@@ -58,7 +62,8 @@ library ParameterStorageLib {
             uint48(UFixed18.unwrap(fundingFee) / OFFSET),
             uint48(UFixed18.unwrap(makerFee) / OFFSET),
             uint48(UFixed18.unwrap(takerFee) / OFFSET),
-            uint48(UFixed18.unwrap(positionFee) / OFFSET)
+            uint48(UFixed18.unwrap(positionFee) / OFFSET),
+            closed
         );
         assembly {
             sstore(self, value)

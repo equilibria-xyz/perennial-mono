@@ -7,6 +7,7 @@ import "../interfaces/IParamProvider.sol";
 import "../interfaces/IProduct.sol";
 import "./types/Parameter.sol";
 
+//TODO: add version to versioned params
 abstract contract UParamProvider is IParamProvider, UControllerProvider {
     /**
      * @notice Initializes the contract state
@@ -28,7 +29,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
         UFixed18 makerLimit_,
         JumpRateUtilizationCurve memory utilizationCurve_
     ) internal onlyInitializer {
-        _updateParameter(maintenance_, fundingFee_, makerFee_, takerFee_, positionFee_);
+        _updateParameter(maintenance_, fundingFee_, makerFee_, takerFee_, positionFee_, false);
         _updateMakerLimit(makerLimit_);
         _updateUtilizationCurve(utilizationCurve_);
     }
@@ -43,8 +44,8 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
 
     /// @dev The parameter values
     ParameterStorage private constant _parameter = ParameterStorage.wrap(keccak256("equilibria.perennial.UParamProvider.parameter"));
-    function parameter() public view returns (UFixed18 maintenance, UFixed18 fundingFee, UFixed18 makerFee, UFixed18 takerFee, UFixed18 positionFee) {
-        (maintenance, fundingFee, makerFee, takerFee, positionFee) = _parameter.read();
+    function parameter() public view returns (UFixed18 maintenance, UFixed18 fundingFee, UFixed18 makerFee, UFixed18 takerFee, UFixed18 positionFee, bool closed) {
+        (maintenance, fundingFee, makerFee, takerFee, positionFee, closed) = _parameter.read();
         fundingFee = UFixed18Lib.max(fundingFee, controller().minFundingFee());
     }
 
@@ -62,15 +63,17 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
         UFixed18 newFundingFee,
         UFixed18 newMakerFee,
         UFixed18 newTakerFee,
-        UFixed18 newPositionFee
+        UFixed18 newPositionFee,
+        bool newClosed
     ) private {
-        _parameter.store(newMaintenance, newFundingFee, newMakerFee, newTakerFee, newPositionFee);
+        _parameter.store(newMaintenance, newFundingFee, newMakerFee, newTakerFee, newPositionFee, newClosed);
 
         emit MaintenanceUpdated(newFundingFee);
         emit FundingFeeUpdated(newFundingFee);
         emit MakerFeeUpdated(newMakerFee);
         emit TakerFeeUpdated(newTakerFee);
         emit PositionFeeUpdated(newPositionFee);
+        emit ClosedUpdated(newClosed);
     }
 
     function updateParameter(
@@ -78,9 +81,10 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
         UFixed18 newFundingFee,
         UFixed18 newMakerFee,
         UFixed18 newTakerFee,
-        UFixed18 newPositionFee
+        UFixed18 newPositionFee,
+        bool newClosed
     ) external onlyProductOwner {
-        _updateParameter(newMaintenance, newFundingFee, newMakerFee, newTakerFee, newPositionFee);
+        _updateParameter(newMaintenance, newFundingFee, newMakerFee, newTakerFee, newPositionFee, newClosed);
     }
 
     /**

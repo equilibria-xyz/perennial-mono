@@ -53,7 +53,6 @@ interface IProduct is IPayoffProvider, IParamProvider {
     event TakeOpened(address indexed account, uint256 version, UFixed18 amount);
     event MakeClosed(address indexed account, uint256 version, UFixed18 amount);
     event TakeClosed(address indexed account, uint256 version, UFixed18 amount);
-    event ClosedUpdated(bool indexed newClosed, uint256 version);
 
     error ProductInsufficientLiquidityError(UFixed18 socializationFactor);
     error ProductDoubleSidedError();
@@ -87,6 +86,4 @@ interface IProduct is IPayoffProvider, IParamProvider {
     function valueAtVersion(uint256 oracleVersion) external view returns (Accumulator memory);
     function shareAtVersion(uint256 oracleVersion) external view returns (Accumulator memory);
     function latestVersion(address account) external view returns (uint256);
-    function closed() external view returns (bool);
-    function updateClosed(bool newClosed) external;
 }

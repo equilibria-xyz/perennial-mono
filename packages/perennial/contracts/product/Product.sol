@@ -17,11 +17,6 @@ import "./types/Account.sol";
  * @dev Cloned by the Controller contract to launch new product markets.
  */
 contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, UReentrancyGuard {
-    /// @dev Whether or not the product is closed
-    BoolStorage private constant _closed =
-        BoolStorage.wrap(keccak256("equilibria.perennial.Product.closed"));
-    function closed() public view returns (bool) { return _closed.read(); }
-
     /// @dev The name of the product
     string public name;
 
@@ -102,9 +97,9 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
                 atVersion(_latestVersion + 1);
 
         // Load parameters
-        (, UFixed18 fundingFee, UFixed18 makerFee, UFixed18 takerFee, UFixed18 positionFee) = parameter();
+        (, UFixed18 fundingFee, UFixed18 makerFee, UFixed18 takerFee, UFixed18 positionFee, bool closed) = parameter();
         UFixed18 feeAccumulator;
-        VersionLib.ProductParams memory params = VersionLib.ProductParams(utilizationCurve(), fundingFee, closed());
+        VersionLib.ProductParams memory params = VersionLib.ProductParams(utilizationCurve(), fundingFee, closed);
 
         // a->b (and settle)
         (operatingVersion, feeAccumulator) = operatingVersion.accumulateAndSettle(
@@ -228,7 +223,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     maintenanceInvariant
     {
         IOracleProvider.OracleVersion memory latestOracleVersion = atVersion(latestVersion());
-        (, , , UFixed18 takerFee, ) = parameter();
+        (, , , UFixed18 takerFee, , ) = parameter();
 
         _pres[msg.sender].openTake(amount);
         _pre.openTake(amount);
@@ -256,7 +251,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
     function _closeTake(address account, UFixed18 amount) private {
         IOracleProvider.OracleVersion memory latestOracleVersion = atVersion(latestVersion());
-        (, , , UFixed18 takerFee, ) = parameter();
+        (, , , UFixed18 takerFee, , ) = parameter();
 
         _pres[account].closeTake(amount);
         _pre.closeTake(amount);
@@ -284,7 +279,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     maintenanceInvariant
     {
         IOracleProvider.OracleVersion memory latestOracleVersion = atVersion(latestVersion());
-        (, , UFixed18 makerFee, , ) = parameter();
+        (, , UFixed18 makerFee, , , ) = parameter();
 
         _pres[msg.sender].openMake(amount);
         _pre.openMake(amount);
@@ -313,7 +308,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
     function _closeMake(address account, UFixed18 amount) private {
         IOracleProvider.OracleVersion memory latestOracleVersion = atVersion(latestVersion());
-        (, , UFixed18 makerFee, , ) = parameter();
+        (, , UFixed18 makerFee, , , ) = parameter();
 
         _pres[account].closeMake(amount);
         _pre.closeMake(amount);
@@ -347,7 +342,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @return The current maintenance requirement
      */
     function maintenance(address account) external view returns (UFixed18) {
-        (UFixed18 _maintenance, , , , ) = parameter();
+        (UFixed18 _maintenance, , , , , ) = parameter();
         return _accounts[account].maintenance(currentVersion(), _maintenance);
     }
 
@@ -358,7 +353,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @return The next maintenance requirement
      */
     function maintenanceNext(address account) external view returns (UFixed18) {
-        (UFixed18 _maintenance, , , , ) = parameter();
+        (UFixed18 _maintenance, , , , , ) = parameter();
         return _accounts[account].maintenanceNext(_pres[account], currentVersion(), _maintenance);
     }
 
@@ -444,17 +439,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         return _latestVersions[account];
     }
 
-    /**
-     * @notice Updates product closed state
-     * @dev only callable by product owner. Settles the product before flipping the flag
-     * @param newClosed new closed value
-     */
-    function updateClosed(bool newClosed) external onlyProductOwner {
-        (IOracleProvider.OracleVersion memory oracleVersion, ) = _settle();
-        _closed.store(newClosed);
-        emit ClosedUpdated(newClosed, oracleVersion.version);
-    }
-
     /// @dev Limit total maker for guarded rollouts
     modifier makerInvariant {
         _;
@@ -468,7 +452,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     modifier takerInvariant {
         _;
 
-        if (closed()) return;
+        (, , , , , bool closed) = parameter();
+        if (closed) return;
 
         Position memory next = positionAtVersion(_latestVersion).next(_pre);
         UFixed18 socializationFactor = next.socializationFactor();
@@ -522,7 +507,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
     /// @dev Ensure the product is not closed
     modifier notClosed {
-        if (closed()) revert ProductClosedError();
+        (, , , , , bool closed) = parameter();
+        if (closed) revert ProductClosedError();
 
         _;
     }

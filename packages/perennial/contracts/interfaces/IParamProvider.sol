@@ -11,6 +11,7 @@ interface IParamProvider {
     event TakerFeeUpdated(UFixed18 newTakerFee);
     event PositionFeeUpdated(UFixed18 newPositionFee);
     event MakerLimitUpdated(UFixed18 newMakerLimit);
+    event ClosedUpdated(bool newClosed);
     event JumpRateUtilizationCurveUpdated(
         Fixed18 minRate,
         Fixed18 maxRate,
@@ -18,13 +19,14 @@ interface IParamProvider {
         UFixed18 targetUtilization
     );
     
-    function parameter() external view returns (UFixed18, UFixed18, UFixed18, UFixed18, UFixed18);
+    function parameter() external view returns (UFixed18, UFixed18, UFixed18, UFixed18, UFixed18, bool);
     function updateParameter(
         UFixed18 newMaintenance,
         UFixed18 newFundingFee,
         UFixed18 newMakerFee,
         UFixed18 newTakerFee,
-        UFixed18 newPositionFee
+        UFixed18 newPositionFee,
+        bool newClosed
     ) external;
     function makerLimit() external view returns (UFixed18);
     function updateMakerLimit(UFixed18 newMakerLimit) external;
