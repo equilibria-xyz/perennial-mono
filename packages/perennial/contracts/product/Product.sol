@@ -316,15 +316,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     }
 
     /**
-     * @notice Returns whether `account` has a completely zero'd position
-     * @param account Account to return for
-     * @return The the account is closed
-     */
-    function isClosed(address account) external view returns (bool) {
-        return _accounts[account].isClosed();
-    }
-
-    /**
      * @notice Returns whether `account` is currently locked for an in-progress liquidation
      * @param account Account to return for
      * @return Whether the account is in liquidation

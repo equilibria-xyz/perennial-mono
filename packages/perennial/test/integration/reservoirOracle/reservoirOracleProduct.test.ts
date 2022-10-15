@@ -89,7 +89,6 @@ describe('Reservoir Oracle Product', () => {
       .withArgs(user.address, INITIAL_VERSION, POSITION)
 
     // Check user is in the correct state
-    expect(await product.isClosed(user.address)).to.equal(false)
     expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre(address)'](user.address), {
       openPosition: { maker: POSITION, taker: 0 },
@@ -143,7 +142,6 @@ describe('Reservoir Oracle Product', () => {
       .withArgs(user.address, INITIAL_VERSION, POSITION.div(2))
 
     // Check user is in the correct state
-    expect(await product.isClosed(user.address)).to.equal(false)
     expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre(address)'](user.address), {
       openPosition: { maker: POSITION, taker: 0 },
@@ -197,7 +195,6 @@ describe('Reservoir Oracle Product', () => {
       .withArgs(user.address, INITIAL_VERSION, CLOSE_POSITION)
 
     // User state
-    expect(await product.isClosed(user.address)).to.equal(true)
     expect(await product['maintenance(address)'](user.address)).to.equal(0)
     expect(await product.maintenanceNext(user.address)).to.equal(0)
     expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
@@ -233,7 +230,6 @@ describe('Reservoir Oracle Product', () => {
       .withArgs(user.address, INITIAL_VERSION, CLOSE_POSITION.div(2))
 
     // User state
-    expect(await product.isClosed(user.address)).to.equal(true)
     expect(await product['maintenance(address)'](user.address)).to.equal(0)
     expect(await product.maintenanceNext(user.address)).to.equal(0)
     expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
@@ -269,7 +265,6 @@ describe('Reservoir Oracle Product', () => {
       .withArgs(userB.address, INITIAL_VERSION, TAKE_POSITION)
 
     // User State
-    expect(await product.isClosed(userB.address)).to.equal(false)
     expectPositionEq(await product.position(userB.address), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre(address)'](userB.address), {
       openPosition: { maker: 0, taker: TAKE_POSITION },
@@ -330,7 +325,6 @@ describe('Reservoir Oracle Product', () => {
       .withArgs(userB.address, INITIAL_VERSION, TAKE_POSITION.div(2))
 
     // User State
-    expect(await product.isClosed(userB.address)).to.equal(false)
     expectPositionEq(await product.position(userB.address), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre(address)'](userB.address), {
       openPosition: { maker: 0, taker: TAKE_POSITION },
@@ -395,7 +389,6 @@ describe('Reservoir Oracle Product', () => {
       .withArgs(userB.address, INITIAL_VERSION, CLOSE_TAKE_POSITION)
 
     // User State
-    expect(await product.isClosed(userB.address)).to.equal(true)
     expect(await product['maintenance(address)'](userB.address)).to.equal(0)
     expect(await product.maintenanceNext(userB.address)).to.equal(0)
     expectPositionEq(await product.position(userB.address), { maker: 0, taker: 0 })
@@ -438,7 +431,6 @@ describe('Reservoir Oracle Product', () => {
       .withArgs(userB.address, INITIAL_VERSION, CLOSE_TAKE_POSITION.div(2))
 
     // User State
-    expect(await product.isClosed(userB.address)).to.equal(true)
     expect(await product['maintenance(address)'](userB.address)).to.equal(0)
     expect(await product.maintenanceNext(userB.address)).to.equal(0)
     expectPositionEq(await product.position(userB.address), { maker: 0, taker: 0 })

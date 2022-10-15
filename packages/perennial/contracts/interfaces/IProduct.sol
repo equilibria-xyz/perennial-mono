@@ -75,7 +75,6 @@ interface IProduct is IPayoffProvider, IParamProvider {
     function closeAll(address account) external;
     function maintenance(address account) external view returns (UFixed18);
     function maintenanceNext(address account) external view returns (UFixed18);
-    function isClosed(address account) external view returns (bool);
     function isLiquidating(address account) external view returns (bool);
     function position(address account) external view returns (Position memory);
     function pre(address account) external view returns (PrePosition memory);

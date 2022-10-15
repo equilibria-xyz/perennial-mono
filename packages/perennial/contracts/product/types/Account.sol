@@ -119,15 +119,6 @@ library AccountLib {
     }
 
     /**
-     * @notice Returns whether an account is completely closed, i.e. no position or pre-position
-     * @param self The struct to operate on
-     * @return Whether the account is closed
-     */
-    function isClosed(Account memory self) internal pure returns (bool) {
-        return self.pre.isEmpty() && self.position.isEmpty();
-    }
-
-    /**
      * @notice Returns whether an account has opened position on both sides of the market (maker vs taker)
      * @dev Used to verify the invariant that a single account can only have a position on one side of the
      *      market at a time
