@@ -97,18 +97,17 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         // Load parameters
         Version memory operatingVersion = _versions[_latestVersion];
         UFixed18 accumulatedFee;
+        VersionLib.ProductParams memory params = VersionLib.ProductParams(utilizationCurve(), fundingFee(), closed());
 
         // a->b (and settle)
         (operatingVersion, accumulatedFee) = operatingVersion.accumulateAndSettle(
             accumulatedFee,
             pre(),
             Period(latestOracleVersion, settleOracleVersion),
-            utilizationCurve(),
-            fundingFee(),
             makerFee(),
             takerFee(),
             positionFee(),
-            closed()
+            params
         );
         _versions[settleOracleVersion.version] = operatingVersion;
         delete _pre;
@@ -118,9 +117,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
             (_versions[currentOracleVersion.version], accumulatedFee) = operatingVersion.accumulate(
                 accumulatedFee,
                 Period(settleOracleVersion, currentOracleVersion),
-                utilizationCurve(),
-                fundingFee(),
-                closed()
+                params
             );
         }
 

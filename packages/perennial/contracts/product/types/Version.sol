@@ -69,12 +69,10 @@ library VersionLib {
         UFixed18 feeAccumulator,
         PrePosition memory pre,
         Period memory period,
-        JumpRateUtilizationCurve memory utilizationCurve,
-        UFixed18 fundingFee,
         UFixed18 makerFee,
         UFixed18 takerFee,
         UFixed18 positionFee,
-        bool closed
+        ProductParams memory params
     ) internal pure returns (Version memory newVersionAccumulator, UFixed18 newFeeAccumulator) {
         // unpack
         (Accumulator memory valueAccumulator, Accumulator memory shareAccumulator, Position memory latestPosition) =
@@ -82,10 +80,10 @@ library VersionLib {
 
         // accumulate funding
         (valueAccumulator, feeAccumulator) =
-            _accumulateFunding(valueAccumulator, feeAccumulator, latestPosition, period, utilizationCurve, fundingFee, closed);
+            _accumulateFunding(valueAccumulator, feeAccumulator, latestPosition, period, params.utilizationCurve, params.fundingFee, params.closed);
 
         // accumulate position
-        (valueAccumulator) = _accumulatePosition(valueAccumulator, latestPosition, period, closed);
+        (valueAccumulator) = _accumulatePosition(valueAccumulator, latestPosition, period, params.closed);
 
         // accumulate share
         (shareAccumulator) = _accumulateShare(shareAccumulator, latestPosition, period);
@@ -99,13 +97,17 @@ library VersionLib {
         newFeeAccumulator = feeAccumulator.add(newFeeAccumulator);
     }
 
+    struct ProductParams {
+        JumpRateUtilizationCurve utilizationCurve;
+        UFixed18 fundingFee;
+        bool closed;
+    }
+
     function accumulate(
         Version memory versionAccumulator,
         UFixed18 feeAccumulator,
         Period memory period,
-        JumpRateUtilizationCurve memory utilizationCurve,
-        UFixed18 fundingFee,
-        bool closed
+        ProductParams memory params
     ) internal pure returns (Version memory newVersionAccumulator, UFixed18 newFeeAccumulator) {
         // unpack
         (Accumulator memory valueAccumulator, Accumulator memory shareAccumulator, Position memory latestPosition) =
@@ -113,10 +115,10 @@ library VersionLib {
 
         // accumulate funding
         (valueAccumulator, feeAccumulator) =
-            _accumulateFunding(valueAccumulator, feeAccumulator, latestPosition, period, utilizationCurve, fundingFee, closed);
+            _accumulateFunding(valueAccumulator, feeAccumulator, latestPosition, period, params.utilizationCurve, params.fundingFee, params.closed);
 
         // accumulate position
-        (valueAccumulator) = _accumulatePosition(valueAccumulator, latestPosition, period, closed);
+        (valueAccumulator) = _accumulatePosition(valueAccumulator, latestPosition, period, params.closed);
 
         // accumulate share
         (shareAccumulator) = _accumulateShare(shareAccumulator, latestPosition, period);
