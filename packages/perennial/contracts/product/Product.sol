@@ -87,7 +87,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
         // Sync incentivizer programs
         IController _controller = controller();
-        _controller.incentivizer().sync(currentOracleVersion);
+        // _controller.incentivizer().sync(currentOracleVersion);
 
         // Load version data into memory
         IOracleProvider.OracleVersion memory latestOracleVersion = atVersion(_latestVersion);
@@ -124,7 +124,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         }
 
         // Settle collateral
-        _controller.collateral().settleProduct(feeAccumulator);
+        // _controller.collateral().settleProduct(feeAccumulator);
 
         // Save state
         _latestVersion = currentOracleVersion.version;
@@ -182,7 +182,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         Fixed18 valueAccumulator;
 
         // sync incentivizer before accumulator
-        _controller.incentivizer().syncAccount(account, settleOracleVersion);
+        // _controller.incentivizer().syncAccount(account, settleOracleVersion);
 
         // account a->b
         (_accounts[account], valueAccumulator) =
@@ -191,14 +191,14 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         // short-circuit from a->c if b == c
         if (settleOracleVersion.version != currentOracleVersion.version) {
             // sync incentivizer before accumulator
-            _controller.incentivizer().syncAccount(account, currentOracleVersion);
+            // _controller.incentivizer().syncAccount(account, currentOracleVersion);
 
             // account b->c
             (valueAccumulator) = _accounts[account].accumulate(valueAccumulator, settleVersion, currentVersion);
         }
 
         // settle collateral
-        _controller.collateral().settleAccount(account, valueAccumulator);
+        // _controller.collateral().settleAccount(account, valueAccumulator);
 
         // save state
         _latestVersions[account] = currentOracleVersion.version;

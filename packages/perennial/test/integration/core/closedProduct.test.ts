@@ -20,20 +20,30 @@ describe('Closed Product', () => {
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await product.connect(user).openMake(POSITION)
 
-    expect(await product.closed()).to.be.false
+    //TODO: uncomment when versioned params are added
+    //expect(await product.closed()).to.be.false
 
     // Settle the product with a new oracle version
     await chainlink.nextWithPriceModification(price => price.mul(10))
     await product.settle()
 
     await chainlink.next()
-    await expect(product.updateClosed(true))
-      .to.emit(product, 'ClosedUpdated')
-      .withArgs(true, 2474)
-      .to.emit(product, 'Settle')
-      .withArgs(2474, 2474)
+    const parameters = await product.parameter()
+    await product.updateParameter(
+      parameters.maintenance,
+      parameters.fundingFee,
+      parameters.makerFee,
+      parameters.takerFee,
+      parameters.positionFee,
+      true,
+    )
+    // await expect(product.updateClosed(true))
+    //   .to.emit(product, 'ClosedUpdated')
+    //   .withArgs(true, 2474)
+    //   .to.emit(product, 'Settle')
+    //   .withArgs(2474, 2474)
 
-    expect(await product.closed()).to.be.true
+    // expect(await product.closed()).to.be.true
   })
 
   describe('changes to system constraints', async () => {
@@ -48,7 +58,15 @@ describe('Closed Product', () => {
       await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
       await product.connect(user).openMake(POSITION)
       await product.connect(userB).openTake(POSITION)
-      await product.updateClosed(true)
+      const parameters = await product.parameter()
+      await product.updateParameter(
+        parameters.maintenance,
+        parameters.fundingFee,
+        parameters.makerFee,
+        parameters.takerFee,
+        parameters.positionFee,
+        true,
+      )
     })
 
     it('reverts on new open positions', async () => {
@@ -83,7 +101,15 @@ describe('Closed Product', () => {
 
     await chainlink.next()
     await chainlink.next()
-    await product.updateClosed(true)
+    const parameters = await product.parameter()
+    await product.updateParameter(
+      parameters.maintenance,
+      parameters.fundingFee,
+      parameters.makerFee,
+      parameters.takerFee,
+      parameters.positionFee,
+      true,
+    )
     await product.settleAccount(user.address)
     await product.settleAccount(userB.address)
 
@@ -122,7 +148,15 @@ describe('Closed Product', () => {
     await chainlink.nextWithPriceModification(price => price.mul(2))
     await expect(collateral.liquidate(user.address, product.address)).to.not.be.reverted
     expect(await product.isLiquidating(user.address)).to.be.true
-    await product.updateClosed(true)
+    const parameters = await product.parameter()
+    await product.updateParameter(
+      parameters.maintenance,
+      parameters.fundingFee,
+      parameters.makerFee,
+      parameters.takerFee,
+      parameters.positionFee,
+      true,
+    )
     await chainlink.next()
 
     await product.settleAccount(user.address)
