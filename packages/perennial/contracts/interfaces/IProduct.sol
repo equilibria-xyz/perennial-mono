@@ -54,7 +54,7 @@ interface IProduct is IPayoffProvider, IParamProvider {
     event MakeClosed(address indexed account, uint256 version, UFixed18 amount);
     event TakeClosed(address indexed account, uint256 version, UFixed18 amount);
 
-    error ProductInsufficientLiquidityError(UFixed18 socializationFactor);
+    error ProductInsufficientLiquidityError();
     error ProductDoubleSidedError();
     error ProductOverClosedError();
     error ProductInsufficientCollateralError();
