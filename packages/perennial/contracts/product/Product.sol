@@ -36,6 +36,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     mapping(address => uint256) private _latestVersions;
 
     struct CurrentContext {
+        Account account;
         IOracleProvider.OracleVersion oracleVersion;
         Version version;
         UFixed18 maintenance;
@@ -188,13 +189,14 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
         // initialize
         Fixed18 valueAccumulator;
+        context.account = _accounts[account];
 
         // sync incentivizer before accumulator
         _controller.incentivizer().syncAccount(account, settleOracleVersion);
 
         // account a->b
-        (_accounts[account], valueAccumulator) =
-            _accounts[account].accumulateAndSettle(valueAccumulator, _pres[account], _versions[latestVersion_], settleVersion);
+        (context.account, valueAccumulator) =
+            context.account.accumulateAndSettle(valueAccumulator, _pres[account], _versions[latestVersion_], settleVersion);
 
         // short-circuit from a->c if b == c
         if (settleOracleVersion.version != context.oracleVersion.version) {
@@ -202,7 +204,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
             _controller.incentivizer().syncAccount(account, context.oracleVersion);
 
             // account b->c
-            (valueAccumulator) = _accounts[account].accumulate(valueAccumulator, settleVersion, context.version);
+            (valueAccumulator) = context.account.accumulate(valueAccumulator, settleVersion, context.version);
         }
 
         // settle collateral
@@ -210,7 +212,9 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
         // save state
         _latestVersions[account] = context.oracleVersion.version;
+        _accounts[account].position = context.account.position;
         delete _pres[account];
+        if (context.account.liquidation) _accounts[account].liquidation = false;
 
         emit AccountSettle(account, settleOracleVersion.version, context.oracleVersion.version);
     }
@@ -226,18 +230,17 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     notClosed
     takerInvariant
     positionInvariant
-    liquidationInvariant
     maintenanceInvariant
     {
         CurrentContext memory context = _settle();
         _settleAccount(msg.sender, context);
 
-        IOracleProvider.OracleVersion memory latestOracleVersion = atVersion(latestVersion());
+        if (context.account.liquidation) revert ProductInLiquidationError();
 
         _pres[msg.sender].openTake(amount);
         _pre.openTake(amount);
 
-        UFixed18 positionFee = amount.mul(latestOracleVersion.price.abs()).mul(context.takerFee);
+        UFixed18 positionFee = amount.mul(context.oracleVersion.price.abs()).mul(context.takerFee);
         if (!positionFee.isZero()) controller().collateral().settleAccount(msg.sender, Fixed18Lib.from(-1, positionFee));
 
         emit TakeOpened(msg.sender, _latestVersion, amount);
@@ -252,21 +255,20 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     nonReentrant
     notPaused
     closeInvariant
-    liquidationInvariant
     {
         CurrentContext memory context = _settle();
         _settleAccount(msg.sender, context);
+
+        if (context.account.liquidation) revert ProductInLiquidationError();
 
         _closeTake(context, msg.sender, amount);
     }
 
     function _closeTake(CurrentContext memory context, address account, UFixed18 amount) private {
-        IOracleProvider.OracleVersion memory latestOracleVersion = atVersion(latestVersion());
-
         _pres[account].closeTake(amount);
         _pre.closeTake(amount);
 
-        UFixed18 positionFee = amount.mul(latestOracleVersion.price.abs()).mul(context.takerFee);
+        UFixed18 positionFee = amount.mul(context.oracleVersion.price.abs()).mul(context.takerFee);
         if (!positionFee.isZero()) controller().collateral().settleAccount(account, Fixed18Lib.from(-1, positionFee));
 
         emit TakeClosed(account, _latestVersion, amount);
@@ -283,18 +285,17 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     notClosed
     makerInvariant
     positionInvariant
-    liquidationInvariant
     maintenanceInvariant
     {
         CurrentContext memory context = _settle();
         _settleAccount(msg.sender, context);
 
-        IOracleProvider.OracleVersion memory latestOracleVersion = atVersion(latestVersion());
+        if (context.account.liquidation) revert ProductInLiquidationError();
 
         _pres[msg.sender].openMake(amount);
         _pre.openMake(amount);
 
-        UFixed18 positionFee = amount.mul(latestOracleVersion.price.abs()).mul(context.makerFee);
+        UFixed18 positionFee = amount.mul(context.oracleVersion.price.abs()).mul(context.makerFee);
         if (!positionFee.isZero()) controller().collateral().settleAccount(msg.sender, Fixed18Lib.from(-1, positionFee));
 
         emit MakeOpened(msg.sender, _latestVersion, amount);
@@ -310,21 +311,20 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     notPaused
     takerInvariant
     closeInvariant
-    liquidationInvariant
     {
         CurrentContext memory context = _settle();
         _settleAccount(msg.sender, context);
+
+        if (context.account.liquidation) revert ProductInLiquidationError();
 
         _closeMake(context, msg.sender, amount);
     }
 
     function _closeMake(CurrentContext memory context, address account, UFixed18 amount) private {
-        IOracleProvider.OracleVersion memory latestOracleVersion = atVersion(latestVersion());
-
         _pres[account].closeMake(amount);
         _pre.closeMake(amount);
 
-        UFixed18 positionFee = amount.mul(latestOracleVersion.price.abs()).mul(context.makerFee);
+        UFixed18 positionFee = amount.mul(context.oracleVersion.price.abs()).mul(context.makerFee);
         if (!positionFee.isZero()) controller().collateral().settleAccount(account, Fixed18Lib.from(-1, positionFee));
 
         emit MakeClosed(account, _latestVersion, amount);
@@ -495,13 +495,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
         if (controller().collateral().liquidatableNext(msg.sender, IProduct(this)))
             revert ProductInsufficientCollateralError();
-    }
-
-    /// @dev Ensure that the user is not currently being liquidated
-    modifier liquidationInvariant {
-        if (_accounts[msg.sender].liquidation) revert ProductInLiquidationError();
-
-        _;
     }
 
     /// @dev Ensure the product is not closed

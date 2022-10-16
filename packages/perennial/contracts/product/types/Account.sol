@@ -32,7 +32,7 @@ library AccountLib {
         Version memory toVersion
     ) internal pure returns (Account memory newAccount, Fixed18 newValueAccumulator) {
         newValueAccumulator = valueAccumulator.add(account.position.mul(toVersion.value().sub(fromVersion.value())).sum());
-        newAccount = Account(account.position.next(pre), false);
+        newAccount = Account(account.position.next(pre), account.liquidation);
     }
 
     /**
