@@ -46,7 +46,6 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
     ParameterStorage private constant _parameter = ParameterStorage.wrap(keccak256("equilibria.perennial.UParamProvider.parameter"));
     function parameter() public view returns (UFixed18 maintenance, UFixed18 fundingFee, UFixed18 makerFee, UFixed18 takerFee, UFixed18 positionFee, bool closed) {
         (maintenance, fundingFee, makerFee, takerFee, positionFee, closed) = _parameter.read();
-        fundingFee = UFixed18Lib.max(fundingFee, controller().minFundingFee());
     }
 
     /// @dev The maker limit value

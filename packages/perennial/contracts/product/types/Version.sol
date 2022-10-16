@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.15;
+pragma solidity 0.8.17;
 
 import "../../interfaces/IProduct.sol";
 import "../../interfaces/types/Accumulator.sol";
@@ -80,7 +80,7 @@ library VersionLib {
 
         // accumulate funding
         (valueAccumulator, feeAccumulator) =
-            _accumulateFunding(valueAccumulator, feeAccumulator, latestPosition, period, params.utilizationCurve, params.fundingFee, params.closed);
+            _accumulateFunding(valueAccumulator, feeAccumulator, latestPosition, period, params);
 
         // accumulate position
         (valueAccumulator) = _accumulatePosition(valueAccumulator, latestPosition, period, params.closed);
@@ -99,6 +99,7 @@ library VersionLib {
 
     struct ProductParams {
         JumpRateUtilizationCurve utilizationCurve;
+        UFixed18 minFundingFee;
         UFixed18 fundingFee;
         bool closed;
     }
@@ -115,7 +116,7 @@ library VersionLib {
 
         // accumulate funding
         (valueAccumulator, feeAccumulator) =
-            _accumulateFunding(valueAccumulator, feeAccumulator, latestPosition, period, params.utilizationCurve, params.fundingFee, params.closed);
+            _accumulateFunding(valueAccumulator, feeAccumulator, latestPosition, period, params);
 
         // accumulate position
         (valueAccumulator) = _accumulatePosition(valueAccumulator, latestPosition, period, params.closed);
@@ -179,10 +180,8 @@ library VersionLib {
      * @dev If an oracle version is skipped due to no pre positions, funding will continue to be
      *      pegged to the price of the last snapshotted oracleVersion until a new one is accumulated.
      *      This is an acceptable approximation.
-     * @param fundingFee The funding fee rate for the product
      * @param latestPosition The latest global position
      * @param period The oracle version period to settle for
-     * @param closed Whether the product is closed
      * @return newValueAccumulator The total amount accumulated from funding
      * @return newFeeAccumulator The total fee accrued from funding accumulation
      */
@@ -191,21 +190,20 @@ library VersionLib {
         UFixed18 feeAccumulator,
         Position memory latestPosition,
         Period memory period,
-        JumpRateUtilizationCurve memory utilizationCurve,
-        UFixed18 fundingFee,
-        bool closed
+        ProductParams memory params
     ) private pure returns (Accumulator memory newValueAccumulator, UFixed18 newFeeAccumulator) {
-        if (closed) return (valueAccumulator, feeAccumulator);
+        if (params.closed) return (valueAccumulator, feeAccumulator);
         if (latestPosition.taker.isZero()) return (valueAccumulator, feeAccumulator);
         if (latestPosition.maker.isZero()) return (valueAccumulator, feeAccumulator);
 
         UFixed18 takerNotional = Fixed18Lib.from(latestPosition.taker).mul(period.fromVersion.price).abs();
         UFixed18 socializedNotional = takerNotional.mul(latestPosition.socializationFactor());
 
-        Fixed18 fundingAccumulated = utilizationCurve.compute(latestPosition.utilization())     // yearly funding rate
+        Fixed18 fundingAccumulated = params.utilizationCurve.compute(latestPosition.utilization())     // yearly funding rate
             .mul(Fixed18Lib.from(period.timestampDelta()))                                      // multiply by seconds in period
             .div(Fixed18Lib.from(365 days))                                                     // divide by seconds in year (funding rate for period)
             .mul(Fixed18Lib.from(socializedNotional));                                          // multiply by socialized notion (funding for period)
+        UFixed18 fundingFee = UFixed18Lib.max(params.fundingFee, params.minFundingFee);
         newFeeAccumulator = fundingAccumulated.abs().mul(fundingFee);
 
         Fixed18 fundingAccumulatedWithoutFee = Fixed18Lib.from(

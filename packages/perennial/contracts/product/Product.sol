@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.15;
+pragma solidity 0.8.17;
 
 import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@equilibria/root/control/unstructured/UReentrancyGuard.sol";
@@ -51,6 +51,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         UFixed18 positionFee;
         bool closed;
         bytes31 __unallocated3__;
+        bool paused;
+        bytes31 __unallocated4__;
     }
 
     /**
@@ -78,8 +80,10 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     /**
      * @notice Surfaces global settlement externally
      */
-    function settle() external nonReentrant notPaused {
-        _settle();
+    function settle() external nonReentrant {
+        CurrentContext memory context = _settle();
+
+        if (context.paused) revert PausedError();
     }
 
     /**
@@ -95,7 +99,9 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      *  Syncs each to instantaneously after the oracle update.
      */
     function _settle() private returns (CurrentContext memory context) {
-        (context.collateral, context.incentivizer) = (controller().collateral(), controller().incentivizer());
+        UFixed18 minFundingFee;
+        (context.collateral, context.incentivizer, minFundingFee, context.paused) =
+            (controller().collateral(), controller().incentivizer(), controller().minFundingFee(), controller().paused());
 
         // Determine periods to settle
         context.oracleVersion = _sync();
@@ -113,16 +119,18 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
                 atVersion(_latestVersion + 1);
 
         // Load parameters
+        UFixed18 fundingFee;
+        UFixed18 positionFee;
         (
             context.maintenance,
-            context.fundingFee,
+            fundingFee,
             context.makerFee,
             context.takerFee,
-            context.positionFee,
+            positionFee,
             context.closed
         ) = parameter();
         UFixed18 feeAccumulator;
-        VersionLib.ProductParams memory params = VersionLib.ProductParams(utilizationCurve(), context.fundingFee, context.closed); // TODO: remove?
+        VersionLib.ProductParams memory params = VersionLib.ProductParams(utilizationCurve(), minFundingFee, fundingFee, context.closed); // TODO: remove?
 
         // a->b (and settle)
         (context.version, feeAccumulator) = context.version.accumulateAndSettle(
@@ -131,7 +139,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
             Period(latestOracleVersion, settleOracleVersion),
             context.makerFee,
             context.takerFee,
-            context.positionFee,
+            positionFee,
             params
         );
         _versions[settleOracleVersion.version] = context.version;
@@ -160,9 +168,11 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     * @notice Surfaces account settlement externally
      * @param account Account to settle
      */
-    function settleAccount(address account) external nonReentrant notPaused {
+    function settleAccount(address account) external nonReentrant {
         CurrentContext memory context = _settle();
         _settleAccount(account, context);
+
+        if (context.paused) revert PausedError();
     }
 
     /**
@@ -230,12 +240,12 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     function openTake(UFixed18 amount)
     external
     nonReentrant
-    notPaused
     positionInvariant
     {
         CurrentContext memory context = _settle();
         _settleAccount(msg.sender, context);
 
+        if (context.paused) revert PausedError();
         if (context.closed) revert ProductClosedError();
         if (context.account.liquidation) revert ProductInLiquidationError();
 
@@ -258,12 +268,12 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     function closeTake(UFixed18 amount)
     external
     nonReentrant
-    notPaused
     closeInvariant
     {
         CurrentContext memory context = _settle();
         _settleAccount(msg.sender, context);
 
+        if (context.paused) revert PausedError();
         if (context.account.liquidation) revert ProductInLiquidationError();
 
         _closeTake(context, msg.sender, amount);
@@ -286,13 +296,13 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     function openMake(UFixed18 amount)
     external
     nonReentrant
-    notPaused
     makerInvariant
     positionInvariant
     {
         CurrentContext memory context = _settle();
         _settleAccount(msg.sender, context);
 
+        if (context.paused) revert PausedError();
         if (context.closed) revert ProductClosedError();
         if (context.account.liquidation) revert ProductInLiquidationError();
 
@@ -314,12 +324,12 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     function closeMake(UFixed18 amount)
     external
     nonReentrant
-    notPaused
     closeInvariant
     {
         CurrentContext memory context = _settle();
         _settleAccount(msg.sender, context);
 
+        if (context.paused) revert PausedError();
         if (context.account.liquidation) revert ProductInLiquidationError();
 
         _closeMake(context, msg.sender, amount);
