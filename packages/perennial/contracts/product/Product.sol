@@ -212,9 +212,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
         // save state
         _latestVersions[account] = context.oracleVersion.version;
-        _accounts[account].position = context.account.position;
+        _accounts[account] = context.account;
         delete _pres[account];
-        if (context.account.liquidation) _accounts[account].liquidation = false;
 
         emit AccountSettle(account, settleOracleVersion.version, context.oracleVersion.version);
     }
