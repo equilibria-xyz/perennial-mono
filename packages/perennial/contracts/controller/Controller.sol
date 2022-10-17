@@ -372,6 +372,10 @@ contract Controller is IController, UInitializable {
         return treasury(coordinatorFor[product]);
     }
 
+    function settlementParameters() external returns (ICollateral, IIncentivizer, UFixed18, bool) {
+        return (collateral(), incentivizer(), minFundingFee(), paused());
+    }
+
     /// @dev Only allow owner of `coordinatorId` to call
     modifier onlyOwner(uint256 coordinatorId) {
         if (msg.sender != owner(coordinatorId)) revert ControllerNotOwnerError(coordinatorId);

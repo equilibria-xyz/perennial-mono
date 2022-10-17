@@ -85,4 +85,5 @@ interface IController {
     function treasury() external view returns (address);
     function treasury(uint256 coordinatorId) external view returns (address);
     function treasury(IProduct product) external view returns (address);
+    function settlementParameters() external returns (ICollateral, IIncentivizer, UFixed18, bool);
 }

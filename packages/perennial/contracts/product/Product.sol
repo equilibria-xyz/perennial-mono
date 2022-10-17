@@ -110,8 +110,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      */
     function _settle() private returns (CurrentContext memory context) {
         UFixed18 minFundingFee;
-        (context.collateral, context.incentivizer, minFundingFee, context.paused) =
-            (controller().collateral(), controller().incentivizer(), controller().minFundingFee(), controller().paused());
+        (context.collateral, context.incentivizer, minFundingFee, context.paused) = controller().settlementParameters();
 
         // Determine periods to settle
         context.oracleVersion = _sync();
