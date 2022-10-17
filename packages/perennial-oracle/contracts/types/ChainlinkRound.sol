@@ -7,7 +7,7 @@ import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 struct ChainlinkRound {
     uint256 timestamp;
     int256 answer;
-    uint80 roundId;
+    uint256 roundId;
 }
 using ChainlinkRoundLib for ChainlinkRound global;
 
@@ -24,7 +24,7 @@ library ChainlinkRoundLib {
      * @param self Round to compute from
      * @return Chainlink phase ID
      */
-    function phaseId(ChainlinkRound memory self) internal pure returns (uint16) {
-        return uint16(self.roundId >> PHASE_OFFSET);
+    function phaseId(ChainlinkRound memory self) internal pure returns (uint256) {
+        return self.roundId >> PHASE_OFFSET;
     }
 }

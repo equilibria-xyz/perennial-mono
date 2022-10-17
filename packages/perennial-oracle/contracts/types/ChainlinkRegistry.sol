@@ -34,7 +34,7 @@ library ChainlinkRegistryLib {
     function getLatestRound(ChainlinkRegistry self, address base, address quote) internal view returns (ChainlinkRound memory) {
         (uint80 roundId, int256 answer, , uint256 updatedAt, ) =
             FeedRegistryInterface(ChainlinkRegistry.unwrap(self)).latestRoundData(base, quote);
-        return ChainlinkRound({roundId: roundId, timestamp: updatedAt, answer: answer});
+        return ChainlinkRound({roundId: uint256(roundId), timestamp: updatedAt, answer: answer});
     }
 
     /**
@@ -45,9 +45,9 @@ library ChainlinkRegistryLib {
      * @param roundId The specific round to fetch data for
      * @return Specific round's data
      */
-    function getRound(ChainlinkRegistry self, address base, address quote, uint80 roundId) internal view returns (ChainlinkRound memory) {
+    function getRound(ChainlinkRegistry self, address base, address quote, uint256 roundId) internal view returns (ChainlinkRound memory) {
         (, int256 answer, , uint256 updatedAt, ) =
-            FeedRegistryInterface(ChainlinkRegistry.unwrap(self)).getRoundData(base, quote, roundId);
+            FeedRegistryInterface(ChainlinkRegistry.unwrap(self)).getRoundData(base, quote, uint80(roundId));
         return ChainlinkRound({roundId: roundId, timestamp: updatedAt, answer: answer});
     }
 
@@ -60,10 +60,11 @@ library ChainlinkRegistryLib {
      * @param phaseId The specific phase to fetch data for
      * @return startingRoundId The starting round ID for the phase
      */
-    function getStartingRoundId(ChainlinkRegistry self, address base, address quote, uint16 phaseId)
-    internal view returns (uint80 startingRoundId) {
-        (startingRoundId, ) =
-            FeedRegistryInterface(ChainlinkRegistry.unwrap(self)).getPhaseRange(base, quote, phaseId);
+    function getStartingRoundId(ChainlinkRegistry self, address base, address quote, uint256 phaseId)
+    internal view returns (uint256) {
+        (uint80 startingRoundId, ) =
+            FeedRegistryInterface(ChainlinkRegistry.unwrap(self)).getPhaseRange(base, quote, uint16(phaseId));
+        return uint256(startingRoundId);
     }
 
     /**
@@ -74,10 +75,10 @@ library ChainlinkRegistryLib {
      * @param phaseId The specific phase to fetch data for
      * @return The quantity of rounds for the phase
      */
-    function getRoundCount(ChainlinkRegistry self, address base, address quote, uint16 phaseId)
-    internal view returns (uint80) {
+    function getRoundCount(ChainlinkRegistry self, address base, address quote, uint256 phaseId)
+    internal view returns (uint256) {
         (uint80 startingRoundId, uint80 endingRoundId) =
-            FeedRegistryInterface(ChainlinkRegistry.unwrap(self)).getPhaseRange(base, quote, phaseId);
-        return endingRoundId - startingRoundId + 1;
+            FeedRegistryInterface(ChainlinkRegistry.unwrap(self)).getPhaseRange(base, quote, uint16(phaseId));
+        return uint256(endingRoundId) - uint256(startingRoundId) + 1;
     }
 }
