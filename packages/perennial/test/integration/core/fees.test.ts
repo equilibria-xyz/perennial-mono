@@ -189,7 +189,7 @@ describe('Fees', () => {
       await product.connect(userB).openMake(MAKER_POSITION.mul(2))
     })
 
-    it('credits the takers with the maker position fee', async () => {
+    it('credits the takers with the maker position fee on open', async () => {
       const { collateral, chainlink, treasuryA, treasuryB } = instanceVars
       const aVersion = await product.currentVersion()
 
@@ -225,7 +225,6 @@ describe('Fees', () => {
       const A_TO_B_FUNDING_WITHOUT_FEE = A_TO_B_FUNDING.sub(A_TO_B_FUNDING_FEE)
       const A_TO_B_PNL = Big18Math.mul(bVersion.price.sub(aVersion.price), TAKER_POSITION)
       const A_TO_B_MAKER_FEE = Big18Math.mul(Big18Math.mul(aVersion.price, MAKER_FEE_RATE), MAKER_POSITION.mul(2))
-      // Taker Position Fee * (1 - protocol position fee)
       const B_MAKER_VALUE = Big18Math.div(A_TO_B_PNL.mul(-1).add(A_TO_B_FUNDING_WITHOUT_FEE), MAKER_POSITION)
       const B_TAKER_VALUE = Big18Math.div(A_TO_B_PNL.sub(A_TO_B_FUNDING).add(A_TO_B_MAKER_FEE.div(2)), TAKER_POSITION)
 
@@ -259,6 +258,76 @@ describe('Fees', () => {
 
       // (A_TO_BE_TAKER_FEE * position fee + A_TO_B_FUNDING_FEE + B_TO_C_FUNDING_FEE)
       const TOTAL_FEES = A_TO_B_MAKER_FEE.div(2).add(A_TO_B_FUNDING_FEE).add(B_TO_C_FUNDING_FEE)
+      // Check Protocol Fees = TOTAL_FEES * protocol fee
+      expect(await collateral.fees(treasuryA.address)).to.equal(TOTAL_FEES.div(2))
+      // Check Product Fees = TOTAL_FEES * (1 - protocol fee)
+      expect(await collateral.fees(treasuryB.address)).to.equal(TOTAL_FEES.div(2))
+    })
+
+    it('credits both sides on position closes', async () => {
+      const { user, userC, collateral, chainlink, treasuryA, treasuryB } = instanceVars
+      const aVersion = await product.currentVersion()
+      await product.connect(user).closeMake(MAKER_POSITION)
+      await product.connect(userC).closeTake(TAKER_POSITION)
+
+      await chainlink.next()
+      const bVersion = await product.currentVersion()
+      await chainlink.next()
+      // Claim fees to make later calculations easier
+      await collateral.connect(treasuryA).claimFee()
+      await collateral.connect(treasuryB).claimFee()
+      await product.settle()
+      const cVersion = await product.currentVersion()
+
+      expectPositionEq(await product.positionAtVersion(aVersion.version), {
+        maker: MAKER_POSITION,
+        taker: TAKER_POSITION,
+      })
+      expectPositionEq(await product.valueAtVersion(aVersion.version), {
+        maker: 0,
+        taker: 0,
+      })
+
+      expectPositionEq(await product.positionAtVersion(bVersion.version), {
+        maker: MAKER_POSITION.mul(2),
+        taker: 0,
+      })
+
+      const A_TO_B_ELAPSED = bVersion.timestamp.sub(aVersion.timestamp)
+      const A_TO_B_FUNDING = Big18Math.mul(
+        Big18Math.mul(FUNDING_RATE.div(ONE_YEAR), A_TO_B_ELAPSED.mul(Big18Math.BASE)), // RateAccumulated
+        Big18Math.mul(aVersion.price, TAKER_POSITION).abs(), // TakerNotional
+      )
+      const A_TO_B_FUNDING_FEE = Big18Math.mul(A_TO_B_FUNDING, FUNDING_FEE_RATE).abs()
+      const A_TO_B_FUNDING_WITHOUT_FEE = A_TO_B_FUNDING.sub(A_TO_B_FUNDING_FEE)
+      const A_TO_B_PNL = Big18Math.mul(bVersion.price.sub(aVersion.price), TAKER_POSITION)
+      const A_TO_B_MAKER_FEE = Big18Math.mul(Big18Math.mul(aVersion.price, MAKER_FEE_RATE), MAKER_POSITION)
+      const A_TO_B_TAKER_FEE = Big18Math.mul(Big18Math.mul(aVersion.price, TAKER_FEE_RATE), TAKER_POSITION)
+      const B_MAKER_VALUE = Big18Math.div(
+        A_TO_B_PNL.mul(-1).add(A_TO_B_FUNDING_WITHOUT_FEE).add(A_TO_B_TAKER_FEE.div(2)),
+        MAKER_POSITION,
+      )
+      const B_TAKER_VALUE = Big18Math.div(
+        A_TO_B_PNL.sub(A_TO_B_FUNDING).add(A_TO_B_MAKER_FEE.sub(A_TO_B_MAKER_FEE.div(2))),
+        TAKER_POSITION,
+      )
+
+      expectPositionEq(await product.valueAtVersion(bVersion.version), {
+        maker: B_MAKER_VALUE,
+        taker: B_TAKER_VALUE,
+      })
+
+      expectPositionEq(await product.positionAtVersion(cVersion.version), {
+        maker: MAKER_POSITION.mul(2),
+        taker: 0,
+      })
+      expectPositionEq(await product.valueAtVersion(cVersion.version), {
+        maker: B_MAKER_VALUE,
+        taker: B_TAKER_VALUE,
+      })
+
+      // ((A_TO_BE_TAKER_FEE + A_TO_BE_TAKER_FEE) * position fee + A_TO_B_FUNDING_FEE
+      const TOTAL_FEES = A_TO_B_MAKER_FEE.add(A_TO_B_TAKER_FEE).div(2).add(A_TO_B_FUNDING_FEE)
       // Check Protocol Fees = TOTAL_FEES * protocol fee
       expect(await collateral.fees(treasuryA.address)).to.equal(TOTAL_FEES.div(2))
       // Check Product Fees = TOTAL_FEES * (1 - protocol fee)
