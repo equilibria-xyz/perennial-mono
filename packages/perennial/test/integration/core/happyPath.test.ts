@@ -366,7 +366,7 @@ describe.only('Happy Path', () => {
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
 
     await expect(product.connect(userB).openTake(OPEN_TAKE_POSITION)).to.be.revertedWith(
-      'InsufficientLiquidityError(0)',
+      'ProductInsufficientLiquidityError()',
     )
     await product.connect(user).openMake(OPEN_MAKE_POSITION)
     await product.connect(userB).openTake(OPEN_TAKE_POSITION)
@@ -407,7 +407,7 @@ describe.only('Happy Path', () => {
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
 
     await expect(product.connect(userB).openTake(OPEN_TAKE_POSITION)).to.be.revertedWith(
-      'InsufficientLiquidityError(0)',
+      'ProductInsufficientLiquidityError()',
     )
     await product.connect(user).openMake(OPEN_MAKE_POSITION)
     await product.connect(userB).openTake(OPEN_TAKE_POSITION)

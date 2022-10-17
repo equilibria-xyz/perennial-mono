@@ -20,6 +20,11 @@ library ParameterStorageLib {
 
     error ParameterStorageOverflowError();
 
+    function _storagePointer(ParameterStorage self)
+    private pure returns (Parameter storage pointer) {
+        assembly { pointer.slot := self }
+    }
+
     function read(ParameterStorage self) internal view returns (
         UFixed18 maintenance,
         UFixed18 fundingFee,
@@ -28,10 +33,7 @@ library ParameterStorageLib {
         UFixed18 positionFee,
         bool closed
     ) {
-        Parameter memory value;
-        assembly {
-            value := sload(self)
-        }
+        Parameter memory value = _storagePointer(self);
         return (
             UFixed18.wrap(uint256(value.maintenance) * OFFSET),
             UFixed18.wrap(uint256(value.fundingFee) * OFFSET),

@@ -36,23 +36,33 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     mapping(address => uint256) private _latestVersions;
 
     struct CurrentContext {
-        Account account;
-        bytes31 __unallocated0__;
+        /* Global Parameters */
         ICollateral collateral;
         bytes12 __unallocated1__;
+
         IIncentivizer incentivizer;
         bytes12 __unallocated2__;
-        IOracleProvider.OracleVersion oracleVersion;
-        Version version;
+
         UFixed18 maintenance;
-        UFixed18 fundingFee;
+
         UFixed18 makerFee;
+
         UFixed18 takerFee;
-        UFixed18 positionFee;
+
         bool closed;
         bytes31 __unallocated3__;
+
         bool paused;
         bytes31 __unallocated4__;
+
+        /* Current Global State */
+        IOracleProvider.OracleVersion oracleVersion;
+
+        Version version;
+
+        /* Current Account State */
+        Account account;
+        bytes31 __unallocated0__;
     }
 
     /**
@@ -240,7 +250,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     function openTake(UFixed18 amount)
     external
     nonReentrant
-    positionInvariant
     {
         CurrentContext memory context = _settle();
         _settleAccount(msg.sender, context);
@@ -257,6 +266,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
         if (_liquidatableNext(context, msg.sender)) revert ProductInsufficientCollateralError();
         if (_socializationNext(context).lt(UFixed18Lib.ONE)) revert ProductInsufficientLiquidityError();
+        if (context.account.isDoubleSided(_pres[msg.sender])) revert ProductDoubleSidedError();
 
         emit TakeOpened(msg.sender, _latestVersion, amount);
     }
@@ -268,7 +278,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     function closeTake(UFixed18 amount)
     external
     nonReentrant
-    closeInvariant
     {
         CurrentContext memory context = _settle();
         _settleAccount(msg.sender, context);
@@ -277,6 +286,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         if (context.account.liquidation) revert ProductInLiquidationError();
 
         _closeTake(context, msg.sender, amount);
+
+        if (context.account.isOverClosed(_pres[msg.sender])) revert ProductOverClosedError();
     }
 
     function _closeTake(CurrentContext memory context, address account, UFixed18 amount) private {
@@ -296,8 +307,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     function openMake(UFixed18 amount)
     external
     nonReentrant
-    makerInvariant
-    positionInvariant
     {
         CurrentContext memory context = _settle();
         _settleAccount(msg.sender, context);
@@ -313,6 +322,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         if (!positionFee.isZero()) context.collateral.settleAccount(msg.sender, Fixed18Lib.from(-1, positionFee));
 
         if (_liquidatableNext(context, msg.sender)) revert ProductInsufficientCollateralError();
+        if (context.version.position().next(_pre).maker.gt(makerLimit())) revert ProductMakerOverLimitError();
+        if (context.account.isDoubleSided(_pres[msg.sender])) revert ProductDoubleSidedError();
 
         emit MakeOpened(msg.sender, _latestVersion, amount);
     }
@@ -324,7 +335,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     function closeMake(UFixed18 amount)
     external
     nonReentrant
-    closeInvariant
     {
         CurrentContext memory context = _settle();
         _settleAccount(msg.sender, context);
@@ -335,6 +345,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         _closeMake(context, msg.sender, amount);
 
         if (_socializationNext(context).lt(UFixed18Lib.ONE)) revert ProductInsufficientLiquidityError();
+        if (context.account.isOverClosed(_pres[msg.sender])) revert ProductOverClosedError();
     }
 
     function _closeMake(CurrentContext memory context, address account, UFixed18 amount) private {
@@ -487,28 +498,5 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     function _socializationNext(CurrentContext memory context) private view returns (UFixed18) {
         if (context.closed) return UFixed18Lib.ONE;
         return context.version.position().next(_pre).socializationFactor();
-    }
-
-    /// @dev Limit total maker for guarded rollouts
-    modifier makerInvariant {
-        _;
-
-        Position memory next = positionAtVersion(_latestVersion).next(_pre);
-
-        if (next.maker.gt(makerLimit())) revert ProductMakerOverLimitError();
-    }
-
-    /// @dev Ensure that the user has only taken a maker or taker position, but not both
-    modifier positionInvariant {
-        _;
-
-        if (_accounts[msg.sender].isDoubleSided(_pres[msg.sender])) revert ProductDoubleSidedError();
-    }
-
-    /// @dev Ensure that the user hasn't closed more than is open
-    modifier closeInvariant {
-        _;
-
-        if (_accounts[msg.sender].isOverClosed(_pres[msg.sender])) revert ProductOverClosedError();
     }
 }
