@@ -22,7 +22,7 @@ library ParameterStorageLib {
 
     function _storagePointer(ParameterStorage self)
     private pure returns (Parameter storage pointer) {
-        assembly { pointer.slot := self }
+        assembly ("memory-safe") { pointer.slot := self }
     }
 
     function read(ParameterStorage self) internal view returns (
@@ -67,7 +67,7 @@ library ParameterStorageLib {
             uint48(UFixed18.unwrap(positionFee) / OFFSET),
             closed
         );
-        assembly {
+        assembly ("memory-safe") {
             sstore(self, value)
         }
     }

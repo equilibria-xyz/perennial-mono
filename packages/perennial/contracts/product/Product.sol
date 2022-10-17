@@ -139,7 +139,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
             context.closed
         ) = parameter();
         UFixed18 feeAccumulator;
-        VersionLib.ProductParams memory params = VersionLib.ProductParams(utilizationCurve(), minFundingFee, fundingFee, context.closed); // TODO: remove?
+        JumpRateUtilizationCurve memory _utilizationCurve = utilizationCurve();
 
         // a->b (and settle)
         (context.version, feeAccumulator) = context.version.accumulateAndSettle(
@@ -149,7 +149,10 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
             context.makerFee,
             context.takerFee,
             positionFee,
-            params
+            _utilizationCurve,
+            minFundingFee,
+            fundingFee,
+            context.closed
         );
         _versions[settleOracleVersion.version] = context.version;
 
@@ -158,7 +161,10 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
             (context.version, feeAccumulator) = context.version.accumulate(
                 feeAccumulator,
                 Period(settleOracleVersion, context.oracleVersion),
-                params
+                _utilizationCurve,
+                minFundingFee,
+                fundingFee,
+                context.closed
             );
             _versions[context.oracleVersion.version] = context.version;
         }

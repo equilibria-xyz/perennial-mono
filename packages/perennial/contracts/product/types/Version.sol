@@ -72,7 +72,10 @@ library VersionLib {
         UFixed18 makerFee,
         UFixed18 takerFee,
         UFixed18 positionFee,
-        ProductParams memory params
+        JumpRateUtilizationCurve memory utilizationCurve,
+        UFixed18 minFundingFee,
+        UFixed18 fundingFee,
+        bool closed
     ) internal pure returns (Version memory newVersionAccumulator, UFixed18 newFeeAccumulator) {
         // unpack
         (Accumulator memory valueAccumulator, Accumulator memory shareAccumulator, Position memory latestPosition) =
@@ -80,10 +83,10 @@ library VersionLib {
 
         // accumulate funding
         (valueAccumulator, feeAccumulator) =
-            _accumulateFunding(valueAccumulator, feeAccumulator, latestPosition, period, params);
+            _accumulateFunding(valueAccumulator, feeAccumulator, latestPosition, period, utilizationCurve, minFundingFee, fundingFee, closed);
 
         // accumulate position
-        (valueAccumulator) = _accumulatePosition(valueAccumulator, latestPosition, period, params.closed);
+        (valueAccumulator) = _accumulatePosition(valueAccumulator, latestPosition, period, closed);
 
         // accumulate share
         (shareAccumulator) = _accumulateShare(shareAccumulator, latestPosition, period);
@@ -108,7 +111,10 @@ library VersionLib {
         Version memory versionAccumulator,
         UFixed18 feeAccumulator,
         Period memory period,
-        ProductParams memory params
+        JumpRateUtilizationCurve memory utilizationCurve,
+        UFixed18 minFundingFee,
+        UFixed18 fundingFee,
+        bool closed
     ) internal pure returns (Version memory newVersionAccumulator, UFixed18 newFeeAccumulator) {
         // unpack
         (Accumulator memory valueAccumulator, Accumulator memory shareAccumulator, Position memory latestPosition) =
@@ -116,10 +122,10 @@ library VersionLib {
 
         // accumulate funding
         (valueAccumulator, feeAccumulator) =
-            _accumulateFunding(valueAccumulator, feeAccumulator, latestPosition, period, params);
+            _accumulateFunding(valueAccumulator, feeAccumulator, latestPosition, period, utilizationCurve, minFundingFee, fundingFee, closed);
 
         // accumulate position
-        (valueAccumulator) = _accumulatePosition(valueAccumulator, latestPosition, period, params.closed);
+        (valueAccumulator) = _accumulatePosition(valueAccumulator, latestPosition, period, closed);
 
         // accumulate share
         (shareAccumulator) = _accumulateShare(shareAccumulator, latestPosition, period);
@@ -190,21 +196,24 @@ library VersionLib {
         UFixed18 feeAccumulator,
         Position memory latestPosition,
         Period memory period,
-        ProductParams memory params
+        JumpRateUtilizationCurve memory utilizationCurve,
+        UFixed18 minFundingFee,
+        UFixed18 fundingFee,
+        bool closed
     ) private pure returns (Accumulator memory newValueAccumulator, UFixed18 newFeeAccumulator) {
-        if (params.closed) return (valueAccumulator, feeAccumulator);
+        if (closed) return (valueAccumulator, feeAccumulator);
         if (latestPosition.taker.isZero()) return (valueAccumulator, feeAccumulator);
         if (latestPosition.maker.isZero()) return (valueAccumulator, feeAccumulator);
 
         UFixed18 takerNotional = Fixed18Lib.from(latestPosition.taker).mul(period.fromVersion.price).abs();
         UFixed18 socializedNotional = takerNotional.mul(latestPosition.socializationFactor());
 
-        Fixed18 fundingAccumulated = params.utilizationCurve.compute(latestPosition.utilization())     // yearly funding rate
+        Fixed18 fundingAccumulated = utilizationCurve.compute(latestPosition.utilization())     // yearly funding rate
             .mul(Fixed18Lib.from(period.timestampDelta()))                                      // multiply by seconds in period
             .div(Fixed18Lib.from(365 days))                                                     // divide by seconds in year (funding rate for period)
             .mul(Fixed18Lib.from(socializedNotional));                                          // multiply by socialized notion (funding for period)
-        UFixed18 fundingFee = UFixed18Lib.max(params.fundingFee, params.minFundingFee);
-        newFeeAccumulator = fundingAccumulated.abs().mul(fundingFee);
+        UFixed18 boundedFundingFee = UFixed18Lib.max(fundingFee, minFundingFee);
+        newFeeAccumulator = fundingAccumulated.abs().mul(boundedFundingFee);
 
         Fixed18 fundingAccumulatedWithoutFee = Fixed18Lib.from(
             fundingAccumulated.sign(),
