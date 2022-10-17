@@ -286,7 +286,7 @@ contract Controller is IController, UInitializable {
      * @param product Contract address to check
      * @return Whether a contract is a product
      */
-    function isProduct(IProduct product) external view returns (bool) {
+    function isProduct(IProduct product) public view returns (bool) {
         return coordinatorFor[product] != 0;
     }
 
@@ -347,7 +347,7 @@ contract Controller is IController, UInitializable {
      * @dev Defaults to the `owner` when `treasury` is unset
      * @return Treasury of the protocol
      */
-    function treasury() external view returns (address) {
+    function treasury() public view returns (address) {
         return treasury(0);
     }
 
@@ -368,12 +368,16 @@ contract Controller is IController, UInitializable {
      * @param product Product to return for
      * @return Treasury of the product
      */
-    function treasury(IProduct product) external view returns (address) {
+    function treasury(IProduct product) public view returns (address) {
         return treasury(coordinatorFor[product]);
     }
 
     function settlementParameters() external returns (ICollateral, IIncentivizer, UFixed18, bool) {
         return (collateral(), incentivizer(), minFundingFee(), paused());
+    }
+
+    function collateralParameters(IProduct product) external returns (address, address, UFixed18, bool) {
+        return (treasury(), treasury(product), protocolFee(), isProduct(product));
     }
 
     /// @dev Only allow owner of `coordinatorId` to call

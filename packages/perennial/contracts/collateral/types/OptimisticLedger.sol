@@ -68,7 +68,7 @@ library OptimisticLedgerLib {
             newBalance = Fixed18Lib.ZERO;
         }
 
-        self.balances[account] = newBalance.abs(); //TODO: not needed abs()
+        self.balances[account] = newBalance.abs();
         self.shortfall = self.shortfall.add(newShortfall);
     }
 

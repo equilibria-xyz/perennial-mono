@@ -141,20 +141,21 @@ contract Collateral is ICollateral, UInitializable, UControllerProvider, UReentr
      *      Removes collateral from the product as fees.
      * @param amount Amount to debit from the account
      */
-    function settleProduct(UFixed18 amount) external onlyProduct {
-        (IProduct product, IController controller) = (IProduct(msg.sender), controller());
+    function settleProduct(UFixed18 amount) external {
+        IProduct product = IProduct(msg.sender);
+        (address protocolTreasury, address productTreasury, UFixed18 protocolFee, bool isProduct) =
+            controller().collateralParameters(product);
 
-        address protocolTreasury = controller.treasury();
-        address productTreasury = controller.treasury(product);
+        if (!isProduct) revert NotProductError(product);
 
-        UFixed18 protocolFee = amount.mul(controller.protocolFee());
-        UFixed18 productFee = amount.sub(protocolFee);
+        UFixed18 protocolFeeAmount = amount.mul(protocolFee);
+        UFixed18 productFeeAmount = amount.sub(protocolFeeAmount);
 
         _products[product].debit(amount);
-        fees[protocolTreasury] = fees[protocolTreasury].add(protocolFee);
-        fees[productTreasury] = fees[productTreasury].add(productFee);
+        fees[protocolTreasury] = fees[protocolTreasury].add(protocolFeeAmount);
+        fees[productTreasury] = fees[productTreasury].add(productFeeAmount);
 
-        emit ProductSettle(product, protocolFee, productFee);
+        emit ProductSettle(product, protocolFeeAmount, productFeeAmount);
     }
 
     /**
