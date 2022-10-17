@@ -154,6 +154,7 @@ describe('Product', () => {
       await product.updateFundingFee(utils.parseEther('0.2'))
       await product.updateMakerFee(utils.parseEther('0.3'))
       await product.updateTakerFee(utils.parseEther('0.4'))
+      await product.updatePositionFee(utils.parseEther('0.43'))
       await product.updateMakerLimit(utils.parseEther('0.5'))
       await product.updateUtilizationCurve({
         minRate: utils.parseEther('0.10'),
@@ -166,6 +167,7 @@ describe('Product', () => {
       expect(await product.fundingFee()).to.equal(utils.parseEther('0.2'))
       expect(await product.makerFee()).to.equal(utils.parseEther('0.3'))
       expect(await product.takerFee()).to.equal(utils.parseEther('0.4'))
+      expect(await product.positionFee()).to.equal(utils.parseEther('0.43'))
       expect(await product.makerLimit()).to.equal(utils.parseEther('0.5'))
 
       const curve = await product.utilizationCurve()
@@ -188,6 +190,9 @@ describe('Product', () => {
       await expect(product.connect(user).updateTakerFee(utils.parseEther('0.4'))).to.be.be.revertedWith(
         'NotOwnerError(1)',
       )
+      await expect(product.connect(user).updatePositionFee(utils.parseEther('0.4'))).to.be.be.revertedWith(
+        'NotOwnerError(1)',
+      )
       await expect(product.connect(user).updateMakerLimit(utils.parseEther('0.5'))).to.be.be.revertedWith(
         'NotOwnerError(1)',
       )
@@ -201,6 +206,9 @@ describe('Product', () => {
         'ParamProviderInvalidMakerFee()',
       )
       await expect(product.updateTakerFee(utils.parseEther('1.01'))).to.be.be.revertedWith(
+        'ParamProviderInvalidTakerFee()',
+      )
+      await expect(product.updatePositionFee(utils.parseEther('1.01'))).to.be.be.revertedWith(
         'ParamProviderInvalidTakerFee()',
       )
     })
