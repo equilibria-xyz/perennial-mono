@@ -52,17 +52,24 @@ describe('Fees', () => {
       await depositTo(instanceVars, user, product, INITIAL_COLLATERAL)
       await depositTo(instanceVars, userB, product, INITIAL_COLLATERAL)
       await depositTo(instanceVars, userC, product, INITIAL_COLLATERAL)
-
-      await product.connect(user).openMake(MAKER_POSITION)
-      await product.connect(userB).openMake(MAKER_POSITION.mul(2))
-      await product.connect(userC).openTake(TAKER_POSITION)
     })
 
     it('debits fees from the users on position open', async () => {
       const { user, userB, userC, collateral } = instanceVars
+
       const currentVersion = await product.currentVersion()
       const MAKER_FEE = Big18Math.mul(Big18Math.mul(currentVersion.price, MAKER_FEE_RATE), MAKER_POSITION)
       const TAKER_FEE = Big18Math.mul(Big18Math.mul(currentVersion.price, TAKER_FEE_RATE), TAKER_POSITION)
+
+      await expect(product.connect(user).openMake(MAKER_POSITION))
+        .to.emit(collateral, 'AccountSettle')
+        .withArgs(product.address, user.address, MAKER_FEE.mul(-1), 0)
+      await expect(product.connect(userB).openMake(MAKER_POSITION.mul(2)))
+        .to.emit(collateral, 'AccountSettle')
+        .withArgs(product.address, userB.address, MAKER_FEE.mul(-2), 0)
+      await expect(product.connect(userC).openTake(TAKER_POSITION))
+        .to.emit(collateral, 'AccountSettle')
+        .withArgs(product.address, userC.address, TAKER_FEE.mul(-1), 0)
 
       expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(
         INITIAL_COLLATERAL.sub(MAKER_FEE),
@@ -76,7 +83,12 @@ describe('Fees', () => {
     })
 
     it('credits the protocol and product with the full fee amount', async () => {
-      const { collateral, chainlink, treasuryA, treasuryB } = instanceVars
+      const { user, userB, userC, collateral, chainlink, treasuryA, treasuryB } = instanceVars
+
+      await product.connect(user).openMake(MAKER_POSITION)
+      await product.connect(userB).openMake(MAKER_POSITION.mul(2))
+      await product.connect(userC).openTake(TAKER_POSITION)
+
       const currentVersion = await product.currentVersion()
       const MAKER_FEE = Big18Math.mul(Big18Math.mul(currentVersion.price, MAKER_FEE_RATE), MAKER_POSITION.mul(3))
       const TAKER_FEE = Big18Math.mul(Big18Math.mul(currentVersion.price, TAKER_FEE_RATE), TAKER_POSITION)
