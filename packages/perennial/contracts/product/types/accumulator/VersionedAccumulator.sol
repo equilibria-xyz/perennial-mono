@@ -77,6 +77,12 @@ library VersionedAccumulatorLib {
         accumulatedPosition = accumulatedPosition.add(
             _accumulatePosition(latestPosition, latestOracleVersion, toOracleVersion));
 
+        // accumulate position fee
+        (Accumulator memory accumulatedPositionFee, UFixed18 protocolPositionFee) =
+            _accumulatePositionFee(latestPosition, position.pre, latestOracleVersion);
+        accumulatedPosition = accumulatedPosition.add(accumulatedPositionFee);
+        accumulatedFee = accumulatedFee.add(protocolPositionFee);
+
         // accumulate share
         Accumulator memory accumulatedShare =
             _accumulateShare(latestPosition, latestOracleVersion, toOracleVersion);
@@ -90,6 +96,7 @@ library VersionedAccumulatorLib {
             .pack();
         self.latestVersion = toOracleVersion.version;
     }
+
 
     /**
      * @notice Globally accumulates all funding since last oracle update
@@ -157,6 +164,45 @@ library VersionedAccumulatorLib {
 
         accumulatedPosition.maker = socializedTakerDelta.div(Fixed18Lib.from(latestPosition.maker)).mul(Fixed18Lib.NEG_ONE);
         accumulatedPosition.taker = socializedTakerDelta.div(Fixed18Lib.from(latestPosition.taker));
+    }
+
+    /**
+     * @notice Globally accumulates position fees since last oracle update
+     * @dev Position fees are calculated based on the price at `latestOracleVersion` as that is the price used to
+     *      calculate the user's fee total. In the event that settlement is occurring over multiple oracle versions
+     *      (i.e. from a -> b -> c) it is safe to use the latestOracleVersion because in the a -> b case, a is always
+     *      b - 1, and in the b -> c case the `PrePosition` is always empty so this is skipped.
+     * @param latestPosition The latest global position
+     * @param pre The global pre-position
+     * @param latestOracleVersion The latest oracle version
+     * @return accumulatedPosition The total amount accumulated from position PNL
+     * @return fee The position fee that is retained by the protocol and product
+     */
+    function _accumulatePositionFee(
+        Position memory latestPosition,
+        PrePosition memory pre,
+        IOracleProvider.OracleVersion memory latestOracleVersion
+    ) private view returns (Accumulator memory accumulatedPosition, UFixed18 fee) {
+        if (pre.isEmpty()) return (accumulatedPosition, fee);
+
+        Position memory positionFee = pre.computeFee(latestOracleVersion);
+        Position memory protocolFee = positionFee.mul(_product().positionFee());
+        positionFee = positionFee.sub(protocolFee);
+        fee = protocolFee.sum();
+
+        // If there are makers to distribute the taker's position fee to, distribute. Otherwise give it to the protocol
+        if (!latestPosition.maker.isZero()) {
+            accumulatedPosition.maker = Fixed18Lib.from(positionFee.taker.div(latestPosition.maker));
+        } else {
+            fee = fee.add(positionFee.taker);
+        }
+
+        // If there are takers to distribute the maker's position fee to, distribute. Otherwise give it to the protocol
+        if (!latestPosition.taker.isZero()) {
+            accumulatedPosition.taker = Fixed18Lib.from(positionFee.maker.div(latestPosition.taker));
+        } else {
+            fee = fee.add(positionFee.maker);
+        }
     }
 
     /**
