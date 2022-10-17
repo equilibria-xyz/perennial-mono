@@ -209,7 +209,7 @@ describe('Product', () => {
         'ParamProviderInvalidTakerFee()',
       )
       await expect(product.updatePositionFee(utils.parseEther('1.01'))).to.be.be.revertedWith(
-        'ParamProviderInvalidTakerFee()',
+        'ParamProviderInvalidPositionFee()',
       )
     })
   })
