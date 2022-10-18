@@ -52,17 +52,24 @@ describe('Fees', () => {
       await depositTo(instanceVars, user, product, INITIAL_COLLATERAL)
       await depositTo(instanceVars, userB, product, INITIAL_COLLATERAL)
       await depositTo(instanceVars, userC, product, INITIAL_COLLATERAL)
-
-      await product.connect(user).openMake(MAKER_POSITION)
-      await product.connect(userB).openMake(MAKER_POSITION.mul(2))
-      await product.connect(userC).openTake(TAKER_POSITION)
     })
 
     it('debits fees from the users on position open', async () => {
       const { user, userB, userC, collateral } = instanceVars
+
       const currentVersion = await product.currentVersion()
       const MAKER_FEE = Big18Math.mul(Big18Math.mul(currentVersion.price, MAKER_FEE_RATE), MAKER_POSITION)
       const TAKER_FEE = Big18Math.mul(Big18Math.mul(currentVersion.price, TAKER_FEE_RATE), TAKER_POSITION)
+
+      await expect(product.connect(user).openMake(MAKER_POSITION))
+        .to.emit(collateral, 'AccountSettle')
+        .withArgs(product.address, user.address, MAKER_FEE.mul(-1), 0)
+      await expect(product.connect(userB).openMake(MAKER_POSITION.mul(2)))
+        .to.emit(collateral, 'AccountSettle')
+        .withArgs(product.address, userB.address, MAKER_FEE.mul(-2), 0)
+      await expect(product.connect(userC).openTake(TAKER_POSITION))
+        .to.emit(collateral, 'AccountSettle')
+        .withArgs(product.address, userC.address, TAKER_FEE.mul(-1), 0)
 
       expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(
         INITIAL_COLLATERAL.sub(MAKER_FEE),
@@ -76,7 +83,12 @@ describe('Fees', () => {
     })
 
     it('credits the protocol and product with the full fee amount', async () => {
-      const { collateral, chainlink, treasuryA, treasuryB } = instanceVars
+      const { user, userB, userC, collateral, chainlink, treasuryA, treasuryB } = instanceVars
+
+      await product.connect(user).openMake(MAKER_POSITION)
+      await product.connect(userB).openMake(MAKER_POSITION.mul(2))
+      await product.connect(userC).openTake(TAKER_POSITION)
+
       const currentVersion = await product.currentVersion()
       const MAKER_FEE = Big18Math.mul(Big18Math.mul(currentVersion.price, MAKER_FEE_RATE), MAKER_POSITION.mul(3))
       const TAKER_FEE = Big18Math.mul(Big18Math.mul(currentVersion.price, TAKER_FEE_RATE), TAKER_POSITION)
@@ -110,7 +122,7 @@ describe('Fees', () => {
     })
 
     it('credits the makers with the funding and taker position fee', async () => {
-      const { collateral, chainlink, treasuryA, treasuryB } = instanceVars
+      const { user, userB, userC, collateral, chainlink, treasuryA, treasuryB } = instanceVars
       const aVersion = await product.currentVersion()
 
       await chainlink.next()
@@ -155,9 +167,9 @@ describe('Fees', () => {
         taker: TAKER_POSITION,
       })
 
-      // PnL + Funding
-      const C_MAKER_VALUE = Big18Math.div(B_TO_C_PNL.mul(-1).add(B_TO_C_FUNDING_WITHOUT_FEE), MAKER_POSITION.mul(3))
       // PnL + (Funding - Funding Fee)
+      const C_MAKER_VALUE = Big18Math.div(B_TO_C_PNL.mul(-1).add(B_TO_C_FUNDING_WITHOUT_FEE), MAKER_POSITION.mul(3))
+      // PnL - Funding
       const C_TAKER_VALUE = Big18Math.div(B_TO_C_PNL.sub(B_TO_C_FUNDING), TAKER_POSITION)
       expectPositionEq(await product.valueAtVersion(cVersion.version), {
         maker: C_MAKER_VALUE.add(B_MAKER_VALUE),
@@ -170,6 +182,28 @@ describe('Fees', () => {
       expect(await collateral.fees(treasuryA.address)).to.equal(TOTAL_FEES.div(2))
       // Check Product Fees = TOTAL_FEES * (1 - protocol fee)
       expect(await collateral.fees(treasuryB.address)).to.equal(TOTAL_FEES.div(2))
+
+      const INITIAL_MAKER_FEE = Big18Math.mul(
+        Big18Math.mul((await product.atVersion(aVersion.version.sub(1))).price, MAKER_FEE_RATE),
+        MAKER_POSITION,
+      )
+
+      await product.settleAccount(user.address)
+      expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(
+        INITIAL_COLLATERAL.add(Big18Math.mul(B_MAKER_VALUE.add(C_MAKER_VALUE), MAKER_POSITION).sub(INITIAL_MAKER_FEE)),
+      )
+
+      await product.settleAccount(userB.address)
+      expect(await collateral['collateral(address,address)'](userB.address, product.address)).to.equal(
+        INITIAL_COLLATERAL.add(
+          Big18Math.mul(B_MAKER_VALUE.add(C_MAKER_VALUE), MAKER_POSITION).sub(INITIAL_MAKER_FEE).mul(2),
+        ),
+      )
+
+      await product.settleAccount(userC.address)
+      expect(await collateral['collateral(address,address)'](userC.address, product.address)).to.equal(
+        INITIAL_COLLATERAL.add(Big18Math.mul(C_TAKER_VALUE, TAKER_POSITION).sub(A_TO_B_TAKER_FEE)),
+      )
     })
   })
 
@@ -190,7 +224,7 @@ describe('Fees', () => {
     })
 
     it('credits the takers with the maker position fee on open', async () => {
-      const { collateral, chainlink, treasuryA, treasuryB } = instanceVars
+      const { user, userB, userC, collateral, chainlink, treasuryA, treasuryB } = instanceVars
       const aVersion = await product.currentVersion()
 
       await chainlink.next()
@@ -247,9 +281,9 @@ describe('Fees', () => {
         taker: TAKER_POSITION,
       })
 
-      // PnL + Funding
-      const C_MAKER_VALUE = Big18Math.div(B_TO_C_PNL.mul(-1).add(B_TO_C_FUNDING_WITHOUT_FEE), MAKER_POSITION.mul(3))
       // PnL + (Funding - Funding Fee)
+      const C_MAKER_VALUE = Big18Math.div(B_TO_C_PNL.mul(-1).add(B_TO_C_FUNDING_WITHOUT_FEE), MAKER_POSITION.mul(3))
+      // PnL - Fundng
       const C_TAKER_VALUE = Big18Math.div(B_TO_C_PNL.sub(B_TO_C_FUNDING), TAKER_POSITION)
       expectPositionEq(await product.valueAtVersion(cVersion.version), {
         maker: C_MAKER_VALUE.add(B_MAKER_VALUE),
@@ -262,10 +296,34 @@ describe('Fees', () => {
       expect(await collateral.fees(treasuryA.address)).to.equal(TOTAL_FEES.div(2))
       // Check Product Fees = TOTAL_FEES * (1 - protocol fee)
       expect(await collateral.fees(treasuryB.address)).to.equal(TOTAL_FEES.div(2))
+
+      const INITIAL_MAKER_FEE = Big18Math.mul(
+        Big18Math.mul((await product.atVersion(aVersion.version.sub(1))).price, MAKER_FEE_RATE),
+        MAKER_POSITION,
+      )
+      const INITIAL_TAKER_FEE = Big18Math.mul(
+        Big18Math.mul((await product.atVersion(aVersion.version.sub(1))).price, TAKER_FEE_RATE),
+        TAKER_POSITION,
+      )
+
+      await product.settleAccount(user.address)
+      expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(
+        INITIAL_COLLATERAL.add(Big18Math.mul(B_MAKER_VALUE.add(C_MAKER_VALUE), MAKER_POSITION).sub(INITIAL_MAKER_FEE)),
+      )
+
+      await product.settleAccount(userB.address)
+      expect(await collateral['collateral(address,address)'](userB.address, product.address)).to.equal(
+        INITIAL_COLLATERAL.add(Big18Math.mul(C_MAKER_VALUE, MAKER_POSITION).mul(2).sub(A_TO_B_MAKER_FEE)),
+      )
+
+      await product.settleAccount(userC.address)
+      expect(await collateral['collateral(address,address)'](userC.address, product.address)).to.equal(
+        INITIAL_COLLATERAL.add(Big18Math.mul(B_TAKER_VALUE.add(C_TAKER_VALUE), TAKER_POSITION).sub(INITIAL_TAKER_FEE)),
+      )
     })
 
     it('credits both sides on position closes', async () => {
-      const { user, userC, collateral, chainlink, treasuryA, treasuryB } = instanceVars
+      const { user, userB, userC, collateral, chainlink, treasuryA, treasuryB } = instanceVars
       const aVersion = await product.currentVersion()
       await product.connect(user).closeMake(MAKER_POSITION)
       await product.connect(userC).closeTake(TAKER_POSITION)
@@ -332,6 +390,34 @@ describe('Fees', () => {
       expect(await collateral.fees(treasuryA.address)).to.equal(TOTAL_FEES.div(2))
       // Check Product Fees = TOTAL_FEES * (1 - protocol fee)
       expect(await collateral.fees(treasuryB.address)).to.equal(TOTAL_FEES.div(2))
+
+      const INITIAL_MAKER_FEE = Big18Math.mul(
+        Big18Math.mul((await product.atVersion(aVersion.version.sub(1))).price, MAKER_FEE_RATE),
+        MAKER_POSITION,
+      )
+      const INITIAL_TAKER_FEE = Big18Math.mul(
+        Big18Math.mul((await product.atVersion(aVersion.version.sub(1))).price, TAKER_FEE_RATE),
+        TAKER_POSITION,
+      )
+
+      await product.settleAccount(user.address)
+      expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(
+        INITIAL_COLLATERAL.add(
+          Big18Math.mul(B_MAKER_VALUE, MAKER_POSITION).sub(INITIAL_MAKER_FEE).sub(A_TO_B_MAKER_FEE),
+        ),
+      )
+
+      await product.settleAccount(userB.address)
+      expect(await collateral['collateral(address,address)'](userB.address, product.address)).to.equal(
+        INITIAL_COLLATERAL.sub(A_TO_B_MAKER_FEE.mul(2)),
+      )
+
+      await product.settleAccount(userC.address)
+      expect(await collateral['collateral(address,address)'](userC.address, product.address)).to.equal(
+        INITIAL_COLLATERAL.add(
+          Big18Math.mul(B_TAKER_VALUE, TAKER_POSITION).sub(INITIAL_TAKER_FEE).sub(A_TO_B_TAKER_FEE),
+        ),
+      )
     })
   })
 })
