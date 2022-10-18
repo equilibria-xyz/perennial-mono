@@ -97,7 +97,6 @@ library VersionedAccumulatorLib {
         self.latestVersion = toOracleVersion.version;
     }
 
-
     /**
      * @notice Globally accumulates all funding since last oracle update
      * @dev If an oracle version is skipped due to no pre positions, funding will continue to be
