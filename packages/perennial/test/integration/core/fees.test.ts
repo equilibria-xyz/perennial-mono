@@ -403,13 +403,13 @@ describe('Fees', () => {
       await product.settleAccount(user.address)
       expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(
         INITIAL_COLLATERAL.add(
-          Big18Math.mul(B_MAKER_VALUE, MAKER_POSITION).sub(INITIAL_MAKER_FEE).sub(A_TO_B_MAKER_FEE),
+          Big18Math.mul(B_MAKER_VALUE, MAKER_POSITION).sub(INITIAL_MAKER_FEE).sub(A_TO_B_MAKER_FEE.div(3)),
         ),
       )
 
       await product.settleAccount(userB.address)
       expect(await collateral['collateral(address,address)'](userB.address, product.address)).to.equal(
-        INITIAL_COLLATERAL.sub(A_TO_B_MAKER_FEE.mul(2)),
+        INITIAL_COLLATERAL.sub(A_TO_B_MAKER_FEE.mul(2).div(3)),
       )
 
       await product.settleAccount(userC.address)

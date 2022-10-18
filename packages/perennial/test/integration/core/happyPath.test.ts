@@ -1,6 +1,6 @@
 import { expect } from 'chai'
 import 'hardhat'
-import { utils, constants } from 'ethers'
+import { utils } from 'ethers'
 
 import { InstanceVars, deployProtocol, createProduct, depositTo, INITIAL_VERSION } from '../helpers/setupHelpers'
 import {
@@ -672,12 +672,16 @@ describe('Happy Path', () => {
       await chainlink.next()
       await product.settle()
 
-      const totalMakerFees = Big18Math.mul(Big18Math.mul(currentVersion.price, MAKE_POSITION), MAKER_FEE)
-      const totalTakerFees = Big18Math.mul(Big18Math.mul(currentVersion.price, TAKE_POSITION), TAKER_FEE)
+      const totalMakerFees = Big18Math.mul(Big18Math.mul(currentVersion.price, MAKE_POSITION.div(2)), MAKER_FEE).add(
+        Big18Math.mul(Big18Math.mul(currentVersion.price, MAKE_POSITION.div(2)), MAKER_FEE),
+      )
+      const totalTakerFees = Big18Math.mul(Big18Math.mul(currentVersion.price, TAKE_POSITION.div(2)), TAKER_FEE).add(
+        Big18Math.mul(Big18Math.mul(currentVersion.price, TAKE_POSITION.div(2)), TAKER_FEE),
+      )
       const totalFees = totalMakerFees.add(totalTakerFees)
 
       // 0.0001 * productPrice * 0.5 + 0.00001 * productPrice * 0.5
-      expect(await collateral.fees(treasuryB.address)).to.equal(totalFees)
+      expect((await collateral.fees(treasuryB.address)).sub(totalFees)).to.be.within(0, 1)
 
       await product.settleAccount(user.address)
       expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(
@@ -704,12 +708,12 @@ describe('Happy Path', () => {
       await product.updateMakerFee(utils.parseEther('0.5'))
       await product.connect(user).closeMake(MAKE_POSITION)
       await product.connect(userB).openMake(MAKE_POSITION)
+      const currentVersion = await product.currentVersion()
 
       await chainlink.next()
       await product.settle()
 
-      const currentVersion = await product.currentVersion()
-      const makerFeePerPosition = currentVersion.price.mul(MAKE_POSITION).div(2).div(constants.WeiPerEther)
+      const makerFeePerPosition = Big18Math.mul(currentVersion.price, MAKE_POSITION).div(2)
       const totalFees = makerFeePerPosition.mul(2) // 2 total position changes
 
       expect((await collateral.fees(treasuryB.address)).sub(totalFees)).to.be.within(0, 1)
@@ -738,7 +742,7 @@ describe('Happy Path', () => {
       await product.settle()
       await product.settleAccount(userC.address)
       await product.settleAccount(user.address)
-      const currentPrice = (await product.currentVersion()).price
+      const openPrice = (await product.currentVersion()).price
 
       // Charge a taker fee for future position changes
       await product.updateTakerFee(utils.parseEther('0.5'))
@@ -750,9 +754,9 @@ describe('Happy Path', () => {
       await product.settle()
 
       const currentVersion = await product.currentVersion()
-      const takerFeePerPosition = currentVersion.price.mul(TAKE_POSITION).div(2).div(constants.WeiPerEther)
+      const takerFeePerPosition = Big18Math.mul(openPrice, TAKE_POSITION).div(2)
       const totalFees = takerFeePerPosition.mul(2) // 2 total position changes
-      const takerPnL = currentVersion.price.sub(currentPrice).mul(TAKE_POSITION).div(constants.WeiPerEther).mul(-1)
+      const takerPnL = Big18Math.mul(currentVersion.price.sub(openPrice), TAKE_POSITION).mul(-1)
 
       expect((await collateral.fees(treasuryB.address)).sub(totalFees)).to.be.within(0, 1)
 

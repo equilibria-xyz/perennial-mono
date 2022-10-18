@@ -42,7 +42,7 @@ describe('Product', () => {
   const FUNDING_FEE = utils.parseEther('0.10')
   const MAKER_FEE = utils.parseEther('0.0')
   const TAKER_FEE = utils.parseEther('0.0')
-  const POSITION_FEE_SHARE = utils.parseEther('0.0')
+  const POSITION_FEE_SHARE = utils.parseEther('1.0')
   const MAINTENANCE = utils.parseEther('0.5')
   const PRODUCT_INFO: IProduct.ProductInfoStruct = {
     name: 'Squeeth',
@@ -2947,12 +2947,25 @@ describe('Product', () => {
           await expect(product.connect(multiInvokerMock).closeMakeFor(user.address, POSITION))
             .to.emit(product, 'MakeClosed')
             .withArgs(user.address, 1, POSITION)
-          expect(await product.isClosed(user.address)).to.equal(true)
+          expect(await product.isClosed(user.address)).to.equal(false)
           expect(await product['maintenance(address)'](user.address)).to.equal(0)
           expect(await product.maintenanceNext(user.address)).to.equal(0)
           expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
           expectPrePositionEq(await product['pre(address)'](user.address), {
             oracleVersion: 1,
+            openPosition: { maker: POSITION, taker: 0 },
+            closePosition: { maker: POSITION, taker: 0 },
+          })
+
+          await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
+          await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
+          await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
+          await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_2)
+          await product.settleAccount(user.address)
+
+          expect(await product.isClosed(user.address)).to.equal(true)
+          expectPrePositionEq(await product['pre(address)'](user.address), {
+            oracleVersion: 0,
             openPosition: { maker: 0, taker: 0 },
             closePosition: { maker: 0, taker: 0 },
           })
@@ -3002,12 +3015,25 @@ describe('Product', () => {
           await expect(product.connect(multiInvokerMock).closeTakeFor(user.address, POSITION))
             .to.emit(product, 'TakeClosed')
             .withArgs(user.address, 1, POSITION)
-          expect(await product.isClosed(user.address)).to.equal(true)
+          expect(await product.isClosed(user.address)).to.equal(false)
           expect(await product['maintenance(address)'](user.address)).to.equal(0)
           expect(await product.maintenanceNext(user.address)).to.equal(0)
           expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
           expectPrePositionEq(await product['pre(address)'](user.address), {
             oracleVersion: 1,
+            openPosition: { maker: 0, taker: POSITION },
+            closePosition: { maker: 0, taker: POSITION },
+          })
+
+          await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
+          await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
+          await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
+          await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_2)
+          await product.settleAccount(user.address)
+
+          expect(await product.isClosed(user.address)).to.equal(true)
+          expectPrePositionEq(await product['pre(address)'](user.address), {
+            oracleVersion: 0,
             openPosition: { maker: 0, taker: 0 },
             closePosition: { maker: 0, taker: 0 },
           })
@@ -3037,7 +3063,8 @@ describe('Product', () => {
           await product.updateMakerFee(utils.parseEther('0.01'))
           const MAKER_FEE = utils.parseEther('24.6') // 2 * position * maker fee * price
           await collateral.mock.settleProduct.withArgs(MAKER_FEE).returns()
-          await collateral.mock.settleAccount.withArgs(user.address, MAKER_FEE.mul(-1)).returns()
+          await collateral.mock.settleAccount.withArgs(user.address, MAKER_FEE.div(2).mul(-1)).returns()
+          await collateral.mock.settleAccount.withArgs(user.address, MAKER_FEE.div(2).mul(-1)).returns()
 
           await expect(product.connect(user).openMake(POSITION))
             .to.emit(product, 'MakeOpened')
@@ -3111,7 +3138,8 @@ describe('Product', () => {
           await product.updateTakerFee(utils.parseEther('0.01'))
           const TAKER_FEE = utils.parseEther('24.6') // 2 * position * maker fee * price
           await collateral.mock.settleProduct.withArgs(TAKER_FEE).returns()
-          await collateral.mock.settleAccount.withArgs(user.address, TAKER_FEE.mul(-1)).returns()
+          await collateral.mock.settleAccount.withArgs(user.address, TAKER_FEE.div(2).mul(-1)).returns()
+          await collateral.mock.settleAccount.withArgs(user.address, TAKER_FEE.div(2).mul(-1)).returns()
 
           await expect(product.connect(user).openTake(POSITION))
             .to.emit(product, 'TakeOpened')
@@ -5900,7 +5928,8 @@ describe('Product', () => {
           await product.updateMakerFee(utils.parseEther('0.01'))
           const MAKER_FEE = utils.parseEther('24.6') // 2 * position * maker fee * price
           await collateral.mock.settleProduct.withArgs(MAKER_FEE).returns()
-          await collateral.mock.settleAccount.withArgs(user.address, MAKER_FEE.mul(-1)).returns()
+          await collateral.mock.settleAccount.withArgs(user.address, MAKER_FEE.div(2).mul(-1)).returns()
+          await collateral.mock.settleAccount.withArgs(user.address, MAKER_FEE.div(2).mul(-1)).returns()
 
           await expect(product.connect(user).openMake(POSITION))
             .to.emit(product, 'MakeOpened')
@@ -5974,7 +6003,8 @@ describe('Product', () => {
           await product.updateTakerFee(utils.parseEther('0.01'))
           const TAKER_FEE = utils.parseEther('24.6') // 2 * position * maker fee * price
           await collateral.mock.settleProduct.withArgs(TAKER_FEE).returns()
-          await collateral.mock.settleAccount.withArgs(user.address, TAKER_FEE.mul(-1)).returns()
+          await collateral.mock.settleAccount.withArgs(user.address, TAKER_FEE.div(2).mul(-1)).returns()
+          await collateral.mock.settleAccount.withArgs(user.address, TAKER_FEE.div(2).mul(-1)).returns()
 
           await expect(product.connect(user).openTake(POSITION))
             .to.emit(product, 'TakeOpened')

@@ -33,8 +33,6 @@ using PrePositionLib for PrePosition global;
 library PrePositionLib {
     /**
      * @notice Returns whether there is no pending-settlement position delta
-     * @dev Can be "empty" even with a non-zero oracleVersion if a position is opened and
-     *      closed in the same version netting out to a zero position delta
      * @param self The struct to operate on
      * @return Whether the pending-settlement position delta is empty
      */
@@ -44,7 +42,6 @@ library PrePositionLib {
 
     /**
      * @notice Increments the maker side of the open position delta
-     * @dev Nets out open and close deltas to minimize the size of each
      * @param self The struct to operate on
      * @param currentVersion The current oracle version index
      * @param amount The position amount to open
@@ -56,7 +53,6 @@ library PrePositionLib {
 
     /**
      * @notice Increments the maker side of the close position delta
-     * @dev Nets out open and close deltas to minimize the size of each
      * @param self The struct to operate on
      * @param currentVersion The current oracle version index
      * @param amount The maker position amount to close
@@ -68,7 +64,6 @@ library PrePositionLib {
 
     /**
      * @notice Increments the taker side of the open position delta
-     * @dev Nets out open and close deltas to minimize the size of each
      * @param self The struct to operate on
      * @param currentVersion The current oracle version index
      * @param amount The taker position amount to open
@@ -80,7 +75,6 @@ library PrePositionLib {
 
     /**
      * @notice Increments the taker side of the close position delta
-     * @dev Nets out open and close deltas to minimize the size of each
      * @param self The struct to operate on
      * @param currentVersion The current oracle version index
      * @param amount The taker position amount to close
