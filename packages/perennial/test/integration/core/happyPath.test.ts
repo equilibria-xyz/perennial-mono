@@ -3,7 +3,12 @@ import 'hardhat'
 import { utils, constants } from 'ethers'
 
 import { InstanceVars, deployProtocol, createProduct, depositTo, INITIAL_VERSION } from '../helpers/setupHelpers'
-import { createPayoffDefinition, expectPositionEq, expectPrePositionEq } from '../../../../common/testutil/types'
+import {
+  Big18Math,
+  createPayoffDefinition,
+  expectPositionEq,
+  expectPrePositionEq,
+} from '../../../../common/testutil/types'
 import { Product } from '../../../types/generated'
 
 describe('Happy Path', () => {
@@ -631,6 +636,8 @@ describe('Happy Path', () => {
     const MAKE_POSITION = utils.parseEther('0.0001')
     const TAKE_POSITION = utils.parseEther('0.00001')
     const DEPOSIT_AMOUNT = utils.parseEther('10000')
+    const MAKER_FEE = utils.parseEther('0.25')
+    const TAKER_FEE = utils.parseEther('0.5')
 
     beforeEach(async () => {
       const { user, userB, controller } = instanceVars
@@ -644,8 +651,9 @@ describe('Happy Path', () => {
         targetRate: 0,
         targetUtilization: utils.parseEther('1'),
       })
-      await product.updateMakerFee(utils.parseEther('0.5'))
-      await product.updateTakerFee(utils.parseEther('0.5'))
+      await product.updateMakerFee(MAKER_FEE)
+      await product.updateTakerFee(TAKER_FEE)
+      await product.updatePositionFee(utils.parseEther('1')) // Send all fees to protocol/product
       await depositTo(instanceVars, user, product, DEPOSIT_AMOUNT)
       await depositTo(instanceVars, userB, product, DEPOSIT_AMOUNT)
     })
@@ -653,33 +661,31 @@ describe('Happy Path', () => {
     it('charges the fees for each position change', async () => {
       const { user, userB, chainlink, collateral, treasuryB } = instanceVars
 
-      let currentVersion = await product.currentVersion()
-      let makerFees = currentVersion.price.mul(MAKE_POSITION).div(2).div(constants.WeiPerEther)
-      let takerFees = currentVersion.price.mul(TAKE_POSITION).div(2).div(constants.WeiPerEther)
-
       await product.connect(user).openMake(MAKE_POSITION.div(2))
       await product.connect(userB).openTake(TAKE_POSITION.div(2))
       await product.connect(userB).closeTake(TAKE_POSITION.div(2))
       await product.connect(user).closeMake(MAKE_POSITION.div(2))
 
+      // Fees are charged on the version the open/close action happened, rather than the settlement version
+      const currentVersion = await product.currentVersion()
+
       await chainlink.next()
       await product.settle()
 
-      currentVersion = await product.currentVersion()
-      makerFees = currentVersion.price.mul(MAKE_POSITION).div(2).div(constants.WeiPerEther)
-      takerFees = currentVersion.price.mul(TAKE_POSITION).div(2).div(constants.WeiPerEther)
-      const totalFees = makerFees.add(takerFees)
+      const totalMakerFees = Big18Math.mul(Big18Math.mul(currentVersion.price, MAKE_POSITION), MAKER_FEE)
+      const totalTakerFees = Big18Math.mul(Big18Math.mul(currentVersion.price, TAKE_POSITION), TAKER_FEE)
+      const totalFees = totalMakerFees.add(totalTakerFees)
 
       // 0.0001 * productPrice * 0.5 + 0.00001 * productPrice * 0.5
       expect(await collateral.fees(treasuryB.address)).to.equal(totalFees)
 
       await product.settleAccount(user.address)
       expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(
-        DEPOSIT_AMOUNT.sub(makerFees),
+        DEPOSIT_AMOUNT.sub(totalMakerFees),
       )
       await product.settleAccount(userB.address)
       expect(await collateral['collateral(address,address)'](userB.address, product.address)).to.equal(
-        DEPOSIT_AMOUNT.sub(takerFees),
+        DEPOSIT_AMOUNT.sub(totalTakerFees),
       )
     })
 
