@@ -42,7 +42,7 @@ describe('Product', () => {
   const FUNDING_FEE = utils.parseEther('0.10')
   const MAKER_FEE = utils.parseEther('0.0')
   const TAKER_FEE = utils.parseEther('0.0')
-  const POSITION_FEE_SHARE = utils.parseEther('1.0')
+  const POSITION_FEE = utils.parseEther('1.0')
   const MAINTENANCE = utils.parseEther('0.5')
   const PRODUCT_INFO: IProduct.ProductInfoStruct = {
     name: 'Squeeth',
@@ -53,7 +53,7 @@ describe('Product', () => {
     fundingFee: FUNDING_FEE,
     makerFee: MAKER_FEE,
     takerFee: TAKER_FEE,
-    positionFee: POSITION_FEE_SHARE,
+    positionFee: POSITION_FEE,
     makerLimit: POSITION.mul(10),
     utilizationCurve: {
       // Force a 0.10 rate to make tests simpler
