@@ -206,14 +206,14 @@ describe('Reservoir Oracle Product', () => {
       .withArgs(user.address, INITIAL_VERSION, CLOSE_POSITION)
 
     // User state
-    expect(await product.isClosed(user.address)).to.equal(true)
+    expect(await product.isClosed(user.address)).to.equal(false)
     expect(await product['maintenance(address)'](user.address)).to.equal(0)
     expect(await product.maintenanceNext(user.address)).to.equal(0)
     expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre(address)'](user.address), {
       oracleVersion: INITIAL_VERSION,
-      openPosition: { maker: 0, taker: 0 },
-      closePosition: { maker: 0, taker: 0 },
+      openPosition: { maker: OPEN_POSITION, taker: 0 },
+      closePosition: { maker: CLOSE_POSITION, taker: 0 },
     })
     expect(await product['latestVersion(address)'](user.address)).to.equal(INITIAL_VERSION)
 
@@ -222,11 +222,35 @@ describe('Reservoir Oracle Product', () => {
     expectPositionEq(await product.positionAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre()'](), {
       oracleVersion: INITIAL_VERSION,
-      openPosition: { maker: 0, taker: 0 },
-      closePosition: { maker: 0, taker: 0 },
+      openPosition: { maker: OPEN_POSITION, taker: 0 },
+      closePosition: { maker: CLOSE_POSITION, taker: 0 },
     })
     expectPositionEq(await product.valueAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
     expectPositionEq(await product.shareAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
+
+    // Settle the product with a new oracle version
+    await oracleFeed.next()
+    await product.settle()
+
+    // Check global post-settlement state
+    expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION.add(1))
+    expectPositionEq(await product.positionAtVersion(INITIAL_VERSION.add(1)), { maker: 0, taker: 0 })
+    expectPrePositionEq(await product['pre()'](), {
+      oracleVersion: 0,
+      openPosition: { maker: 0, taker: 0 },
+      closePosition: { maker: 0, taker: 0 },
+    })
+
+    // Settle user and check state
+    await product.settleAccount(user.address)
+    expect(await product.isClosed(user.address)).to.equal(true)
+    expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
+    expectPrePositionEq(await product['pre(address)'](user.address), {
+      oracleVersion: 0,
+      openPosition: { maker: 0, taker: 0 },
+      closePosition: { maker: 0, taker: 0 },
+    })
+    expect(await product['latestVersion(address)'](user.address)).to.equal(INITIAL_VERSION.add(1))
   })
 
   it('closes multiple make positions', async () => {
@@ -244,14 +268,14 @@ describe('Reservoir Oracle Product', () => {
       .withArgs(user.address, INITIAL_VERSION, CLOSE_POSITION.div(2))
 
     // User state
-    expect(await product.isClosed(user.address)).to.equal(true)
+    expect(await product.isClosed(user.address)).to.equal(false)
     expect(await product['maintenance(address)'](user.address)).to.equal(0)
     expect(await product.maintenanceNext(user.address)).to.equal(0)
     expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre(address)'](user.address), {
       oracleVersion: INITIAL_VERSION,
-      openPosition: { maker: 0, taker: 0 },
-      closePosition: { maker: 0, taker: 0 },
+      openPosition: { maker: OPEN_POSITION, taker: 0 },
+      closePosition: { maker: CLOSE_POSITION, taker: 0 },
     })
     expect(await product['latestVersion(address)'](user.address)).to.equal(INITIAL_VERSION)
 
@@ -260,11 +284,35 @@ describe('Reservoir Oracle Product', () => {
     expectPositionEq(await product.positionAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre()'](), {
       oracleVersion: INITIAL_VERSION,
-      openPosition: { maker: 0, taker: 0 },
-      closePosition: { maker: 0, taker: 0 },
+      openPosition: { maker: OPEN_POSITION, taker: 0 },
+      closePosition: { maker: CLOSE_POSITION, taker: 0 },
     })
     expectPositionEq(await product.valueAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
     expectPositionEq(await product.shareAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
+
+    // Settle the product with a new oracle version
+    await oracleFeed.next()
+    await product.settle()
+
+    // Check global post-settlement state
+    expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION.add(1))
+    expectPositionEq(await product.positionAtVersion(INITIAL_VERSION.add(1)), { maker: 0, taker: 0 })
+    expectPrePositionEq(await product['pre()'](), {
+      oracleVersion: 0,
+      openPosition: { maker: 0, taker: 0 },
+      closePosition: { maker: 0, taker: 0 },
+    })
+
+    // Settle user and check state
+    await product.settleAccount(user.address)
+    expect(await product.isClosed(user.address)).to.equal(true)
+    expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
+    expectPrePositionEq(await product['pre(address)'](user.address), {
+      oracleVersion: 0,
+      openPosition: { maker: 0, taker: 0 },
+      closePosition: { maker: 0, taker: 0 },
+    })
+    expect(await product['latestVersion(address)'](user.address)).to.equal(INITIAL_VERSION.add(1))
   })
 
   it('opens a take position', async () => {
@@ -416,27 +464,51 @@ describe('Reservoir Oracle Product', () => {
       .withArgs(userB.address, INITIAL_VERSION, CLOSE_TAKE_POSITION)
 
     // User State
-    expect(await product.isClosed(userB.address)).to.equal(true)
+    expect(await product.isClosed(userB.address)).to.equal(false)
     expect(await product['maintenance(address)'](userB.address)).to.equal(0)
     expect(await product.maintenanceNext(userB.address)).to.equal(0)
     expectPositionEq(await product.position(userB.address), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre(address)'](userB.address), {
       oracleVersion: INITIAL_VERSION,
-      openPosition: { maker: 0, taker: 0 },
-      closePosition: { maker: 0, taker: 0 },
+      openPosition: { maker: 0, taker: OPEN_TAKE_POSITION },
+      closePosition: { maker: 0, taker: CLOSE_TAKE_POSITION },
     })
-    expect(await product['latestVersion(address)'](user.address)).to.equal(INITIAL_VERSION)
+    expect(await product['latestVersion(address)'](userB.address)).to.equal(INITIAL_VERSION)
 
     // Global State
     expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION)
     expectPositionEq(await product.positionAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre()'](), {
       oracleVersion: INITIAL_VERSION,
-      openPosition: { maker: OPEN_MAKE_POSITION, taker: 0 },
-      closePosition: { maker: 0, taker: 0 },
+      openPosition: { maker: OPEN_MAKE_POSITION, taker: OPEN_TAKE_POSITION },
+      closePosition: { maker: 0, taker: CLOSE_TAKE_POSITION },
     })
     expectPositionEq(await product.valueAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
     expectPositionEq(await product.shareAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
+
+    // Settle the product with a new oracle version
+    await oracleFeed.next()
+    await product.settle()
+
+    // Check global post-settlement state
+    expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION.add(1))
+    expectPositionEq(await product.positionAtVersion(INITIAL_VERSION.add(1)), { maker: OPEN_MAKE_POSITION, taker: 0 })
+    expectPrePositionEq(await product['pre()'](), {
+      oracleVersion: 0,
+      openPosition: { maker: 0, taker: 0 },
+      closePosition: { maker: 0, taker: 0 },
+    })
+
+    // Settle user and check state
+    await product.settleAccount(userB.address)
+    expect(await product.isClosed(userB.address)).to.equal(true)
+    expectPositionEq(await product.position(userB.address), { maker: 0, taker: 0 })
+    expectPrePositionEq(await product['pre(address)'](userB.address), {
+      oracleVersion: 0,
+      openPosition: { maker: 0, taker: 0 },
+      closePosition: { maker: 0, taker: 0 },
+    })
+    expect(await product['latestVersion(address)'](userB.address)).to.equal(INITIAL_VERSION.add(1))
   })
 
   it('closes multiple take positions', async () => {
@@ -461,27 +533,51 @@ describe('Reservoir Oracle Product', () => {
       .withArgs(userB.address, INITIAL_VERSION, CLOSE_TAKE_POSITION.div(2))
 
     // User State
-    expect(await product.isClosed(userB.address)).to.equal(true)
+    expect(await product.isClosed(userB.address)).to.equal(false)
     expect(await product['maintenance(address)'](userB.address)).to.equal(0)
     expect(await product.maintenanceNext(userB.address)).to.equal(0)
     expectPositionEq(await product.position(userB.address), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre(address)'](userB.address), {
       oracleVersion: INITIAL_VERSION,
-      openPosition: { maker: 0, taker: 0 },
-      closePosition: { maker: 0, taker: 0 },
+      openPosition: { maker: 0, taker: OPEN_TAKE_POSITION },
+      closePosition: { maker: 0, taker: CLOSE_TAKE_POSITION },
     })
-    expect(await product['latestVersion(address)'](user.address)).to.equal(INITIAL_VERSION)
+    expect(await product['latestVersion(address)'](userB.address)).to.equal(INITIAL_VERSION)
 
     // Global State
     expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION)
     expectPositionEq(await product.positionAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre()'](), {
       oracleVersion: INITIAL_VERSION,
-      openPosition: { maker: OPEN_MAKE_POSITION, taker: 0 },
-      closePosition: { maker: 0, taker: 0 },
+      openPosition: { maker: OPEN_MAKE_POSITION, taker: OPEN_TAKE_POSITION },
+      closePosition: { maker: 0, taker: CLOSE_TAKE_POSITION },
     })
     expectPositionEq(await product.valueAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
     expectPositionEq(await product.shareAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
+
+    // Settle the product with a new oracle version
+    await oracleFeed.next()
+    await product.settle()
+
+    // Check global post-settlement state
+    expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION.add(1))
+    expectPositionEq(await product.positionAtVersion(INITIAL_VERSION.add(1)), { maker: OPEN_MAKE_POSITION, taker: 0 })
+    expectPrePositionEq(await product['pre()'](), {
+      oracleVersion: 0,
+      openPosition: { maker: 0, taker: 0 },
+      closePosition: { maker: 0, taker: 0 },
+    })
+
+    // Settle user and check state
+    await product.settleAccount(userB.address)
+    expect(await product.isClosed(userB.address)).to.equal(true)
+    expectPositionEq(await product.position(userB.address), { maker: 0, taker: 0 })
+    expectPrePositionEq(await product['pre(address)'](userB.address), {
+      oracleVersion: 0,
+      openPosition: { maker: 0, taker: 0 },
+      closePosition: { maker: 0, taker: 0 },
+    })
+    expect(await product['latestVersion(address)'](userB.address)).to.equal(INITIAL_VERSION.add(1))
   })
 
   it('settle no op (gas test)', async () => {

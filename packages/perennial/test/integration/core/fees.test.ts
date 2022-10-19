@@ -359,7 +359,7 @@ describe('Fees', () => {
       const A_TO_B_FUNDING_FEE = Big18Math.mul(A_TO_B_FUNDING, FUNDING_FEE_RATE).abs()
       const A_TO_B_FUNDING_WITHOUT_FEE = A_TO_B_FUNDING.sub(A_TO_B_FUNDING_FEE)
       const A_TO_B_PNL = Big18Math.mul(bVersion.price.sub(aVersion.price), TAKER_POSITION)
-      const A_TO_B_MAKER_FEE = Big18Math.mul(Big18Math.mul(aVersion.price, MAKER_FEE_RATE), MAKER_POSITION)
+      const A_TO_B_MAKER_FEE = Big18Math.mul(Big18Math.mul(aVersion.price, MAKER_FEE_RATE), MAKER_POSITION.mul(3))
       const A_TO_B_TAKER_FEE = Big18Math.mul(Big18Math.mul(aVersion.price, TAKER_FEE_RATE), TAKER_POSITION)
       const B_MAKER_VALUE = Big18Math.div(
         A_TO_B_PNL.mul(-1).add(A_TO_B_FUNDING_WITHOUT_FEE).add(A_TO_B_TAKER_FEE.div(2)),
@@ -403,13 +403,13 @@ describe('Fees', () => {
       await product.settleAccount(user.address)
       expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(
         INITIAL_COLLATERAL.add(
-          Big18Math.mul(B_MAKER_VALUE, MAKER_POSITION).sub(INITIAL_MAKER_FEE).sub(A_TO_B_MAKER_FEE),
+          Big18Math.mul(B_MAKER_VALUE, MAKER_POSITION).sub(INITIAL_MAKER_FEE).sub(A_TO_B_MAKER_FEE.div(3)),
         ),
       )
 
       await product.settleAccount(userB.address)
       expect(await collateral['collateral(address,address)'](userB.address, product.address)).to.equal(
-        INITIAL_COLLATERAL.sub(A_TO_B_MAKER_FEE.mul(2)),
+        INITIAL_COLLATERAL.sub(A_TO_B_MAKER_FEE.mul(2).div(3)),
       )
 
       await product.settleAccount(userC.address)
