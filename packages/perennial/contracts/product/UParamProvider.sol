@@ -22,6 +22,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
         UFixed18 fundingFee_,
         UFixed18 makerFee_,
         UFixed18 takerFee_,
+        UFixed18 positionFee_,
         UFixed18 makerLimit_,
         JumpRateUtilizationCurve memory utilizationCurve_
     ) internal onlyInitializer {
@@ -29,6 +30,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
         _updateFundingFee(fundingFee_);
         _updateMakerFee(makerFee_);
         _updateTakerFee(takerFee_);
+        _updatePositionFee(positionFee_);
         _updateMakerLimit(makerLimit_);
         _updateUtilizationCurve(utilizationCurve_);
     }
@@ -56,6 +58,10 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
     /// @dev The taker fee value
     UFixed18Storage private constant _takerFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.takerFee"));
     function takerFee() public view returns (UFixed18) { return _takerFee.read(); }
+
+    /// @dev The positon fee share value
+    UFixed18Storage private constant _positionFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.positionFee"));
+    function positionFee() public view returns (UFixed18) { return _positionFee.read(); }
 
     /// @dev The maker limit value
     UFixed18Storage private constant _makerLimit = UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.makerLimit"));
@@ -113,7 +119,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
         emit MakerFeeUpdated(newMakerFee);
     }
 
-     /**
+    /**
      * @notice Updates the maker fee to `newMakerFee`
      * @dev only callable by product owner
      * @param newMakerFee new maker fee value
@@ -139,6 +145,25 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
      */
     function updateTakerFee(UFixed18 newTakerFee) external onlyProductOwner {
         _updateTakerFee(newTakerFee);
+    }
+
+    /**
+     * @notice Updates the position fee to `newPositionFee`
+     * @param newPositionFee new position fee value
+     */
+    function _updatePositionFee(UFixed18 newPositionFee) private {
+        if (newPositionFee.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidPositionFee();
+        _positionFee.store(newPositionFee);
+        emit PositionFeeUpdated(newPositionFee);
+    }
+
+    /**
+     * @notice Updates the position fee to `newPositionFee`
+     * @dev only callable by product owner
+     * @param newPositionFee new position fee value
+     */
+    function updatePositionFee(UFixed18 newPositionFee) external onlyProductOwner {
+        _updatePositionFee(newPositionFee);
     }
 
     /**

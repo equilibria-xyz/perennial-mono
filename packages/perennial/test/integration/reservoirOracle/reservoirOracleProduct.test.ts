@@ -24,6 +24,7 @@ const PRODUCT_INFO = {
   fundingFee: utils.parseEther('0.1'),
   makerFee: 0,
   takerFee: 0,
+  positionFee: 0,
   makerLimit: utils.parseEther('1'),
   utilizationCurve: {
     minRate: 0,
