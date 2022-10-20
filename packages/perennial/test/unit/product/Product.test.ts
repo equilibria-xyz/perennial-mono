@@ -234,9 +234,9 @@ describe('Product', () => {
           .to.emit(product, 'PendingPositionFeeUpdated')
           .withArgs(utils.parseEther('0.5'))
 
-        expect(await product.makerFee()).to.equal(0)
-        expect(await product.takerFee()).to.equal(0)
-        expect(await product.positionFee()).to.equal(0)
+        expect(await product.makerFee()).to.equal(MAKER_FEE)
+        expect(await product.takerFee()).to.equal(TAKER_FEE)
+        expect(await product.positionFee()).to.equal(POSITION_FEE)
 
         const pendingFees = await product.pendingFeeUpdates()
         expect(pendingFees.makerFeeUpdated).to.be.true
@@ -260,9 +260,9 @@ describe('Product', () => {
           .to.emit(product, 'PendingPositionFeeUpdated')
           .withArgs(utils.parseEther('0.5'))
 
-        expect(await product.makerFee()).to.equal(0)
-        expect(await product.takerFee()).to.equal(0)
-        expect(await product.positionFee()).to.equal(0)
+        expect(await product.makerFee()).to.equal(MAKER_FEE)
+        expect(await product.takerFee()).to.equal(TAKER_FEE)
+        expect(await product.positionFee()).to.equal(POSITION_FEE)
 
         await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
         await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
@@ -1511,9 +1511,73 @@ describe('Product', () => {
         expect(await product['latestVersion(address)'](user.address)).to.equal(3)
       })
 
-      it('opens the position and settles later with fee', async () => {
-        await product.updateTakerFee(utils.parseEther('0.01'))
+      it('opens the position with settle after liquidation', async () => {
+        await product.connect(user).openTake(POSITION)
 
+        await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
+        await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
+        await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
+        await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_2)
+
+        // rate * elapsed * utilization * maker * price
+        // ( 0.1 * 10^18 / 365 / 24 / 60 / 60 ) * 3600 * 0.5 * 20 * 123 = 14041095890000000
+        const EXPECTED_FUNDING = ethers.BigNumber.from('14041095888744000')
+        const EXPECTED_FUNDING_FEE = EXPECTED_FUNDING.div(10)
+        await collateral.mock.settleProduct.withArgs(EXPECTED_FUNDING_FEE).returns()
+        await collateral.mock.settleAccount.withArgs(user.address, EXPECTED_FUNDING.mul(-1)).returns()
+
+        // Liquidate the user
+        await product.connect(collateralSigner).closeAll(user.address)
+        // User can't open a new position yet
+        await expect(product.connect(user).openTake(POSITION)).to.be.revertedWith('ProductInLiquidationError()')
+
+        // Advance version
+        await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
+        await oracle.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
+        await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
+        await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_3)
+
+        // Liquidation flag is cleared during settle flow
+        await expect(product.connect(user).openTake(POSITION))
+          .to.emit(product, 'TakeOpened')
+          .withArgs(user.address, 3, POSITION)
+      })
+
+      it('reverts if taker > maker', async () => {
+        const socialization = utils.parseEther('0.5')
+        await expect(product.connect(user).openTake(POSITION.mul(4))).to.be.revertedWith(
+          `ProductInsufficientLiquidityError(${socialization})`,
+        )
+      })
+
+      it('reverts if double sided position', async () => {
+        await product.connect(user).openMake(POSITION)
+        await expect(product.connect(user).openTake(POSITION)).to.be.revertedWith('ProductDoubleSidedError()')
+      })
+
+      it('reverts if in liquidation', async () => {
+        await product.connect(collateralSigner).closeAll(user.address)
+        await expect(product.connect(user).openTake(POSITION)).to.be.revertedWith('ProductInLiquidationError()')
+      })
+
+      it('reverts if paused', async () => {
+        await controller.mock.paused.withArgs().returns(true)
+        await expect(product.connect(user).openTake(POSITION)).to.be.revertedWith('PausedError()')
+      })
+
+      it('reverts if closed', async () => {
+        await product.updateClosed(true)
+        await expect(product.connect(user).openTake(POSITION)).to.be.revertedWith('ProductClosedError()')
+      })
+    })
+
+    context('#openTake with fee', () => {
+      beforeEach(async () => {
+        await product.updateTakerFee(utils.parseEther('0.01'))
+        await product.connect(userB).openMake(POSITION.mul(2))
+      })
+
+      it('opens the position and settles later with fee', async () => {
         const TAKER_FEE = utils.parseEther('12.3') // position * taker fee * price
 
         // rate * elapsed * utilization * maker * price
@@ -1573,65 +1637,6 @@ describe('Product', () => {
           closePosition: { maker: 0, taker: 0 },
         })
         expect(await product['latestVersion(address)'](user.address)).to.equal(3)
-      })
-
-      it('opens the position with settle after liquidation', async () => {
-        await product.connect(user).openTake(POSITION)
-
-        await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
-        await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
-        await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
-        await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_2)
-
-        // rate * elapsed * utilization * maker * price
-        // ( 0.1 * 10^18 / 365 / 24 / 60 / 60 ) * 3600 * 0.5 * 20 * 123 = 14041095890000000
-        const EXPECTED_FUNDING = ethers.BigNumber.from('14041095888744000')
-        const EXPECTED_FUNDING_FEE = EXPECTED_FUNDING.div(10)
-        await collateral.mock.settleProduct.withArgs(EXPECTED_FUNDING_FEE).returns()
-        await collateral.mock.settleAccount.withArgs(user.address, EXPECTED_FUNDING.mul(-1)).returns()
-
-        // Liquidate the user
-        await product.connect(collateralSigner).closeAll(user.address)
-        // User can't open a new position yet
-        await expect(product.connect(user).openTake(POSITION)).to.be.revertedWith('ProductInLiquidationError()')
-
-        // Advance version
-        await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
-        await oracle.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
-        await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
-        await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_3)
-
-        // Liquidation flag is cleared during settle flow
-        await expect(product.connect(user).openTake(POSITION))
-          .to.emit(product, 'TakeOpened')
-          .withArgs(user.address, 3, POSITION)
-      })
-
-      it('reverts if taker > maker', async () => {
-        const socialization = utils.parseEther('0.5')
-        await expect(product.connect(user).openTake(POSITION.mul(4))).to.be.revertedWith(
-          `ProductInsufficientLiquidityError(${socialization})`,
-        )
-      })
-
-      it('reverts if double sided position', async () => {
-        await product.connect(user).openMake(POSITION)
-        await expect(product.connect(user).openTake(POSITION)).to.be.revertedWith('ProductDoubleSidedError()')
-      })
-
-      it('reverts if in liquidation', async () => {
-        await product.connect(collateralSigner).closeAll(user.address)
-        await expect(product.connect(user).openTake(POSITION)).to.be.revertedWith('ProductInLiquidationError()')
-      })
-
-      it('reverts if paused', async () => {
-        await controller.mock.paused.withArgs().returns(true)
-        await expect(product.connect(user).openTake(POSITION)).to.be.revertedWith('PausedError()')
-      })
-
-      it('reverts if closed', async () => {
-        await product.updateClosed(true)
-        await expect(product.connect(user).openTake(POSITION)).to.be.revertedWith('ProductClosedError()')
       })
     })
 
@@ -2481,17 +2486,17 @@ describe('Product', () => {
         await collateral.mock.settleAccount.withArgs(user.address, -1 * EXPECTED_FUNDING).returns()
         await collateral.mock.settleAccount.withArgs(userB.address, EXPECTED_FUNDING_WITH_FEE).returns()
 
-        await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
-        await oracle.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
-        await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
-        await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_3)
-
         await product.updateUtilizationCurve({
           minRate: utils.parseEther('0.10').mul(-1),
           maxRate: utils.parseEther('0.10').mul(-1),
           targetRate: utils.parseEther('0.10').mul(-1),
           targetUtilization: utils.parseEther('1'),
         })
+
+        await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
+        await oracle.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
+        await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
+        await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_3)
 
         await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(3, 3)
 
@@ -4503,70 +4508,6 @@ describe('Product', () => {
         expect(await product['latestVersion(address)'](user.address)).to.equal(3)
       })
 
-      it('opens the position and settles later with fee', async () => {
-        await product.updateTakerFee(utils.parseEther('0.01'))
-
-        const TAKER_FEE = utils.parseEther('12.3') // position * taker fee * price
-
-        // rate * elapsed * utilization * maker * price
-        // ( 0.1 * 10^18 / 365 / 24 / 60 / 60 ) * 3600 * 0.5 * 20 * 123 = 14041095890000000
-        const EXPECTED_FUNDING = ethers.BigNumber.from('14041095888744000')
-        const EXPECTED_FUNDING_FEE = EXPECTED_FUNDING.div(10)
-        const EXPECTED_FUNDING_WITH_FEE = EXPECTED_FUNDING.sub(EXPECTED_FUNDING_FEE) // maker funding
-
-        // Since there are no settled makers for the taker fee to go to, it all goes to the protocol instead
-        await collateral.mock.settleProduct.withArgs(EXPECTED_FUNDING_FEE.add(TAKER_FEE)).returns()
-        // Position Fee and Funding Fee are settled separately
-        await collateral.mock.settleAccount.withArgs(user.address, TAKER_FEE.mul(-1)).returns()
-        await collateral.mock.settleAccount.withArgs(user.address, EXPECTED_FUNDING.mul(-1)).returns()
-
-        await expect(product.connect(user).openTake(POSITION))
-          .to.emit(product, 'TakeOpened')
-          .withArgs(user.address, 1, POSITION)
-        expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('615'))
-
-        await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
-
-        await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
-        await oracle.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
-        await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
-        await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_3)
-
-        await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(2, 3)
-
-        expect(await product['latestVersion()']()).to.equal(3)
-        expectPositionEq(await product.positionAtVersion(2), { maker: POSITION.mul(2), taker: POSITION })
-        expectPositionEq(await product.positionAtVersion(3), { maker: POSITION.mul(2), taker: POSITION })
-        expectPrePositionEq(await product['pre()'](), {
-          oracleVersion: 0,
-          openPosition: { maker: 0, taker: 0 },
-          closePosition: { maker: 0, taker: 0 },
-        })
-        expectPositionEq(await product.valueAtVersion(3), {
-          maker: EXPECTED_FUNDING_WITH_FEE.div(20),
-          taker: EXPECTED_FUNDING.div(10).mul(-1),
-        })
-        expectPositionEq(await product.shareAtVersion(3), {
-          maker: utils.parseEther('180'),
-          taker: utils.parseEther('360'),
-        })
-
-        await expect(product.connect(user).settleAccount(user.address))
-          .to.emit(product, 'AccountSettle')
-          .withArgs(user.address, 2, 3)
-
-        expect(await product.isClosed(user.address)).to.equal(false)
-        expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('615'))
-        expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('615'))
-        expectPositionEq(await product.position(user.address), { maker: 0, taker: POSITION })
-        expectPrePositionEq(await product['pre(address)'](user.address), {
-          oracleVersion: 0,
-          openPosition: { maker: 0, taker: 0 },
-          closePosition: { maker: 0, taker: 0 },
-        })
-        expect(await product['latestVersion(address)'](user.address)).to.equal(3)
-      })
-
       it('opens the position with settle after liquidation', async () => {
         await product.connect(user).openTake(POSITION)
 
@@ -4632,6 +4573,74 @@ describe('Product', () => {
       it('reverts if closed', async () => {
         await product.updateClosed(true)
         await expect(product.connect(user).openTake(POSITION)).to.be.revertedWith('ProductClosedError()')
+      })
+    })
+
+    context('#openTake with fee', async () => {
+      beforeEach(async () => {
+        await product.updateTakerFee(utils.parseEther('0.01'))
+        await product.connect(userB).openMake(POSITION.mul(2))
+      })
+
+      it('opens the position and settles later with fee', async () => {
+        const TAKER_FEE = utils.parseEther('12.3') // position * taker fee * price
+        // rate * elapsed * utilization * maker * price
+        // ( 0.1 * 10^18 / 365 / 24 / 60 / 60 ) * 3600 * 0.5 * 20 * 123 = 14041095890000000
+        const EXPECTED_FUNDING = ethers.BigNumber.from('14041095888744000')
+        const EXPECTED_FUNDING_FEE = EXPECTED_FUNDING.div(10)
+        const EXPECTED_FUNDING_WITH_FEE = EXPECTED_FUNDING.sub(EXPECTED_FUNDING_FEE) // maker funding
+
+        // Since there are no settled makers for the taker fee to go to, it all goes to the protocol instead
+        await collateral.mock.settleProduct.withArgs(EXPECTED_FUNDING_FEE.add(TAKER_FEE)).returns()
+        // Position Fee and Funding Fee are settled separately
+        await collateral.mock.settleAccount.withArgs(user.address, TAKER_FEE.mul(-1)).returns()
+        await collateral.mock.settleAccount.withArgs(user.address, EXPECTED_FUNDING.mul(-1)).returns()
+
+        await expect(product.connect(user).openTake(POSITION))
+          .to.emit(product, 'TakeOpened')
+          .withArgs(user.address, 1, POSITION)
+        expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('615'))
+
+        await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
+
+        await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
+        await oracle.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
+        await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
+        await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_3)
+
+        await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(2, 3)
+
+        expect(await product['latestVersion()']()).to.equal(3)
+        expectPositionEq(await product.positionAtVersion(2), { maker: POSITION.mul(2), taker: POSITION })
+        expectPositionEq(await product.positionAtVersion(3), { maker: POSITION.mul(2), taker: POSITION })
+        expectPrePositionEq(await product['pre()'](), {
+          oracleVersion: 0,
+          openPosition: { maker: 0, taker: 0 },
+          closePosition: { maker: 0, taker: 0 },
+        })
+        expectPositionEq(await product.valueAtVersion(3), {
+          maker: EXPECTED_FUNDING_WITH_FEE.div(20),
+          taker: EXPECTED_FUNDING.div(10).mul(-1),
+        })
+        expectPositionEq(await product.shareAtVersion(3), {
+          maker: utils.parseEther('180'),
+          taker: utils.parseEther('360'),
+        })
+
+        await expect(product.connect(user).settleAccount(user.address))
+          .to.emit(product, 'AccountSettle')
+          .withArgs(user.address, 2, 3)
+
+        expect(await product.isClosed(user.address)).to.equal(false)
+        expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('615'))
+        expect(await product.maintenanceNext(user.address)).to.equal(utils.parseEther('615'))
+        expectPositionEq(await product.position(user.address), { maker: 0, taker: POSITION })
+        expectPrePositionEq(await product['pre(address)'](user.address), {
+          oracleVersion: 0,
+          openPosition: { maker: 0, taker: 0 },
+          closePosition: { maker: 0, taker: 0 },
+        })
+        expect(await product['latestVersion(address)'](user.address)).to.equal(3)
       })
     })
 
@@ -5479,17 +5488,17 @@ describe('Product', () => {
         await collateral.mock.settleAccount.withArgs(user.address, -1 * EXPECTED_FUNDING).returns()
         await collateral.mock.settleAccount.withArgs(userB.address, EXPECTED_FUNDING_WITH_FEE).returns()
 
-        await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
-        await oracle.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
-        await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
-        await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_3)
-
         await product.updateUtilizationCurve({
           minRate: utils.parseEther('0.10').mul(-1),
           maxRate: utils.parseEther('0.10').mul(-1),
           targetRate: utils.parseEther('0.10').mul(-1),
           targetUtilization: utils.parseEther('1'),
         })
+
+        await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
+        await oracle.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3)
+        await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
+        await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_3)
 
         await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(3, 3)
 
@@ -6186,6 +6195,7 @@ describe('Product', () => {
   describe('#rate', async () => {
     const SECONDS_IN_YEAR = 60 * 60 * 24 * 365
     beforeEach(async () => {
+      await oracle.mock.sync.withArgs().returns({ timestamp: 0, price: 0, version: 0 })
       await product.updateUtilizationCurve({
         minRate: 0,
         maxRate: utils.parseEther('5.00'),
