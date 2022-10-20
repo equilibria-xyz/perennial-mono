@@ -111,6 +111,9 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         // position a->b
         _position.settle(_latestVersion, settleOracleVersion);
 
+        // Apply any pending fee updates if present
+        if (pendingFeeUpdates().hasUpdates()) applyPendingFeeUpdates();
+
         // short-circuit from a->c if b == c
         if (settleOracleVersion.version != currentOracleVersion.version) {
             // value b->c

@@ -3,13 +3,17 @@ pragma solidity ^0.8.13;
 
 import "@equilibria/root/number/types/UFixed18.sol";
 import "@equilibria/root/curve/types/JumpRateUtilizationCurve.sol";
+import "./types/PendingFeeUpdates.sol";
 
 interface IParamProvider {
     event MaintenanceUpdated(UFixed18 newMaintenance);
     event FundingFeeUpdated(UFixed18 newFundingFee);
     event MakerFeeUpdated(UFixed18 newMakerFee);
+    event PendingMakerFeeUpdated(UFixed18 newMakerFee);
     event TakerFeeUpdated(UFixed18 newTakerFee);
+    event PendingTakerFeeUpdated(UFixed18 newTakerFee);
     event PositionFeeUpdated(UFixed18 newPositionFee);
+    event PendingPositionFeeUpdated(UFixed18 newPositionFee);
     event MakerLimitUpdated(UFixed18 newMakerLimit);
     event JumpRateUtilizationCurveUpdated(
         Fixed18 minRate,
@@ -37,4 +41,5 @@ interface IParamProvider {
     function updateMakerLimit(UFixed18 newMakerLimit) external;
     function utilizationCurve() external view returns (JumpRateUtilizationCurve memory);
     function updateUtilizationCurve(JumpRateUtilizationCurve memory newUtilizationCurve) external;
+    function pendingFeeUpdates() external view returns (PendingFeeUpdates memory);
 }

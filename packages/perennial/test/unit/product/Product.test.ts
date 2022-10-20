@@ -36,7 +36,7 @@ describe('Product', () => {
   let oracle: MockContract
   let incentivizer: MockContract
 
-  let product: Product
+  let product: SmockContract<Product>
 
   const POSITION = utils.parseEther('10')
   const FUNDING_FEE = utils.parseEther('0.10')
@@ -75,7 +75,7 @@ describe('Product', () => {
     controller = await waffle.deployMockContract(owner, Controller__factory.abi)
     controllerSigner = await impersonate.impersonateWithBalance(controller.address, utils.parseEther('10'))
 
-    product = await new Product__factory(owner).deploy()
+    product = await (await smock.mock<Product__factory>('Product')).deploy()
     PRODUCT_INFO.oracle = oracle.address
     await product.connect(controllerSigner).initialize(PRODUCT_INFO)
 
@@ -85,6 +85,7 @@ describe('Product', () => {
     await controller.mock.incentivizer.withArgs().returns(incentivizer.address)
     await controller.mock.coordinatorFor.withArgs(product.address).returns(1)
     await controller.mock.owner.withArgs(1).returns(owner.address)
+    await controller.mock.minFundingFee.withArgs().returns(FUNDING_FEE)
   })
 
   describe('#initialize', async () => {
@@ -149,7 +150,11 @@ describe('Product', () => {
   })
 
   describe('updating params', async () => {
-    it('correctly updates the params', async () => {
+    beforeEach(async () => {
+      await oracle.mock.sync.returns({ price: 0, timestamp: 0, version: 0 })
+    })
+
+    it('correctly updates the params and calls settle for each update', async () => {
       await product.updateMaintenance(utils.parseEther('0.1'))
       await product.updateFundingFee(utils.parseEther('0.2'))
       await product.updateMakerFee(utils.parseEther('0.3'))
@@ -163,6 +168,8 @@ describe('Product', () => {
         targetUtilization: utils.parseEther('0.4'),
       })
 
+      expect(product.settle).to.have.callCount(7)
+
       expect(await product['maintenance()']()).to.equal(utils.parseEther('0.1'))
       expect(await product.fundingFee()).to.equal(utils.parseEther('0.2'))
       expect(await product.makerFee()).to.equal(utils.parseEther('0.3'))
@@ -175,6 +182,109 @@ describe('Product', () => {
       expect(curve.maxRate).to.equal(utils.parseEther('0.20'))
       expect(curve.targetRate).to.equal(utils.parseEther('0.30'))
       expect(curve.targetUtilization).to.equal(utils.parseEther('0.4'))
+    })
+
+    describe('pending fee updates', () => {
+      const ORACLE_VERSION = 1
+      const TIMESTAMP = 1636401093
+      const PRICE = utils.parseEther('123')
+
+      const ORACLE_VERSION_0 = {
+        price: utils.parseEther('2'),
+        timestamp: 0,
+        version: 0,
+      }
+
+      const ORACLE_VERSION_1 = {
+        price: PRICE,
+        timestamp: TIMESTAMP,
+        version: ORACLE_VERSION,
+      }
+
+      const ORACLE_VERSION_2 = {
+        price: PRICE,
+        timestamp: TIMESTAMP + 3600,
+        version: ORACLE_VERSION + 1,
+      }
+
+      beforeEach(async () => {
+        await collateral.mock.settleProduct.withArgs(0).returns()
+        await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_1)
+        await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_1)
+        await oracle.mock.atVersion.withArgs(0).returns(ORACLE_VERSION_0)
+        await oracle.mock.atVersion.withArgs(1).returns(ORACLE_VERSION_1)
+
+        await incentivizer.mock.sync.withArgs(ORACLE_VERSION_1).returns()
+
+        await collateral.mock.liquidatableNext.withArgs(user.address, product.address).returns(false)
+        await collateral.mock.settleAccount.withArgs(user.address, 0).returns()
+        await incentivizer.mock.syncAccount.returns()
+      })
+
+      it('sets pending fees if product pre position is not empty', async () => {
+        await product.connect(user).openMake(POSITION)
+
+        await expect(product.updateMakerFee(utils.parseEther('0.3')))
+          .to.emit(product, 'PendingMakerFeeUpdated')
+          .withArgs(utils.parseEther('0.3'))
+        await expect(product.updateTakerFee(utils.parseEther('0.4')))
+          .to.emit(product, 'PendingTakerFeeUpdated')
+          .withArgs(utils.parseEther('0.4'))
+        await expect(product.updatePositionFee(utils.parseEther('0.5')))
+          .to.emit(product, 'PendingPositionFeeUpdated')
+          .withArgs(utils.parseEther('0.5'))
+
+        expect(await product.makerFee()).to.equal(0)
+        expect(await product.takerFee()).to.equal(0)
+        expect(await product.positionFee()).to.equal(0)
+
+        const pendingFees = await product.pendingFeeUpdates()
+        expect(pendingFees.makerFeeUpdated).to.be.true
+        expect(pendingFees.takerFeeUpdated).to.be.true
+        expect(pendingFees.positionFeeUpdated).to.be.true
+        expect(pendingFees.pendingMakerFee).to.equal(utils.parseEther('0.3'))
+        expect(pendingFees.pendingTakerFee).to.equal(utils.parseEther('0.4'))
+        expect(pendingFees.pendingPositionFee).to.equal(utils.parseEther('0.5'))
+      })
+
+      it('transitions the fees on settle', async () => {
+        await product.connect(user).openMake(POSITION)
+
+        await expect(product.updateMakerFee(utils.parseEther('0.3')))
+          .to.emit(product, 'PendingMakerFeeUpdated')
+          .withArgs(utils.parseEther('0.3'))
+        await expect(product.updateTakerFee(utils.parseEther('0.4')))
+          .to.emit(product, 'PendingTakerFeeUpdated')
+          .withArgs(utils.parseEther('0.4'))
+        await expect(product.updatePositionFee(utils.parseEther('0.5')))
+          .to.emit(product, 'PendingPositionFeeUpdated')
+          .withArgs(utils.parseEther('0.5'))
+
+        expect(await product.makerFee()).to.equal(0)
+        expect(await product.takerFee()).to.equal(0)
+        expect(await product.positionFee()).to.equal(0)
+
+        await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
+        await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
+        await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
+        await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_2)
+
+        await product.settle()
+
+        // Pending Fees are Cleared
+        const pendingFees = await product.pendingFeeUpdates()
+        expect(pendingFees.makerFeeUpdated).to.be.false
+        expect(pendingFees.takerFeeUpdated).to.be.false
+        expect(pendingFees.positionFeeUpdated).to.be.false
+        expect(pendingFees.pendingMakerFee).to.equal(0)
+        expect(pendingFees.pendingTakerFee).to.equal(0)
+        expect(pendingFees.pendingPositionFee).to.equal(0)
+
+        // New Fees are set
+        expect(await product.makerFee()).to.equal(utils.parseEther('0.3'))
+        expect(await product.takerFee()).to.equal(utils.parseEther('0.4'))
+        expect(await product.positionFee()).to.equal(utils.parseEther('0.5'))
+      })
     })
 
     it('reverts if not owner', async () => {
@@ -261,8 +371,6 @@ describe('Product', () => {
       await oracle.mock.atVersion.withArgs(0).returns(ORACLE_VERSION_0)
       await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_1)
       await oracle.mock.atVersion.withArgs(1).returns(ORACLE_VERSION_1)
-
-      await controller.mock.minFundingFee.withArgs().returns(FUNDING_FEE)
 
       await incentivizer.mock.sync.withArgs(ORACLE_VERSION_1).returns()
 

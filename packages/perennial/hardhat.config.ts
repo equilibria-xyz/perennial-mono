@@ -12,6 +12,13 @@ const config = defaultConfig({
           enabled: OPTIMIZER_ENABLED,
           runs: 5800, // Maximum value as of commit e6b7ab7
         },
+        outputSelection: OPTIMIZER_ENABLED
+          ? {}
+          : {
+              '*': {
+                '*': ['storageLayout'],
+              },
+            },
       },
     },
   },
