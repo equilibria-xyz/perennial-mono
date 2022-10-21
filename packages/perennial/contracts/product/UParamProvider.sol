@@ -124,6 +124,10 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
         emit MakerFeeUpdated(newMakerFee);
     }
 
+    /**
+     * @notice Updates the pending maker fee to `newMakerFee`
+     * @param newMakerFee new maker fee value
+     */
     function _updatePendingMakerFee(UFixed18 newMakerFee) private {
         if (newMakerFee.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidMakerFee();
         PendingFeeUpdates memory pendingFees_ = pendingFeeUpdates();
@@ -138,7 +142,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
      * @param newMakerFee new maker fee value
      */
     function updateMakerFee(UFixed18 newMakerFee) external onlyProductOwner settleProduct {
-        if (!productPreIsEmpty()) {
+        if (!_noPendingPositions()) {
             _updatePendingMakerFee(newMakerFee);
         } else {
             _updateMakerFee(newMakerFee);
@@ -155,6 +159,10 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
         emit TakerFeeUpdated(newTakerFee);
     }
 
+    /**
+     * @notice Updates the pending taker fee to `newTakerFee`
+     * @param newTakerFee new taker fee value
+     */
     function _updatePendingTakerFee(UFixed18 newTakerFee) private {
         if (newTakerFee.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidTakerFee();
         PendingFeeUpdates memory pendingFees_ = pendingFeeUpdates();
@@ -169,7 +177,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
      * @param newTakerFee new taker fee value
      */
     function updateTakerFee(UFixed18 newTakerFee) external onlyProductOwner settleProduct {
-        if (!productPreIsEmpty()) {
+        if (!_noPendingPositions()) {
             _updatePendingTakerFee(newTakerFee);
         } else {
             _updateTakerFee(newTakerFee);
@@ -186,6 +194,10 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
         emit PositionFeeUpdated(newPositionFee);
     }
 
+    /**
+     * @notice Updates the pending position fee to `newPositionFee`
+     * @param newPositionFee new position fee value
+     */
     function _updatePendingPositionFee(UFixed18 newPositionFee) private {
         if (newPositionFee.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidPositionFee();
         PendingFeeUpdates memory pendingFees_ = pendingFeeUpdates();
@@ -200,7 +212,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
      * @param newPositionFee new position fee value
      */
     function updatePositionFee(UFixed18 newPositionFee) external onlyProductOwner settleProduct {
-        if (!productPreIsEmpty()) {
+        if (!_noPendingPositions()) {
             _updatePendingPositionFee(newPositionFee);
         } else {
             _updatePositionFee(newPositionFee);
@@ -248,8 +260,9 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
         _updateUtilizationCurve(newUtilizationCurve);
     }
 
-    function applyPendingFeeUpdates() internal {
+    function _settleFeeUpdates() internal {
         PendingFeeUpdates memory pendingFeeUpdates_ = pendingFeeUpdates();
+        if (!pendingFeeUpdates_.hasUpdates()) return;
         if (pendingFeeUpdates_.makerFeeUpdated) _updateMakerFee(pendingFeeUpdates_.makerFee());
         if (pendingFeeUpdates_.takerFeeUpdated) _updateTakerFee(pendingFeeUpdates_.takerFee());
         if (pendingFeeUpdates_.positionFeeUpdated) _updatePositionFee(pendingFeeUpdates_.positionFee());
@@ -262,7 +275,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
      * @notice Checks whether the Product's `pre` position is empty
      * @return Whether or not the pre position is empty
      */
-    function productPreIsEmpty() private view returns (bool) {
+    function _noPendingPositions() private view returns (bool) {
         return IProduct(address(this)).pre().isEmpty();
     }
 
