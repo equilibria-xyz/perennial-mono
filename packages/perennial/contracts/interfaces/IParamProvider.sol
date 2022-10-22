@@ -19,17 +19,16 @@ interface IParamProvider {
         UFixed18 targetUtilization
     );
     
-    function parameter() external view returns (UFixed18, UFixed18, UFixed18, UFixed18, UFixed18, bool);
+    function parameter() external view returns (UFixed18, UFixed18, UFixed18, UFixed18, UFixed18, UFixed18, bool);
     function updateParameter(
         UFixed18 newMaintenance,
         UFixed18 newFundingFee,
         UFixed18 newMakerFee,
         UFixed18 newTakerFee,
         UFixed18 newPositionFee,
+        UFixed18 newMakerLimit,
         bool newClosed
     ) external;
-    function makerLimit() external view returns (UFixed18);
-    function updateMakerLimit(UFixed18 newMakerLimit) external;
     function utilizationCurve() external view returns (JumpRateUtilizationCurve memory);
     function updateUtilizationCurve(JumpRateUtilizationCurve memory newUtilizationCurve) external;
 }

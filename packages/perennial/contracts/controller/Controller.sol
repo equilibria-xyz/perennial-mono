@@ -372,11 +372,11 @@ contract Controller is IController, UInitializable {
         return treasury(coordinatorFor[product]);
     }
 
-    function settlementParameters() external returns (ICollateral, IIncentivizer, UFixed18, bool) {
+    function settlementParameters() external view returns (ICollateral, IIncentivizer, UFixed18, bool) {
         return (collateral(), incentivizer(), minFundingFee(), paused());
     }
 
-    function collateralParameters(IProduct product) external returns (address, address, UFixed18, bool) {
+    function collateralParameters(IProduct product) external view returns (address, address, UFixed18, bool) {
         return (treasury(), treasury(product), protocolFee(), isProduct(product));
     }
 

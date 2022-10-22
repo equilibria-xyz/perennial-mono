@@ -29,8 +29,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
         UFixed18 makerLimit_,
         JumpRateUtilizationCurve memory utilizationCurve_
     ) internal onlyInitializer {
-        _updateParameter(maintenance_, fundingFee_, makerFee_, takerFee_, positionFee_, false);
-        _updateMakerLimit(makerLimit_);
+        _updateParameter(maintenance_, fundingFee_, makerFee_, takerFee_, positionFee_, makerLimit_, false);
         _updateUtilizationCurve(utilizationCurve_);
     }
 
@@ -44,13 +43,9 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
 
     /// @dev The parameter values
     ParameterStorage private constant _parameter = ParameterStorage.wrap(keccak256("equilibria.perennial.UParamProvider.parameter"));
-    function parameter() public view returns (UFixed18 maintenance, UFixed18 fundingFee, UFixed18 makerFee, UFixed18 takerFee, UFixed18 positionFee, bool closed) {
-        (maintenance, fundingFee, makerFee, takerFee, positionFee, closed) = _parameter.read();
+    function parameter() public view returns (UFixed18 maintenance, UFixed18 fundingFee, UFixed18 makerFee, UFixed18 takerFee, UFixed18 positionFee, UFixed18 makerLimit, bool closed) {
+        (maintenance, fundingFee, makerFee, takerFee, positionFee, makerLimit, closed) = _parameter.read();
     }
-
-    /// @dev The maker limit value
-    UFixed18Storage private constant _makerLimit = UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.makerLimit"));
-    function makerLimit() public view returns (UFixed18) { return _makerLimit.read(); }
 
     /// @dev The JumpRateUtilizationCurve params
     JumpRateUtilizationCurveStorage private constant _utilizationCurve =
@@ -63,15 +58,17 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
         UFixed18 newMakerFee,
         UFixed18 newTakerFee,
         UFixed18 newPositionFee,
+        UFixed18 newMakerLimit,
         bool newClosed
     ) private {
-        _parameter.store(newMaintenance, newFundingFee, newMakerFee, newTakerFee, newPositionFee, newClosed);
+        _parameter.store(newMaintenance, newFundingFee, newMakerFee, newTakerFee, newPositionFee, newMakerLimit, newClosed);
 
         emit MaintenanceUpdated(newFundingFee);
         emit FundingFeeUpdated(newFundingFee);
         emit MakerFeeUpdated(newMakerFee);
         emit TakerFeeUpdated(newTakerFee);
         emit PositionFeeUpdated(newPositionFee);
+        emit MakerLimitUpdated(newMakerLimit);
         emit ClosedUpdated(newClosed);
     }
 
@@ -81,27 +78,10 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
         UFixed18 newMakerFee,
         UFixed18 newTakerFee,
         UFixed18 newPositionFee,
+        UFixed18 newMakerLimit,
         bool newClosed
     ) external onlyProductOwner {
-        _updateParameter(newMaintenance, newFundingFee, newMakerFee, newTakerFee, newPositionFee, newClosed);
-    }
-
-    /**
-     * @notice Updates the maker limit to `newMakerLimit`
-     * @param newMakerLimit new maker limit value
-     */
-    function _updateMakerLimit(UFixed18 newMakerLimit) private {
-        _makerLimit.store(newMakerLimit);
-        emit MakerLimitUpdated(newMakerLimit);
-    }
-
-    /**
-     * @notice Updates the maker limit to `newMakerLimit`
-     * @dev only callable by product owner
-     * @param newMakerLimit new maker limit value
-     */
-    function updateMakerLimit(UFixed18 newMakerLimit) external onlyProductOwner {
-        _updateMakerLimit(newMakerLimit);
+        _updateParameter(newMaintenance, newFundingFee, newMakerFee, newTakerFee, newPositionFee, newMakerLimit, newClosed);
     }
 
     /**

@@ -35,6 +35,7 @@ describe('Closed Product', () => {
       parameters.makerFee,
       parameters.takerFee,
       parameters.positionFee,
+      parameters.makerLimit,
       true,
     )
     // await expect(product.updateClosed(true))
@@ -65,6 +66,7 @@ describe('Closed Product', () => {
         parameters.makerFee,
         parameters.takerFee,
         parameters.positionFee,
+        parameters.makerLimit,
         true,
       )
     })
@@ -108,6 +110,7 @@ describe('Closed Product', () => {
       parameters.makerFee,
       parameters.takerFee,
       parameters.positionFee,
+      parameters.makerLimit,
       true,
     )
     await product.settleAccount(user.address)
@@ -155,6 +158,7 @@ describe('Closed Product', () => {
       parameters.makerFee,
       parameters.takerFee,
       parameters.positionFee,
+      parameters.makerLimit,
       true,
     )
     await chainlink.next()

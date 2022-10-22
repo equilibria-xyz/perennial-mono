@@ -49,6 +49,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
         UFixed18 takerFee;
 
+        UFixed18 makerLimit;
+
         bool closed;
         bytes31 __unallocated3__;
 
@@ -112,6 +114,18 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         UFixed18 minFundingFee;
         (context.collateral, context.incentivizer, minFundingFee, context.paused) = controller().settlementParameters();
 
+        UFixed18 fundingFee;
+        UFixed18 positionFee;
+        (
+            context.maintenance,
+            fundingFee,
+            context.makerFee,
+            context.takerFee,
+            positionFee,
+            context.makerLimit,
+            context.closed
+        ) = parameter();
+
         // Determine periods to settle
         context.oracleVersion = _sync();
         context.version = _versions[_latestVersion];
@@ -128,16 +142,17 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
                 atVersion(_latestVersion + 1);
 
         // Load parameters
-        UFixed18 fundingFee;
-        UFixed18 positionFee;
-        (
-            context.maintenance,
-            fundingFee,
-            context.makerFee,
-            context.takerFee,
-            positionFee,
-            context.closed
-        ) = parameter();
+//        UFixed18 fundingFee;
+//        UFixed18 positionFee;
+//        (
+//            context.maintenance,
+//            fundingFee,
+//            context.makerFee,
+//            context.takerFee,
+//            positionFee,
+//            context.makerLimit,
+//            context.closed
+//        ) = parameter();
         UFixed18 feeAccumulator;
         JumpRateUtilizationCurve memory _utilizationCurve = utilizationCurve();
 
@@ -327,7 +342,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         if (!positionFee.isZero()) context.collateral.settleAccount(msg.sender, Fixed18Lib.from(-1, positionFee));
 
         if (_liquidatableNext(context, msg.sender)) revert ProductInsufficientCollateralError();
-        if (context.version.position().next(_pre).maker.gt(makerLimit())) revert ProductMakerOverLimitError();
+        if (context.version.position().next(_pre).maker.gt(context.makerLimit)) revert ProductMakerOverLimitError();
         if (context.account.isDoubleSided(_pres[msg.sender])) revert ProductDoubleSidedError();
 
         emit MakeOpened(msg.sender, _latestVersion, amount);
@@ -390,8 +405,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @param account Account to return for
      * @return The current maintenance requirement
      */
-    function maintenance(address account) public view returns (UFixed18) {
-        (UFixed18 _maintenance, , , , , ) = parameter();
+    function maintenance(address account) external view returns (UFixed18) {
+        (UFixed18 _maintenance, , , , , , ) = parameter();
         return _accounts[account].maintenance(currentVersion(), _maintenance);
     }
 
@@ -401,8 +416,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @param account Account to return for
      * @return The next maintenance requirement
      */
-    function maintenanceNext(address account) public view returns (UFixed18) {
-        (UFixed18 _maintenance, , , , , ) = parameter();
+    function maintenanceNext(address account) external view returns (UFixed18) {
+        (UFixed18 _maintenance, , , , , , ) = parameter();
         return _accounts[account].maintenanceNext(_pres[account], currentVersion(), _maintenance);
     }
 

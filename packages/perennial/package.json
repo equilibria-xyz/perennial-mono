@@ -10,6 +10,7 @@
   "scripts": {
     "build": "yarn compile",
     "compile": "hardhat compile",
+    "compile:optimizer": "OPTIMIZER_ENABLED=true hardhat compile",
     "deploy": "OPTIMIZER_ENABLED=true hardhat deploy",
     "verify": "hardhat etherscan-verify --sleep --solc-input",
     "gasReport": "REPORT_GAS=true yarn test:integration",

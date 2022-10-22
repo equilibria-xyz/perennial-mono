@@ -54,7 +54,7 @@ contract PerennialLens is IPerennialLens {
         _snapshot.rate = rate(product);
         _snapshot.dailyRate = dailyRate(product);
         _snapshot.latestVersion = latestVersion(product);
-        (_snapshot.maintenance, , , , , ) = product.parameter();
+        (_snapshot.maintenance, , , , , , ) = product.parameter();
         _snapshot.collateral = collateral(product);
         _snapshot.shortfall = shortfall(product);
         _snapshot.pre = pre(product);
@@ -138,8 +138,7 @@ contract PerennialLens is IPerennialLens {
         _info.symbol = symbol(product);
         _info.payoffDefinition = product.payoffDefinition();
         _info.oracle = product.oracle();
-        (_info.maintenance, _info.fundingFee, _info.makerFee, _info.makerFee, _info.positionFee, ) = product.parameter();
-        _info.makerLimit = product.makerLimit();
+        (_info.maintenance, _info.fundingFee, _info.makerFee, _info.makerFee, _info.positionFee, _info.makerLimit, ) = product.parameter();
         _info.utilizationCurve = product.utilizationCurve();
     }
 
@@ -406,7 +405,7 @@ contract PerennialLens is IPerennialLens {
         IProduct product,
         UFixed18 positionSize
     ) public settleAccount(account, product) returns (UFixed18) {
-        (UFixed18 _maintenance, , , , , ) = product.parameter();
+        (UFixed18 _maintenance, , , , , , ) = product.parameter();
         UFixed18 notional = positionSize.mul(_latestVersion(product).price.abs());
         return notional.mul(_maintenance);
     }
