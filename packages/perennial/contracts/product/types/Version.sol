@@ -61,7 +61,6 @@ library VersionLib {
      * @notice Accumulates the global state for the period from `period.fromVersion` to `period.toVersion`
      * @param versionAccumulator The struct to operate on
      * @param period The oracle version period to settle for
-     * @return newVersionAccumulator The resulting version after accumulation
      * @return newFeeAccumulator The fee accrued from opening or closing a new position
      */
     function accumulateAndSettle(
@@ -76,27 +75,45 @@ library VersionLib {
         UFixed18 minFundingFee,
         UFixed18 fundingFee,
         bool closed
-    ) internal pure returns (Version memory newVersionAccumulator, UFixed18 newFeeAccumulator) {
+    ) internal pure returns (UFixed18 newFeeAccumulator) {
         // unpack
         (Accumulator memory valueAccumulator, Accumulator memory shareAccumulator, Position memory latestPosition) =
             (versionAccumulator.value(), versionAccumulator.share(), versionAccumulator.position());
 
         // accumulate funding
-        (valueAccumulator, feeAccumulator) =
-            _accumulateFunding(valueAccumulator, feeAccumulator, latestPosition, period, utilizationCurve, minFundingFee, fundingFee, closed);
+        feeAccumulator = _accumulateFunding(
+            valueAccumulator,
+            feeAccumulator,
+            latestPosition,
+            period,
+            utilizationCurve,
+            minFundingFee,
+            fundingFee,
+            closed
+        );
 
         // accumulate position
-        (valueAccumulator) = _accumulatePosition(valueAccumulator, latestPosition, period, closed);
+        _accumulatePosition(valueAccumulator, latestPosition, period, closed);
 
         // accumulate share
-        (shareAccumulator) = _accumulateShare(shareAccumulator, latestPosition, period);
+        _accumulateShare(shareAccumulator, latestPosition, period);
 
         // accumulate position fee
-        (valueAccumulator, feeAccumulator) =
-            _accumulatePositionFee(valueAccumulator, feeAccumulator, period, latestPosition, pre, makerFee, takerFee, positionFee);
+        feeAccumulator = _accumulatePositionFee(
+            valueAccumulator,
+            feeAccumulator,
+            period,
+            latestPosition,
+            pre,
+            makerFee,
+            takerFee,
+            positionFee
+        );
 
         // pack
-        newVersionAccumulator = Version(valueAccumulator.pack(), shareAccumulator.pack(), latestPosition.next(pre).pack());
+        versionAccumulator._value = valueAccumulator.pack();
+        versionAccumulator._share = shareAccumulator.pack();
+        versionAccumulator._position = latestPosition.next(pre).pack();
         newFeeAccumulator = feeAccumulator.add(newFeeAccumulator);
     }
 
@@ -115,23 +132,32 @@ library VersionLib {
         UFixed18 minFundingFee,
         UFixed18 fundingFee,
         bool closed
-    ) internal pure returns (Version memory newVersionAccumulator, UFixed18 newFeeAccumulator) {
+    ) internal pure returns (UFixed18 newFeeAccumulator) {
         // unpack
         (Accumulator memory valueAccumulator, Accumulator memory shareAccumulator, Position memory latestPosition) =
             (versionAccumulator.value(), versionAccumulator.share(), versionAccumulator.position());
 
         // accumulate funding
-        (valueAccumulator, feeAccumulator) =
-            _accumulateFunding(valueAccumulator, feeAccumulator, latestPosition, period, utilizationCurve, minFundingFee, fundingFee, closed);
+        feeAccumulator = _accumulateFunding(
+            valueAccumulator,
+            feeAccumulator,
+            latestPosition,
+            period,
+            utilizationCurve,
+            minFundingFee,
+            fundingFee,
+            closed
+        );
 
         // accumulate position
-        (valueAccumulator) = _accumulatePosition(valueAccumulator, latestPosition, period, closed);
+        _accumulatePosition(valueAccumulator, latestPosition, period, closed);
 
         // accumulate share
-        (shareAccumulator) = _accumulateShare(shareAccumulator, latestPosition, period);
+        _accumulateShare(shareAccumulator, latestPosition, period);
 
-        // unpack
-        newVersionAccumulator = Version(valueAccumulator.pack(), shareAccumulator.pack(), versionAccumulator._position);
+        // pack
+        versionAccumulator._value = valueAccumulator.pack();
+        versionAccumulator._share = shareAccumulator.pack();
         newFeeAccumulator = feeAccumulator.add(newFeeAccumulator);
     }
 
@@ -143,7 +169,6 @@ library VersionLib {
      *      b - 1, and in the b -> c case the `PrePosition` is always empty so this is skipped.
      * @param latestPosition The latest global position
      * @param pre The global pre-position
-     * @return newValueAccumulator The total amount accumulated from position PNL
      * @return newFeeAccumulator The position fee that is retained by the protocol and product
      */
     function _accumulatePositionFee(
@@ -155,8 +180,8 @@ library VersionLib {
         UFixed18 makerFee,
         UFixed18 takerFee,
         UFixed18 positionFee
-    ) private pure returns (Accumulator memory newValueAccumulator, UFixed18 newFeeAccumulator) {
-        if (pre.isEmpty()) return (valueAccumulator, feeAccumulator);
+    ) private pure returns (UFixed18 newFeeAccumulator) {
+        if (pre.isEmpty()) return feeAccumulator;
 
         Position memory positionFeeAmount = pre.computeFee(period.fromVersion, makerFee, takerFee);
         Position memory protocolFeeAmount = positionFeeAmount.mul(positionFee);
@@ -165,19 +190,20 @@ library VersionLib {
 
         // If there are makers to distribute the taker's position fee to, distribute. Otherwise give it to the protocol
         if (!latestPosition.maker.isZero()) {
-            newValueAccumulator.maker = Fixed18Lib.from(positionFeeAmount.taker.div(latestPosition.maker));
+            valueAccumulator.maker = valueAccumulator.maker
+                .add(Fixed18Lib.from(positionFeeAmount.taker.div(latestPosition.maker)));
         } else {
             newFeeAccumulator = newFeeAccumulator.add(positionFeeAmount.taker);
         }
 
         // If there are takers to distribute the maker's position fee to, distribute. Otherwise give it to the protocol
         if (!latestPosition.taker.isZero()) {
-            newValueAccumulator.taker = Fixed18Lib.from(positionFeeAmount.maker.div(latestPosition.taker));
+            valueAccumulator.taker = valueAccumulator.taker
+                .add(Fixed18Lib.from(positionFeeAmount.maker.div(latestPosition.taker)));
         } else {
             newFeeAccumulator = newFeeAccumulator.add(positionFeeAmount.maker);
         }
 
-        newValueAccumulator = valueAccumulator.add(newValueAccumulator);
         newFeeAccumulator = feeAccumulator.add(newFeeAccumulator);
     }
 
@@ -188,7 +214,6 @@ library VersionLib {
      *      This is an acceptable approximation.
      * @param latestPosition The latest global position
      * @param period The oracle version period to settle for
-     * @return newValueAccumulator The total amount accumulated from funding
      * @return newFeeAccumulator The total fee accrued from funding accumulation
      */
     function _accumulateFunding(
@@ -200,10 +225,10 @@ library VersionLib {
         UFixed18 minFundingFee,
         UFixed18 fundingFee,
         bool closed
-    ) private pure returns (Accumulator memory newValueAccumulator, UFixed18 newFeeAccumulator) {
-        if (closed) return (valueAccumulator, feeAccumulator);
-        if (latestPosition.taker.isZero()) return (valueAccumulator, feeAccumulator);
-        if (latestPosition.maker.isZero()) return (valueAccumulator, feeAccumulator);
+    ) private pure returns (UFixed18 newFeeAccumulator) {
+        if (closed) return feeAccumulator;
+        if (latestPosition.taker.isZero()) return feeAccumulator;
+        if (latestPosition.maker.isZero()) return feeAccumulator;
 
         UFixed18 takerNotional = Fixed18Lib.from(latestPosition.taker).mul(period.fromVersion.price).abs();
         UFixed18 socializedNotional = takerNotional.mul(latestPosition.socializationFactor());
@@ -221,12 +246,14 @@ library VersionLib {
         );
 
         bool makerPaysFunding = fundingAccumulated.sign() < 0;
-        newValueAccumulator.maker = (makerPaysFunding ? fundingAccumulated : fundingAccumulatedWithoutFee)
+        valueAccumulator.maker = valueAccumulator.maker
+            .add(makerPaysFunding ? fundingAccumulated : fundingAccumulatedWithoutFee)
             .div(Fixed18Lib.from(latestPosition.maker));
-        newValueAccumulator.taker = (makerPaysFunding ? fundingAccumulatedWithoutFee : fundingAccumulated)
-            .div(Fixed18Lib.from(latestPosition.taker)).mul(Fixed18Lib.NEG_ONE);
+        valueAccumulator.taker = valueAccumulator.taker
+            .add(makerPaysFunding ? fundingAccumulatedWithoutFee : fundingAccumulated)
+            .div(Fixed18Lib.from(latestPosition.taker))
+            .mul(Fixed18Lib.NEG_ONE);
 
-        newValueAccumulator = valueAccumulator.add(newValueAccumulator);
         newFeeAccumulator = feeAccumulator.add(newFeeAccumulator);
     }
 
@@ -235,25 +262,27 @@ library VersionLib {
      * @param latestPosition The latest global position
      * @param period The oracle version period to settle for
      * @param closed Whether the product is closed
-     * @return newValueAccumulator The total amount accumulated from position PNL
      */
     function _accumulatePosition(
         Accumulator memory valueAccumulator,
         Position memory latestPosition,
         Period memory period,
         bool closed
-    ) private pure returns (Accumulator memory newValueAccumulator) {
-        if (closed) return valueAccumulator;
-        if (latestPosition.taker.isZero()) return valueAccumulator;
-        if (latestPosition.maker.isZero()) return valueAccumulator;
+    ) private pure {
+        if (closed) return;
+        if (latestPosition.taker.isZero()) return;
+        if (latestPosition.maker.isZero()) return;
 
         Fixed18 totalTakerDelta = period.priceDelta().mul(Fixed18Lib.from(latestPosition.taker));
         Fixed18 socializedTakerDelta = totalTakerDelta.mul(Fixed18Lib.from(latestPosition.socializationFactor()));
 
-        newValueAccumulator.maker = socializedTakerDelta.div(Fixed18Lib.from(latestPosition.maker)).mul(Fixed18Lib.NEG_ONE);
-        newValueAccumulator.taker = socializedTakerDelta.div(Fixed18Lib.from(latestPosition.taker));
-
-        newValueAccumulator = valueAccumulator.add(newValueAccumulator);
+        valueAccumulator.maker = valueAccumulator.maker
+            .add(socializedTakerDelta)
+            .div(Fixed18Lib.from(latestPosition.maker))
+            .mul(Fixed18Lib.NEG_ONE);
+        valueAccumulator.taker = valueAccumulator.taker
+            .add(socializedTakerDelta)
+            .div(Fixed18Lib.from(latestPosition.taker));
     }
 
     /**
@@ -261,22 +290,19 @@ library VersionLib {
      * @dev This is used to compute incentivization rewards based on market participation
      * @param latestPosition The latest global position
      * @param period The oracle version period to settle for
-     * @return newShareAccumulator The total share amount accumulated per position
      */
     function _accumulateShare(
         Accumulator memory shareAccumulator,
         Position memory latestPosition,
         Period memory period
-    ) private pure returns (Accumulator memory newShareAccumulator) {
+    ) private pure {
         UFixed18 elapsed = UFixed18Lib.from(period.toVersion.timestamp - period.fromVersion.timestamp);
 
-        newShareAccumulator.maker = latestPosition.maker.isZero() ?
-            Fixed18Lib.ZERO :
-            Fixed18Lib.from(elapsed.div(latestPosition.maker));
-        newShareAccumulator.taker = latestPosition.taker.isZero() ?
-            Fixed18Lib.ZERO :
-            Fixed18Lib.from(elapsed.div(latestPosition.taker));
-
-        newShareAccumulator = shareAccumulator.add(newShareAccumulator);
+        shareAccumulator.maker = latestPosition.maker.isZero() ?
+            shareAccumulator.maker :
+            shareAccumulator.maker.add(Fixed18Lib.from(elapsed.div(latestPosition.maker)));
+        shareAccumulator.taker = latestPosition.taker.isZero() ?
+            shareAccumulator.taker :
+            shareAccumulator.taker.add(Fixed18Lib.from(elapsed.div(latestPosition.taker)));
     }
 }

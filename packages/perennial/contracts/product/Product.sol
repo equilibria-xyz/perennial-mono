@@ -141,23 +141,11 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
                 context.oracleVersion :
                 atVersion(_latestVersion + 1);
 
-        // Load parameters
-//        UFixed18 fundingFee;
-//        UFixed18 positionFee;
-//        (
-//            context.maintenance,
-//            fundingFee,
-//            context.makerFee,
-//            context.takerFee,
-//            positionFee,
-//            context.makerLimit,
-//            context.closed
-//        ) = parameter();
         UFixed18 feeAccumulator;
         JumpRateUtilizationCurve memory _utilizationCurve = utilizationCurve();
 
         // a->b (and settle)
-        (context.version, feeAccumulator) = context.version.accumulateAndSettle(
+        (feeAccumulator) = context.version.accumulateAndSettle(
             feeAccumulator,
             pre(),
             Period(latestOracleVersion, settleOracleVersion),
@@ -173,7 +161,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
         // b->c
         if (settleOracleVersion.version != context.oracleVersion.version) { // skip is b == c
-            (context.version, feeAccumulator) = context.version.accumulate(
+            (feeAccumulator) = context.version.accumulate(
                 feeAccumulator,
                 Period(settleOracleVersion, context.oracleVersion),
                 _utilizationCurve,
@@ -240,8 +228,12 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         context.incentivizer.syncAccount(account, settleOracleVersion);
 
         // account a->b
-        (context.account, valueAccumulator) =
-            context.account.accumulateAndSettle(valueAccumulator, _pres[account], _versions[latestVersion_], settleVersion);
+        valueAccumulator = context.account.accumulateAndSettle(
+            valueAccumulator,
+            _pres[account],
+            _versions[latestVersion_],
+            settleVersion
+        );
 
         // short-circuit from a->c if b == c
         if (settleOracleVersion.version != context.oracleVersion.version) {
@@ -249,7 +241,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
             context.incentivizer.syncAccount(account, context.oracleVersion);
 
             // account b->c
-            (valueAccumulator) = context.account.accumulate(valueAccumulator, settleVersion, context.version);
+            valueAccumulator = context.account.accumulate(valueAccumulator, settleVersion, context.version);
         }
 
         // settle collateral
