@@ -83,7 +83,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
      */
     function _updateMaintenance(UFixed18 newMaintenance) private {
         _maintenance.store(newMaintenance);
-        emit MaintenanceUpdated(newMaintenance);
+        emit MaintenanceUpdated(newMaintenance, _productVersion());
     }
 
     /**
@@ -102,7 +102,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
     function _updateFundingFee(UFixed18 newFundingFee) private {
         if (newFundingFee.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidFundingFee();
         _fundingFee.store(newFundingFee);
-        emit FundingFeeUpdated(newFundingFee);
+        emit FundingFeeUpdated(newFundingFee, _productVersion());
     }
 
     /**
@@ -121,7 +121,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
     function _updateMakerFee(UFixed18 newMakerFee) private {
         if (newMakerFee.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidMakerFee();
         _makerFee.store(newMakerFee);
-        emit MakerFeeUpdated(newMakerFee);
+        emit MakerFeeUpdated(newMakerFee, _productVersion());
     }
 
     /**
@@ -156,7 +156,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
     function _updateTakerFee(UFixed18 newTakerFee) private {
         if (newTakerFee.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidTakerFee();
         _takerFee.store(newTakerFee);
-        emit TakerFeeUpdated(newTakerFee);
+        emit TakerFeeUpdated(newTakerFee, _productVersion());
     }
 
     /**
@@ -191,7 +191,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
     function _updatePositionFee(UFixed18 newPositionFee) private {
         if (newPositionFee.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidPositionFee();
         _positionFee.store(newPositionFee);
-        emit PositionFeeUpdated(newPositionFee);
+        emit PositionFeeUpdated(newPositionFee, _productVersion());
     }
 
     /**
@@ -225,7 +225,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
      */
     function _updateMakerLimit(UFixed18 newMakerLimit) private {
         _makerLimit.store(newMakerLimit);
-        emit MakerLimitUpdated(newMakerLimit);
+        emit MakerLimitUpdated(newMakerLimit, _productVersion());
     }
 
     /**
@@ -243,12 +243,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
      */
     function _updateUtilizationCurve(JumpRateUtilizationCurve memory newUtilizationCurve) private {
         _utilizationCurve.store(newUtilizationCurve);
-        emit JumpRateUtilizationCurveUpdated(
-            newUtilizationCurve.minRate.unpack(),
-            newUtilizationCurve.maxRate.unpack(),
-            newUtilizationCurve.targetRate.unpack(),
-            newUtilizationCurve.targetUtilization.unpack()
-        );
+        emit JumpRateUtilizationCurveUpdated(newUtilizationCurve, _productVersion());
     }
 
     /**
@@ -269,6 +264,12 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
 
         pendingFeeUpdates_.clear();
         _pendingFeeUpdates.store(pendingFeeUpdates_);
+    }
+
+    function _productVersion() private view returns (uint256) {
+        // If this product is being constructed then return 0
+        if (address(this).code.length == 0) { return 0; }
+        return IProduct(address(this)).latestVersion();
     }
 
     /**

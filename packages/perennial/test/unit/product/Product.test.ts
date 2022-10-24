@@ -155,18 +155,33 @@ describe('Product', () => {
     })
 
     it('correctly updates the params and calls settle for each update', async () => {
-      await product.updateMaintenance(utils.parseEther('0.1'))
-      await product.updateFundingFee(utils.parseEther('0.2'))
-      await product.updateMakerFee(utils.parseEther('0.3'))
-      await product.updateTakerFee(utils.parseEther('0.4'))
-      await product.updatePositionFee(utils.parseEther('0.43'))
-      await product.updateMakerLimit(utils.parseEther('0.5'))
-      await product.updateUtilizationCurve({
+      await expect(product.updateMaintenance(utils.parseEther('0.1')))
+        .to.emit(product, 'MaintenanceUpdated')
+        .withArgs(utils.parseEther('0.1'), 0)
+      await expect(product.updateFundingFee(utils.parseEther('0.2')))
+        .to.emit(product, 'FundingFeeUpdated')
+        .withArgs(utils.parseEther('0.2'), 0)
+      await expect(product.updateMakerFee(utils.parseEther('0.3')))
+        .to.emit(product, 'MakerFeeUpdated')
+        .withArgs(utils.parseEther('0.3'), 0)
+      await expect(product.updateTakerFee(utils.parseEther('0.4')))
+        .to.emit(product, 'TakerFeeUpdated')
+        .withArgs(utils.parseEther('0.4'), 0)
+      await expect(product.updatePositionFee(utils.parseEther('0.43')))
+        .to.emit(product, 'PositionFeeUpdated')
+        .withArgs(utils.parseEther('0.43'), 0)
+      await expect(product.updateMakerLimit(utils.parseEther('0.5')))
+        .to.emit(product, 'MakerLimitUpdated')
+        .withArgs(utils.parseEther('0.5'), 0)
+      const newCurve = {
         minRate: utils.parseEther('0.10'),
         maxRate: utils.parseEther('0.20'),
         targetRate: utils.parseEther('0.30'),
         targetUtilization: utils.parseEther('0.4'),
-      })
+      }
+      await expect(product.updateUtilizationCurve(newCurve))
+        .to.emit(product, 'JumpRateUtilizationCurveUpdated')
+        .withArgs(newCurve, 0)
 
       expect(product.settle).to.have.callCount(7)
 

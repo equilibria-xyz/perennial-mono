@@ -6,20 +6,18 @@ import "@equilibria/root/curve/types/JumpRateUtilizationCurve.sol";
 import "./types/PendingFeeUpdates.sol";
 
 interface IParamProvider {
-    event MaintenanceUpdated(UFixed18 newMaintenance);
-    event FundingFeeUpdated(UFixed18 newFundingFee);
-    event MakerFeeUpdated(UFixed18 newMakerFee);
+    event MaintenanceUpdated(UFixed18 newMaintenance, uint256 version);
+    event FundingFeeUpdated(UFixed18 newFundingFee, uint256 version);
+    event MakerFeeUpdated(UFixed18 newMakerFee, uint256 version);
     event PendingMakerFeeUpdated(UFixed18 newMakerFee);
-    event TakerFeeUpdated(UFixed18 newTakerFee);
+    event TakerFeeUpdated(UFixed18 newTakerFee, uint256 version);
     event PendingTakerFeeUpdated(UFixed18 newTakerFee);
-    event PositionFeeUpdated(UFixed18 newPositionFee);
+    event PositionFeeUpdated(UFixed18 newPositionFee, uint256 version);
     event PendingPositionFeeUpdated(UFixed18 newPositionFee);
-    event MakerLimitUpdated(UFixed18 newMakerLimit);
+    event MakerLimitUpdated(UFixed18 newMakerLimit, uint256 version);
     event JumpRateUtilizationCurveUpdated(
-        Fixed18 minRate,
-        Fixed18 maxRate,
-        Fixed18 targetRate,
-        UFixed18 targetUtilization
+        JumpRateUtilizationCurve,
+        uint256 version
     );
 
     error ParamProviderInvalidMakerFee();
