@@ -2,7 +2,7 @@ import { FakeContract, smock } from '@defi-wonderland/smock'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { expect, use } from 'chai'
 import HRE from 'hardhat'
-import { utils } from 'ethers'
+import { constants, utils } from 'ethers'
 
 import {
   ICollateral,
@@ -50,6 +50,7 @@ describe('MultiInvoker', () => {
     controller.incentivizer.returns(incentivizer.address)
     collateral.token.returns(dsu.address)
     batcher.RESERVE.returns(reserve.address)
+    batcher.DSU.returns(dsu.address)
 
     multiInvoker = await new MultiInvoker__factory(owner).deploy(usdc.address, batcher.address)
 
@@ -59,8 +60,12 @@ describe('MultiInvoker', () => {
     dsu.approve.whenCalledWith(batcher.address, ethers.constants.MaxUint256).returns(true)
     dsu.allowance.whenCalledWith(multiInvoker.address, reserve.address).returns(0)
     dsu.approve.whenCalledWith(reserve.address, ethers.constants.MaxUint256).returns(true)
+    dsu.balanceOf.whenCalledWith(batcher.address).returns(constants.MaxUint256)
+
     usdc.allowance.whenCalledWith(multiInvoker.address, batcher.address).returns(0)
     usdc.approve.whenCalledWith(batcher.address, ethers.constants.MaxUint256).returns(true)
+    usdc.allowance.whenCalledWith(multiInvoker.address, reserve.address).returns(0)
+    usdc.approve.whenCalledWith(reserve.address, ethers.constants.MaxUint256).returns(true)
 
     await multiInvoker.initialize(controller.address)
   })
@@ -79,6 +84,7 @@ describe('MultiInvoker', () => {
       expect(dsu.approve).to.be.calledWith(collateral.address, ethers.constants.MaxUint256)
       expect(dsu.approve).to.be.calledWith(reserve.address, ethers.constants.MaxUint256)
       expect(usdc.approve).to.be.calledWith(batcher.address, ethers.constants.MaxUint256)
+      expect(usdc.approve).to.be.calledWith(reserve.address, ethers.constants.MaxUint256)
     })
   })
 
@@ -148,6 +154,17 @@ describe('MultiInvoker', () => {
 
       expect(usdc.transferFrom).to.have.been.calledWith(user.address, multiInvoker.address, usdcAmount)
       expect(batcher.wrap).to.have.been.calledWith(amount, user.address)
+    })
+
+    it('wraps USDC to DSU using RESERVE on WRAP action if amount is greater than batcher balance', async () => {
+      dsu.balanceOf.whenCalledWith(batcher.address).returns(0)
+      dsu.transfer.whenCalledWith(user.address, amount).returns(true)
+
+      await multiInvoker.connect(user).invoke([actions.WRAP])
+
+      expect(usdc.transferFrom).to.have.been.calledWith(user.address, multiInvoker.address, usdcAmount)
+      expect(reserve.mint).to.have.been.calledWith(amount)
+      expect(dsu.transfer).to.have.been.calledWith(user.address, amount)
     })
 
     it('unwraps DSU to USDC on UNWRAP action', async () => {
