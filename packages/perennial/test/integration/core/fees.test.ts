@@ -420,4 +420,169 @@ describe('Fees', () => {
       )
     })
   })
+
+  describe('fee updates', () => {
+    const NEW_MAKER_FEE_RATE = utils.parseEther('0.03')
+    const NEW_TAKER_FEE_RATE = utils.parseEther('0.04')
+    const NEW_POSITION_FEE_RATE = utils.parseEther('0.05')
+
+    context('no pending pre positions', () => {
+      it('updates the fees immediately', async () => {
+        await expect(product.updateMakerFee(NEW_MAKER_FEE_RATE))
+          .to.emit(product, 'MakerFeeUpdated')
+          .withArgs(NEW_MAKER_FEE_RATE)
+        await expect(product.updateTakerFee(NEW_TAKER_FEE_RATE))
+          .to.emit(product, 'TakerFeeUpdated')
+          .withArgs(NEW_TAKER_FEE_RATE)
+        await expect(product.updatePositionFee(NEW_POSITION_FEE_RATE))
+          .to.emit(product, 'PositionFeeUpdated')
+          .withArgs(NEW_POSITION_FEE_RATE)
+
+        expect(await product.makerFee()).to.equal(NEW_MAKER_FEE_RATE)
+        expect(await product.takerFee()).to.equal(NEW_TAKER_FEE_RATE)
+        expect(await product.positionFee()).to.equal(NEW_POSITION_FEE_RATE)
+      })
+    })
+
+    context('pending pre positions that can be settled', () => {
+      beforeEach(async () => {
+        const { user, userB, chainlink } = instanceVars
+        await depositTo(instanceVars, user, product, INITIAL_COLLATERAL)
+        await depositTo(instanceVars, userB, product, INITIAL_COLLATERAL)
+
+        await product.connect(user).openMake(MAKER_POSITION)
+        await product.connect(userB).openMake(TAKER_POSITION)
+
+        await chainlink.next()
+      })
+
+      it('settles before updating maker fee', async () => {
+        await expect(product.updateMakerFee(NEW_MAKER_FEE_RATE))
+          .to.emit(product, 'MakerFeeUpdated')
+          .withArgs(NEW_MAKER_FEE_RATE)
+          .to.emit(product, 'Settle')
+          .withArgs(2473, 2473)
+
+        expect(await product.makerFee()).to.equal(NEW_MAKER_FEE_RATE)
+      })
+
+      it('settles before updating taker fee', async () => {
+        await expect(product.updateTakerFee(NEW_TAKER_FEE_RATE))
+          .to.emit(product, 'TakerFeeUpdated')
+          .withArgs(NEW_TAKER_FEE_RATE)
+          .to.emit(product, 'Settle')
+          .withArgs(2473, 2473)
+
+        expect(await product.takerFee()).to.equal(NEW_TAKER_FEE_RATE)
+      })
+
+      it('settles before updating position fee', async () => {
+        await expect(product.updatePositionFee(NEW_POSITION_FEE_RATE))
+          .to.emit(product, 'PositionFeeUpdated')
+          .withArgs(NEW_POSITION_FEE_RATE)
+          .to.emit(product, 'Settle')
+          .withArgs(2473, 2473)
+
+        expect(await product.positionFee()).to.equal(NEW_POSITION_FEE_RATE)
+      })
+    })
+
+    context("pending pre positions that can't be settled", async () => {
+      beforeEach(async () => {
+        const { user, userB } = instanceVars
+        await depositTo(instanceVars, user, product, INITIAL_COLLATERAL)
+        await depositTo(instanceVars, userB, product, INITIAL_COLLATERAL)
+
+        await product.connect(user).openMake(MAKER_POSITION)
+        await product.connect(userB).openMake(TAKER_POSITION)
+      })
+
+      it('puts the maker fee change in pending and updates on next settle', async () => {
+        const { chainlink } = instanceVars
+
+        await expect(product.updateMakerFee(NEW_MAKER_FEE_RATE))
+          .to.emit(product, 'PendingMakerFeeUpdated')
+          .withArgs(NEW_MAKER_FEE_RATE)
+
+        expect(await product.makerFee()).to.equal(MAKER_FEE_RATE)
+        expect((await product.pendingFeeUpdates()).pendingMakerFee).to.equal(NEW_MAKER_FEE_RATE)
+
+        await chainlink.next()
+
+        await expect(product.settle()).to.emit(product, 'MakerFeeUpdated').withArgs(NEW_MAKER_FEE_RATE)
+
+        expect(await product.makerFee()).to.equal(NEW_MAKER_FEE_RATE)
+      })
+
+      it('puts the taker fee change in pending and updates on next settle', async () => {
+        const { chainlink } = instanceVars
+
+        await expect(product.updateTakerFee(NEW_TAKER_FEE_RATE))
+          .to.emit(product, 'PendingTakerFeeUpdated')
+          .withArgs(NEW_TAKER_FEE_RATE)
+
+        expect(await product.takerFee()).to.equal(TAKER_FEE_RATE)
+        expect((await product.pendingFeeUpdates()).pendingTakerFee).to.equal(NEW_TAKER_FEE_RATE)
+
+        await chainlink.next()
+
+        await expect(product.settle()).to.emit(product, 'TakerFeeUpdated').withArgs(NEW_TAKER_FEE_RATE)
+
+        expect(await product.takerFee()).to.equal(NEW_TAKER_FEE_RATE)
+      })
+
+      it('puts the position fee change in pending and updates on next settle', async () => {
+        const { chainlink } = instanceVars
+
+        await expect(product.updatePositionFee(NEW_POSITION_FEE_RATE))
+          .to.emit(product, 'PendingPositionFeeUpdated')
+          .withArgs(NEW_POSITION_FEE_RATE)
+
+        expect(await product.positionFee()).to.equal(POSITION_FEE_RATE)
+        expect((await product.pendingFeeUpdates()).pendingPositionFee).to.equal(NEW_POSITION_FEE_RATE)
+
+        await chainlink.next()
+
+        await expect(product.settle()).to.emit(product, 'PositionFeeUpdated').withArgs(NEW_POSITION_FEE_RATE)
+
+        expect(await product.positionFee()).to.equal(NEW_POSITION_FEE_RATE)
+      })
+
+      it('batches multiple fee updates and updates all on next settle', async () => {
+        const { chainlink } = instanceVars
+
+        await expect(product.updateMakerFee(NEW_MAKER_FEE_RATE))
+          .to.emit(product, 'PendingMakerFeeUpdated')
+          .withArgs(NEW_MAKER_FEE_RATE)
+        await expect(product.updateTakerFee(NEW_TAKER_FEE_RATE))
+          .to.emit(product, 'PendingTakerFeeUpdated')
+          .withArgs(NEW_TAKER_FEE_RATE)
+        await expect(product.updatePositionFee(NEW_POSITION_FEE_RATE))
+          .to.emit(product, 'PendingPositionFeeUpdated')
+          .withArgs(NEW_POSITION_FEE_RATE)
+
+        expect(await product.makerFee()).to.equal(MAKER_FEE_RATE)
+        expect(await product.takerFee()).to.equal(TAKER_FEE_RATE)
+        expect(await product.positionFee()).to.equal(POSITION_FEE_RATE)
+        const pendingFees = await product.pendingFeeUpdates()
+        expect(pendingFees.pendingMakerFee).to.equal(NEW_MAKER_FEE_RATE)
+        expect(pendingFees.pendingTakerFee).to.equal(NEW_TAKER_FEE_RATE)
+        expect(pendingFees.pendingPositionFee).to.equal(NEW_POSITION_FEE_RATE)
+
+        await chainlink.next()
+
+        await expect(product.settle())
+          .to.emit(product, 'MakerFeeUpdated')
+          .withArgs(NEW_MAKER_FEE_RATE)
+          .to.emit(product, 'TakerFeeUpdated')
+          .withArgs(NEW_TAKER_FEE_RATE)
+          .to.emit(product, 'PositionFeeUpdated')
+          .withArgs(NEW_POSITION_FEE_RATE)
+
+        expect(await product.makerFee()).to.equal(NEW_MAKER_FEE_RATE)
+        expect(await product.takerFee()).to.equal(NEW_TAKER_FEE_RATE)
+        expect(await product.positionFee()).to.equal(NEW_POSITION_FEE_RATE)
+      })
+    })
+  })
 })
