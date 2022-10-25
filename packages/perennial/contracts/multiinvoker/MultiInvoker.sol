@@ -11,7 +11,7 @@ import "../interfaces/IMultiInvoker.sol";
 
 contract MultiInvoker is IMultiInvoker, UInitializable, UControllerProvider {
     /// @dev USDC stablecoin address
-    Token6 public immutable USDC;
+    Token6 public immutable USDC; // solhint-disable-line var-name-mixedcase
 
     /// @dev Batcher address
     Batcher public immutable batcher;
