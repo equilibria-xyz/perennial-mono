@@ -268,7 +268,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
 
     function _productVersion() private view returns (uint256) {
         // If this product is being constructed then return 0
-        if (address(this).code.length == 0) { return 0; }
+        if (!Address.isContract(address(this))) return 0;
         return IProduct(address(this)).latestVersion();
     }
 
