@@ -22,6 +22,7 @@ describe('MultiInvoker', () => {
       expect(await dsu.allowance(multiInvoker.address, collateral.address)).to.equal(constants.MaxUint256)
       expect(await dsu.allowance(multiInvoker.address, await batcher.RESERVE())).to.equal(constants.MaxUint256)
       expect(await usdc.allowance(multiInvoker.address, batcher.address)).to.equal(constants.MaxUint256)
+      expect(await usdc.allowance(multiInvoker.address, await batcher.RESERVE())).to.equal(constants.MaxUint256)
     })
 
     it('reverts if already initialized', async () => {
@@ -65,6 +66,25 @@ describe('MultiInvoker', () => {
       const receipt = await tx.wait()
       expect(receipt.status).to.equal(1)
       expect(receipt.logs.length).to.equal(0)
+    })
+
+    it('calls the reserve directly if WRAP amount is greater than batcher balance', async () => {
+      const { user, dsu, batcher, usdc, usdcHolder, multiInvoker } = instanceVars
+
+      await usdc.connect(usdcHolder).transfer(user.address, 1_000_000e6)
+
+      const amount = utils.parseEther('2000000')
+      const WRAP = {
+        action: 8,
+        args: utils.defaultAbiCoder.encode(['address', 'uint'], [user.address, amount]),
+      }
+      await expect(multiInvoker.connect(user).invoke([WRAP]))
+        .to.emit(usdc, 'Transfer')
+        .withArgs(user.address, multiInvoker.address, 2_000_000e6)
+        .to.emit(batcher.RESERVE(), 'Mint')
+        .withArgs(multiInvoker.address, amount)
+        .to.emit(dsu, 'Transfer')
+        .withArgs(multiInvoker.address, user.address, amount)
     })
 
     it('performs a WRAP, DEPOSIT, and OPEN_MAKE chain', async () => {

@@ -41,6 +41,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable, UControllerProvider {
         token.approve(address(_collateral));
         token.approve(address(batcher.RESERVE()));
         USDC.approve(address(batcher));
+        USDC.approve(address(batcher.RESERVE()));
     }
 
     /**
@@ -124,8 +125,15 @@ contract MultiInvoker is IMultiInvoker, UInitializable, UControllerProvider {
         // Pull USDC from the `msg.sender`
         USDC.pull(msg.sender, amount, true);
 
-        // Wrap the USDC into DSU and return to the receiver
-        batcher.wrap(amount, receiver);
+        Token18 token = controller().collateral().token();
+        // If the batcher doesn't have enough for this wrap, go directly to the reserve
+        if (amount.gt(token.balanceOf(address(batcher)))) {
+            batcher.RESERVE().mint(amount);
+            token.push(receiver, amount);
+        } else {
+            // Wrap the USDC into DSU and return to the receiver
+            batcher.wrap(amount, receiver);
+        }
     }
 
     /**
