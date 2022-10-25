@@ -111,6 +111,7 @@ library PendingFeeUpdatesStorageLib {
     function _storagePointer(
         PendingFeeUpdatesStorage self
     ) private pure returns (PendingFeeUpdatesStoragePointer storage pointer) {
-        assembly ("memory-safe") { pointer.slot := self }
+        /// @solidity memory-safe-assembly
+        assembly { pointer.slot := self } // solhint-disable-line no-inline-assembly
     }
 }
