@@ -44,68 +44,38 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
     }
 
     /// @dev The maintenance value
-    UFixed18Storage private constant _maintenance =
-        UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.maintenance"));
-
-    function maintenance() public view returns (UFixed18) {
-        return _maintenance.read();
-    }
+    UFixed18Storage private constant _maintenance = UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.maintenance"));
+    function maintenance() public view returns (UFixed18) { return _maintenance.read(); }
 
     /// @dev The funding fee value
-    UFixed18Storage private constant _fundingFee =
-        UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.fundingFee"));
-
-    function fundingFee() public view returns (UFixed18) {
-        return _fundingFee.read();
-    }
+    UFixed18Storage private constant _fundingFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.fundingFee"));
+    function fundingFee() public view returns (UFixed18) { return _fundingFee.read(); }
 
     /// @dev The maker fee value
-    UFixed18Storage private constant _makerFee =
-        UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.makerFee"));
-
-    function makerFee() public view returns (UFixed18) {
-        return _makerFee.read();
-    }
+    UFixed18Storage private constant _makerFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.makerFee"));
+    function makerFee() public view returns (UFixed18) { return _makerFee.read(); }
 
     /// @dev The taker fee value
-    UFixed18Storage private constant _takerFee =
-        UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.takerFee"));
-
-    function takerFee() public view returns (UFixed18) {
-        return _takerFee.read();
-    }
+    UFixed18Storage private constant _takerFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.takerFee"));
+    function takerFee() public view returns (UFixed18) { return _takerFee.read(); }
 
     /// @dev The positon fee share value
-    UFixed18Storage private constant _positionFee =
-        UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.positionFee"));
-
-    function positionFee() public view returns (UFixed18) {
-        return _positionFee.read();
-    }
+    UFixed18Storage private constant _positionFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.positionFee"));
+    function positionFee() public view returns (UFixed18) { return _positionFee.read(); }
 
     /// @dev The maker limit value
-    UFixed18Storage private constant _makerLimit =
-        UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.makerLimit"));
-
-    function makerLimit() public view returns (UFixed18) {
-        return _makerLimit.read();
-    }
+    UFixed18Storage private constant _makerLimit = UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.makerLimit"));
+    function makerLimit() public view returns (UFixed18) { return _makerLimit.read(); }
 
     /// @dev The JumpRateUtilizationCurve params
     JumpRateUtilizationCurveStorage private constant _utilizationCurve =
         JumpRateUtilizationCurveStorage.wrap(keccak256("equilibria.perennial.UParamProvider.jumpRateUtilizationCurve"));
-
-    function utilizationCurve() public view returns (JumpRateUtilizationCurve memory) {
-        return _utilizationCurve.read();
-    }
+    function utilizationCurve() public view returns (JumpRateUtilizationCurve memory) { return _utilizationCurve.read(); }
 
     /// @dev The pending fee updates value
     PendingFeeUpdatesStorage private constant _pendingFeeUpdates =
         PendingFeeUpdatesStorage.wrap(keccak256("equilibria.perennial.UParamProvider.pendingFeeUpdates"));
-
-    function pendingFeeUpdates() public view returns (PendingFeeUpdates memory) {
-        return _pendingFeeUpdates.read();
-    }
+    function pendingFeeUpdates() public view returns (PendingFeeUpdates memory) { return _pendingFeeUpdates.read(); }
 
     /**
      * @notice Updates the maintenance to `newMaintenance`
@@ -281,11 +251,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
      * @dev only callable by product owner
      * @param newUtilizationCurve new utilization curve value
      */
-    function updateUtilizationCurve(JumpRateUtilizationCurve calldata newUtilizationCurve)
-        external
-        onlyProductOwner
-        settleProduct
-    {
+    function updateUtilizationCurve(JumpRateUtilizationCurve calldata newUtilizationCurve) external onlyProductOwner settleProduct {
         _updateUtilizationCurve(newUtilizationCurve);
     }
 
@@ -315,7 +281,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
     }
 
     /// @dev Only allow the Product's coordinator owner to call
-    modifier onlyProductOwner() {
+    modifier onlyProductOwner {
         uint256 coordinatorId = controller().coordinatorFor(IProduct(address(this)));
         if (controller().owner(coordinatorId) != msg.sender) revert NotOwnerError(coordinatorId);
 
@@ -323,7 +289,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
     }
 
     /// @dev Settles the product
-    modifier settleProduct() {
+    modifier settleProduct {
         IProduct(address(this)).settle();
 
         _;
