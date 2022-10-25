@@ -1653,58 +1653,6 @@ describe('Product', () => {
         })
         expect(await product['latestVersion(address)'](user.address)).to.equal(3)
       })
-
-      it('opens the position with settle after liquidation', async () => {
-        await product.connect(user).openTake(POSITION)
-
-        await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
-        await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
-        await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
-        await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_2)
-
-        // Liquidate the user
-        await product.connect(collateralSigner).closeAll(user.address)
-        // User can't open a new position yet
-        await expect(product.connect(user).openTake(POSITION)).to.be.revertedWith('ProductInLiquidationError()')
-
-        // Advance version
-        await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
-        await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_3)
-        await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3).returns()
-        await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_3)
-
-        // Liquidation flag is cleared during settle flow
-        await expect(product.connect(user).openTake(POSITION))
-          .to.emit(product, 'TakeOpened')
-          .withArgs(user.address, 3, POSITION)
-      })
-
-      it('reverts if taker > maker', async () => {
-        const socialization = utils.parseEther('0.5')
-        await expect(product.connect(user).openTake(POSITION.mul(4))).to.be.revertedWith(
-          `ProductInsufficientLiquidityError(${socialization})`,
-        )
-      })
-
-      it('reverts if double sided position', async () => {
-        await product.connect(user).openMake(POSITION)
-        await expect(product.connect(user).openTake(POSITION)).to.be.revertedWith('ProductDoubleSidedError()')
-      })
-
-      it('reverts if in liquidation', async () => {
-        await product.connect(collateralSigner).closeAll(user.address)
-        await expect(product.connect(user).openTake(POSITION)).to.be.revertedWith('ProductInLiquidationError()')
-      })
-
-      it('reverts if paused', async () => {
-        await controller.mock.paused.withArgs().returns(true)
-        await expect(product.connect(user).openTake(POSITION)).to.be.revertedWith('PausedError()')
-      })
-
-      it('reverts if closed', async () => {
-        await product.updateClosed(true)
-        await expect(product.connect(user).openTake(POSITION)).to.be.revertedWith('ProductClosedError()')
-      })
     })
 
     context('#closeTake', async () => {
