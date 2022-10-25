@@ -25,6 +25,8 @@ export function isTestnet(networkName: string): boolean {
     case 'goerli':
     case 'rinkeby':
       return true
+    case 'localhost':
+      return process.env.FORK_ENABLED === 'true' && ['goerli, kovan'].indexOf(process.env.FORK_NETWORK || '') >= 0
     default:
       return false
   }
@@ -35,6 +37,8 @@ export function isMainnet(networkName: string): boolean {
     case 'mainnet':
     case 'mainnet-fork':
       return true
+    case 'localhost':
+      return process.env.FORK_ENABLED === 'true' && process.env.FORK_NETWORK === 'mainnet'
     default:
       return false
   }
