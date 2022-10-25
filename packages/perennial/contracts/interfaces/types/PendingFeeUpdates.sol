@@ -96,24 +96,21 @@ library PendingFeeUpdatesLib {
  * @notice Library that surfaces storage read and writes for the PendingFeeUpdates type
  */
 library PendingFeeUpdatesStorageLib {
+    struct PendingFeeUpdatesStoragePointer {
+        PendingFeeUpdates value;
+    }
+
     function read(PendingFeeUpdatesStorage self) internal view returns (PendingFeeUpdates memory) {
-        return _storagePointer(self);
+        return _storagePointer(self).value;
     }
 
     function store(PendingFeeUpdatesStorage self, PendingFeeUpdates memory value) internal {
-        PendingFeeUpdates storage storagePointer = _storagePointer(self);
-
-        storagePointer.makerFeeUpdated = value.makerFeeUpdated;
-        storagePointer.pendingMakerFee = value.pendingMakerFee;
-        storagePointer.takerFeeUpdated = value.takerFeeUpdated;
-        storagePointer.pendingTakerFee = value.pendingTakerFee;
-        storagePointer.positionFeeUpdated = value.positionFeeUpdated;
-        storagePointer.pendingPositionFee = value.pendingPositionFee;
+        _storagePointer(self).value = value;
     }
 
     function _storagePointer(
         PendingFeeUpdatesStorage self
-    ) private pure returns (PendingFeeUpdates storage pointer) {
-        assembly { pointer.slot := self }
+    ) private pure returns (PendingFeeUpdatesStoragePointer storage pointer) {
+        assembly ("memory-safe") { pointer.slot := self }
     }
 }
