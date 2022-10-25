@@ -110,7 +110,7 @@ export default function defaultConfig({
               ? {}
               : {
                   '*': {
-                    '*': ['storageLayout'],
+                    '*': ['storageLayout'], // This is needed by Smock for mocking functions
                   },
                 },
           },

@@ -32,7 +32,7 @@ const MINIMUM_CONTRACT_SIZE_SOLIDITY_OVERRIDES = {
         }
       : {
           '*': {
-            '*': ['storageLayout'],
+            '*': ['storageLayout'], // This is needed by Smock for mocking functions
           },
         },
   },
