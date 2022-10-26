@@ -1,0 +1,70 @@
+import { expect } from 'chai'
+import HRE from 'hardhat'
+import { constants, utils } from 'ethers'
+import { Deployment } from 'hardhat-deploy/types'
+import { Controller, Controller__factory, Product, Product__factory } from '../../../types/generated'
+
+const { ethers } = HRE
+
+describe('Product - Short Ether - Mainnet Verification', () => {
+  let deployments: { [name: string]: Deployment }
+  let controller: Controller
+  let shortEther: Product
+
+  beforeEach(async () => {
+    const [signer] = await ethers.getSigners()
+    deployments = await HRE.deployments.all()
+    controller = Controller__factory.connect(deployments['Controller_Proxy'].address, signer)
+    shortEther = Product__factory.connect(deployments['Product_ShortEther'].address, signer)
+  })
+
+  it('is already initialized', async () => {
+    await expect(
+      shortEther.callStatic.initialize({
+        name: 'Ether',
+        symbol: 'ETH',
+        payoffDefinition: {
+          payoffDirection: 0,
+          payoffType: 0,
+          data: '0x000000000000000000000000000000000000000000000000000000000000',
+        },
+        oracle: constants.AddressZero,
+        maintenance: 0,
+        fundingFee: 0,
+        makerFee: 0,
+        takerFee: 0,
+        makerLimit: 0,
+        utilizationCurve: {
+          minRate: 0,
+          maxRate: 0,
+          targetRate: 0,
+          targetUtilization: 0,
+        },
+      }),
+    ).to.be.revertedWith('UInitializableAlreadyInitializedError')
+  })
+
+  it('has the correct parameters and configuration', async () => {
+    it('has the correct parameters and configuration', async () => {
+      expect(await shortEther.controller()).to.equal(controller.address)
+
+      const payoffDefinition = await shortEther.payoffDefinition()
+      expect(payoffDefinition.payoffType).to.equal(0) // Passthrough
+      expect(payoffDefinition.payoffDirection).to.equal(1) // Short
+      expect(payoffDefinition.data).to.equal('0x000000000000000000000000000000000000000000000000000000000000') // Unused
+
+      expect(await shortEther['maintenance()']()).to.equal(utils.parseEther('0.2'))
+      expect(await shortEther.fundingFee()).to.equal(0)
+      expect(await shortEther.makerFee()).to.equal(0)
+      expect(await shortEther.takerFee()).to.equal(0)
+      expect(await shortEther.makerLimit()).to.equal(0 /* utils.parseEther('2000') */)
+      expect(await shortEther.oracle()).to.equal(deployments['ChainlinkOracle_ETH'].address)
+
+      const utilizationCurve = await shortEther.utilizationCurve()
+      expect(utilizationCurve.minRate).to.equal(utils.parseEther('0.02'))
+      expect(utilizationCurve.maxRate).to.equal(utils.parseEther('1.25'))
+      expect(utilizationCurve.targetRate).to.equal(utils.parseEther('0.25'))
+      expect(utilizationCurve.targetUtilization).to.equal(utils.parseEther('0.8'))
+    })
+  })
+})
