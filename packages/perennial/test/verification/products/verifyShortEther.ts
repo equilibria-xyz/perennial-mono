@@ -48,6 +48,10 @@ describe('Product - Short Ether - Mainnet Verification', () => {
     it('has the correct parameters and configuration', async () => {
       expect(await shortEther.controller()).to.equal(controller.address)
 
+      expect(await shortEther.name()).to.equal('Ether')
+      expect(await shortEther.symbol()).to.equal('ETH')
+      expect(await shortEther.closed()).to.be.false
+
       const payoffDefinition = await shortEther.payoffDefinition()
       expect(payoffDefinition.payoffType).to.equal(0) // Passthrough
       expect(payoffDefinition.payoffDirection).to.equal(1) // Short

@@ -56,7 +56,7 @@ describe('Core - Mainnet Verification', () => {
     })
 
     it('has the correct parameters and configuration', async () => {
-      const timelockAddress = '0xA20ea565cD799e01A86548af5a2929EB7c767fC9' // deployments['TimelockController'].address
+      const timelockAddress = '0xA20ea565cD799e01A86548af5a2929EB7c767fC9' // timelock.address
 
       expect(await controller.collateral()).to.equal(collateral.address)
       expect(await controller.incentivizer()).to.equal(incentivizer.address)

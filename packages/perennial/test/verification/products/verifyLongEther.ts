@@ -47,6 +47,10 @@ describe('Product - Long Ether - Mainnet Verification', () => {
   it('has the correct parameters and configuration', async () => {
     expect(await longEther.controller()).to.equal(controller.address)
 
+    expect(await longEther.name()).to.equal('Ether')
+    expect(await longEther.symbol()).to.equal('ETH')
+    expect(await longEther.closed()).to.be.false
+
     const payoffDefinition = await longEther.payoffDefinition()
     expect(payoffDefinition.payoffType).to.equal(0) // Passthrough
     expect(payoffDefinition.payoffDirection).to.equal(0) // Long
