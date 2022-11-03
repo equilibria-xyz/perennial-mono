@@ -89,7 +89,6 @@ describe('Core - Mainnet Verification', () => {
       )
       expect(await controller.paused()).to.be.false
 
-      // TODO: verify product ownership
       const longEtherAddress = deployments['Product_LongEther'].address
       expect(await controller.isProduct(longEtherAddress)).to.be.true
       expect(await controller.coordinatorFor(longEtherAddress)).to.equal(1)
