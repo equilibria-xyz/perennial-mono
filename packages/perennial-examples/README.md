@@ -30,7 +30,7 @@ Run the Mocha tests:
 $ yarn test
 ```
 
-To run integration tests against a Mainnet fork, set your `ALCHEMY_MAINNET` in `.env` and run
+To run integration tests against a Mainnet fork, set your `MAINNET_NODE_URL` in `.env` and run
 
 ```sh
 $ yarn test:integration
@@ -55,4 +55,3 @@ $ yarn deploy --network <network>
 ```sh
 $ yarn verify --network <network>
 ```
-
