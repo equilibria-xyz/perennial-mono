@@ -96,6 +96,11 @@ contract MultiInvoker is IMultiInvoker, UInitializable, UControllerProvider {
             } else if (invocation.action == PerennialAction.UNWRAP) {
                 (address receiver, UFixed18 amount) = abi.decode(invocation.args, (address, UFixed18));
                 unwrap(receiver, amount);
+
+            // Wrap `msg.sender`s USDC into DSU and deposit into `account`s `product` collateral account
+            } else if (invocation.action == PerennialAction.WRAP_AND_DEPOSIT) {
+                (address account, IProduct product, UFixed18 amount) = abi.decode(invocation.args, (address, IProduct, UFixed18));
+                wrapAndDeposit(account, product, amount);
             }
         }
     }
@@ -151,5 +156,28 @@ contract MultiInvoker is IMultiInvoker, UInitializable, UControllerProvider {
 
         // Push the amount to the receiver
         USDC.push(receiver, amount);
+    }
+
+    /**
+     * @notice Wraps `amount` USDC from `msg.sender` into DSU, then deposits the USDC into `account`s `product` collateral account
+     * @param account Account to deposit funds on behalf of
+     * @param product Product to deposit funds for
+     * @param amount Amount of USDC to deposit into the collateral account
+     */
+    function wrapAndDeposit(address account, IProduct product, UFixed18 amount) private {
+        // Pull USDC from the `msg.sender`
+        USDC.pull(msg.sender, amount, true);
+
+        ICollateral _collateral = controller().collateral();
+        // If the batcher doesn't have enough for this wrap, go directly to the reserve
+        if (amount.gt(_collateral.token().balanceOf(address(batcher)))) {
+            batcher.RESERVE().mint(amount);
+        } else {
+            // Wrap the USDC into DSU
+            batcher.wrap(amount, address(this));
+        }
+
+        // Deposit the amount to the collateral account
+        _collateral.depositTo(account, product, amount);
     }
 }

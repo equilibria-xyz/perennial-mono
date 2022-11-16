@@ -19,7 +19,8 @@ interface IMultiInvoker {
         CLOSE_MAKE,
         CLAIM,
         WRAP,
-        UNWRAP
+        UNWRAP,
+        WRAP_AND_DEPOSIT
     }
 
     /// @dev Struct for action invocation
