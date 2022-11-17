@@ -13,6 +13,7 @@ export type InvokerAction =
   | 'WRAP'
   | 'UNWRAP'
   | 'WRAP_AND_DEPOSIT'
+  | 'WITHDRAW_AND_UNWRAP'
 
 export const buildInvokerActions = (
   userAddress: string,
@@ -64,6 +65,10 @@ export const buildInvokerActions = (
     },
     WRAP_AND_DEPOSIT: {
       action: 10,
+      args: utils.defaultAbiCoder.encode(['address', 'address', 'uint'], [userAddress, productAddress, amount]),
+    },
+    WITHDRAW_AND_UNWRAP: {
+      action: 11,
       args: utils.defaultAbiCoder.encode(['address', 'address', 'uint'], [userAddress, productAddress, amount]),
     },
   }

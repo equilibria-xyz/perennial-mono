@@ -102,6 +102,12 @@ contract MultiInvoker is IMultiInvoker, UInitializable, UControllerProvider {
                 (address account, IProduct product, UFixed18 amount) = abi.decode(invocation.args, (address, IProduct, UFixed18));
                 wrapAndDeposit(account, product, amount);
             }
+
+            // Withdraw DSU from `msg.sender`s `product` collateral account, unwrap into USDC, and return the USDC to `account`
+            else if (invocation.action == PerennialAction.WITHDRAW_AND_UNWRAP) {
+                (address receiver, IProduct product, UFixed18 amount) = abi.decode(invocation.args, (address, IProduct, UFixed18));
+                withdrawAndUnwrap(receiver, product, amount);
+            }
         }
     }
 
@@ -179,5 +185,17 @@ contract MultiInvoker is IMultiInvoker, UInitializable, UControllerProvider {
 
         // Deposit the amount to the collateral account
         _collateral.depositTo(account, product, amount);
+    }
+
+    function withdrawAndUnwrap(address receiver, IProduct product, UFixed18 amount) private {
+        // Withdraw the amount from the collateral account
+        controller().collateral().withdrawFrom(msg.sender, address(this), product, amount);
+
+        // Unwrap the DSU into USDC and return to the receiver
+        // The current batcher does not have UNWRAP functionality yet, so just go directly to the reserve
+        batcher.RESERVE().redeem(amount);
+
+        // Push the amount to the receiver
+        USDC.push(receiver, amount);
     }
 }

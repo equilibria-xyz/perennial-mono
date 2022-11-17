@@ -194,6 +194,20 @@ describe('MultiInvoker', () => {
       expect(collateral.depositTo).to.have.been.calledWith(user.address, product.address, amount)
     })
 
+    it('withdraws then unwraps on WITHDRAW_AND_UNWRAP action', async () => {
+      await expect(multiInvoker.connect(user).invoke([actions.WITHDRAW_AND_UNWRAP])).to.not.be.reverted
+
+      expect(collateral.withdrawFrom).to.have.been.calledWith(
+        user.address,
+        multiInvoker.address,
+        product.address,
+        amount,
+      )
+
+      expect(reserve.redeem).to.have.been.calledWith(amount)
+      expect(usdc.transfer).to.have.been.calledWith(user.address, usdcAmount)
+    })
+
     it('performs a multi invoke', async () => {
       await expect(multiInvoker.connect(user).invoke(Object.values(actions))).to.not.be.reverted
 

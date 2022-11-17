@@ -275,5 +275,25 @@ describe('MultiInvoker', () => {
         .to.emit(usdc, 'Transfer')
         .withArgs(multiInvoker.address, user.address, 10000e6)
     })
+
+    it('performs WITHDRAW_AND_UNWRAP', async () => {
+      const { user, multiInvoker, batcher, usdc, collateral } = instanceVars
+
+      // Load the Reserve with some USDC
+      await usdc.connect(user).approve(batcher.address, constants.MaxUint256)
+      await batcher.connect(user).wrap(amount, user.address)
+      await batcher.rebalance()
+
+      // Deposit the collateral to withdraw
+      await multiInvoker.connect(user).invoke([actions.DEPOSIT])
+
+      await expect(multiInvoker.connect(user).invoke([actions.WITHDRAW_AND_UNWRAP]))
+        .to.emit(collateral, 'Withdraw')
+        .withArgs(user.address, product.address, amount)
+        .to.emit(batcher.RESERVE(), 'Redeem')
+        .withArgs(multiInvoker.address, amount)
+        .to.emit(usdc, 'Transfer')
+        .withArgs(multiInvoker.address, user.address, 10000e6)
+    })
   })
 })
