@@ -1,8 +1,8 @@
-import { MockContract } from '@ethereum-waffle/mock-contract'
+import { MockContract, deployMockContract } from '@ethereum-waffle/mock-contract'
 import { constants, utils } from 'ethers'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { expect } from 'chai'
-import HRE, { waffle } from 'hardhat'
+import HRE from 'hardhat'
 
 import { impersonate } from '../../../../common/testutil'
 
@@ -33,13 +33,13 @@ describe('Collateral', () => {
   beforeEach(async () => {
     ;[owner, user, userB, treasuryA, treasuryB, notProduct] = await ethers.getSigners()
 
-    token = await waffle.deployMockContract(owner, IERC20Metadata__factory.abi)
+    token = await deployMockContract(owner, IERC20Metadata__factory.abi)
     await token.mock.decimals.returns(18)
 
-    product = await waffle.deployMockContract(owner, Product__factory.abi)
+    product = await deployMockContract(owner, Product__factory.abi)
     productSigner = await impersonate.impersonateWithBalance(product.address, utils.parseEther('10'))
 
-    controller = await waffle.deployMockContract(owner, Controller__factory.abi)
+    controller = await deployMockContract(owner, Controller__factory.abi)
     await controller.mock.paused.withArgs().returns(false)
     await controller.mock.liquidationFee.withArgs().returns(utils.parseEther('0.5'))
     await controller.mock.minCollateral.withArgs().returns(0)
@@ -57,15 +57,16 @@ describe('Collateral', () => {
     })
 
     it('reverts if already initialized', async () => {
-      await expect(collateral.initialize(controller.address)).to.be.revertedWith(
-        'UInitializableAlreadyInitializedError(1)',
-      )
+      await expect(collateral.initialize(controller.address))
+        .to.be.revertedWithCustomError(collateral, 'UInitializableAlreadyInitializedError')
+        .withArgs(1)
     })
 
     it('reverts if controller is zero address', async () => {
       const collateralFresh = await new Collateral__factory(owner).deploy(token.address)
-      await expect(collateralFresh.initialize(ethers.constants.AddressZero)).to.be.revertedWith(
-        'InvalidControllerError()',
+      await expect(collateralFresh.initialize(ethers.constants.AddressZero)).to.be.revertedWithCustomError(
+        collateralFresh,
+        'InvalidControllerError',
       )
     })
   })
@@ -83,30 +84,30 @@ describe('Collateral', () => {
 
     it('reverts if paused', async () => {
       await controller.mock.paused.withArgs().returns(true)
-      await expect(collateral.connect(owner).depositTo(user.address, product.address, 100)).to.be.revertedWith(
-        'PausedError()',
-      )
+      await expect(
+        collateral.connect(owner).depositTo(user.address, product.address, 100),
+      ).to.be.revertedWithCustomError(collateral, 'PausedError')
     })
 
     it('reverts if zero address', async () => {
       await expect(
         collateral.connect(owner).depositTo(ethers.constants.AddressZero, product.address, 100),
-      ).to.be.revertedWith(`CollateralZeroAddressError()`)
+      ).to.be.revertedWithCustomError(collateral, `CollateralZeroAddressError`)
     })
 
     it('reverts if not product', async () => {
-      await expect(collateral.connect(owner).depositTo(user.address, notProduct.address, 100)).to.be.revertedWith(
-        `NotProductError("${notProduct.address}")`,
-      )
+      await expect(collateral.connect(owner).depositTo(user.address, notProduct.address, 100))
+        .to.be.revertedWithCustomError(collateral, `NotProductError`)
+        .withArgs(notProduct.address)
     })
 
     it('reverts if below limit', async () => {
       await controller.mock.minCollateral.withArgs().returns(100)
       await token.mock.transferFrom.withArgs(owner.address, collateral.address, 80).returns(true)
 
-      await expect(collateral.connect(owner).depositTo(user.address, product.address, 80)).to.be.revertedWith(
-        'CollateralUnderLimitError()',
-      )
+      await expect(
+        collateral.connect(owner).depositTo(user.address, product.address, 80),
+      ).to.be.revertedWithCustomError(collateral, 'CollateralUnderLimitError')
     })
 
     describe('multiple users per product', async () => {
@@ -166,30 +167,30 @@ describe('Collateral', () => {
 
     it('reverts if paused', async () => {
       await controller.mock.paused.withArgs().returns(true)
-      await expect(collateral.connect(user).withdrawTo(user.address, product.address, 80)).to.be.revertedWith(
-        'PausedError()',
-      )
+      await expect(
+        collateral.connect(user).withdrawTo(user.address, product.address, 80),
+      ).to.be.revertedWithCustomError(collateral, 'PausedError')
     })
 
     it('reverts if zero address', async () => {
       await expect(
         collateral.connect(user).withdrawTo(ethers.constants.AddressZero, product.address, 100),
-      ).to.be.revertedWith(`CollateralZeroAddressError()`)
+      ).to.be.revertedWithCustomError(collateral, `CollateralZeroAddressError`)
     })
 
     it('reverts if not product', async () => {
-      await expect(collateral.connect(user).withdrawTo(user.address, notProduct.address, 100)).to.be.revertedWith(
-        `NotProductError("${notProduct.address}")`,
-      )
+      await expect(collateral.connect(user).withdrawTo(user.address, notProduct.address, 100))
+        .to.be.revertedWithCustomError(collateral, `NotProductError`)
+        .withArgs(notProduct.address)
     })
 
     it('reverts if below limit', async () => {
       await controller.mock.minCollateral.withArgs().returns(50)
       await token.mock.transfer.withArgs(user.address, 80).returns(true)
 
-      await expect(collateral.connect(user).withdrawTo(user.address, product.address, 80)).to.be.revertedWith(
-        'CollateralUnderLimitError()',
-      )
+      await expect(
+        collateral.connect(user).withdrawTo(user.address, product.address, 80),
+      ).to.be.revertedWithCustomError(collateral, 'CollateralUnderLimitError')
     })
 
     it('reverts if liquidatable current', async () => {
@@ -197,9 +198,9 @@ describe('Collateral', () => {
       await product.mock.maintenanceNext.withArgs(user.address).returns(100)
 
       await token.mock.transfer.withArgs(user.address, 80).returns(true)
-      await expect(collateral.connect(user).withdrawTo(user.address, product.address, 80)).to.be.revertedWith(
-        'CollateralInsufficientCollateralError()',
-      )
+      await expect(
+        collateral.connect(user).withdrawTo(user.address, product.address, 80),
+      ).to.be.revertedWithCustomError(collateral, 'CollateralInsufficientCollateralError')
     })
 
     it('reverts if liquidatable next', async () => {
@@ -207,9 +208,9 @@ describe('Collateral', () => {
       await product.mock.maintenanceNext.withArgs(user.address).returns(50)
 
       await token.mock.transfer.withArgs(user.address, 80).returns(true)
-      await expect(collateral.connect(user).withdrawTo(user.address, product.address, 80)).to.be.revertedWith(
-        'CollateralInsufficientCollateralError()',
-      )
+      await expect(
+        collateral.connect(user).withdrawTo(user.address, product.address, 80),
+      ).to.be.revertedWithCustomError(collateral, 'CollateralInsufficientCollateralError')
     })
 
     describe('multiple users per product', async () => {
@@ -245,7 +246,9 @@ describe('Collateral', () => {
         expect(await collateral['collateral(address)'](product.address)).to.equal(200)
         expect(await collateral.shortfall(product.address)).to.equal(50)
 
-        await expect(collateral.connect(user).withdrawTo(user.address, product.address, 250)).to.be.revertedWith('0x11') // underflow
+        await expect(collateral.connect(user).withdrawTo(user.address, product.address, 250)).to.be.revertedWithPanic(
+          '0x11',
+        ) // underflow
       })
     })
 
@@ -265,7 +268,9 @@ describe('Collateral', () => {
         expect(await collateral['collateral(address)'](product.address)).to.equal(200)
         expect(await collateral.shortfall(product.address)).to.equal(100)
 
-        await expect(collateral.connect(user).withdrawTo(user.address, product.address, 300)).to.be.revertedWith('0x11') // underflow
+        await expect(collateral.connect(user).withdrawTo(user.address, product.address, 300)).to.be.revertedWithPanic(
+          '0x11',
+        ) // underflow
       })
     })
   })
@@ -310,9 +315,9 @@ describe('Collateral', () => {
     it('reverts if not product', async () => {
       await controller.mock.isProduct.withArgs(user.address).returns(false)
 
-      await expect(collateral.connect(user).settleAccount(user.address, 101)).to.be.revertedWith(
-        `NotProductError("${user.address}")`,
-      )
+      await expect(collateral.connect(user).settleAccount(user.address, 101))
+        .to.be.revertedWithCustomError(collateral, `NotProductError`)
+        .withArgs(user.address)
     })
   })
 
@@ -340,13 +345,15 @@ describe('Collateral', () => {
     })
 
     it('reverts if product shortfall', async () => {
-      await expect(collateral.connect(productSigner).settleProduct(110)).to.be.revertedWith(`0x11`)
+      await expect(collateral.connect(productSigner).settleProduct(110)).to.be.revertedWithPanic(`0x11`)
     })
 
     it('reverts if not product', async () => {
       await controller.mock.isProduct.withArgs(user.address).returns(false)
 
-      await expect(collateral.connect(user).settleProduct(90)).to.be.revertedWith(`NotProductError("${user.address}")`)
+      await expect(collateral.connect(user).settleProduct(90))
+        .to.be.revertedWithCustomError(collateral, `NotProductError`)
+        .withArgs(user.address)
     })
   })
 
@@ -366,9 +373,9 @@ describe('Collateral', () => {
 
         expect(await collateral.liquidatable(user.address, product.address)).to.equal(false)
 
-        await expect(collateral.liquidate(user.address, product.address)).to.be.revertedWith(
-          'CollateralCantLiquidate(10, 100)',
-        )
+        await expect(collateral.liquidate(user.address, product.address))
+          .to.be.revertedWithCustomError(collateral, 'CollateralCantLiquidate')
+          .withArgs(10, 100)
       })
     })
 
@@ -405,13 +412,16 @@ describe('Collateral', () => {
 
       it('reverts if paused', async () => {
         await controller.mock.paused.withArgs().returns(true)
-        await expect(collateral.liquidate(user.address, product.address)).to.be.revertedWith('PausedError()')
+        await expect(collateral.liquidate(user.address, product.address)).to.be.revertedWithCustomError(
+          collateral,
+          'PausedError',
+        )
       })
 
       it('reverts if not product', async () => {
-        await expect(collateral.liquidate(user.address, notProduct.address)).to.be.revertedWith(
-          `NotProductError("${notProduct.address}")`,
-        )
+        await expect(collateral.liquidate(user.address, notProduct.address))
+          .to.be.revertedWithCustomError(collateral, `NotProductError`)
+          .withArgs(notProduct.address)
       })
     })
   })
@@ -453,7 +463,10 @@ describe('Collateral', () => {
 
     it('reverts if paused', async () => {
       await controller.mock.paused.withArgs().returns(true)
-      await expect(collateral.connect(user).resolveShortfall(product.address, 90)).to.be.revertedWith('PausedError()')
+      await expect(collateral.connect(user).resolveShortfall(product.address, 90)).to.be.revertedWithCustomError(
+        collateral,
+        'PausedError',
+      )
     })
   })
 
@@ -487,7 +500,7 @@ describe('Collateral', () => {
 
     it('reverts if paused', async () => {
       await controller.mock.paused.returns(true)
-      await expect(collateral.connect(treasuryB).claimFee()).to.be.revertedWith('PausedError()')
+      await expect(collateral.connect(treasuryB).claimFee()).to.be.revertedWithCustomError(collateral, 'PausedError')
     })
   })
 })

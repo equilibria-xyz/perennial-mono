@@ -1,8 +1,8 @@
-import { MockContract } from '@ethereum-waffle/mock-contract'
+import { MockContract, deployMockContract } from '@ethereum-waffle/mock-contract'
 import { constants, utils } from 'ethers'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { expect } from 'chai'
-import HRE, { waffle } from 'hardhat'
+import HRE from 'hardhat'
 
 import {
   Controller,
@@ -50,12 +50,12 @@ describe('Controller', () => {
       coordinatorTreasury,
       coordinatorPauser,
     ] = await ethers.getSigners()
-    collateral = await waffle.deployMockContract(owner, Collateral__factory.abi)
-    payoffProvider = await waffle.deployMockContract(owner, IContractPayoffProvider__factory.abi)
-    oracle = await waffle.deployMockContract(owner, IOracleProvider__factory.abi)
-    incentivizer = await waffle.deployMockContract(owner, Incentivizer__factory.abi)
+    collateral = await deployMockContract(owner, Collateral__factory.abi)
+    payoffProvider = await deployMockContract(owner, IContractPayoffProvider__factory.abi)
+    oracle = await deployMockContract(owner, IOracleProvider__factory.abi)
+    incentivizer = await deployMockContract(owner, Incentivizer__factory.abi)
 
-    productBeacon = await waffle.deployMockContract(owner, IBeacon__factory.abi)
+    productBeacon = await deployMockContract(owner, IBeacon__factory.abi)
     productImpl = await new Product__factory(owner).deploy()
     await productBeacon.mock.implementation.withArgs().returns(productImpl.address)
 
@@ -91,9 +91,9 @@ describe('Controller', () => {
     })
 
     it('reverts if already initialized', async () => {
-      await expect(
-        controller.initialize(collateral.address, incentivizer.address, productBeacon.address),
-      ).to.be.revertedWith('UInitializableAlreadyInitializedError(1)')
+      await expect(controller.initialize(collateral.address, incentivizer.address, productBeacon.address))
+        .to.be.revertedWithCustomError(controller, 'UInitializableAlreadyInitializedError')
+        .withArgs(1)
     })
   })
 
@@ -157,15 +157,15 @@ describe('Controller', () => {
     })
 
     it('reverts if not owner', async () => {
-      await expect(
-        controller.connect(owner).updateCoordinatorPendingOwner(1, coordinatorPendingOwner.address),
-      ).to.be.revertedWith('ControllerNotOwnerError(1)')
+      await expect(controller.connect(owner).updateCoordinatorPendingOwner(1, coordinatorPendingOwner.address))
+        .to.be.revertedWithCustomError(controller, 'ControllerNotOwnerError')
+        .withArgs(1)
     })
 
     it('reverts if not owner (protocol)', async () => {
-      await expect(controller.connect(user).updateCoordinatorTreasury(0, pendingOwner.address)).to.be.revertedWith(
-        'ControllerNotOwnerError(0)',
-      )
+      await expect(controller.connect(user).updateCoordinatorTreasury(0, pendingOwner.address))
+        .to.be.revertedWithCustomError(controller, 'ControllerNotOwnerError')
+        .withArgs(0)
     })
   })
 
@@ -214,33 +214,33 @@ describe('Controller', () => {
     it('reverts if owner', async () => {
       await controller.connect(coordinatorOwner).updateCoordinatorPendingOwner(1, coordinatorPendingOwner.address)
 
-      await expect(controller.connect(coordinatorOwner).acceptCoordinatorOwner(1)).to.be.revertedWith(
-        'ControllerNotPendingOwnerError(1)',
-      )
+      await expect(controller.connect(coordinatorOwner).acceptCoordinatorOwner(1))
+        .to.be.revertedWithCustomError(controller, 'ControllerNotPendingOwnerError')
+        .withArgs(1)
     })
 
     it('reverts if not pending owner (unrelated)', async () => {
       await controller.connect(coordinatorOwner).updateCoordinatorPendingOwner(1, coordinatorPendingOwner.address)
 
-      await expect(controller.connect(coordinatorPauser).acceptCoordinatorOwner(1)).to.be.revertedWith(
-        'ControllerNotPendingOwnerError(1)',
-      )
+      await expect(controller.connect(coordinatorPauser).acceptCoordinatorOwner(1))
+        .to.be.revertedWithCustomError(controller, 'ControllerNotPendingOwnerError')
+        .withArgs(1)
     })
 
     it('reverts if owner (protocol)', async () => {
       await controller.connect(owner).updateCoordinatorPendingOwner(0, pendingOwner.address)
 
-      await expect(controller.connect(owner).acceptCoordinatorOwner(0)).to.be.revertedWith(
-        'ControllerNotPendingOwnerError(0)',
-      )
+      await expect(controller.connect(owner).acceptCoordinatorOwner(0))
+        .to.be.revertedWithCustomError(controller, 'ControllerNotPendingOwnerError')
+        .withArgs(0)
     })
 
     it('reverts if not pending owner (unrelated) (protocol)', async () => {
       await controller.connect(owner).updateCoordinatorPendingOwner(0, pendingOwner.address)
 
-      await expect(controller.connect(pauser).acceptCoordinatorOwner(0)).to.be.revertedWith(
-        'ControllerNotPendingOwnerError(0)',
-      )
+      await expect(controller.connect(pauser).acceptCoordinatorOwner(0))
+        .to.be.revertedWithCustomError(controller, 'ControllerNotPendingOwnerError')
+        .withArgs(0)
     })
   })
 
@@ -283,15 +283,15 @@ describe('Controller', () => {
     })
 
     it('reverts if not owner', async () => {
-      await expect(
-        controller.connect(owner).updateCoordinatorTreasury(1, coordinatorTreasury.address),
-      ).to.be.revertedWith('ControllerNotOwnerError(1)')
+      await expect(controller.connect(owner).updateCoordinatorTreasury(1, coordinatorTreasury.address))
+        .to.be.revertedWithCustomError(controller, 'ControllerNotOwnerError')
+        .withArgs(1)
     })
 
     it('reverts if not owner (protocol)', async () => {
-      await expect(controller.connect(user).updateCoordinatorTreasury(0, treasury.address)).to.be.revertedWith(
-        'ControllerNotOwnerError(0)',
-      )
+      await expect(controller.connect(user).updateCoordinatorTreasury(0, treasury.address))
+        .to.be.revertedWithCustomError(controller, 'ControllerNotOwnerError')
+        .withArgs(0)
     })
   })
 
@@ -336,21 +336,22 @@ describe('Controller', () => {
     })
 
     it('reverts if zero coordinator', async () => {
-      await expect(controller.connect(owner).createProduct(0, PRODUCT_INFO)).to.be.revertedWith(
-        'ControllerNoZeroCoordinatorError()',
+      await expect(controller.connect(owner).createProduct(0, PRODUCT_INFO)).to.be.revertedWithCustomError(
+        controller,
+        'ControllerNoZeroCoordinatorError',
       )
     })
 
     it('reverts if not coordinator owner', async () => {
-      await expect(controller.connect(owner).createProduct(1, PRODUCT_INFO)).to.be.revertedWith(
-        'ControllerNotOwnerError(1)',
-      )
+      await expect(controller.connect(owner).createProduct(1, PRODUCT_INFO))
+        .to.be.revertedWithCustomError(controller, 'ControllerNotOwnerError')
+        .withArgs(1)
     })
   })
 
   describe('#updateCollateral', async () => {
     it('updates the collateral address', async () => {
-      const newCollateral = await waffle.deployMockContract(owner, Collateral__factory.abi)
+      const newCollateral = await deployMockContract(owner, Collateral__factory.abi)
       await expect(controller.updateCollateral(newCollateral.address))
         .to.emit(controller, 'CollateralUpdated')
         .withArgs(newCollateral.address)
@@ -359,20 +360,23 @@ describe('Controller', () => {
     })
 
     it('reverts if not owner', async () => {
-      const newCollateral = await waffle.deployMockContract(owner, Collateral__factory.abi)
-      await expect(controller.connect(user).updateCollateral(newCollateral.address)).to.be.revertedWith(
-        'ControllerNotOwnerError(0)',
-      )
+      const newCollateral = await deployMockContract(owner, Collateral__factory.abi)
+      await expect(controller.connect(user).updateCollateral(newCollateral.address))
+        .to.be.revertedWithCustomError(controller, 'ControllerNotOwnerError')
+        .withArgs(0)
     })
 
     it('reverts on invalid address', async () => {
-      await expect(controller.updateCollateral(user.address)).to.be.revertedWith('ControllerNotContractAddressError()')
+      await expect(controller.updateCollateral(user.address)).to.be.revertedWithCustomError(
+        controller,
+        'ControllerNotContractAddressError',
+      )
     })
   })
 
   describe('#updateIncentivizer', async () => {
     it('updates the collateral address', async () => {
-      const newIncentivizer = await waffle.deployMockContract(owner, Incentivizer__factory.abi)
+      const newIncentivizer = await deployMockContract(owner, Incentivizer__factory.abi)
       await expect(controller.updateIncentivizer(newIncentivizer.address))
         .to.emit(controller, 'IncentivizerUpdated')
         .withArgs(newIncentivizer.address)
@@ -381,22 +385,23 @@ describe('Controller', () => {
     })
 
     it('reverts if not owner', async () => {
-      const newIncentivizer = await waffle.deployMockContract(owner, Incentivizer__factory.abi)
-      await expect(controller.connect(user).updateIncentivizer(newIncentivizer.address)).to.be.revertedWith(
-        'ControllerNotOwnerError(0)',
-      )
+      const newIncentivizer = await deployMockContract(owner, Incentivizer__factory.abi)
+      await expect(controller.connect(user).updateIncentivizer(newIncentivizer.address))
+        .to.be.revertedWithCustomError(controller, 'ControllerNotOwnerError')
+        .withArgs(0)
     })
 
     it('reverts on invalid address', async () => {
-      await expect(controller.updateIncentivizer(user.address)).to.be.revertedWith(
-        'ControllerNotContractAddressError()',
+      await expect(controller.updateIncentivizer(user.address)).to.be.revertedWithCustomError(
+        controller,
+        'ControllerNotContractAddressError',
       )
     })
   })
 
   describe('#updateProductBeacon', async () => {
     it('updates the collateral address', async () => {
-      const newProductBeacon = await waffle.deployMockContract(owner, IBeacon__factory.abi)
+      const newProductBeacon = await deployMockContract(owner, IBeacon__factory.abi)
       await expect(controller.updateProductBeacon(newProductBeacon.address))
         .to.emit(controller, 'ProductBeaconUpdated')
         .withArgs(newProductBeacon.address)
@@ -405,15 +410,16 @@ describe('Controller', () => {
     })
 
     it('reverts if not owner', async () => {
-      const newProductBeacon = await waffle.deployMockContract(owner, IBeacon__factory.abi)
-      await expect(controller.connect(user).updateProductBeacon(newProductBeacon.address)).to.be.revertedWith(
-        'ControllerNotOwnerError(0)',
-      )
+      const newProductBeacon = await deployMockContract(owner, IBeacon__factory.abi)
+      await expect(controller.connect(user).updateProductBeacon(newProductBeacon.address))
+        .to.be.revertedWithCustomError(controller, 'ControllerNotOwnerError')
+        .withArgs(0)
     })
 
     it('reverts on invalid address', async () => {
-      await expect(controller.updateProductBeacon(user.address)).to.be.revertedWith(
-        'ControllerNotContractAddressError()',
+      await expect(controller.updateProductBeacon(user.address)).to.be.revertedWithCustomError(
+        controller,
+        'ControllerNotContractAddressError',
       )
     })
   })
@@ -430,15 +436,16 @@ describe('Controller', () => {
 
     it('reverts if not owner', async () => {
       const newProtocolFee = utils.parseEther('0.5')
-      await expect(controller.connect(user).updateProtocolFee(newProtocolFee)).to.be.revertedWith(
-        'ControllerNotOwnerError(0)',
-      )
+      await expect(controller.connect(user).updateProtocolFee(newProtocolFee))
+        .to.be.revertedWithCustomError(controller, 'ControllerNotOwnerError')
+        .withArgs(0)
     })
 
     it('reverts if too large', async () => {
       const newProtocolFee = utils.parseEther('1.05')
-      await expect(controller.connect(owner).updateProtocolFee(newProtocolFee)).to.be.revertedWith(
-        'ControllerInvalidProtocolFeeError()',
+      await expect(controller.connect(owner).updateProtocolFee(newProtocolFee)).to.be.revertedWithCustomError(
+        controller,
+        'ControllerInvalidProtocolFeeError',
       )
     })
   })
@@ -455,15 +462,16 @@ describe('Controller', () => {
 
     it('reverts if not owner', async () => {
       const newMinFundingFee = utils.parseEther('0.1')
-      await expect(controller.connect(user).updateMinFundingFee(newMinFundingFee)).to.be.revertedWith(
-        'ControllerNotOwnerError(0)',
-      )
+      await expect(controller.connect(user).updateMinFundingFee(newMinFundingFee))
+        .to.be.revertedWithCustomError(controller, 'ControllerNotOwnerError')
+        .withArgs(0)
     })
 
     it('reverts if too large', async () => {
       const newMinFundingFee = utils.parseEther('1.05')
-      await expect(controller.connect(owner).updateMinFundingFee(newMinFundingFee)).to.be.revertedWith(
-        'ControllerInvalidMinFundingFeeError()',
+      await expect(controller.connect(owner).updateMinFundingFee(newMinFundingFee)).to.be.revertedWithCustomError(
+        controller,
+        'ControllerInvalidMinFundingFeeError',
       )
     })
   })
@@ -480,15 +488,16 @@ describe('Controller', () => {
 
     it('reverts if not owner', async () => {
       const newLiquidationFee = utils.parseEther('0.05')
-      await expect(controller.connect(user).updateLiquidationFee(newLiquidationFee)).to.be.revertedWith(
-        `ControllerNotOwnerError(0)`,
-      )
+      await expect(controller.connect(user).updateLiquidationFee(newLiquidationFee))
+        .to.be.revertedWithCustomError(controller, `ControllerNotOwnerError`)
+        .withArgs(0)
     })
 
     it('reverts if too large', async () => {
       const newLiquidationFee = utils.parseEther('1.05')
-      await expect(controller.connect(owner).updateLiquidationFee(newLiquidationFee)).to.be.revertedWith(
-        `ControllerInvalidLiquidationFeeError()`,
+      await expect(controller.connect(owner).updateLiquidationFee(newLiquidationFee)).to.be.revertedWithCustomError(
+        controller,
+        `ControllerInvalidLiquidationFeeError`,
       )
     })
   })
@@ -503,15 +512,15 @@ describe('Controller', () => {
     })
 
     it('reverts if not owner', async () => {
-      await expect(controller.connect(user).updateIncentivizationFee(utils.parseEther('0.02'))).to.be.revertedWith(
-        `ControllerNotOwnerError(0)`,
-      )
+      await expect(controller.connect(user).updateIncentivizationFee(utils.parseEther('0.02')))
+        .to.be.revertedWithCustomError(controller, `ControllerNotOwnerError`)
+        .withArgs(0)
     })
 
     it('reverts if too large', async () => {
-      await expect(controller.connect(owner).updateIncentivizationFee(utils.parseEther('1.05'))).to.be.revertedWith(
-        `ControllerInvalidIncentivizationFeeError()`,
-      )
+      await expect(
+        controller.connect(owner).updateIncentivizationFee(utils.parseEther('1.05')),
+      ).to.be.revertedWithCustomError(controller, `ControllerInvalidIncentivizationFeeError`)
     })
   })
 
@@ -527,9 +536,9 @@ describe('Controller', () => {
 
     it('reverts if not owner', async () => {
       const newMinCollateral = utils.parseEther('1000')
-      await expect(controller.connect(user).updateMinCollateral(newMinCollateral)).to.be.revertedWith(
-        'ControllerNotOwnerError(0)',
-      )
+      await expect(controller.connect(user).updateMinCollateral(newMinCollateral))
+        .to.be.revertedWithCustomError(controller, 'ControllerNotOwnerError')
+        .withArgs(0)
     })
   })
 
@@ -543,9 +552,9 @@ describe('Controller', () => {
     })
 
     it('reverts if not owner', async () => {
-      await expect(controller.connect(user).updateProgramsPerProduct(3)).to.be.revertedWith(
-        `ControllerNotOwnerError(0)`,
-      )
+      await expect(controller.connect(user).updateProgramsPerProduct(3))
+        .to.be.revertedWithCustomError(controller, `ControllerNotOwnerError`)
+        .withArgs(0)
     })
   })
 
@@ -561,7 +570,10 @@ describe('Controller', () => {
     })
 
     it('reverts if not pauser', async () => {
-      await expect(controller.connect(user).updatePaused(true)).to.be.revertedWith(`ControllerNotPauserError()`)
+      await expect(controller.connect(user).updatePaused(true)).to.be.revertedWithCustomError(
+        controller,
+        `ControllerNotPauserError`,
+      )
     })
   })
 
@@ -585,7 +597,9 @@ describe('Controller', () => {
     })
 
     it('reverts if not owner', async () => {
-      await expect(controller.connect(user).updatePauser(user.address)).to.be.revertedWith('ControllerNotOwnerError(0)')
+      await expect(controller.connect(user).updatePauser(user.address))
+        .to.be.revertedWithCustomError(controller, 'ControllerNotOwnerError')
+        .withArgs(0)
     })
   })
 })

@@ -62,16 +62,16 @@ describe('Forwarder', () => {
     it('reverts on invalid addresses', async () => {
       await expect(
         new Forwarder__factory(owner).deploy(user.address, dsu.address, batcher.address, collateral.address),
-      ).to.be.revertedWith('ForwarderNotContractAddressError()')
+      ).to.be.revertedWithCustomError(forwarder, 'ForwarderNotContractAddressError')
       await expect(
         new Forwarder__factory(owner).deploy(usdc.address, user.address, batcher.address, collateral.address),
-      ).to.be.revertedWith('ForwarderNotContractAddressError()')
+      ).to.be.revertedWithCustomError(forwarder, 'ForwarderNotContractAddressError')
       await expect(
         new Forwarder__factory(owner).deploy(user.address, dsu.address, user.address, collateral.address),
-      ).to.be.revertedWith('ForwarderNotContractAddressError()')
+      ).to.be.revertedWithCustomError(forwarder, 'ForwarderNotContractAddressError')
       await expect(
         new Forwarder__factory(owner).deploy(user.address, dsu.address, batcher.address, user.address),
-      ).to.be.revertedWith('ForwarderNotContractAddressError()')
+      ).to.be.revertedWithCustomError(forwarder, 'ForwarderNotContractAddressError')
     })
   })
 

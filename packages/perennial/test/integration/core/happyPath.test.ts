@@ -22,9 +22,9 @@ describe('Happy Path', () => {
   it('reverts if already initialized', async () => {
     const { collateral, controller } = instanceVars
 
-    await expect(collateral.initialize(controller.address)).to.be.revertedWith(
-      'UInitializableAlreadyInitializedError(1)',
-    )
+    await expect(collateral.initialize(controller.address))
+      .to.be.revertedWithCustomError(collateral, 'UInitializableAlreadyInitializedError')
+      .withArgs(1)
   })
 
   it('creates a product', async () => {
@@ -390,9 +390,9 @@ describe('Happy Path', () => {
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
 
-    await expect(product.connect(userB).openTake(OPEN_TAKE_POSITION)).to.be.revertedWith(
-      'InsufficientLiquidityError(0)',
-    )
+    await expect(product.connect(userB).openTake(OPEN_TAKE_POSITION))
+      .to.be.revertedWithCustomError(product, 'ProductInsufficientLiquidityError')
+      .withArgs(0)
     await product.connect(user).openMake(OPEN_MAKE_POSITION)
     await product.connect(userB).openTake(OPEN_TAKE_POSITION)
 
@@ -434,9 +434,9 @@ describe('Happy Path', () => {
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
 
-    await expect(product.connect(userB).openTake(OPEN_TAKE_POSITION)).to.be.revertedWith(
-      'InsufficientLiquidityError(0)',
-    )
+    await expect(product.connect(userB).openTake(OPEN_TAKE_POSITION))
+      .to.be.revertedWithCustomError(product, 'ProductInsufficientLiquidityError')
+      .withArgs(0)
     await product.connect(user).openMake(OPEN_MAKE_POSITION)
     await product.connect(userB).openTake(OPEN_TAKE_POSITION)
     await product.connect(userB).closeTake(CLOSE_TAKE_POSITION.div(2))
@@ -485,19 +485,22 @@ describe('Happy Path', () => {
     const product = await createProduct(instanceVars)
 
     await expect(controller.connect(pauser).updatePaused(true)).to.emit(controller, 'PausedUpdated').withArgs(true)
-    await expect(collateral.depositTo(user.address, product.address, utils.parseEther('1000'))).to.be.revertedWith(
-      'PausedError()',
+    await expect(
+      collateral.depositTo(user.address, product.address, utils.parseEther('1000')),
+    ).to.be.revertedWithCustomError(collateral, 'PausedError')
+    await expect(
+      collateral.withdrawTo(user.address, product.address, utils.parseEther('1000')),
+    ).to.be.revertedWithCustomError(collateral, 'PausedError')
+    await expect(collateral.liquidate(user.address, product.address)).to.be.revertedWithCustomError(
+      collateral,
+      'PausedError',
     )
-    await expect(collateral.withdrawTo(user.address, product.address, utils.parseEther('1000'))).to.be.revertedWith(
-      'PausedError()',
-    )
-    await expect(collateral.liquidate(user.address, product.address)).to.be.revertedWith('PausedError()')
 
-    await expect(product.openMake(utils.parseEther('0.001'))).to.be.revertedWith('PausedError()')
-    await expect(product.closeMake(utils.parseEther('0.001'))).to.be.revertedWith('PausedError()')
-    await expect(product.openTake(utils.parseEther('0.001'))).to.be.revertedWith('PausedError()')
-    await expect(product.closeTake(utils.parseEther('0.001'))).to.be.revertedWith('PausedError()')
-    await expect(product.settle()).to.be.revertedWith('PausedError()')
-    await expect(product.settleAccount(user.address)).to.be.revertedWith('PausedError()')
+    await expect(product.openMake(utils.parseEther('0.001'))).to.be.revertedWithCustomError(collateral, 'PausedError')
+    await expect(product.closeMake(utils.parseEther('0.001'))).to.be.revertedWithCustomError(collateral, 'PausedError')
+    await expect(product.openTake(utils.parseEther('0.001'))).to.be.revertedWithCustomError(collateral, 'PausedError')
+    await expect(product.closeTake(utils.parseEther('0.001'))).to.be.revertedWithCustomError(collateral, 'PausedError')
+    await expect(product.settle()).to.be.revertedWithCustomError(collateral, 'PausedError')
+    await expect(product.settleAccount(user.address)).to.be.revertedWithCustomError(collateral, 'PausedError')
   })
 })

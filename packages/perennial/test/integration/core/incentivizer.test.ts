@@ -30,9 +30,9 @@ describe('Incentivizer', () => {
   it('reverts if already initialized', async () => {
     const { incentivizer, controller } = instanceVars
 
-    await expect(incentivizer.initialize(controller.address)).to.be.revertedWith(
-      'UInitializableAlreadyInitializedError(1)',
-    )
+    await expect(incentivizer.initialize(controller.address))
+      .to.be.revertedWithCustomError(incentivizer, 'UInitializableAlreadyInitializedError')
+      .withArgs(1)
   })
 
   it('creates a protocol owned program', async () => {

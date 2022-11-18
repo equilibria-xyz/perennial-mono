@@ -68,8 +68,9 @@ describe('TestnetBatcher', () => {
 
   describe('#unwrap', () => {
     it('reverts with NotImplemented', async () => {
-      await expect(batcher.unwrap(utils.parseEther('10'), account.address)).to.be.revertedWith(
-        'BatcherNotImplementedError()',
+      await expect(batcher.unwrap(utils.parseEther('10'), account.address)).to.be.revertedWithCustomError(
+        batcher,
+        'BatcherNotImplementedError',
       )
     })
   })
