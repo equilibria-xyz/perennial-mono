@@ -136,15 +136,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable, UControllerProvider {
         // Pull USDC from the `msg.sender`
         USDC.pull(msg.sender, amount, true);
 
-        Token18 token = controller().collateral().token();
-        // If the batcher doesn't have enough for this wrap, go directly to the reserve
-        if (amount.gt(token.balanceOf(address(batcher)))) {
-            batcher.RESERVE().mint(amount);
-            token.push(receiver, amount);
-        } else {
-            // Wrap the USDC into DSU and return to the receiver
-            batcher.wrap(amount, receiver);
-        }
+        _wrap(controller().collateral().token(), receiver, amount);
     }
 
     /**
@@ -175,13 +167,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable, UControllerProvider {
         USDC.pull(msg.sender, amount, true);
 
         ICollateral _collateral = controller().collateral();
-        // If the batcher doesn't have enough for this wrap, go directly to the reserve
-        if (amount.gt(_collateral.token().balanceOf(address(batcher)))) {
-            batcher.RESERVE().mint(amount);
-        } else {
-            // Wrap the USDC into DSU
-            batcher.wrap(amount, address(this));
-        }
+        _wrap(_collateral.token(), address(this), amount);
 
         // Deposit the amount to the collateral account
         _collateral.depositTo(account, product, amount);
@@ -197,5 +183,19 @@ contract MultiInvoker is IMultiInvoker, UInitializable, UControllerProvider {
 
         // Push the amount to the receiver
         USDC.push(receiver, amount);
+    }
+
+    /**
+     * @notice Wraps token from `msg.sender` into DSU using the batcher or reserve
+     */
+    function _wrap(Token18 token, address receiver, UFixed18 amount) private {
+        // If the batcher doesn't have enough for this wrap, go directly to the reserve
+        if (amount.gt(token.balanceOf(address(batcher)))) {
+            batcher.RESERVE().mint(amount);
+            if (receiver != address(this)) token.push(receiver, amount);
+        } else {
+            // Wrap the USDC into DSU and return to the receiver
+            batcher.wrap(amount, receiver);
+        }
     }
 }
