@@ -175,9 +175,9 @@ contract MultiInvoker is IMultiInvoker, UInitializable, UControllerProvider {
 
     /**
      * @notice Withdraws `amount` DSU from `msg.sender`s `product` collateral account, then unwraps the DSU into USDC and sends it to `receiver`
-     * @param account Account to withdraw funds on behalf of
-     * @param product Product to withdraw funds from
-     * @param amount Amount of DSU to withdraw and unwrap
+     * @param receiver Address to receive the USDC
+     * @param product Product to withdraw funds for
+     * @param amount Amount of DSU to withdraw from the collateral account
      */
     function withdrawAndUnwrap(address receiver, IProduct product, UFixed18 amount) private {
         // Withdraw the amount from the collateral account
