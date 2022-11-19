@@ -103,7 +103,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable, UControllerProvider {
                 wrapAndDeposit(account, product, amount);
             }
 
-            // Withdraw DSU from `msg.sender`s `product` collateral account, unwrap into USDC, and return the USDC to `account`
+            // Withdraw DSU from `msg.sender`s `product` collateral account, unwrap into USDC, and return the USDC to `receiver`
             else if (invocation.action == PerennialAction.WITHDRAW_AND_UNWRAP) {
                 (address receiver, IProduct product, UFixed18 amount) = abi.decode(invocation.args, (address, IProduct, UFixed18));
                 withdrawAndUnwrap(receiver, product, amount);
@@ -173,6 +173,12 @@ contract MultiInvoker is IMultiInvoker, UInitializable, UControllerProvider {
         _collateral.depositTo(account, product, amount);
     }
 
+    /**
+     * @notice Withdraws `amount` DSU from `msg.sender`s `product` collateral account, then unwraps the DSU into USDC and sends it to `receiver`
+     * @param account Account to withdraw funds on behalf of
+     * @param product Product to withdraw funds from
+     * @param amount Amount of DSU to withdraw and unwrap
+     */
     function withdrawAndUnwrap(address receiver, IProduct product, UFixed18 amount) private {
         // Withdraw the amount from the collateral account
         controller().collateral().withdrawFrom(msg.sender, address(this), product, amount);
@@ -186,7 +192,10 @@ contract MultiInvoker is IMultiInvoker, UInitializable, UControllerProvider {
     }
 
     /**
-     * @notice Wraps token from `msg.sender` into DSU using the batcher or reserve
+     * @notice Helper function to wrap `amount` USDC from `msg.sender` into DSU using the batcher or reserve
+     * @param token DSU token
+     * @param receiver Address to receive the DSU
+     * @param amount Amount of USDC to wrap
      */
     function _wrap(Token18 token, address receiver, UFixed18 amount) private {
         // If the batcher doesn't have enough for this wrap, go directly to the reserve
