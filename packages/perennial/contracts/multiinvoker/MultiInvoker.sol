@@ -193,7 +193,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable, UControllerProvider {
 
     /**
      * @notice Helper function to wrap `amount` USDC from `msg.sender` into DSU using the batcher or reserve
-     * @param token DSU token
+     * @param token DSU token address
      * @param receiver Address to receive the DSU
      * @param amount Amount of USDC to wrap
      */
