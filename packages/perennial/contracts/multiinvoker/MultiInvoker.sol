@@ -148,12 +148,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable, UControllerProvider {
         // Pull the token from the `msg.sender`
         controller().collateral().token().pull(msg.sender, amount);
 
-        // Unwrap the DSU into USDC and return to the receiver
-        // The current batcher does not have UNWRAP functionality yet, so just go directly to the reserve
-        batcher.RESERVE().redeem(amount);
-
-        // Push the amount to the receiver
-        USDC.push(receiver, amount);
+        _unwrap(receiver, amount);
     }
 
     /**
@@ -183,12 +178,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable, UControllerProvider {
         // Withdraw the amount from the collateral account
         controller().collateral().withdrawFrom(msg.sender, address(this), product, amount);
 
-        // Unwrap the DSU into USDC and return to the receiver
-        // The current batcher does not have UNWRAP functionality yet, so just go directly to the reserve
-        batcher.RESERVE().redeem(amount);
-
-        // Push the amount to the receiver
-        USDC.push(receiver, amount);
+        _unwrap(receiver, amount);
     }
 
     /**
@@ -206,5 +196,19 @@ contract MultiInvoker is IMultiInvoker, UInitializable, UControllerProvider {
             // Wrap the USDC into DSU and return to the receiver
             batcher.wrap(amount, receiver);
         }
+    }
+
+    /**
+     * @notice Helper function to unwrap `amount` DSU into USDC and send to `receiver`
+     * @param receiver Address to receive the USDC
+     * @param amount Amount of DSU to unwrap
+     */
+    function _unwrap(address receiver, UFixed18 amount) private {
+        // Unwrap the DSU into USDC and return to the receiver
+        // The current batcher does not have UNWRAP functionality yet, so just go directly to the reserve
+        batcher.RESERVE().redeem(amount);
+
+        // Push the amount to the receiver
+        USDC.push(receiver, amount);
     }
 }
