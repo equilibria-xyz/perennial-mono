@@ -16,6 +16,11 @@ contract MultiInvoker is IMultiInvoker, UInitializable, UControllerProvider {
     /// @dev Batcher address
     Batcher public immutable batcher;
 
+    struct LazyLoadables {
+        ICollateral collateral;
+        Token18 token;
+    }
+
     /**
      * @notice Initializes the immutable contract state
      * @dev Called at implementation instantiate and constant for that implementation.
@@ -38,10 +43,11 @@ contract MultiInvoker is IMultiInvoker, UInitializable, UControllerProvider {
 
         ICollateral _collateral = controller().collateral();
         Token18 token = _collateral.token();
+        address batcherAddress = address(batcher.RESERVE());
         token.approve(address(_collateral));
-        token.approve(address(batcher.RESERVE()));
+        token.approve(batcherAddress);
         USDC.approve(address(batcher));
-        USDC.approve(address(batcher.RESERVE()));
+        USDC.approve(batcherAddress);
     }
 
     /**
@@ -49,18 +55,20 @@ contract MultiInvoker is IMultiInvoker, UInitializable, UControllerProvider {
      * @param invocations The list of invocations to execute in order
      */
     function invoke(Invocation[] calldata invocations) external {
+        LazyLoadables memory ll;
+
         for (uint256 i = 0; i < invocations.length; i++) {
             Invocation memory invocation = invocations[i];
 
             // Deposit from `msg.sender` into `account`s `product` collateral account
             if (invocation.action == PerennialAction.DEPOSIT) {
                 (address account, IProduct product, UFixed18 amount) = abi.decode(invocation.args, (address, IProduct, UFixed18));
-                depositTo(account, product, amount);
+                depositTo(loadCollateral(ll), loadToken(ll), account, product, amount);
 
             // Withdraw from `msg.sender`s `product` collateral account to `receiver`
             } else if (invocation.action == PerennialAction.WITHDRAW) {
                 (address receiver, IProduct product, UFixed18 amount) = abi.decode(invocation.args, (address, IProduct, UFixed18));
-                controller().collateral().withdrawFrom(msg.sender, receiver, product, amount);
+                loadCollateral(ll).withdrawFrom(msg.sender, receiver, product, amount);
 
             // Open a take position on behalf of `msg.sender`
             } else if (invocation.action == PerennialAction.OPEN_TAKE) {
@@ -90,23 +98,23 @@ contract MultiInvoker is IMultiInvoker, UInitializable, UControllerProvider {
             // Wrap `msg.sender`s USDC into DSU and return the DSU to `account`
             } else if (invocation.action == PerennialAction.WRAP) {
                 (address receiver, UFixed18 amount) = abi.decode(invocation.args, (address, UFixed18));
-                wrap(receiver, amount);
+                wrap(loadToken(ll), receiver, amount);
 
             // Unwrap `msg.sender`s DSU into USDC and return the USDC to `account`
             } else if (invocation.action == PerennialAction.UNWRAP) {
                 (address receiver, UFixed18 amount) = abi.decode(invocation.args, (address, UFixed18));
-                unwrap(receiver, amount);
+                unwrap(loadToken(ll), receiver, amount);
 
             // Wrap `msg.sender`s USDC into DSU and deposit into `account`s `product` collateral account
             } else if (invocation.action == PerennialAction.WRAP_AND_DEPOSIT) {
                 (address account, IProduct product, UFixed18 amount) = abi.decode(invocation.args, (address, IProduct, UFixed18));
-                wrapAndDeposit(account, product, amount);
+                wrapAndDeposit(loadCollateral(ll), loadToken(ll), account, product, amount);
             }
 
             // Withdraw DSU from `msg.sender`s `product` collateral account, unwrap into USDC, and return the USDC to `receiver`
             else if (invocation.action == PerennialAction.WITHDRAW_AND_UNWRAP) {
                 (address receiver, IProduct product, UFixed18 amount) = abi.decode(invocation.args, (address, IProduct, UFixed18));
-                withdrawAndUnwrap(receiver, product, amount);
+                withdrawAndUnwrap(loadCollateral(ll), receiver, product, amount);
             }
         }
     }
@@ -117,14 +125,12 @@ contract MultiInvoker is IMultiInvoker, UInitializable, UControllerProvider {
      * @param product Product to deposit funds for
      * @param amount Amount of DSU to deposit into the collateral account
      */
-    function depositTo(address account, IProduct product, UFixed18 amount) private {
-        ICollateral _collateral = controller().collateral();
-
+    function depositTo(ICollateral collateral, Token18 token, address account, IProduct product, UFixed18 amount) private {
         // Pull the token from the `msg.sender`
-        _collateral.token().pull(msg.sender, amount);
+        token.pull(msg.sender, amount);
 
         // Deposit the amount to the collateral account
-        _collateral.depositTo(account, product, amount);
+        collateral.depositTo(account, product, amount);
     }
 
     /**
@@ -132,11 +138,11 @@ contract MultiInvoker is IMultiInvoker, UInitializable, UControllerProvider {
      * @param receiver Address to receive the DSU
      * @param amount Amount of USDC to wrap
      */
-    function wrap(address receiver, UFixed18 amount) private {
+    function wrap(Token18 token, address receiver, UFixed18 amount) private {
         // Pull USDC from the `msg.sender`
         USDC.pull(msg.sender, amount, true);
 
-        _wrap(controller().collateral().token(), receiver, amount);
+        _wrap(token, receiver, amount);
     }
 
     /**
@@ -144,9 +150,9 @@ contract MultiInvoker is IMultiInvoker, UInitializable, UControllerProvider {
      * @param receiver Address to receive the USDC
      * @param amount Amount of DSU to unwrap
      */
-    function unwrap(address receiver, UFixed18 amount) private {
+    function unwrap(Token18 token, address receiver, UFixed18 amount) private {
         // Pull the token from the `msg.sender`
-        controller().collateral().token().pull(msg.sender, amount);
+        token.pull(msg.sender, amount);
 
         _unwrap(receiver, amount);
     }
@@ -157,15 +163,14 @@ contract MultiInvoker is IMultiInvoker, UInitializable, UControllerProvider {
      * @param product Product to deposit funds for
      * @param amount Amount of USDC to deposit into the collateral account
      */
-    function wrapAndDeposit(address account, IProduct product, UFixed18 amount) private {
+    function wrapAndDeposit(ICollateral collateral, Token18 token, address account, IProduct product, UFixed18 amount) private {
         // Pull USDC from the `msg.sender`
         USDC.pull(msg.sender, amount, true);
 
-        ICollateral _collateral = controller().collateral();
-        _wrap(_collateral.token(), address(this), amount);
+        _wrap(token, address(this), amount);
 
         // Deposit the amount to the collateral account
-        _collateral.depositTo(account, product, amount);
+        collateral.depositTo(account, product, amount);
     }
 
     /**
@@ -174,9 +179,9 @@ contract MultiInvoker is IMultiInvoker, UInitializable, UControllerProvider {
      * @param product Product to withdraw funds for
      * @param amount Amount of DSU to withdraw from the collateral account
      */
-    function withdrawAndUnwrap(address receiver, IProduct product, UFixed18 amount) private {
+    function withdrawAndUnwrap(ICollateral collateral, address receiver, IProduct product, UFixed18 amount) private {
         // Withdraw the amount from the collateral account
-        controller().collateral().withdrawFrom(msg.sender, address(this), product, amount);
+        collateral.withdrawFrom(msg.sender, address(this), product, amount);
 
         _unwrap(receiver, amount);
     }
@@ -210,5 +215,19 @@ contract MultiInvoker is IMultiInvoker, UInitializable, UControllerProvider {
 
         // Push the amount to the receiver
         USDC.push(receiver, amount);
+    }
+
+    function loadCollateral(LazyLoadables memory l) internal returns (ICollateral) {
+        if (l.collateral == ICollateral(address(0))) {
+            l.collateral = controller().collateral();
+        }
+        return l.collateral;
+    }
+
+    function loadToken(LazyLoadables memory l) internal returns (Token18) {
+        if (l.token.isZero()) {
+            l.token = loadCollateral(l).token();
+        }
+        return l.token;
     }
 }
