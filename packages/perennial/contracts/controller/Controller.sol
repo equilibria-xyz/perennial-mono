@@ -77,20 +77,17 @@ contract Controller is IController, UInitializable {
      * @param collateral_ Collateral contract address
      * @param incentivizer_ Incentivizer contract address
      * @param productBeacon_ Product implementation beacon address
-     * @param multiInvoker_ MultiINvoker contract address
      */
     function initialize(
         ICollateral collateral_,
         IIncentivizer incentivizer_,
-        IBeacon productBeacon_,
-        IMultiInvoker multiInvoker_
+        IBeacon productBeacon_
     ) external initializer(1) {
         _createCoordinator();
 
         updateCollateral(collateral_);
         updateIncentivizer(incentivizer_);
         updateProductBeacon(productBeacon_);
-        updateMultiInvoker(multiInvoker_);
     }
 
     /**

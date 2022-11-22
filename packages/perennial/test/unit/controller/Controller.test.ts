@@ -63,7 +63,8 @@ describe('Controller', () => {
     await productBeacon.mock.implementation.withArgs().returns(productImpl.address)
 
     controller = await new Controller__factory(owner).deploy()
-    await controller.initialize(collateral.address, incentivizer.address, productBeacon.address, multiInvoker.address)
+    await controller.initialize(collateral.address, incentivizer.address, productBeacon.address)
+    await controller.updateMultiInvoker(multiInvoker.address)
   })
 
   describe('#initialize', async () => {
@@ -96,7 +97,7 @@ describe('Controller', () => {
 
     it('reverts if already initialized', async () => {
       await expect(
-        controller.initialize(collateral.address, incentivizer.address, productBeacon.address, multiInvoker.address),
+        controller.initialize(collateral.address, incentivizer.address, productBeacon.address),
       ).to.be.revertedWith('UInitializableAlreadyInitializedError(1)')
     })
   })
