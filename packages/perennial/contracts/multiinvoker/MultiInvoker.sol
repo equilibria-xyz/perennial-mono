@@ -38,10 +38,11 @@ contract MultiInvoker is IMultiInvoker, UInitializable, UControllerProvider {
 
         ICollateral _collateral = controller().collateral();
         Token18 token = _collateral.token();
+        address reserve = address(batcher.RESERVE());
         token.approve(address(_collateral));
-        token.approve(address(batcher.RESERVE()));
+        token.approve(reserve);
         USDC.approve(address(batcher));
-        USDC.approve(address(batcher.RESERVE()));
+        USDC.approve(reserve);
     }
 
     /**
