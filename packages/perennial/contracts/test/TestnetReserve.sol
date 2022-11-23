@@ -7,7 +7,7 @@ import "@equilibria/emptyset-batcher/interfaces/IBatcher.sol";
 import "@equilibria/root/token/types/Token18.sol";
 import "@equilibria/root/token/types/Token6.sol";
 
-contract TestnetReserve {
+contract TestnetReserve is IEmptySetReserve {
     event Mint(address indexed to, UFixed18 amount);
     event Redeem(address indexed to, UFixed18 amount);
 
@@ -19,18 +19,26 @@ contract TestnetReserve {
         USDC = usdc_;
     }
 
-    function mint(UFixed18 amount, address to) external {
+    function mint(UFixed18 amount) external {
         USDC.pull(msg.sender, amount, true);
-        ERC20PresetMinterPauser(Token18.unwrap(DSU)).mint(to, UFixed18.unwrap(amount));
+        ERC20PresetMinterPauser(Token18.unwrap(DSU)).mint(msg.sender, UFixed18.unwrap(amount));
 
-        emit Mint(to, amount);
+        emit Mint(msg.sender, amount);
     }
 
-    function redeem(UFixed18 amount, address to) external {
+    function redeem(UFixed18 amount) external {
         DSU.pull(msg.sender, amount);
         ERC20Burnable(Token18.unwrap(DSU)).burn(UFixed18.unwrap(amount));
-        USDC.push(to, amount, true);
+        USDC.push(msg.sender, amount, true);
 
-        emit Redeem(to, amount);
+        emit Redeem(msg.sender, amount);
+    }
+
+    function debt(address) external pure returns (UFixed18) {
+        return UFixed18Lib.ZERO;
+    }
+
+    function repay(address, UFixed18) external pure {
+        return;
     }
 }

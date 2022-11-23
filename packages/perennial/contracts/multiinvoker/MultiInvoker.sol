@@ -14,7 +14,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable, UControllerProvider {
     Token6 public immutable USDC; // solhint-disable-line var-name-mixedcase
 
     /// @dev Batcher address
-    Batcher public immutable batcher;
+    IBatcher public immutable batcher;
 
     /**
      * @notice Initializes the immutable contract state
@@ -22,7 +22,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable, UControllerProvider {
      * @param usdc_ USDC stablecoin address
      * @param batcher_ Protocol Batcher address
      */
-    constructor(Token6 usdc_, Batcher batcher_) {
+    constructor(Token6 usdc_, IBatcher batcher_) {
         USDC = usdc_;
         batcher = batcher_;
     }
@@ -205,11 +205,13 @@ contract MultiInvoker is IMultiInvoker, UInitializable, UControllerProvider {
      * @param amount Amount of DSU to unwrap
      */
     function _unwrap(address receiver, UFixed18 amount) private {
-        // Unwrap the DSU into USDC and return to the receiver
-        // The current batcher does not have UNWRAP functionality yet, so just go directly to the reserve
-        batcher.RESERVE().redeem(amount);
-
-        // Push the amount to the receiver
-        USDC.push(receiver, amount);
+        // If the batcher doesn't have enough for this unwrap, go directly to the reserve
+        if (amount.gt(USDC.balanceOf(address(batcher)))) {
+            batcher.RESERVE().redeem(amount);
+            if (receiver != address(this)) USDC.push(receiver, amount);
+        } else {
+            // Unwrap the DSU into USDC and return to the receiver
+            batcher.unwrap(amount, receiver);
+        }
     }
 }

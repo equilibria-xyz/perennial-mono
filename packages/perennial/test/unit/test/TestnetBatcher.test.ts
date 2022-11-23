@@ -34,12 +34,14 @@ describe('TestnetBatcher', () => {
     dsu.allowance.whenCalledWith(batcherAddress, reserve.address).returns(0)
     dsu.approve.whenCalledWith(reserve.address, ethers.constants.MaxUint256).returns(true)
 
-    batcher = await new TestnetBatcher__factory(owner).deploy(reserve.address)
+    batcher = await new TestnetBatcher__factory(owner).deploy(reserve.address, usdc.address, dsu.address)
   })
 
   describe('#constructor', () => {
     it('constructs correctly', async () => {
-      expect(await batcher.reserve()).to.equal(reserve.address)
+      expect(await batcher.RESERVE()).to.equal(reserve.address)
+      expect(await batcher.USDC()).to.equal(usdc.address)
+      expect(await batcher.DSU()).to.equal(dsu.address)
     })
   })
 
