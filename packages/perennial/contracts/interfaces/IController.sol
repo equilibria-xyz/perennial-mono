@@ -48,7 +48,6 @@ interface IController {
     error ControllerInvalidIncentivizationFeeError();
     error ControllerNotContractAddressError();
 
-    function collateral() external view returns (ICollateral);
     function incentivizer() external view returns (IIncentivizer);
     function productBeacon() external view returns (IBeacon);
     function coordinators(uint256 collateralId) external view returns (Coordinator memory);
@@ -61,13 +60,12 @@ interface IController {
     function programsPerProduct() external view returns (uint256);
     function pauser() external view returns (address);
     function paused() external view returns (bool);
-    function initialize(ICollateral collateral_, IIncentivizer incentivizer_, IBeacon productBeacon_) external;
+    function initialize(IIncentivizer incentivizer_, IBeacon productBeacon_) external;
     function createCoordinator() external returns (uint256);
     function updateCoordinatorPendingOwner(uint256 coordinatorId, address newPendingOwner) external;
     function acceptCoordinatorOwner(uint256 coordinatorId) external;
     function updateCoordinatorTreasury(uint256 coordinatorId, address newTreasury) external;
     function createProduct(uint256 coordinatorId, IProduct.ProductInfo calldata productInfo) external returns (IProduct);
-    function updateCollateral(ICollateral newCollateral) external;
     function updateIncentivizer(IIncentivizer newIncentivizer) external;
     function updateProductBeacon(IBeacon newProductBeacon) external;
     function updateProtocolFee(UFixed18 newProtocolFee) external;
@@ -85,6 +83,6 @@ interface IController {
     function treasury() external view returns (address);
     function treasury(uint256 coordinatorId) external view returns (address);
     function treasury(IProduct product) external view returns (address);
-    function settlementParameters() external returns (ICollateral, IIncentivizer, UFixed18, bool);
-    function collateralParameters(IProduct product) external returns (address, address, UFixed18, bool);
+    function settlementParameters() external returns (IIncentivizer, UFixed18, bool);
+    function collateralParameters(IProduct product) external returns (address, address, UFixed18);
 }

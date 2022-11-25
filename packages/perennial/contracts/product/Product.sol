@@ -7,6 +7,7 @@ import "../controller/UControllerProvider.sol";
 import "./UPayoffProvider.sol";
 import "./UParamProvider.sol";
 import "./types/Account.sol";
+import "./types/OptimisticLedger.sol";
 
 // TODO: position needs less settle on the second period for both global and account
 // TODO: lots of params can be passed in from global settle to account settle
@@ -23,6 +24,15 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     /// @dev The symbol of the product
     string public symbol;
 
+    /// @dev ERC20 stablecoin for collateral
+    Token18 public token;
+
+    /// @dev Per product collateral state
+    OptimisticLedger private _collateral;
+
+    /// @dev Protocol and product fees collected, but not yet claimed
+    UFixed18 public fees;
+
     /// @dev The individual state for each account
     mapping(address => Account) private _accounts;
 
@@ -37,9 +47,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
     struct CurrentContext {
         /* Global Parameters */
-        ICollateral collateral;
-        bytes12 __unallocated1__;
-
         IIncentivizer incentivizer;
         bytes12 __unallocated2__;
 
@@ -87,6 +94,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
         name = productInfo_.name;
         symbol = productInfo_.symbol;
+        token = productInfo_.token;
     }
 
     /**
@@ -112,7 +120,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      */
     function _settle() private returns (CurrentContext memory context) {
         UFixed18 minFundingFee;
-        (context.collateral, context.incentivizer, minFundingFee, context.paused) = controller().settlementParameters();
+        (context.incentivizer, minFundingFee, context.paused) = controller().settlementParameters();
 
         UFixed18 fundingFee;
         UFixed18 positionFee;
@@ -172,8 +180,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
             _versions[context.oracleVersion.version] = context.version;
         }
 
-        // Settle collateral
-        context.collateral.settleProduct(feeAccumulator);
+        // Settle fees
+        _settleFees(feeAccumulator);
 
         // Save state
         _latestVersion = context.oracleVersion.version;
@@ -245,7 +253,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         }
 
         // settle collateral
-        context.collateral.settleAccount(account, valueAccumulator);
+        _settleCollateral(account, valueAccumulator);
 
         // save state
         _latestVersions[account] = context.oracleVersion.version;
@@ -274,7 +282,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         _pre.openTake(amount);
 
         UFixed18 positionFee = amount.mul(context.oracleVersion.price.abs()).mul(context.takerFee);
-        if (!positionFee.isZero()) context.collateral.settleAccount(msg.sender, Fixed18Lib.from(-1, positionFee));
+        if (!positionFee.isZero()) _settleCollateral(msg.sender, Fixed18Lib.from(-1, positionFee));
 
         if (_liquidatableNext(context, msg.sender)) revert ProductInsufficientCollateralError();
         if (_socializationNext(context).lt(UFixed18Lib.ONE)) revert ProductInsufficientLiquidityError();
@@ -307,7 +315,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         _pre.closeTake(amount);
 
         UFixed18 positionFee = amount.mul(context.oracleVersion.price.abs()).mul(context.takerFee);
-        if (!positionFee.isZero()) context.collateral.settleAccount(account, Fixed18Lib.from(-1, positionFee));
+        if (!positionFee.isZero()) _settleCollateral(account, Fixed18Lib.from(-1, positionFee));
 
         emit TakeClosed(account, _latestVersion, amount);
     }
@@ -331,7 +339,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         _pre.openMake(amount);
 
         UFixed18 positionFee = amount.mul(context.oracleVersion.price.abs()).mul(context.makerFee);
-        if (!positionFee.isZero()) context.collateral.settleAccount(msg.sender, Fixed18Lib.from(-1, positionFee));
+        if (!positionFee.isZero()) _settleCollateral(msg.sender, Fixed18Lib.from(-1, positionFee));
 
         if (_liquidatableNext(context, msg.sender)) revert ProductInsufficientCollateralError();
         if (context.version.position().next(_pre).maker.gt(context.makerLimit)) revert ProductMakerOverLimitError();
@@ -365,9 +373,41 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         _pre.closeMake(amount);
 
         UFixed18 positionFee = amount.mul(context.oracleVersion.price.abs()).mul(context.makerFee);
-        if (!positionFee.isZero()) context.collateral.settleAccount(account, Fixed18Lib.from(-1, positionFee));
+        if (!positionFee.isZero()) _settleCollateral(account, Fixed18Lib.from(-1, positionFee));
 
         emit MakeClosed(account, _latestVersion, amount);
+    }
+
+    /**
+     * @notice Liquidates `account`'s `product` collateral account
+     * @dev Account must be under-collateralized, fee returned immediately to `msg.sender`
+     * @param account Account to liquidate
+     * @param product Product to liquidate for
+     */
+    function liquidate(address account, IProduct product)
+    external
+    nonReentrant
+    notPaused
+    {
+        CurrentContext memory context = _settle();
+        _settleAccount(account, context);
+
+        if (!_liquidatable(context, account))
+            revert ProductCantLiquidate();
+
+        _closeAll(context, account);
+
+        // claim fee
+        UFixed18 liquidationFee = controller().liquidationFee();
+        UFixed18 fee = UFixed18Lib.min(
+            _collateral.balances[account],
+            context.account.maintenance(context.oracleVersion, context.maintenance).mul(liquidationFee)
+        );
+
+        _collateral.debitAccount(account, fee);
+        token.push(msg.sender, fee);
+
+        emit Liquidation(account, msg.sender, fee);
     }
 
     /**
@@ -375,10 +415,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @dev Only callable by the Collateral contract as part of the liquidation flow
      * @param account Account to close out
      */
-    function closeAll(address account) external onlyCollateral {
-        CurrentContext memory context = _settle();
-        _settleAccount(account, context);
-
+    function _closeAll(CurrentContext memory context, address account) private {
         if (context.closed) revert ProductClosedError();
 
         Account storage account_ = _accounts[account];
@@ -422,6 +459,10 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         return _accounts[account].liquidation;
     }
 
+    function collateral(address account) external view returns (UFixed18) {
+        return _collateral.balances[account];
+    }
+
     /**
      * @notice Returns `account`'s current position
      * @param account Account to return for
@@ -446,6 +487,14 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      */
     function latestVersion() public view returns (uint256) {
         return _latestVersion;
+    }
+
+    function collateral() external view returns (UFixed18) {
+        return _collateral.total;
+    }
+
+    function shortfall() external view returns (UFixed18) {
+        return _collateral.shortfall;
     }
 
     /**
@@ -504,11 +553,108 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      */
     function _liquidatableNext(CurrentContext memory context, address account) private view returns (bool) {
         UFixed18 maintenanceAmount = context.account.maintenanceNext(_pres[account], context.oracleVersion, context.maintenance);
-        return maintenanceAmount.gt(context.collateral.collateral(account, IProduct(this)));
+        return maintenanceAmount.gt(_collateral.balances[account]);
+    }
+
+    function _liquidatable(CurrentContext memory context, address account) private view returns (bool) {
+        UFixed18 maintenanceAmount = context.account.maintenance(context.oracleVersion, context.maintenance);
+        return maintenanceAmount.gt(_collateral.balances[account]);
+    }
+
+    function liquidatable(address account) public view returns (bool) {
+        (UFixed18 _maintenance, , , , , , ) = parameter();
+        UFixed18 maintenanceAmount = _accounts[account].maintenance(currentVersion(), _maintenance);
+        return maintenanceAmount.gt(_collateral.balances[account]);
     }
 
     function _socializationNext(CurrentContext memory context) private view returns (UFixed18) {
         if (context.closed) return UFixed18Lib.ONE;
         return context.version.position().next(_pre).socializationFactor();
+    }
+
+    /**
+     * @notice Deposits `amount` collateral from `msg.sender` to `account`'s `product`
+     *         account
+     * @param account Account to deposit the collateral for
+     * @param product Product to credit the collateral to
+     * @param amount Amount of collateral to deposit
+     */
+    function depositTo(address account, IProduct product, UFixed18 amount)
+    external
+    nonReentrant
+    notPaused
+    {
+        _collateral.creditAccount(account, amount);
+        token.pull(msg.sender, amount);
+
+        UFixed18 accountCollateral = _collateral.balances[account];
+        if (!accountCollateral.isZero() && accountCollateral.lt(controller().minCollateral()))
+            revert ProductCollateralUnderLimitError();
+
+        emit Deposit(account, amount);
+    }
+
+    /**
+     * @notice Withdraws `amount` collateral from `msg.sender`'s `product` account
+     *         and sends it to `account`
+     * @param account Account to withdraw the collateral to
+     * @param product Product to withdraw the collateral from
+     * @param amount Amount of collateral to withdraw
+     */
+    function withdrawTo(address account, IProduct product, UFixed18 amount)
+    external
+    nonReentrant
+    notPaused
+    {
+        CurrentContext memory context = _settle();
+        _settleAccount(account, context);
+
+        UFixed18 accountCollateral = _collateral.balances[account];
+        amount = amount.eq(UFixed18Lib.MAX) ? accountCollateral : amount;
+        _collateral.debitAccount(msg.sender, amount);
+        token.push(account, amount);
+
+        if (!accountCollateral.isZero() && accountCollateral.lt(controller().minCollateral()))
+            revert ProductCollateralUnderLimitError();
+        if (_liquidatable(context, account) || _liquidatableNext(context, account))
+            revert ProductInsufficientCollateralError();
+
+        emit Withdrawal(msg.sender, amount);
+    }
+
+    /**
+     * @notice Credits `amount` to `account`'s collateral account
+     * @dev Callable only by the corresponding product as part of the settlement flywheel.
+     *      Moves collateral within a product, any collateral leaving the product due to
+     *      fees has already been accounted for in the settleProduct flywheel.
+     *      Debits in excess of the account balance get recorded as shortfall, and can be
+     *      resolved by the product owner as needed.
+     * @param account Account to credit
+     * @param amount Amount to credit the account (can be negative)
+     */
+    function _settleCollateral(address account, Fixed18 amount) private {
+        UFixed18 newShortfall = _collateral.settleAccount(account, amount);
+
+        emit CollateralSettled(account, amount, newShortfall);
+    }
+
+    /**
+     * @notice Debits `amount` from product's total collateral account
+     * @dev Callable only by the corresponding product as part of the settlement flywheel
+     *      Removes collateral from the product as fees.
+     * @param amount Amount to debit from the account
+     */
+    function _settleFees(UFixed18 amount) private {
+        (address protocolTreasury, address productTreasury, UFixed18 protocolFee) =
+        controller().collateralParameters(IProduct(this));
+
+        UFixed18 protocolFeeAmount = amount.mul(protocolFee);
+        UFixed18 productFeeAmount = amount.sub(protocolFeeAmount);
+
+        _collateral.debit(amount);
+        token.push(protocolTreasury, protocolFeeAmount);
+        fees = fees.add(productFeeAmount);
+
+        emit FeeSettled(protocolFeeAmount, productFeeAmount);
     }
 }

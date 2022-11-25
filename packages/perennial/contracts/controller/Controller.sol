@@ -13,10 +13,6 @@ import "../interfaces/IProduct.sol";
  * @notice Manages creating new products and global protocol parameters.
  */
 contract Controller is IController, UInitializable {
-    /// @dev Collateral contract address for the protocol
-    AddressStorage private constant _collateral = AddressStorage.wrap(keccak256("equilibria.perennial.Controller.collateral"));
-    function collateral() public view returns (ICollateral) { return ICollateral(_collateral.read()); }
-
     /// @dev Incentivizer contract address for the protocol
     AddressStorage private constant _incentivizer = AddressStorage.wrap(keccak256("equilibria.perennial.Controller.incentivizer"));
     function incentivizer() public view returns (IIncentivizer) { return IIncentivizer(_incentivizer.read()); }
@@ -70,18 +66,15 @@ contract Controller is IController, UInitializable {
      * @notice Initializes the contract state
      * @dev Must be called atomically as part of the upgradeable proxy deployment to
      *      avoid front-running
-     * @param collateral_ Collateral contract address
      * @param incentivizer_ Incentivizer contract address
      * @param productBeacon_ Product implementation beacon address
      */
     function initialize(
-        ICollateral collateral_,
         IIncentivizer incentivizer_,
         IBeacon productBeacon_
     ) external initializer(1) {
         _createCoordinator();
 
-        updateCollateral(collateral_);
         updateIncentivizer(incentivizer_);
         updateProductBeacon(productBeacon_);
     }
@@ -169,16 +162,6 @@ contract Controller is IController, UInitializable {
         emit ProductCreated(newProduct, productInfo);
 
         return newProduct;
-    }
-
-    /**
-     * @notice Updates the Collateral contract address
-     * @param newCollateral New Collateral contract address
-     */
-    function updateCollateral(ICollateral newCollateral) public onlyOwner(0) {
-        if (!Address.isContract(address(newCollateral))) revert ControllerNotContractAddressError();
-        _collateral.store(address(newCollateral));
-        emit CollateralUpdated(newCollateral);
     }
 
     /**
@@ -372,12 +355,12 @@ contract Controller is IController, UInitializable {
         return treasury(coordinatorFor[product]);
     }
 
-    function settlementParameters() external view returns (ICollateral, IIncentivizer, UFixed18, bool) {
-        return (collateral(), incentivizer(), minFundingFee(), paused());
+    function settlementParameters() external view returns (IIncentivizer, UFixed18, bool) {
+        return (incentivizer(), minFundingFee(), paused());
     }
 
-    function collateralParameters(IProduct product) external view returns (address, address, UFixed18, bool) {
-        return (treasury(), treasury(product), protocolFee(), isProduct(product));
+    function collateralParameters(IProduct product) external view returns (address, address, UFixed18) {
+        return (treasury(), treasury(product), protocolFee());
     }
 
     /// @dev Only allow owner of `coordinatorId` to call

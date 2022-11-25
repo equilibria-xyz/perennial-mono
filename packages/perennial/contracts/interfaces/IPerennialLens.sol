@@ -45,7 +45,6 @@ interface IPerennialLens {
 
     // Protocol Values
     function controller() external view returns (IController);
-    function collateral() external view returns (ICollateral);
 
     // Snapshot Functions for batch values
     function snapshots(IProduct[] calldata productAddresses) external returns (ProductSnapshot[] memory);

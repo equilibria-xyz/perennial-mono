@@ -2,6 +2,7 @@
 pragma solidity ^0.8.13;
 
 import "@equilibria/root/number/types/UFixed18.sol";
+import "@equilibria/root/token/types/Token18.sol";
 import "@equilibria/root/curve/types/JumpRateUtilizationCurve.sol";
 import "./IPayoffProvider.sol";
 import "./IParamProvider.sol";
@@ -18,6 +19,9 @@ interface IProduct is IPayoffProvider, IParamProvider {
 
         /// @dev symbol of the product
         string symbol;
+
+        /// @dev stablecoin collateral token
+        Token18 token;
 
         /// @dev product payoff definition
         PayoffDefinition payoffDefinition;
@@ -53,6 +57,11 @@ interface IProduct is IPayoffProvider, IParamProvider {
     event TakeOpened(address indexed account, uint256 version, UFixed18 amount);
     event MakeClosed(address indexed account, uint256 version, UFixed18 amount);
     event TakeClosed(address indexed account, uint256 version, UFixed18 amount);
+    event Deposit(address indexed account, UFixed18 amount);
+    event Withdrawal(address indexed account, UFixed18 amount);
+    event Liquidation(address indexed account, address liquidator, UFixed18 fee);
+    event FeeSettled(UFixed18 protocolFeeAmount, UFixed18 productFeeAmount);
+    event CollateralSettled(address indexed account, Fixed18 amount, UFixed18 newShortfall);
 
     error ProductInsufficientLiquidityError();
     error ProductDoubleSidedError();
@@ -64,9 +73,13 @@ interface IProduct is IPayoffProvider, IParamProvider {
     error ProductNotOwnerError();
     error ProductInvalidOracle();
     error ProductClosedError();
+    error ProductCollateralUnderLimitError();
+    error ProductCantLiquidate();
 
     function name() external view returns (string memory);
     function symbol() external view returns (string memory);
+    function token() external view returns (Token18);
+    function fees() external view returns (UFixed18);
     function initialize(ProductInfo calldata productInfo_) external;
     function settle() external;
     function settleAccount(address account) external;
@@ -74,13 +87,19 @@ interface IProduct is IPayoffProvider, IParamProvider {
     function closeTake(UFixed18 amount) external;
     function openMake(UFixed18 amount) external;
     function closeMake(UFixed18 amount) external;
-    function closeAll(address account) external;
+    function liquidate(address account, IProduct product) external;
+    function depositTo(address account, IProduct product, UFixed18 amount) external;
+    function withdrawTo(address account, IProduct product, UFixed18 amount) external;
     function maintenance(address account) external view returns (UFixed18);
     function maintenanceNext(address account) external view returns (UFixed18);
     function isLiquidating(address account) external view returns (bool);
+    function collateral(address account) external view returns (UFixed18);
     function position(address account) external view returns (Position memory);
     function pre(address account) external view returns (PrePosition memory);
+    function liquidatable(address account) external view returns (bool);
     function latestVersion() external view returns (uint256);
+    function collateral() external view returns (UFixed18);
+    function shortfall() external view returns (UFixed18);
     function positionAtVersion(uint256 oracleVersion) external view returns (Position memory);
     function pre() external view returns (PrePosition memory);
     function valueAtVersion(uint256 oracleVersion) external view returns (Accumulator memory);

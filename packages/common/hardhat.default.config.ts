@@ -113,6 +113,7 @@ export default function defaultConfig({
                     '*': ['storageLayout'],
                   },
                 },
+            viaIR: true,
           },
         },
       ],

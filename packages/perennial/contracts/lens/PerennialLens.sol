@@ -20,14 +20,6 @@ contract PerennialLens is IPerennialLens {
     }
 
     /**
-     * @notice Protocol collateral address
-     * @return Protocol collateral address
-     */
-    function collateral() public view returns (ICollateral) {
-        return controller.collateral();
-    }
-
-    /**
      *  Snapshot Functions
      */
 
@@ -148,7 +140,7 @@ contract PerennialLens is IPerennialLens {
      * @return Total collateral for product
      */
     function collateral(IProduct product) public settle(product) returns (UFixed18) {
-        return collateral().collateral(product);
+        return product.collateral();
     }
 
     /**
@@ -157,7 +149,7 @@ contract PerennialLens is IPerennialLens {
      * @return Total shortfall for product
      */
     function shortfall(IProduct product) public settle(product) returns (UFixed18) {
-        return collateral().shortfall(product);
+        return product.shortfall();
     }
 
     /**
@@ -243,11 +235,8 @@ contract PerennialLens is IPerennialLens {
      * @return productFees fees accrued by the product owner
      */
     function fees(IProduct product) public settle(product) returns (UFixed18 protocolFees, UFixed18 productFees) {
-        address protocolTreasury = controller.treasury();
-        address productTreasury = controller.treasury(product);
-
-        protocolFees = collateral().fees(protocolTreasury);
-        productFees = collateral().fees(productTreasury);
+        protocolFees = UFixed18Lib.ZERO; // TODO: not a thing anymore
+        productFees = product.fees();
     }
 
     /**
@@ -274,7 +263,7 @@ contract PerennialLens is IPerennialLens {
      * @return User deposited collateral for product
      */
     function collateral(address account, IProduct product) public settleAccount(account, product) returns (UFixed18) {
-        return collateral().collateral(account, product);
+        return product.collateral(account);
     }
 
     /**
@@ -294,7 +283,7 @@ contract PerennialLens is IPerennialLens {
      * @return Whether or not the user's position eligible to be liquidated
      */
     function liquidatable(address account, IProduct product) public settleAccount(account, product) returns (bool) {
-        return collateral().liquidatable(account, product);
+        return product.liquidatable(account);
     }
 
     /**
@@ -357,7 +346,7 @@ contract PerennialLens is IPerennialLens {
      * @return sum of all fees accrued by the account
      */
     function fees(address account, IProduct product) public settleAccount(account, product) returns (UFixed18) {
-        return collateral().fees(account);
+        return product.fees();
     }
 
     /**
