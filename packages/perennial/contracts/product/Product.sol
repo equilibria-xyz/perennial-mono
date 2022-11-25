@@ -382,9 +382,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @notice Liquidates `account`'s `product` collateral account
      * @dev Account must be under-collateralized, fee returned immediately to `msg.sender`
      * @param account Account to liquidate
-     * @param product Product to liquidate for
      */
-    function liquidate(address account, IProduct product)
+    function liquidate(address account)
     external
     nonReentrant
     notPaused
@@ -576,10 +575,9 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @notice Deposits `amount` collateral from `msg.sender` to `account`'s `product`
      *         account
      * @param account Account to deposit the collateral for
-     * @param product Product to credit the collateral to
      * @param amount Amount of collateral to deposit
      */
-    function depositTo(address account, IProduct product, UFixed18 amount)
+    function depositTo(address account, UFixed18 amount)
     external
     nonReentrant
     notPaused
@@ -598,10 +596,9 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @notice Withdraws `amount` collateral from `msg.sender`'s `product` account
      *         and sends it to `account`
      * @param account Account to withdraw the collateral to
-     * @param product Product to withdraw the collateral from
      * @param amount Amount of collateral to withdraw
      */
-    function withdrawTo(address account, IProduct product, UFixed18 amount)
+    function withdrawTo(address account, UFixed18 amount)
     external
     nonReentrant
     notPaused
@@ -656,5 +653,12 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         fees = fees.add(productFeeAmount);
 
         emit FeeSettled(protocolFeeAmount, productFeeAmount);
+    }
+
+    function resolveShortfall(UFixed18 amount) external nonReentrant notPaused onlyProductOwner {
+        token.pull(msg.sender, amount);
+        _collateral.resolve(amount);
+
+        emit ShortfallResolved(amount);
     }
 }

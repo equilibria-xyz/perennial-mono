@@ -13,13 +13,13 @@ describe('Liquidate', () => {
 
   it('liquidates a user', async () => {
     const POSITION = utils.parseEther('0.0001')
-    const { user, userB, collateral, dsu, chainlink } = instanceVars
+    const { user, userB, dsu, chainlink } = instanceVars
 
     const product = await createProduct(instanceVars)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await product.connect(user).openMake(POSITION)
 
-    expect(await collateral.liquidatable(user.address, product.address)).to.be.false
+    expect(await product.liquidatable(user.address)).to.be.false
 
     // Settle the product with a new oracle version
     await chainlink.nextWithPriceModification(price => price.mul(10))
@@ -27,17 +27,16 @@ describe('Liquidate', () => {
 
     await product.settleAccount(user.address)
 
-    expect(await collateral.liquidatableNext(user.address, product.address)).to.be.true
-    expect(await collateral.liquidatable(user.address, product.address)).to.be.true
+    expect(await product.liquidatable(user.address)).to.be.true
 
-    await expect(collateral.connect(userB).liquidate(user.address, product.address))
-      .to.emit(collateral, 'Liquidation')
+    await expect(product.connect(userB).liquidate(user.address))
+      .to.emit(product, 'Liquidation')
       .withArgs(user.address, product.address, userB.address, utils.parseEther('1000'))
 
     expect(await product.isLiquidating(user.address)).to.be.true
 
-    expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(0)
-    expect(await collateral['collateral(address)'](product.address)).to.equal(0)
+    expect(await product['collateral(address)'](user.address)).to.equal(0)
+    expect(await product['collateral()']()).to.equal(0)
     expect(await dsu.balanceOf(userB.address)).to.equal(utils.parseEther('21000')) // Original 20000 + fee
 
     await chainlink.next()
@@ -48,7 +47,7 @@ describe('Liquidate', () => {
 
   it('creates and resolves a shortfall', async () => {
     const POSITION = utils.parseEther('0.0001')
-    const { user, userB, collateral, dsu, chainlink } = instanceVars
+    const { user, userB, dsu, chainlink } = instanceVars
 
     const product = await createProduct(instanceVars)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
@@ -65,23 +64,21 @@ describe('Liquidate', () => {
     await product.settleAccount(user.address)
     await product.settleAccount(userB.address)
 
-    expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(0)
-    expect(await collateral.shortfall(product.address)).to.equal('2463736825720737646856')
+    expect(await product['collateral(address)'](user.address)).to.equal(0)
+    expect(await product.shortfall()).to.equal('2463736825720737646856')
 
-    const userBCollateral = await collateral['collateral(address,address)'](userB.address, product.address)
-    await expect(
-      collateral.connect(userB).withdrawTo(userB.address, product.address, userBCollateral),
-    ).to.be.revertedWith('0x11') // underflow
+    const userBCollateral = await product['collateral(address)'](userB.address)
+    await expect(product.connect(userB).withdrawTo(userB.address, userBCollateral)).to.be.revertedWith('0x11') // underflow
 
-    await dsu.connect(userB).approve(collateral.address, constants.MaxUint256)
-    await collateral.connect(userB).resolveShortfall(product.address, '2463736825720737646856')
+    await dsu.connect(userB).approve(product.address, constants.MaxUint256)
+    await product.connect(userB).resolveShortfall('2463736825720737646856')
 
-    expect(await collateral.shortfall(product.address)).to.equal(0)
+    expect(await product.shortfall()).to.equal(0)
   })
 
   it('uses a socialization factor', async () => {
     const POSITION = utils.parseEther('0.0001')
-    const { user, userB, userC, userD, collateral, chainlink, treasuryA, treasuryB } = instanceVars
+    const { user, userB, userC, userD, chainlink, treasuryA, dsu } = instanceVars
 
     const product = await createProduct(instanceVars)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
@@ -93,15 +90,15 @@ describe('Liquidate', () => {
     await product.connect(userC).openTake(POSITION)
     await product.connect(userD).openTake(POSITION)
 
-    expect(await collateral.liquidatable(user.address, product.address)).to.be.false
+    expect(await product.liquidatable(user.address)).to.be.false
 
     // Settle the product with a new oracle version
     await chainlink.nextWithPriceModification(price => price.mul(2))
 
     // Liquidate `user` which results in taker > maker
     const expectedLiquidationFee = BigNumber.from('682778989173237912428')
-    await expect(collateral.connect(userB).liquidate(user.address, product.address))
-      .to.emit(collateral, 'Liquidation')
+    await expect(product.connect(userB).liquidate(user.address))
+      .to.emit(product, 'Liquidation')
       .withArgs(user.address, product.address, userB.address, expectedLiquidationFee)
 
     await chainlink.next()
@@ -110,22 +107,22 @@ describe('Liquidate', () => {
     await product.settleAccount(userC.address)
     await product.settleAccount(userD.address)
 
-    const currA = await collateral['collateral(address,address)'](user.address, product.address)
-    const currB = await collateral['collateral(address,address)'](userB.address, product.address)
-    const currC = await collateral['collateral(address,address)'](userC.address, product.address)
-    const currD = await collateral['collateral(address,address)'](userD.address, product.address)
+    const currA = await product['collateral(address)'](user.address)
+    const currB = await product['collateral(address)'](userB.address)
+    const currC = await product['collateral(address)'](userC.address)
+    const currD = await product['collateral(address)'](userD.address)
     const totalCurr = currA.add(currB).add(currC).add(currD)
-    const feesCurr = (await collateral.fees(treasuryA.address)).add(await collateral.fees(treasuryB.address))
+    const feesCurr = (await dsu.balanceOf(treasuryA.address)).add(await product.fees())
 
     await chainlink.next()
     await product.settleAccount(userB.address)
     await product.settleAccount(userC.address)
     await product.settleAccount(userD.address)
 
-    const newA = await collateral['collateral(address,address)'](user.address, product.address)
-    const newB = await collateral['collateral(address,address)'](userB.address, product.address)
-    const newC = await collateral['collateral(address,address)'](userC.address, product.address)
-    const newD = await collateral['collateral(address,address)'](userD.address, product.address)
+    const newA = await product['collateral(address)'](user.address)
+    const newB = await product['collateral(address)'](userB.address)
+    const newC = await product['collateral(address)'](userC.address)
+    const newD = await product['collateral(address)'](userD.address)
     const totalNew = newA.add(newB).add(newC).add(newD)
 
     // Expect the loss from B to be socialized equally to C and D
@@ -134,7 +131,7 @@ describe('Liquidate', () => {
     expect(currC.lt(newC)).to.equal(true)
     expect(currD.lt(newD)).to.equal(true)
 
-    const feesNew = (await collateral.fees(treasuryA.address)).add(await collateral.fees(treasuryB.address))
+    const feesNew = (await dsu.balanceOf(treasuryA.address)).add(await product.fees())
 
     expect(totalCurr.add(feesCurr)).to.be.gte(totalNew.add(feesNew))
     expect(totalCurr.add(feesCurr)).to.be.closeTo(totalNew.add(feesNew), 1)

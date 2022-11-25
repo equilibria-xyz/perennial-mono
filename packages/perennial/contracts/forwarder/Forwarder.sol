@@ -18,34 +18,26 @@ contract Forwarder is IForwarder {
     /// @dev Contract that wraps USDC to DSU
     IBatcher public immutable batcher;
 
-    /// @dev Contract managing state for collateral accounts in the protocol
-    ICollateral public immutable collateral;
-
     /**
      * @notice Initializes the contract state
      * @param usdc_ The USDC token contract address
      * @param dsu_ The DSU token contract address
      * @param batcher_ The USDC-to-DSU batcher contract address
-     * @param collateral_ The perennial collateral contract address
      */
     constructor(
         Token6 usdc_,
         Token18 dsu_,
-        IBatcher batcher_,
-        ICollateral collateral_
+        IBatcher batcher_
     ) {
         if (!Address.isContract(Token6.unwrap(usdc_))) revert ForwarderNotContractAddressError();
         if (!Address.isContract(Token18.unwrap(dsu_))) revert ForwarderNotContractAddressError();
         if (!Address.isContract(address(batcher_))) revert ForwarderNotContractAddressError();
-        if (!Address.isContract(address(collateral_))) revert ForwarderNotContractAddressError();
 
         USDC = usdc_;
         DSU = dsu_;
         batcher = batcher_;
-        collateral = collateral_;
 
         USDC.approve(address(batcher));
-        DSU.approve(address(collateral));
     }
 
     /**
@@ -62,7 +54,8 @@ contract Forwarder is IForwarder {
     ) external {
         USDC.pull(msg.sender, amount, true);
         batcher.wrap(amount, address(this));
-        collateral.depositTo(account, product, amount);
+        DSU.approve(address(product), amount);
+        product.depositTo(account, amount);
         emit WrapAndDeposit(account, product, amount);
     }
 }

@@ -1,11 +1,12 @@
 import { expect } from 'chai'
 import 'hardhat'
-import { BigNumber, utils } from 'ethers'
+import { BigNumber, utils, constants } from 'ethers'
 
 import { InstanceVars, deployProtocol, createProduct, depositTo } from '../helpers/setupHelpers'
 import { createPayoffDefinition, expectPositionEq, expectPrePositionEq } from '../../../../common/testutil/types'
 import { DataFeedContext } from '../helpers/feedOracleHelper'
 import {
+  Product__factory,
   ReservoirFeedOracle,
   ReservoirFeedOracle__factory,
   TestnetContractPayoffProvider,
@@ -18,6 +19,7 @@ const INITIAL_VERSION = BigNumber.from(1)
 const PRODUCT_INFO = {
   name: 'Squeeth',
   symbol: 'SQTH',
+  token: constants.AddressZero,
   payoffDefinition: createPayoffDefinition(),
   oracle: '',
   maintenance: utils.parseEther('0.3'),
@@ -42,7 +44,8 @@ describe('Reservoir Oracle Product', () => {
 
   beforeEach(async () => {
     instanceVars = await deployProtocol()
-    const { owner } = instanceVars
+    const { owner, dsu } = instanceVars
+    PRODUCT_INFO.token = dsu.address
 
     // Reservoir has not deployed their feed adaptor to mainnet, so for now use Chainlink's DPI feed as a standin
     // TODO(arjun): Update this with Reservoir's mainnet deploy
@@ -59,7 +62,7 @@ describe('Reservoir Oracle Product', () => {
   })
 
   it('creates a product', async () => {
-    const { owner, user, controller, collateral, treasuryB, dsu } = instanceVars
+    const { owner, user, controller, treasuryB, dsu } = instanceVars
 
     await expect(controller.connect(owner).createCoordinator())
       .to.emit(controller, 'CoordinatorCreated')
@@ -69,13 +72,14 @@ describe('Reservoir Oracle Product', () => {
       .withArgs(1, treasuryB.address)
 
     const productAddress = await controller.callStatic.createProduct(1, PRODUCT_INFO)
+    const product = Product__factory.connect(productAddress, owner)
     await expect(controller.createProduct(1, PRODUCT_INFO)).to.emit(controller, 'ProductCreated')
 
-    await dsu.connect(user).approve(collateral.address, utils.parseEther('1000'))
-    await collateral.connect(user).depositTo(user.address, productAddress, utils.parseEther('1000'))
+    await dsu.connect(user).approve(product.address, utils.parseEther('1000'))
+    await product.connect(user).depositTo(user.address, utils.parseEther('1000'))
 
-    expect(await collateral['collateral(address)'](productAddress)).to.equal(utils.parseEther('1000'))
-    expect(await collateral.shortfall(productAddress)).to.equal(0)
+    expect(await product['collateral()']()).to.equal(utils.parseEther('1000'))
+    expect(await product.shortfall()).to.equal(0)
   })
 
   it('opens a make position', async () => {

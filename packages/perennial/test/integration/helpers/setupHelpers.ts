@@ -5,7 +5,6 @@ import { CHAINLINK_CUSTOM_CURRENCIES, buildChainlinkRoundId } from '@equilibria/
 
 import { time, impersonate } from '../../../../common/testutil'
 import {
-  Collateral,
   Controller,
   TestnetContractPayoffProvider,
   IERC20Metadata,
@@ -14,7 +13,6 @@ import {
   Incentivizer,
   IBeacon,
   IERC20Metadata__factory,
-  Collateral__factory,
   Controller__factory,
   TestnetContractPayoffProvider__factory,
   ChainlinkOracle__factory,
@@ -60,7 +58,6 @@ export interface InstanceVars {
   usdc: IERC20Metadata
   dsuHolder: SignerWithAddress
   usdcHolder: SignerWithAddress
-  collateral: Collateral
   chainlink: ChainlinkContext
   chainlinkOracle: ChainlinkOracle
   productBeacon: IBeacon
@@ -98,7 +95,6 @@ export async function deployProtocol(): Promise<InstanceVars> {
 
   const controllerImpl = await new Controller__factory(owner).deploy()
   const incentivizerImpl = await new Incentivizer__factory(owner).deploy()
-  const collateralImpl = await new Collateral__factory(owner).deploy(dsu.address)
 
   const controllerProxy = await new TransparentUpgradeableProxy__factory(owner).deploy(
     controllerImpl.address,
@@ -110,23 +106,16 @@ export async function deployProtocol(): Promise<InstanceVars> {
     proxyAdmin.address,
     [],
   )
-  const collateralProxy = await new TransparentUpgradeableProxy__factory(owner).deploy(
-    collateralImpl.address,
-    proxyAdmin.address,
-    [],
-  )
 
   const controller = await new Controller__factory(owner).attach(controllerProxy.address)
   const incentivizer = await new Incentivizer__factory(owner).attach(incentivizerProxy.address)
-  const collateral = await new Collateral__factory(owner).attach(collateralProxy.address)
 
   const productImpl = await new Product__factory(owner).deploy()
   const productBeacon = await new UpgradeableBeacon__factory(owner).deploy(productImpl.address)
 
   // Init
   await incentivizer.initialize(controller.address)
-  await controller.initialize(collateral.address, incentivizer.address, productBeacon.address)
-  await collateral.initialize(controller.address)
+  await controller.initialize(incentivizer.address, productBeacon.address)
 
   // Params - TODO: finalize before launch
   await controller.updatePauser(pauser.address)
@@ -149,12 +138,7 @@ export async function deployProtocol(): Promise<InstanceVars> {
 
   const lens = await new PerennialLens__factory(owner).deploy(controller.address)
 
-  const forwarder = await new Forwarder__factory(owner).deploy(
-    usdc.address,
-    dsu.address,
-    batcher.address,
-    collateral.address,
-  )
+  const forwarder = await new Forwarder__factory(owner).deploy(usdc.address, dsu.address, batcher.address)
 
   const incentiveToken = await new ERC20PresetMinterPauser__factory(owner).deploy('Incentive Token', 'ITKN')
 
@@ -179,7 +163,6 @@ export async function deployProtocol(): Promise<InstanceVars> {
     productBeacon,
     productImpl,
     incentivizer,
-    collateral,
     lens,
     batcher,
     forwarder,
@@ -192,7 +175,7 @@ export async function createProduct(
   payoffProvider?: TestnetContractPayoffProvider,
   oracle?: ChainlinkOracle | ReservoirFeedOracle,
 ): Promise<Product> {
-  const { owner, controller, treasuryB, chainlinkOracle } = instanceVars
+  const { owner, controller, treasuryB, chainlinkOracle, dsu } = instanceVars
   if (!payoffProvider) {
     payoffProvider = instanceVars.contractPayoffProvider
   }
@@ -206,6 +189,7 @@ export async function createProduct(
   const productInfo = {
     name: 'Squeeth',
     symbol: 'SQTH',
+    token: dsu.address,
     payoffDefinition: createPayoffDefinition({ contractAddress: payoffProvider.address }),
     oracle: oracle.address,
     maintenance: utils.parseEther('0.3'),
@@ -264,7 +248,7 @@ export async function depositTo(
   product: Product,
   position: BigNumber,
 ): Promise<void> {
-  const { dsu, collateral } = instanceVars
-  await dsu.connect(user).approve(collateral.address, position)
-  await collateral.connect(user).depositTo(user.address, product.address, position)
+  const { dsu } = instanceVars
+  await dsu.connect(user).approve(product.address, position)
+  await product.connect(user).depositTo(user.address, position)
 }

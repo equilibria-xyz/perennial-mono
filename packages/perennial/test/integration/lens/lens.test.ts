@@ -18,7 +18,7 @@ describe('Lens', () => {
 
   it('returns correct lens values', async () => {
     const POSITION = utils.parseEther('0.0001')
-    const { user, userB, collateral, chainlink, lens, controller, treasuryA, incentiveToken } = instanceVars
+    const { user, userB, chainlink, lens, controller, treasuryA, incentiveToken } = instanceVars
 
     expect(await lens.callStatic.controller()).to.equal(controller.address)
     // Setup fees
@@ -38,8 +38,6 @@ describe('Lens', () => {
     expect(info.name).to.equal('Squeeth')
     // Returns the product symbol
     expect(info.symbol).to.equal('SQTH')
-    // Returns collateral address
-    expect(await lens.callStatic['collateral()']()).to.equal(collateral.address)
 
     // PrePositions should exist for user and userB
     let productSnapshot = (await lens.callStatic['snapshots(address[])']([product.address]))[0]
@@ -155,7 +153,7 @@ describe('Lens', () => {
     expect(await lens.callStatic.liquidatable(user.address, product.address)).to.be.true
 
     // Liquidate the user
-    await collateral.connect(userB).liquidate(user.address, product.address)
+    await product.connect(userB).liquidate(user.address)
 
     expect(await lens.callStatic['collateral(address,address)'](user.address, product.address)).to.equal(0)
     expect(await lens.callStatic['collateral(address,address)'](userB.address, product.address)).to.equal(

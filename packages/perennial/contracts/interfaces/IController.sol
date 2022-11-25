@@ -3,7 +3,6 @@ pragma solidity ^0.8.13;
 
 import "@equilibria/root/number/types/UFixed18.sol";
 import "@openzeppelin/contracts/proxy/beacon/IBeacon.sol";
-import "./ICollateral.sol";
 import "./IIncentivizer.sol";
 import "./IProduct.sol";
 import "./types/PayoffDefinition.sol";
@@ -21,7 +20,6 @@ interface IController {
         address treasury;
     }
 
-    event CollateralUpdated(ICollateral newCollateral);
     event IncentivizerUpdated(IIncentivizer newIncentivizer);
     event ProductBeaconUpdated(IBeacon newProductBeacon);
     event ProtocolFeeUpdated(UFixed18 newProtocolFee);

@@ -62,6 +62,7 @@ interface IProduct is IPayoffProvider, IParamProvider {
     event Liquidation(address indexed account, address liquidator, UFixed18 fee);
     event FeeSettled(UFixed18 protocolFeeAmount, UFixed18 productFeeAmount);
     event CollateralSettled(address indexed account, Fixed18 amount, UFixed18 newShortfall);
+    event ShortfallResolved(UFixed18 amount);
 
     error ProductInsufficientLiquidityError();
     error ProductDoubleSidedError();
@@ -87,9 +88,10 @@ interface IProduct is IPayoffProvider, IParamProvider {
     function closeTake(UFixed18 amount) external;
     function openMake(UFixed18 amount) external;
     function closeMake(UFixed18 amount) external;
-    function liquidate(address account, IProduct product) external;
-    function depositTo(address account, IProduct product, UFixed18 amount) external;
-    function withdrawTo(address account, IProduct product, UFixed18 amount) external;
+    function liquidate(address account) external;
+    function depositTo(address account, UFixed18 amount) external;
+    function withdrawTo(address account, UFixed18 amount) external;
+    function resolveShortfall(UFixed18 amount) external;
     function maintenance(address account) external view returns (UFixed18);
     function maintenanceNext(address account) external view returns (UFixed18);
     function isLiquidating(address account) external view returns (bool);

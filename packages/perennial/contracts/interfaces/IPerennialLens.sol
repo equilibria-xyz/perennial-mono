@@ -3,7 +3,6 @@ pragma solidity 0.8.17;
 
 import "@equilibria/perennial-oracle/contracts/interfaces/IOracleProvider.sol";
 import "./IProduct.sol";
-import "./ICollateral.sol";
 import "./IController.sol";
 
 /**

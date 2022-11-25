@@ -81,19 +81,19 @@ describe('Closed Product', () => {
     })
 
     it('reverts on attempts to liquidate', async () => {
-      const { user, collateral, chainlink } = instanceVars
+      const { user, chainlink } = instanceVars
       await chainlink.nextWithPriceModification(price => price.mul(10))
       await product.settle()
       await product.settleAccount(user.address)
 
-      expect(await collateral.liquidatable(user.address, product.address)).to.be.true
-      await expect(collateral.liquidate(user.address, product.address)).to.be.revertedWith('ProductClosedError()')
+      expect(await product.liquidatable(user.address)).to.be.true
+      await expect(product.liquidate(user.address)).to.be.revertedWith('ProductClosedError()')
     })
   })
 
   it('zeroes PnL and fees', async () => {
     const POSITION = utils.parseEther('0.0001')
-    const { user, userB, collateral, chainlink, treasuryA, treasuryB } = instanceVars
+    const { user, userB, chainlink, treasuryA, dsu } = instanceVars
 
     const product = await createProduct(instanceVars)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
@@ -116,30 +116,26 @@ describe('Closed Product', () => {
     await product.settleAccount(user.address)
     await product.settleAccount(userB.address)
 
-    const userCollateralBefore = await collateral['collateral(address,address)'](user.address, product.address)
-    const userBCollateralBefore = await collateral['collateral(address,address)'](userB.address, product.address)
-    const feesABefore = await collateral.fees(treasuryA.address)
-    const feesBBefore = await collateral.fees(treasuryB.address)
+    const userCollateralBefore = await product['collateral(address)'](user.address)
+    const userBCollateralBefore = await product['collateral(address)'](userB.address)
+    const feesABefore = await dsu.balanceOf(treasuryA.address)
+    const feesBBefore = await product.fees()
 
     await chainlink.nextWithPriceModification(price => price.mul(4))
     await chainlink.nextWithPriceModification(price => price.mul(4))
     await product.settleAccount(user.address)
     await product.settleAccount(userB.address)
 
-    expect(await collateral.shortfall(product.address)).to.equal(0)
-    expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(
-      userCollateralBefore,
-    )
-    expect(await collateral['collateral(address,address)'](userB.address, product.address)).to.equal(
-      userBCollateralBefore,
-    )
-    expect(await collateral.fees(treasuryA.address)).to.equal(feesABefore)
-    expect(await collateral.fees(treasuryB.address)).to.equal(feesBBefore)
+    expect(await product.shortfall()).to.equal(0)
+    expect(await product['collateral(address)'](user.address)).to.equal(userCollateralBefore)
+    expect(await product['collateral(address)'](userB.address)).to.equal(userBCollateralBefore)
+    expect(await product.fees()).to.equal(feesABefore)
+    expect(await product.fees()).to.equal(feesBBefore)
   })
 
   it('handles closing during liquidations', async () => {
     const POSITION = utils.parseEther('0.0001')
-    const { user, userB, collateral, chainlink, treasuryA, treasuryB } = instanceVars
+    const { user, userB, chainlink, treasuryA, dsu } = instanceVars
 
     const product = await createProduct(instanceVars)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
@@ -149,7 +145,7 @@ describe('Closed Product', () => {
 
     await chainlink.next()
     await chainlink.nextWithPriceModification(price => price.mul(2))
-    await expect(collateral.liquidate(user.address, product.address)).to.not.be.reverted
+    await expect(product.liquidate(user.address)).to.not.be.reverted
     expect(await product.isLiquidating(user.address)).to.be.true
     const parameters = await product.parameter()
     await product.updateParameter(
@@ -167,23 +163,19 @@ describe('Closed Product', () => {
     await product.settleAccount(userB.address)
 
     expect(await product.isLiquidating(user.address)).to.be.false
-    const userCollateralBefore = await collateral['collateral(address,address)'](user.address, product.address)
-    const userBCollateralBefore = await collateral['collateral(address,address)'](userB.address, product.address)
-    const feesABefore = await collateral.fees(treasuryA.address)
-    const feesBBefore = await collateral.fees(treasuryB.address)
+    const userCollateralBefore = await product['collateral(address)'](user.address)
+    const userBCollateralBefore = await product['collateral(address)'](userB.address)
+    const feesABefore = await dsu.balanceOf(treasuryA.address)
+    const feesBBefore = await product.fees()
 
     await chainlink.nextWithPriceModification(price => price.mul(4))
     await chainlink.nextWithPriceModification(price => price.mul(4))
     await product.settleAccount(user.address)
     await product.settleAccount(userB.address)
 
-    expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(
-      userCollateralBefore,
-    )
-    expect(await collateral['collateral(address,address)'](userB.address, product.address)).to.equal(
-      userBCollateralBefore,
-    )
-    expect(await collateral.fees(treasuryA.address)).to.equal(feesABefore)
-    expect(await collateral.fees(treasuryB.address)).to.equal(feesBBefore)
+    expect(await product['collateral(address)'](user.address)).to.equal(userCollateralBefore)
+    expect(await product['collateral(address)'](userB.address)).to.equal(userBCollateralBefore)
+    expect(await dsu.balanceOf(treasuryA.address)).to.equal(feesABefore)
+    expect(await product.fees()).to.equal(feesBBefore)
   })
 })

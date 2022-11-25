@@ -4,7 +4,6 @@ pragma solidity 0.8.17;
 import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 import "../interfaces/IController.sol";
-import "../interfaces/ICollateral.sol";
 import "../interfaces/IIncentivizer.sol";
 import "../interfaces/IProduct.sol";
 
