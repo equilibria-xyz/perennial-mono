@@ -8,9 +8,6 @@ struct OptimisticLedger {
     /// @dev Individual account collateral balances
     mapping(address => UFixed18) balances;
 
-    /// @dev Total ledger collateral balance
-    UFixed18 total;
-
     /// @dev Total ledger collateral shortfall
     UFixed18 shortfall;
 }
@@ -28,28 +25,6 @@ using OptimisticLedgerLib for OptimisticLedger global;
  *         user level balances until the shortfall is resolved, recapitalizing the ledger.
  */
 library OptimisticLedgerLib {
-    /**
-     * @notice Credits `account` with `amount` collateral
-     * @param self The struct to operate on
-     * @param account Account to credit collateral to
-     * @param amount Amount of collateral to credit
-     */
-    function creditAccount(OptimisticLedger storage self, address account, UFixed18 amount) internal {
-        self.balances[account] = self.balances[account].add(amount);
-        self.total = self.total.add(amount);
-    }
-
-    /**
-     * @notice Debits `account` `amount` collateral
-     * @param self The struct to operate on
-     * @param account Account to debit collateral from
-     * @param amount Amount of collateral to debit
-     */
-    function debitAccount(OptimisticLedger storage self, address account, UFixed18 amount) internal {
-        self.balances[account] = self.balances[account].sub(amount);
-        self.total = self.total.sub(amount);
-    }
-
     /**
      * @notice Credits `account` with `amount` collateral
      * @dev Funds come from inside the product, not totals are updated
@@ -73,22 +48,11 @@ library OptimisticLedgerLib {
     }
 
     /**
-     * @notice Debits ledger globally `amount` collateral
-     * @dev Removes balance from total that is accounted for elsewhere (e.g. product-level accumulators)
-     * @param self The struct to operate on
-     * @param amount Amount of collateral to debit
-     */
-    function debit(OptimisticLedger storage self, UFixed18 amount) internal {
-        self.total = self.total.sub(amount);
-    }
-
-    /**
      * @notice Reduces the amount of collateral shortfall in the ledger
      * @param self The struct to operate on
      * @param amount Amount of shortfall to resolve
      */
     function resolve(OptimisticLedger storage self, UFixed18 amount) internal {
         self.shortfall = self.shortfall.sub(amount);
-        self.total = self.total.add(amount);
     }
 }

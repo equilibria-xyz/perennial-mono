@@ -319,7 +319,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         UFixed18 accountMaintenance = context.account.maintenance(context.oracleVersion, context.maintenance);
         UFixed18 fee = UFixed18Lib.min(_collateral.balances[account], accountMaintenance.mul(liquidationFee));
 
-        _collateral.debitAccount(account, fee);
+        _settleCollateral(account, Fixed18Lib.from(-1, fee));
         token.push(msg.sender, fee);
 
         emit Liquidation(account, msg.sender, fee);
@@ -377,7 +377,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     }
 
     function collateral() external view returns (UFixed18) {
-        return _collateral.total;
+        return token.balanceOf().sub(fees);
     }
 
     function shortfall() external view returns (UFixed18) {
@@ -473,12 +473,13 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @param account Account to deposit the collateral for
      * @param amount Amount of collateral to deposit
      */
+    // TODO: combine
     function depositTo(address account, UFixed18 amount)
     external
     nonReentrant
     notPaused
     {
-        _collateral.creditAccount(account, amount);
+        _settleCollateral(account, Fixed18Lib.from(1, amount));
         token.pull(msg.sender, amount);
 
         UFixed18 accountCollateral = _collateral.balances[account];
@@ -504,7 +505,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
         UFixed18 accountCollateral = _collateral.balances[account];
         amount = amount.eq(UFixed18Lib.MAX) ? accountCollateral : amount;
-        _collateral.debitAccount(msg.sender, amount);
+        _settleCollateral(msg.sender, Fixed18Lib.from(-1, amount), true);
         token.push(account, amount);
 
         if (!accountCollateral.isZero() && accountCollateral.lt(controller().minCollateral()))
@@ -526,8 +527,12 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @param amount Amount to credit the account (can be negative)
      */
     function _settleCollateral(address account, Fixed18 amount) private {
-        UFixed18 newShortfall = _collateral.settleAccount(account, amount);
+        _settleCollateral(account, amount, false);
+    }
 
+    function _settleCollateral(address account, Fixed18 amount, bool noShortfall) private {
+        UFixed18 newShortfall = _collateral.settleAccount(account, amount);
+        if (!newShortfall.isZero()) revert ProductShortfallError();
         emit CollateralSettled(account, amount, newShortfall);
     }
 
@@ -544,7 +549,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         UFixed18 protocolFeeAmount = amount.mul(protocolFee);
         UFixed18 productFeeAmount = amount.sub(protocolFeeAmount);
 
-        _collateral.debit(amount);
         token.push(protocolTreasury, protocolFeeAmount);
         fees = fees.add(productFeeAmount);
 
