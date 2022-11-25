@@ -218,6 +218,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      *  Syncs each to instantaneously after the oracle update.
      */
     function _settleAccount(address account, CurrentContext memory context) private {
+        context.account = _accounts[account];
+
         // Get latest oracle version
         uint256 latestVersion_ = latestVersion(account);
         if (latestVersion_ == context.oracleVersion.version) return; // short circuit entirely if a == c
@@ -232,7 +234,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
         // initialize
         Fixed18 valueAccumulator;
-        context.account = _accounts[account];
 
         // sync incentivizer before accumulator
         context.incentivizer.syncAccount(account, settleOracleVersion);

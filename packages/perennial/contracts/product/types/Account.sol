@@ -31,7 +31,7 @@ library AccountLib {
      */
     function settle(Account memory account) internal pure {
         account._position = next(account).pack();
-        delete account.pre;
+        account._pre = Fixed18Lib.ZERO.pack();
     }
 
     /**
