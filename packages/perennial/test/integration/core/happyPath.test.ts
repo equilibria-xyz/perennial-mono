@@ -59,9 +59,9 @@ describe.only('Happy Path', () => {
     const product = await createProduct(instanceVars)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
 
-    await expect(product.connect(user).openMake(POSITION))
-      .to.emit(product, 'MakeOpened')
-      .withArgs(user.address, INITIAL_VERSION, POSITION)
+    await expect(product.connect(user).update(POSITION.mul(-1)))
+      .to.emit(product, 'Updated')
+      .withArgs(user.address, INITIAL_VERSION, POSITION.mul(-1))
 
     // Check user is in the correct state
     expect(await product.position(user.address)).to.equal(0)
@@ -104,11 +104,11 @@ describe.only('Happy Path', () => {
     const product = await createProduct(instanceVars)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
 
-    await product.connect(user).openMake(POSITION.div(2))
+    await product.connect(user).update(POSITION.div(2).mul(-1))
 
-    await expect(product.connect(user).openMake(POSITION.div(2)))
-      .to.emit(product, 'MakeOpened')
-      .withArgs(user.address, INITIAL_VERSION, POSITION.div(2))
+    await expect(product.connect(user).update(POSITION.div(2).mul(-1)))
+      .to.emit(product, 'Updated')
+      .withArgs(user.address, INITIAL_VERSION, POSITION.div(2).mul(-1))
 
     // Check user is in the correct state
     expect(await product.position(user.address)).to.equal(0)
@@ -151,11 +151,11 @@ describe.only('Happy Path', () => {
 
     const product = await createProduct(instanceVars)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
-    await product.connect(user).openMake(OPEN_POSITION)
-
-    await expect(product.connect(user).closeMake(CLOSE_POSITION))
-      .to.emit(product, 'MakeClosed')
-      .withArgs(user.address, INITIAL_VERSION, CLOSE_POSITION)
+    await product.connect(user).update(OPEN_POSITION.mul(-1))
+    await product.connect(user).update(CLOSE_POSITION)
+    // await expect(product.connect(user).update(CLOSE_POSITION))
+    //   .to.emit(product, 'Updated')
+    //   .withArgs(user.address, INITIAL_VERSION, CLOSE_POSITION)
 
     // User state
     expect(await product.maintenance(user.address)).to.equal(0)
@@ -182,11 +182,11 @@ describe.only('Happy Path', () => {
 
     const product = await createProduct(instanceVars)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
-    await product.connect(user).openMake(OPEN_POSITION)
-    await product.connect(user).closeMake(CLOSE_POSITION.div(2))
+    await product.connect(user).update(OPEN_POSITION.mul(-1))
+    await product.connect(user).update(CLOSE_POSITION.div(2))
 
-    await expect(product.connect(user).closeMake(CLOSE_POSITION.div(2)))
-      .to.emit(product, 'MakeClosed')
+    await expect(product.connect(user).update(CLOSE_POSITION.div(2)))
+      .to.emit(product, 'Updated')
       .withArgs(user.address, INITIAL_VERSION, CLOSE_POSITION.div(2))
 
     // User state
@@ -216,9 +216,9 @@ describe.only('Happy Path', () => {
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
 
-    await product.connect(user).openMake(MAKE_POSITION)
-    await expect(product.connect(userB).openTake(TAKE_POSITION))
-      .to.emit(product, 'TakeOpened')
+    await product.connect(user).update(MAKE_POSITION.mul(-1))
+    await expect(product.connect(userB).update(TAKE_POSITION))
+      .to.emit(product, 'Updated')
       .withArgs(userB.address, INITIAL_VERSION, TAKE_POSITION)
 
     // User State
@@ -268,11 +268,11 @@ describe.only('Happy Path', () => {
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
 
-    await product.connect(user).openMake(MAKE_POSITION)
-    await product.connect(userB).openTake(TAKE_POSITION.div(2))
+    await product.connect(user).update(MAKE_POSITION.mul(-1))
+    await product.connect(userB).update(TAKE_POSITION.div(2))
 
-    await expect(product.connect(userB).openTake(TAKE_POSITION.div(2)))
-      .to.emit(product, 'TakeOpened')
+    await expect(product.connect(userB).update(TAKE_POSITION.div(2)))
+      .to.emit(product, 'Updated')
       .withArgs(userB.address, INITIAL_VERSION, TAKE_POSITION.div(2))
 
     // User State
@@ -323,15 +323,15 @@ describe.only('Happy Path', () => {
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
 
-    await expect(product.connect(userB).openTake(OPEN_TAKE_POSITION)).to.be.revertedWith(
+    await expect(product.connect(userB).update(OPEN_TAKE_POSITION)).to.be.revertedWith(
       'ProductInsufficientLiquidityError()',
     )
-    await product.connect(user).openMake(OPEN_MAKE_POSITION)
-    await product.connect(userB).openTake(OPEN_TAKE_POSITION)
+    await product.connect(user).update(OPEN_MAKE_POSITION.mul(-1))
+    await product.connect(userB).update(OPEN_TAKE_POSITION)
 
-    await expect(product.connect(userB).closeTake(CLOSE_TAKE_POSITION))
-      .to.emit(product, 'TakeClosed')
-      .withArgs(userB.address, INITIAL_VERSION, CLOSE_TAKE_POSITION)
+    await expect(product.connect(userB).update(CLOSE_TAKE_POSITION.mul(-1)))
+      .to.emit(product, 'Updated')
+      .withArgs(userB.address, INITIAL_VERSION, CLOSE_TAKE_POSITION.mul(-1))
 
     // User State
     expect(await product.maintenance(userB.address)).to.equal(0)
@@ -361,16 +361,16 @@ describe.only('Happy Path', () => {
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
 
-    await expect(product.connect(userB).openTake(OPEN_TAKE_POSITION)).to.be.revertedWith(
+    await expect(product.connect(userB).update(OPEN_TAKE_POSITION)).to.be.revertedWith(
       'ProductInsufficientLiquidityError()',
     )
-    await product.connect(user).openMake(OPEN_MAKE_POSITION)
-    await product.connect(userB).openTake(OPEN_TAKE_POSITION)
-    await product.connect(userB).closeTake(CLOSE_TAKE_POSITION.div(2))
+    await product.connect(user).update(OPEN_MAKE_POSITION.mul(-1))
+    await product.connect(userB).update(OPEN_TAKE_POSITION)
+    await product.connect(userB).update(CLOSE_TAKE_POSITION.div(2).mul(-1))
 
-    await expect(product.connect(userB).closeTake(CLOSE_TAKE_POSITION.div(2)))
-      .to.emit(product, 'TakeClosed')
-      .withArgs(userB.address, INITIAL_VERSION, CLOSE_TAKE_POSITION.div(2))
+    await expect(product.connect(userB).update(CLOSE_TAKE_POSITION.div(2).mul(-1)))
+      .to.emit(product, 'Updated')
+      .withArgs(userB.address, INITIAL_VERSION, CLOSE_TAKE_POSITION.div(2).mul(-1))
 
     // User State
     expect(await product.maintenance(userB.address)).to.equal(0)
@@ -409,11 +409,7 @@ describe.only('Happy Path', () => {
     await expect(product.depositTo(user.address, utils.parseEther('1000'))).to.be.revertedWith('PausedError()')
     await expect(product.withdrawTo(user.address, utils.parseEther('1000'))).to.be.revertedWith('PausedError()')
     await expect(product.liquidate(user.address)).to.be.revertedWith('PausedError()')
-
-    await expect(product.openMake(utils.parseEther('0.001'))).to.be.revertedWith('PausedError()')
-    await expect(product.closeMake(utils.parseEther('0.001'))).to.be.revertedWith('PausedError()')
-    await expect(product.openTake(utils.parseEther('0.001'))).to.be.revertedWith('PausedError()')
-    await expect(product.closeTake(utils.parseEther('0.001'))).to.be.revertedWith('PausedError()')
+    await expect(product.update(utils.parseEther('0.001'))).to.be.revertedWith('PausedError()')
     await expect(product.settle()).to.be.revertedWith('PausedError()')
     await expect(product.settleAccount(user.address)).to.be.revertedWith('PausedError()')
   })

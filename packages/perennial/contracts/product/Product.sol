@@ -267,110 +267,56 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @notice Opens a taker position for `msg.sender`
      * @param amount Amount of the position to open
      */
-    function openTake(UFixed18 amount)
+    function update(Fixed18 amount)
     external
     nonReentrant
     {
         CurrentContext memory context = _settle();
         _settleAccount(msg.sender, context);
 
-        if (context.paused) revert PausedError();
-        if (context.closed) revert ProductClosedError();
-        if (context.account.liquidation) revert ProductInLiquidationError();
-
-        _pres[msg.sender] = _pres[msg.sender].add(Fixed18Lib.from(amount));
-        _pre.openTake(amount);
-
-        UFixed18 positionFee = amount.mul(context.oracleVersion.price.abs()).mul(context.takerFee);
-        if (!positionFee.isZero()) _settleCollateral(msg.sender, Fixed18Lib.from(-1, positionFee));
-
-        if (_liquidatableNext(context, msg.sender)) revert ProductInsufficientCollateralError();
-        if (_socializationNext(context).lt(UFixed18Lib.ONE)) revert ProductInsufficientLiquidityError();
-
-        emit TakeOpened(msg.sender, _latestVersion, amount);
+        _update(context, msg.sender, amount);
     }
 
-    /**
-     * @notice Closes a taker position for `msg.sender`
-     * @param amount Amount of the position to close
-     */
-    function closeTake(UFixed18 amount)
-    external
-    nonReentrant
-    {
-        CurrentContext memory context = _settle();
-        _settleAccount(msg.sender, context);
-
+    function _update(CurrentContext memory context, address account, Fixed18 amount) private {
         if (context.paused) revert PausedError();
         if (context.account.liquidation) revert ProductInLiquidationError();
 
-        _closeTake(context, msg.sender, amount);
-    }
+        //TODO: cleanup by consolidated global pre
+        Fixed18 nextPosition = context.account.position.add(_pres[msg.sender]);
+        _pres[msg.sender] = _pres[account].add(amount);
+        if (amount.sign() == 1) {
+            if (nextPosition.sign() == 1) {
+                _pre.openTake(amount.abs());
+            } else {
+                if (nextPosition.sign() == nextPosition.add(amount).sign() || nextPosition.add(amount).sign() == 0) {
+                    _pre.closeMake(amount.abs());
+                } else {
+                    _pre.closeMake(nextPosition.abs());
+                    _pre.openTake(amount.abs().sub(nextPosition.abs()));
+                }
+            }
+        } else {
+            if (nextPosition.sign() == 1) {
+                if (nextPosition.sign() == nextPosition.add(amount).sign() || nextPosition.add(amount).sign() == 0) {
+                    _pre.closeTake(amount.abs());
+                } else {
+                    _pre.closeTake(nextPosition.abs());
+                    _pre.openMake(amount.abs().sub(nextPosition.abs()));
+                }
+            } else {
+                _pre.openMake(amount.abs());
+            }
+        }
 
-    function _closeTake(CurrentContext memory context, address account, UFixed18 amount) private {
-        _pres[account] = _pres[account].sub(Fixed18Lib.from(amount));
-        _pre.closeTake(amount);
-
-        UFixed18 positionFee = amount.mul(context.oracleVersion.price.abs()).mul(context.takerFee);
+        UFixed18 positionFee = amount.mul(context.oracleVersion.price).abs().mul(context.takerFee);
         if (!positionFee.isZero()) _settleCollateral(account, Fixed18Lib.from(-1, positionFee));
 
-        emit TakeClosed(account, _latestVersion, amount);
-    }
-
-    /**
-     * @notice Opens a maker position for `msg.sender`
-     * @param amount Amount of the position to open
-     */
-    function openMake(UFixed18 amount)
-    external
-    nonReentrant
-    {
-        CurrentContext memory context = _settle();
-        _settleAccount(msg.sender, context);
-
-        if (context.paused) revert PausedError();
-        if (context.closed) revert ProductClosedError();
-        if (context.account.liquidation) revert ProductInLiquidationError();
-
-        _pres[msg.sender] = _pres[msg.sender].sub(Fixed18Lib.from(amount));
-        _pre.openMake(amount);
-
-        UFixed18 positionFee = amount.mul(context.oracleVersion.price.abs()).mul(context.makerFee);
-        if (!positionFee.isZero()) _settleCollateral(msg.sender, Fixed18Lib.from(-1, positionFee));
-
-        if (_liquidatableNext(context, msg.sender)) revert ProductInsufficientCollateralError();
+        if (context.closed && !_closingNext(context, account, amount)) revert ProductClosedError();
+        if (_liquidatableNext(context, account)) revert ProductInsufficientCollateralError();
+        if (_socializationNext(context).lt(UFixed18Lib.ONE)) revert ProductInsufficientLiquidityError();
         if (context.version.position().next(_pre).maker.gt(context.makerLimit)) revert ProductMakerOverLimitError();
 
-        emit MakeOpened(msg.sender, _latestVersion, amount);
-    }
-
-    /**
-     * @notice Closes a maker position for `msg.sender`
-     * @param amount Amount of the position to close
-     */
-    function closeMake(UFixed18 amount)
-    external
-    nonReentrant
-    {
-        CurrentContext memory context = _settle();
-        _settleAccount(msg.sender, context);
-
-        if (context.paused) revert PausedError();
-        if (context.account.liquidation) revert ProductInLiquidationError();
-
-        _closeMake(context, msg.sender, amount);
-
-        if (_socializationNext(context).lt(UFixed18Lib.ONE)) revert ProductInsufficientLiquidityError();
-    }
-
-    function _closeMake(CurrentContext memory context, address account, UFixed18 amount) private {
-        _pres[msg.sender] = _pres[account].add(Fixed18Lib.from(amount));
-        _pre.closeMake(amount);
-
-        UFixed18 positionFee = amount.mul(context.oracleVersion.price.abs()).mul(context.makerFee);
-        if (!positionFee.isZero()) _settleCollateral(account, Fixed18Lib.from(-1, positionFee));
-
-        emit MakeClosed(account, _latestVersion, amount);
+        emit Updated(account, _latestVersion, amount);
     }
 
     /**
@@ -381,49 +327,25 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     function liquidate(address account)
     external
     nonReentrant
-    notPaused
     {
         CurrentContext memory context = _settle();
         _settleAccount(account, context);
 
-        if (!_liquidatable(context, account))
-            revert ProductCantLiquidate();
+        // Liquidate position
+        if (!_liquidatable(context, account)) revert ProductCantLiquidate();
 
-        _closeAll(context, account);
+        _update(context, account, _accounts[account].position.mul(Fixed18Lib.NEG_ONE));
+        _accounts[account].liquidation = true;
 
-        // claim fee
+        // Dispurse fee
         UFixed18 liquidationFee = controller().liquidationFee();
-        UFixed18 fee = UFixed18Lib.min(
-            _collateral.balances[account],
-            context.account.maintenance(context.oracleVersion, context.maintenance).mul(liquidationFee)
-        );
+        UFixed18 accountMaintenance = context.account.maintenance(context.oracleVersion, context.maintenance);
+        UFixed18 fee = UFixed18Lib.min(_collateral.balances[account], accountMaintenance.mul(liquidationFee));
 
         _collateral.debitAccount(account, fee);
         token.push(msg.sender, fee);
 
         emit Liquidation(account, msg.sender, fee);
-    }
-
-    /**
-     * @notice Closes all open and pending positions, locking for liquidation
-     * @dev Only callable by the Collateral contract as part of the liquidation flow
-     * @param account Account to close out
-     */
-    function _closeAll(CurrentContext memory context, address account) private {
-        if (context.closed) revert ProductClosedError();
-
-        Account storage account_ = _accounts[account];
-        Fixed18 position_ = account_.position.add(_pres[account]);
-
-        // Close all positions
-        if (position_.sign() == 1) {
-            _closeTake(context, account, position_.abs());
-        } else {
-            _closeMake(context, account, position_.abs());
-        }
-
-        // Mark liquidation to lock position
-        account_.liquidation = true;
     }
 
     /**
@@ -567,6 +489,14 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     function _socializationNext(CurrentContext memory context) private view returns (UFixed18) {
         if (context.closed) return UFixed18Lib.ONE;
         return context.version.position().next(_pre).socializationFactor();
+    }
+
+    function _closingNext(CurrentContext memory context, address account, Fixed18 amount) private view returns (bool) {
+        Fixed18 nextAccountPosition = context.account.position.add(_pres[account]);
+        if (nextAccountPosition.sign() == 0) return true;
+        if (context.account.position.sign() == amount.sign()) return false;
+        if (nextAccountPosition.sign() != context.account.position.sign()) return false;
+        return true;
     }
 
     /**

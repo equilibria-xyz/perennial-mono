@@ -17,7 +17,7 @@ describe('Liquidate', () => {
 
     const product = await createProduct(instanceVars)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
-    await product.connect(user).openMake(POSITION)
+    await product.connect(user).update(POSITION.mul(-1))
 
     expect(await product.liquidatable(user.address)).to.be.false
 
@@ -52,8 +52,8 @@ describe('Liquidate', () => {
     const product = await createProduct(instanceVars)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
-    await product.connect(user).openMake(POSITION)
-    await product.connect(userB).openTake(POSITION)
+    await product.connect(user).update(POSITION.mul(-1))
+    await product.connect(userB).update(POSITION)
 
     // Settle the product with a new oracle version
     await chainlink.next()
@@ -85,10 +85,10 @@ describe('Liquidate', () => {
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userC, product, utils.parseEther('10000'))
     await depositTo(instanceVars, userD, product, utils.parseEther('10000'))
-    await product.connect(user).openMake(POSITION)
-    await product.connect(userB).openMake(POSITION)
-    await product.connect(userC).openTake(POSITION)
-    await product.connect(userD).openTake(POSITION)
+    await product.connect(user).update(POSITION.mul(-1))
+    await product.connect(userB).update(POSITION.mul(-1))
+    await product.connect(userC).update(POSITION)
+    await product.connect(userD).update(POSITION)
 
     expect(await product.liquidatable(user.address)).to.be.false
 

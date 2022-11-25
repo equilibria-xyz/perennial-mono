@@ -89,8 +89,8 @@ describe('Reservoir Oracle Product', () => {
     const product = await createProduct(instanceVars, baycUSDCPayoffProvider, reservoirOracle)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
 
-    await expect(product.connect(user).openMake(POSITION))
-      .to.emit(product, 'MakeOpened')
+    await expect(product.connect(user).update(POSITION.mul(-1)))
+      .to.emit(product, 'Updated')
       .withArgs(user.address, INITIAL_VERSION, POSITION)
 
     // Check user is in the correct state
@@ -134,10 +134,10 @@ describe('Reservoir Oracle Product', () => {
     const product = await createProduct(instanceVars, baycUSDCPayoffProvider, reservoirOracle)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
 
-    await product.connect(user).openMake(POSITION.div(2))
+    await product.connect(user).update(POSITION.div(2).mul(-1))
 
-    await expect(product.connect(user).openMake(POSITION.div(2)))
-      .to.emit(product, 'MakeOpened')
+    await expect(product.connect(user).update(POSITION.div(2).mul(-1)))
+      .to.emit(product, 'Updated')
       .withArgs(user.address, INITIAL_VERSION, POSITION.div(2))
 
     // Check user is in the correct state
@@ -181,10 +181,10 @@ describe('Reservoir Oracle Product', () => {
 
     const product = await createProduct(instanceVars, baycUSDCPayoffProvider, reservoirOracle)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
-    await product.connect(user).openMake(OPEN_POSITION)
+    await product.connect(user).update(OPEN_POSITION.mul(-1))
 
-    await expect(product.connect(user).closeMake(CLOSE_POSITION))
-      .to.emit(product, 'MakeClosed')
+    await expect(product.connect(user).update(CLOSE_POSITION))
+      .to.emit(product, 'Updated')
       .withArgs(user.address, INITIAL_VERSION, CLOSE_POSITION)
 
     // User state
@@ -212,11 +212,11 @@ describe('Reservoir Oracle Product', () => {
 
     const product = await createProduct(instanceVars, baycUSDCPayoffProvider, reservoirOracle)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
-    await product.connect(user).openMake(OPEN_POSITION)
-    await product.connect(user).closeMake(CLOSE_POSITION.div(2))
+    await product.connect(user).update(OPEN_POSITION.mul(-1))
+    await product.connect(user).update(CLOSE_POSITION.div(2))
 
-    await expect(product.connect(user).closeMake(CLOSE_POSITION.div(2)))
-      .to.emit(product, 'MakeClosed')
+    await expect(product.connect(user).update(CLOSE_POSITION.div(2)))
+      .to.emit(product, 'Updated')
       .withArgs(user.address, INITIAL_VERSION, CLOSE_POSITION.div(2))
 
     // User state
@@ -246,9 +246,9 @@ describe('Reservoir Oracle Product', () => {
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
 
-    await product.connect(user).openMake(MAKE_POSITION)
-    await expect(product.connect(userB).openTake(TAKE_POSITION))
-      .to.emit(product, 'TakeOpened')
+    await product.connect(user).update(MAKE_POSITION.mul(-1))
+    await expect(product.connect(userB).update(TAKE_POSITION))
+      .to.emit(product, 'Updated')
       .withArgs(userB.address, INITIAL_VERSION, TAKE_POSITION)
 
     // User State
@@ -298,11 +298,11 @@ describe('Reservoir Oracle Product', () => {
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
 
-    await product.connect(user).openMake(MAKE_POSITION)
-    await product.connect(userB).openTake(TAKE_POSITION.div(2))
+    await product.connect(user).update(MAKE_POSITION.mul(-1))
+    await product.connect(userB).update(TAKE_POSITION.div(2))
 
-    await expect(product.connect(userB).openTake(TAKE_POSITION.div(2)))
-      .to.emit(product, 'TakeOpened')
+    await expect(product.connect(userB).update(TAKE_POSITION.div(2)))
+      .to.emit(product, 'Updated')
       .withArgs(userB.address, INITIAL_VERSION, TAKE_POSITION.div(2))
 
     // User State
@@ -353,14 +353,12 @@ describe('Reservoir Oracle Product', () => {
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
 
-    await expect(product.connect(userB).openTake(OPEN_TAKE_POSITION)).to.be.revertedWith(
-      'InsufficientLiquidityError(0)',
-    )
-    await product.connect(user).openMake(OPEN_MAKE_POSITION)
-    await product.connect(userB).openTake(OPEN_TAKE_POSITION)
+    await expect(product.connect(userB).update(OPEN_TAKE_POSITION)).to.be.revertedWith('InsufficientLiquidityError(0)')
+    await product.connect(user).update(OPEN_MAKE_POSITION.mul(-1))
+    await product.connect(userB).update(OPEN_TAKE_POSITION)
 
-    await expect(product.connect(userB).closeTake(CLOSE_TAKE_POSITION))
-      .to.emit(product, 'TakeClosed')
+    await expect(product.connect(userB).update(CLOSE_TAKE_POSITION.mul(-1)))
+      .to.emit(product, 'Updated')
       .withArgs(userB.address, INITIAL_VERSION, CLOSE_TAKE_POSITION)
 
     // User State
@@ -391,15 +389,13 @@ describe('Reservoir Oracle Product', () => {
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
 
-    await expect(product.connect(userB).openTake(OPEN_TAKE_POSITION)).to.be.revertedWith(
-      'InsufficientLiquidityError(0)',
-    )
-    await product.connect(user).openMake(OPEN_MAKE_POSITION)
-    await product.connect(userB).openTake(OPEN_TAKE_POSITION)
-    await product.connect(userB).closeTake(CLOSE_TAKE_POSITION.div(2))
+    await expect(product.connect(userB).update(OPEN_TAKE_POSITION)).to.be.revertedWith('InsufficientLiquidityError(0)')
+    await product.connect(user).update(OPEN_MAKE_POSITION.mul(-1))
+    await product.connect(userB).update(OPEN_TAKE_POSITION)
+    await product.connect(userB).update(CLOSE_TAKE_POSITION.div(2).mul(-1))
 
-    await expect(product.connect(userB).closeTake(CLOSE_TAKE_POSITION.div(2)))
-      .to.emit(product, 'TakeClosed')
+    await expect(product.connect(userB).update(CLOSE_TAKE_POSITION.div(2).mul(-1)))
+      .to.emit(product, 'Updated')
       .withArgs(userB.address, INITIAL_VERSION, CLOSE_TAKE_POSITION.div(2))
 
     // User State

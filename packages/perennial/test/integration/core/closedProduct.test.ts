@@ -18,7 +18,7 @@ describe('Closed Product', () => {
 
     const product = await createProduct(instanceVars)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
-    await product.connect(user).openMake(POSITION)
+    await product.connect(user).update(POSITION.mul(-1))
 
     //TODO: uncomment when versioned params are added
     //expect(await product.closed()).to.be.false
@@ -57,8 +57,8 @@ describe('Closed Product', () => {
       product = await createProduct(instanceVars)
       await depositTo(instanceVars, user, product, utils.parseEther('1000'))
       await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
-      await product.connect(user).openMake(POSITION)
-      await product.connect(userB).openTake(POSITION)
+      await product.connect(user).update(POSITION.mul(-1))
+      await product.connect(userB).update(POSITION)
       const parameters = await product.parameter()
       await product.updateParameter(
         parameters.maintenance,
@@ -72,12 +72,11 @@ describe('Closed Product', () => {
     })
 
     it('reverts on new open positions', async () => {
-      await expect(product.connect(instanceVars.user).openMake(POSITION)).to.be.revertedWith('ProductClosedError()')
-      await expect(product.connect(instanceVars.userB).openTake(POSITION)).to.be.revertedWith('ProductClosedError()')
+      await expect(product.connect(instanceVars.user).update(POSITION)).to.be.revertedWith('ProductClosedError()')
     })
 
     it('allows insufficient liquidity for close positions', async () => {
-      await expect(product.connect(instanceVars.user).closeMake(POSITION)).to.not.be.reverted
+      await expect(product.connect(instanceVars.user).update(POSITION)).to.not.be.reverted
     })
 
     it('reverts on attempts to liquidate', async () => {
@@ -98,8 +97,8 @@ describe('Closed Product', () => {
     const product = await createProduct(instanceVars)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
-    await product.connect(user).openMake(POSITION)
-    await product.connect(userB).openTake(POSITION)
+    await product.connect(user).update(POSITION.mul(-1))
+    await product.connect(userB).update(POSITION)
 
     await chainlink.next()
     await chainlink.next()
@@ -140,8 +139,8 @@ describe('Closed Product', () => {
     const product = await createProduct(instanceVars)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
-    await product.connect(user).openMake(POSITION)
-    await product.connect(userB).openTake(POSITION)
+    await product.connect(user).update(POSITION.mul(-1))
+    await product.connect(userB).update(POSITION)
 
     await chainlink.next()
     await chainlink.nextWithPriceModification(price => price.mul(2))
