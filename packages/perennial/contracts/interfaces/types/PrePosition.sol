@@ -39,44 +39,30 @@ library PrePositionLib {
         return self.openPosition.isEmpty() && self.closePosition.isEmpty();
     }
 
-    /**
-     * @notice Increments the maker side of the open position delta
-     * @dev Nets out open and close deltas to minimize the size of each
-     * @param self The struct to operate on
-     * @param amount The position amount to open
-     */
-    function openMake(PrePosition storage self, UFixed18 amount) internal {
-        self.openPosition.maker = self.openPosition.maker.add(amount);
-    }
-
-    /**
-     * @notice Increments the maker side of the close position delta
-     * @dev Nets out open and close deltas to minimize the size of each
-     * @param self The struct to operate on
-     * @param amount The maker position amount to close
-     */
-    function closeMake(PrePosition storage self, UFixed18 amount) internal {
-        self.closePosition.maker = self.closePosition.maker.add(amount);
-    }
-
-    /**
-     * @notice Increments the taker side of the open position delta
-     * @dev Nets out open and close deltas to minimize the size of each
-     * @param self The struct to operate on
-     * @param amount The taker position amount to open
-     */
-    function openTake(PrePosition storage self, UFixed18 amount) internal {
-        self.openPosition.taker = self.openPosition.taker.add(amount);
-    }
-
-    /**
-     * @notice Increments the taker side of the close position delta
-     * @dev Nets out open and close deltas to minimize the size of each
-     * @param self The struct to operate on
-     * @param amount The taker position amount to close
-     */
-    function closeTake(PrePosition storage self, UFixed18 amount) internal {
-        self.closePosition.taker = self.closePosition.taker.add(amount);
+    function update(PrePosition storage self, Fixed18 position, Fixed18 amount) internal {
+        if (amount.sign() == 1) {
+            if (position.sign() == 1) {
+                self.openPosition.taker = self.openPosition.taker.add(amount.abs());
+            } else {
+                if (position.sign() == position.add(amount).sign() || position.add(amount).sign() == 0) {
+                    self.closePosition.maker = self.closePosition.maker.add(amount.abs());
+                } else {
+                    self.closePosition.maker = self.closePosition.maker.add(position.abs());
+                    self.openPosition.taker = self.openPosition.taker.add(amount.abs().sub(position.abs()));
+                }
+            }
+        } else {
+            if (position.sign() == 1) {
+                if (position.sign() == position.add(amount).sign() || position.add(amount).sign() == 0) {
+                    self.closePosition.taker = self.closePosition.taker.add(amount.abs());
+                } else {
+                    self.closePosition.taker = self.closePosition.taker.add(position.abs());
+                    self.openPosition.maker = self.openPosition.maker.add(amount.abs().sub(position.abs()));
+                }
+            } else {
+                self.openPosition.maker = self.openPosition.maker.add(amount.abs());
+            }
+        }
     }
 
     /**

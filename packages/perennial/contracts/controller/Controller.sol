@@ -358,8 +358,8 @@ contract Controller is IController, UInitializable {
         return (incentivizer(), minFundingFee(), paused());
     }
 
-    function collateralParameters(IProduct product) external view returns (address, address, UFixed18) {
-        return (treasury(), treasury(product), protocolFee());
+    function collateralParameters(IProduct product) external view returns (address, UFixed18) {
+        return (treasury(), protocolFee());
     }
 
     /// @dev Only allow owner of `coordinatorId` to call

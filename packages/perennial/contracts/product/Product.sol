@@ -166,6 +166,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
             context.closed
         );
         _versions[settleOracleVersion.version] = context.version;
+        delete _pre;
 
         // b->c
         if (settleOracleVersion.version != context.oracleVersion.version) { // skip is b == c
@@ -185,7 +186,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
         // Save state
         _latestVersion = context.oracleVersion.version;
-        delete _pre;
 
         emit Settle(settleOracleVersion.version, context.oracleVersion.version);
     }
@@ -281,32 +281,9 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         if (context.paused) revert PausedError();
         if (context.account.liquidation) revert ProductInLiquidationError();
 
-        //TODO: cleanup by consolidated global pre
         Fixed18 nextPosition = context.account.position.add(_pres[msg.sender]);
         _pres[msg.sender] = _pres[account].add(amount);
-        if (amount.sign() == 1) {
-            if (nextPosition.sign() == 1) {
-                _pre.openTake(amount.abs());
-            } else {
-                if (nextPosition.sign() == nextPosition.add(amount).sign() || nextPosition.add(amount).sign() == 0) {
-                    _pre.closeMake(amount.abs());
-                } else {
-                    _pre.closeMake(nextPosition.abs());
-                    _pre.openTake(amount.abs().sub(nextPosition.abs()));
-                }
-            }
-        } else {
-            if (nextPosition.sign() == 1) {
-                if (nextPosition.sign() == nextPosition.add(amount).sign() || nextPosition.add(amount).sign() == 0) {
-                    _pre.closeTake(amount.abs());
-                } else {
-                    _pre.closeTake(nextPosition.abs());
-                    _pre.openMake(amount.abs().sub(nextPosition.abs()));
-                }
-            } else {
-                _pre.openMake(amount.abs());
-            }
-        }
+        _pre.update(nextPosition, amount);
 
         UFixed18 positionFee = amount.mul(context.oracleVersion.price).abs().mul(context.takerFee);
         if (!positionFee.isZero()) _settleCollateral(account, Fixed18Lib.from(-1, positionFee));
@@ -570,8 +547,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @param amount Amount to debit from the account
      */
     function _settleFees(UFixed18 amount) private {
-        (address protocolTreasury, address productTreasury, UFixed18 protocolFee) =
-        controller().collateralParameters(IProduct(this));
+        (address protocolTreasury, UFixed18 protocolFee) =
+            controller().collateralParameters(IProduct(this));
 
         UFixed18 protocolFeeAmount = amount.mul(protocolFee);
         UFixed18 productFeeAmount = amount.sub(protocolFeeAmount);
