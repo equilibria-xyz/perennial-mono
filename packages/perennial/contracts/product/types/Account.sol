@@ -8,10 +8,10 @@ import "./Version.sol";
 /// @dev Account type
 struct Account {
     /// @dev The current settled position of the account
-    Fixed18 position;
+    PackedFixed18 _pre;
 
-    /// @dev Whether the account is currently locked for liquidation
-    bool liquidation;
+    /// @dev The current settled position of the account
+    PackedFixed18 _position;
 }
 using AccountLib for Account global;
 
@@ -20,19 +20,18 @@ using AccountLib for Account global;
  * @notice Library that manages an account-level position.
  */
 library AccountLib {
+
+    function update(Account memory account, Fixed18 amount) internal pure {
+        account._pre = account._pre.unpack().add(amount).pack();
+    }
+
     /**
      * @notice Settled the account's position to oracle version `toOracleVersion`
      * @param account The struct to operate on
      */
-    function accumulateAndSettle(
-        Account memory account,
-        Fixed18 valueAccumulator,
-        Fixed18 pre,
-        Version memory fromVersion,
-        Version memory toVersion
-    ) internal pure returns (Fixed18 newValueAccumulator) {
-        newValueAccumulator = accumulate(account, valueAccumulator, fromVersion, toVersion);
-        account.position = account.position.add(pre);
+    function settle(Account memory account) internal pure {
+        account._position = next(account).pack();
+        delete account.pre;
     }
 
     /**
@@ -46,10 +45,11 @@ library AccountLib {
         Version memory fromVersion,
         Version memory toVersion
     ) internal pure returns (Fixed18 newValueAccumulator) {
-        if (account.position.sign() == 1) {
-            newValueAccumulator = valueAccumulator.add(account.position.mul(toVersion.value().taker.sub(fromVersion.value().taker)));
+        Fixed18 _position = position(account);
+        if (_position.sign() == 1) {
+            newValueAccumulator = valueAccumulator.add(_position.mul(toVersion.value().taker.sub(fromVersion.value().taker)));
         } else {
-            newValueAccumulator = valueAccumulator.add(account.position.mul(toVersion.value().maker.sub(fromVersion.value().maker)));
+            newValueAccumulator = valueAccumulator.add(_position.mul(toVersion.value().maker.sub(fromVersion.value().maker)));
         }
     }
 
@@ -64,8 +64,7 @@ library AccountLib {
         IOracleProvider.OracleVersion memory currentOracleVersion,
         UFixed18 maintenanceRatio
     ) internal pure returns (UFixed18) {
-        if (self.liquidation) return UFixed18Lib.ZERO;
-        return _maintenance(self.position, currentOracleVersion, maintenanceRatio);
+        return _maintenance(position(self), currentOracleVersion, maintenanceRatio);
     }
 
     /**
@@ -76,25 +75,36 @@ library AccountLib {
      */
     function maintenanceNext(
         Account memory self,
-        Fixed18 pre,
         IOracleProvider.OracleVersion memory currentOracleVersion,
         UFixed18 maintenanceRatio
     ) internal pure returns (UFixed18) {
-        return _maintenance(self.position.add(pre), currentOracleVersion, maintenanceRatio);
+        return _maintenance(next(self), currentOracleVersion, maintenanceRatio);
     }
 
     /**
      * @notice Returns the maintenance requirement for a given `position`
      * @dev Internal helper
-     * @param position The position to compete the maintenance requirement for
+     * @param _position The position to compete the maintenance requirement for
      * @return Next maintenance requirement for the account
      */
     function _maintenance(
-        Fixed18 position,
+        Fixed18 _position,
         IOracleProvider.OracleVersion memory currentOracleVersion,
         UFixed18 maintenanceRatio
     ) private pure returns (UFixed18) {
-        UFixed18 notionalMax = position.mul(currentOracleVersion.price).abs();
+        UFixed18 notionalMax = _position.mul(currentOracleVersion.price).abs();
         return notionalMax.mul(maintenanceRatio);
+    }
+
+    function pre(Account memory self) internal pure returns (Fixed18) {
+        return self._pre.unpack();
+    }
+
+    function position(Account memory self) internal pure returns (Fixed18) {
+        return self._position.unpack();
+    }
+
+    function next(Account memory self) internal pure returns (Fixed18) {
+        return self._position.unpack().add(self._pre.unpack());
     }
 }

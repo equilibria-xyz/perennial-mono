@@ -40,10 +40,12 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     mapping(uint256 => Version) _versions;
 
     PrePosition private _pre;
-    mapping(address => Fixed18) private _pres;
 
     uint256 private _latestVersion;
     mapping(address => uint256) private _latestVersions;
+
+    /// @dev Whether the account is currently locked for liquidation
+    mapping(address => bool) public liquidation;
 
     struct CurrentContext {
         /* Global Parameters */
@@ -236,12 +238,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         context.incentivizer.syncAccount(account, settleOracleVersion);
 
         // account a->b
-        valueAccumulator = context.account.accumulateAndSettle(
-            valueAccumulator,
-            _pres[account],
-            _versions[latestVersion_],
-            settleVersion
-        );
+        valueAccumulator = context.account.accumulate(valueAccumulator, _versions[latestVersion_], settleVersion);
+        context.account.settle();
 
         // short-circuit from a->c if b == c
         if (settleOracleVersion.version != context.oracleVersion.version) {
@@ -258,7 +256,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         // save state
         _latestVersions[account] = context.oracleVersion.version;
         _accounts[account] = context.account;
-        _pres[account] = Fixed18Lib.ZERO;
 
         emit AccountSettle(account, settleOracleVersion.version, context.oracleVersion.version);
     }
@@ -279,16 +276,18 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
     function _update(CurrentContext memory context, address account, Fixed18 amount) private {
         if (context.paused) revert PausedError();
-        if (context.account.liquidation) revert ProductInLiquidationError();
+        if (liquidation[account]) revert ProductInLiquidationError();
+        if (context.closed && !_closingNext(context, amount)) revert ProductClosedError();
 
-        Fixed18 nextPosition = context.account.position.add(_pres[msg.sender]);
-        _pres[msg.sender] = _pres[account].add(amount);
+        Fixed18 nextPosition = context.account.next();
+        context.account.update(amount);
+
+        _accounts[account] = context.account;
         _pre.update(nextPosition, amount);
 
         UFixed18 positionFee = amount.mul(context.oracleVersion.price).abs().mul(context.takerFee);
         if (!positionFee.isZero()) _settleCollateral(account, Fixed18Lib.from(-1, positionFee));
 
-        if (context.closed && !_closingNext(context, account, amount)) revert ProductClosedError();
         if (_liquidatableNext(context, account)) revert ProductInsufficientCollateralError();
         if (_socializationNext(context).lt(UFixed18Lib.ONE)) revert ProductInsufficientLiquidityError();
         if (context.version.position().next(_pre).maker.gt(context.makerLimit)) revert ProductMakerOverLimitError();
@@ -311,8 +310,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         // Liquidate position
         if (!_liquidatable(context, account)) revert ProductCantLiquidate();
 
-        _update(context, account, _accounts[account].position.mul(Fixed18Lib.NEG_ONE));
-        _accounts[account].liquidation = true;
+        _update(context, account, _accounts[account].position().mul(Fixed18Lib.NEG_ONE));
+        liquidation[account] = true;
 
         // Dispurse fee
         UFixed18 liquidationFee = controller().liquidationFee();
@@ -343,16 +342,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      */
     function maintenanceNext(address account) external view returns (UFixed18) {
         (UFixed18 _maintenance, , , , , , ) = parameter();
-        return _accounts[account].maintenanceNext(_pres[account], currentVersion(), _maintenance);
-    }
-
-    /**
-     * @notice Returns whether `account` is currently locked for an in-progress liquidation
-     * @param account Account to return for
-     * @return Whether the account is in liquidation
-     */
-    function isLiquidating(address account) external view returns (bool) {
-        return _accounts[account].liquidation;
+        return _accounts[account].maintenanceNext(currentVersion(), _maintenance);
     }
 
     function collateral(address account) external view returns (UFixed18) {
@@ -365,7 +355,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @return Current position of the account
      */
     function position(address account) external view returns (Fixed18) {
-        return _accounts[account].position;
+        return _accounts[account].position();
     }
 
     /**
@@ -374,7 +364,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @return Current pre-position of the account
      */
     function pre(address account) external view returns (Fixed18) {
-        return _pres[account];
+        return _accounts[account].pre();
     }
 
     /**
@@ -448,7 +438,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @return Whether the account can be liquidated
      */
     function _liquidatableNext(CurrentContext memory context, address account) private view returns (bool) {
-        UFixed18 maintenanceAmount = context.account.maintenanceNext(_pres[account], context.oracleVersion, context.maintenance);
+        UFixed18 maintenanceAmount = context.account.maintenanceNext(context.oracleVersion, context.maintenance);
         return maintenanceAmount.gt(_collateral.balances[account]);
     }
 
@@ -468,11 +458,11 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         return context.version.position().next(_pre).socializationFactor();
     }
 
-    function _closingNext(CurrentContext memory context, address account, Fixed18 amount) private view returns (bool) {
-        Fixed18 nextAccountPosition = context.account.position.add(_pres[account]);
+    function _closingNext(CurrentContext memory context, Fixed18 amount) private view returns (bool) {
+        Fixed18 nextAccountPosition = context.account.next();
         if (nextAccountPosition.sign() == 0) return true;
-        if (context.account.position.sign() == amount.sign()) return false;
-        if (nextAccountPosition.sign() != context.account.position.sign()) return false;
+        if (context.account.position().sign() == amount.sign()) return false;
+        if (nextAccountPosition.sign() != context.account.position().sign()) return false;
         return true;
     }
 

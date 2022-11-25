@@ -293,7 +293,7 @@ contract PerennialLens is IPerennialLens {
      * @return Whether or not the user's position is being liquidated
      */
     function liquidating(address account, IProduct product) public settleAccount(account, product) returns (bool) {
-        return product.isLiquidating(account);
+        return product.liquidation(account);
     }
 
     /**
