@@ -8,7 +8,7 @@ import "./Version.sol";
 /// @dev Account type
 struct Account {
     /// @dev The current settled position of the account
-    Position position;
+    Fixed18 position;
 
     /// @dev Whether the account is currently locked for liquidation
     bool liquidation;
@@ -27,12 +27,12 @@ library AccountLib {
     function accumulateAndSettle(
         Account memory account,
         Fixed18 valueAccumulator,
-        PrePosition memory pre,
+        Fixed18 pre,
         Version memory fromVersion,
         Version memory toVersion
     ) internal pure returns (Fixed18 newValueAccumulator) {
-        newValueAccumulator = valueAccumulator.add(account.position.mul(toVersion.value().sub(fromVersion.value())).sum());
-        account.position = account.position.next(pre);
+        newValueAccumulator = accumulate(account, valueAccumulator, fromVersion, toVersion);
+        account.position = account.position.add(pre);
     }
 
     /**
@@ -46,7 +46,11 @@ library AccountLib {
         Version memory fromVersion,
         Version memory toVersion
     ) internal pure returns (Fixed18 newValueAccumulator) {
-        newValueAccumulator = valueAccumulator.add(account.position.mul(toVersion.value().sub(fromVersion.value())).sum());
+        if (account.position.sign() == 1) {
+            newValueAccumulator = valueAccumulator.add(account.position.mul(toVersion.value().taker.sub(fromVersion.value().taker)));
+        } else {
+            newValueAccumulator = valueAccumulator.add(account.position.mul(toVersion.value().maker.sub(fromVersion.value().maker)));
+        }
     }
 
     /**
@@ -72,11 +76,11 @@ library AccountLib {
      */
     function maintenanceNext(
         Account memory self,
-        PrePosition memory pre,
+        Fixed18 pre,
         IOracleProvider.OracleVersion memory currentOracleVersion,
         UFixed18 maintenanceRatio
     ) internal pure returns (UFixed18) {
-        return _maintenance(self.position.next(pre), currentOracleVersion, maintenanceRatio);
+        return _maintenance(self.position.add(pre), currentOracleVersion, maintenanceRatio);
     }
 
     /**
@@ -86,38 +90,11 @@ library AccountLib {
      * @return Next maintenance requirement for the account
      */
     function _maintenance(
-        Position memory position,
+        Fixed18 position,
         IOracleProvider.OracleVersion memory currentOracleVersion,
         UFixed18 maintenanceRatio
     ) private pure returns (UFixed18) {
-        Fixed18 oraclePrice = currentOracleVersion.price;
-        UFixed18 notionalMax = Fixed18Lib.from(position.max()).mul(oraclePrice).abs();
+        UFixed18 notionalMax = position.mul(currentOracleVersion.price).abs();
         return notionalMax.mul(maintenanceRatio);
-    }
-
-    /**
-     * @notice Returns whether an account has opened position on both sides of the market (maker vs taker)
-     * @dev Used to verify the invariant that a single account can only have a position on one side of the
-     *      market at a time
-     * @param self The struct to operate on
-     * @return Whether the account is currently doubled sided
-     */
-    function isDoubleSided(Account memory self, PrePosition memory pre) internal pure returns (bool) {
-        bool makerEmpty = self.position.maker.isZero() && pre.openPosition.maker.isZero() && pre.closePosition.maker.isZero();
-        bool takerEmpty = self.position.taker.isZero() && pre.openPosition.taker.isZero() && pre.closePosition.taker.isZero();
-
-        return !makerEmpty && !takerEmpty;
-    }
-
-    /**
-     * @notice Returns whether the account's pending-settlement delta closes more position than is open
-     * @dev Used to verify the invariant that an account cannot settle into having a negative position
-     * @param self The struct to operate on
-     * @return Whether the account is currently over closed
-     */
-    function isOverClosed(Account memory self, PrePosition memory pre) internal pure returns (bool) {
-        Position memory nextOpen = self.position.add(pre.openPosition);
-
-        return  pre.closePosition.maker.gt(nextOpen.maker) || pre.closePosition.taker.gt(nextOpen.taker);
     }
 }

@@ -143,8 +143,17 @@ library ProgramLib {
         // accruing must complete between self.versionStarted and self.versionComplete, we know self.versionStarted must be no earlier than current version
         uint256 toVersion = Math.min(_versionComplete, currentOracleVersion.version);
 
-        Accumulator memory globalShareDelta = product.shareAtVersion(toVersion).sub(product.shareAtVersion(fromVersion));
-        Accumulator memory computedUserShareDelta = product.position(account).mul(globalShareDelta);
-        amount = UFixed18Lib.from(programInfo.amountPerShare().mul(computedUserShareDelta).sum());
+        Fixed18 accountPosition = product.position(account);
+        Fixed18 globalShareDelta;
+        Fixed18 computedUserShareDelta;
+        if (accountPosition.sign() == 1) {
+            globalShareDelta = product.shareAtVersion(toVersion).taker.sub(product.shareAtVersion(fromVersion).taker);
+            computedUserShareDelta = product.position(account).mul(globalShareDelta);
+            amount = UFixed18Lib.from(programInfo.amountPerShare().taker.mul(computedUserShareDelta));
+        } else {
+            globalShareDelta = product.shareAtVersion(toVersion).maker.sub(product.shareAtVersion(fromVersion).maker);
+            computedUserShareDelta = product.position(account).mul(globalShareDelta);
+            amount = UFixed18Lib.from(programInfo.amountPerShare().taker.mul(computedUserShareDelta));
+        }
     }
 }

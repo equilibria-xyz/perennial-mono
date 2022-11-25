@@ -33,13 +33,13 @@ interface IPerennialLens {
         address userAddress;
         UFixed18 collateral;
         UFixed18 maintenance;
-        PrePosition pre;
-        Position position;
+        Fixed18 pre;
+        Fixed18 position;
         bool liquidatable;
         bool liquidating;
-        Position openInterest;
+        Fixed18 openInterest;
         UFixed18 fees;
-        UFixed18 exposure;
+        Fixed18 exposure;
     }
 
     // Protocol Values
@@ -72,12 +72,12 @@ interface IPerennialLens {
     function maintenance(address account, IProduct product) external returns (UFixed18);
     function liquidatable(address account, IProduct product) external returns (bool);
     function liquidating(address account, IProduct product) external returns (bool);
-    function pre(address account, IProduct product) external returns (PrePosition memory);
-    function position(address account, IProduct product) external returns (Position memory);
-    function userPosition(address account, IProduct product) external returns (PrePosition memory, Position memory);
+    function pre(address account, IProduct product) external returns (Fixed18);
+    function position(address account, IProduct product) external returns (Fixed18);
+    function userPosition(address account, IProduct product) external returns (Fixed18, Fixed18);
     function fees(address account, IProduct product) external returns (UFixed18);
-    function openInterest(address account, IProduct product) external returns (Position memory);
-    function exposure(address account, IProduct product) external returns (UFixed18);
+    function openInterest(address account, IProduct product) external returns (Fixed18);
+    function exposure(address account, IProduct product) external returns (Fixed18);
     function maintenanceRequired(
         address account,
         IProduct product,

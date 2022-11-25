@@ -65,8 +65,6 @@ interface IProduct is IPayoffProvider, IParamProvider {
     event ShortfallResolved(UFixed18 amount);
 
     error ProductInsufficientLiquidityError();
-    error ProductDoubleSidedError();
-    error ProductOverClosedError();
     error ProductInsufficientCollateralError();
     error ProductInLiquidationError();
     error ProductMakerOverLimitError();
@@ -96,8 +94,8 @@ interface IProduct is IPayoffProvider, IParamProvider {
     function maintenanceNext(address account) external view returns (UFixed18);
     function isLiquidating(address account) external view returns (bool);
     function collateral(address account) external view returns (UFixed18);
-    function position(address account) external view returns (Position memory);
-    function pre(address account) external view returns (PrePosition memory);
+    function position(address account) external view returns (Fixed18);
+    function pre(address account) external view returns (Fixed18);
     function liquidatable(address account) external view returns (bool);
     function latestVersion() external view returns (uint256);
     function collateral() external view returns (UFixed18);

@@ -64,11 +64,8 @@ describe.only('Happy Path', () => {
       .withArgs(user.address, INITIAL_VERSION, POSITION)
 
     // Check user is in the correct state
-    expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
-    expectPrePositionEq(await product['pre(address)'](user.address), {
-      openPosition: { maker: POSITION, taker: 0 },
-      closePosition: { maker: 0, taker: 0 },
-    })
+    expect(await product.position(user.address)).to.equal(0)
+    expect(await product['pre(address)'](user.address)).to.equal(POSITION.mul(-1))
     expect(await product['latestVersion(address)'](user.address)).to.equal(INITIAL_VERSION)
 
     // Check global state
@@ -95,11 +92,8 @@ describe.only('Happy Path', () => {
 
     // Settle user and check state
     await product.settleAccount(user.address)
-    expectPositionEq(await product.position(user.address), { maker: POSITION, taker: 0 })
-    expectPrePositionEq(await product['pre(address)'](user.address), {
-      openPosition: { maker: 0, taker: 0 },
-      closePosition: { maker: 0, taker: 0 },
-    })
+    expect(await product.position(user.address)).to.equal(POSITION.mul(-1))
+    expect(await product['pre(address)'](user.address)).to.equal(0)
     expect(await product['latestVersion(address)'](user.address)).to.equal(INITIAL_VERSION + 1)
   })
 
@@ -117,11 +111,8 @@ describe.only('Happy Path', () => {
       .withArgs(user.address, INITIAL_VERSION, POSITION.div(2))
 
     // Check user is in the correct state
-    expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
-    expectPrePositionEq(await product['pre(address)'](user.address), {
-      openPosition: { maker: POSITION, taker: 0 },
-      closePosition: { maker: 0, taker: 0 },
-    })
+    expect(await product.position(user.address)).to.equal(0)
+    expect(await product['pre(address)'](user.address)).to.equal(POSITION.mul(-1))
     expect(await product['latestVersion(address)'](user.address)).to.equal(INITIAL_VERSION)
 
     // Check global state
@@ -148,11 +139,8 @@ describe.only('Happy Path', () => {
 
     // Settle user and check state
     await product.settleAccount(user.address)
-    expectPositionEq(await product.position(user.address), { maker: POSITION, taker: 0 })
-    expectPrePositionEq(await product['pre(address)'](user.address), {
-      openPosition: { maker: 0, taker: 0 },
-      closePosition: { maker: 0, taker: 0 },
-    })
+    expect(await product.position(user.address)).to.equal(POSITION.mul(-1))
+    expect(await product['pre(address)'](user.address)).to.equal(0)
     expect(await product['latestVersion(address)'](user.address)).to.equal(INITIAL_VERSION + 1)
   })
 
@@ -172,11 +160,8 @@ describe.only('Happy Path', () => {
     // User state
     expect(await product.maintenance(user.address)).to.equal(0)
     expect(await product.maintenanceNext(user.address)).to.equal(0)
-    expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
-    expectPrePositionEq(await product['pre(address)'](user.address), {
-      openPosition: { maker: OPEN_POSITION, taker: 0 },
-      closePosition: { maker: CLOSE_POSITION, taker: 0 },
-    })
+    expect(await product.position(user.address)).to.equal(0)
+    expect(await product['pre(address)'](user.address)).to.equal(0)
     expect(await product['latestVersion(address)'](user.address)).to.equal(INITIAL_VERSION)
 
     // Global State
@@ -207,11 +192,8 @@ describe.only('Happy Path', () => {
     // User state
     expect(await product.maintenance(user.address)).to.equal(0)
     expect(await product.maintenanceNext(user.address)).to.equal(0)
-    expectPositionEq(await product.position(user.address), { maker: 0, taker: 0 })
-    expectPrePositionEq(await product['pre(address)'](user.address), {
-      openPosition: { maker: OPEN_POSITION, taker: 0 },
-      closePosition: { maker: CLOSE_POSITION, taker: 0 },
-    })
+    expect(await product.position(user.address)).to.equal(0)
+    expect(await product['pre(address)'](user.address)).to.equal(0)
     expect(await product['latestVersion(address)'](user.address)).to.equal(INITIAL_VERSION)
 
     // Global State
@@ -240,11 +222,8 @@ describe.only('Happy Path', () => {
       .withArgs(userB.address, INITIAL_VERSION, TAKE_POSITION)
 
     // User State
-    expectPositionEq(await product.position(userB.address), { maker: 0, taker: 0 })
-    expectPrePositionEq(await product['pre(address)'](userB.address), {
-      openPosition: { maker: 0, taker: TAKE_POSITION },
-      closePosition: { maker: 0, taker: 0 },
-    })
+    expect(await product.position(userB.address)).to.equal(0)
+    expect(await product['pre(address)'](userB.address)).to.equal(TAKE_POSITION)
     expect(await product['latestVersion(address)'](userB.address)).to.equal(INITIAL_VERSION)
 
     // Global State
@@ -275,11 +254,8 @@ describe.only('Happy Path', () => {
       closePosition: { maker: 0, taker: 0 },
     })
     await product.settleAccount(userB.address)
-    expectPositionEq(await product.position(userB.address), { maker: 0, taker: TAKE_POSITION })
-    expectPrePositionEq(await product['pre(address)'](userB.address), {
-      openPosition: { maker: 0, taker: 0 },
-      closePosition: { maker: 0, taker: 0 },
-    })
+    expect(await product.position(userB.address)).to.equal(TAKE_POSITION)
+    expect(await product['pre(address)'](userB.address)).to.equal(0)
     expect(await product['latestVersion(address)'](userB.address)).to.equal(INITIAL_VERSION + 2)
   })
 
@@ -300,11 +276,8 @@ describe.only('Happy Path', () => {
       .withArgs(userB.address, INITIAL_VERSION, TAKE_POSITION.div(2))
 
     // User State
-    expectPositionEq(await product.position(userB.address), { maker: 0, taker: 0 })
-    expectPrePositionEq(await product['pre(address)'](userB.address), {
-      openPosition: { maker: 0, taker: TAKE_POSITION },
-      closePosition: { maker: 0, taker: 0 },
-    })
+    expect(await product.position(userB.address)).to.equal(0)
+    expect(await product['pre(address)'](userB.address)).to.equal(TAKE_POSITION)
     expect(await product['latestVersion(address)'](userB.address)).to.equal(INITIAL_VERSION)
 
     // Global State
@@ -335,11 +308,8 @@ describe.only('Happy Path', () => {
       closePosition: { maker: 0, taker: 0 },
     })
     await product.settleAccount(userB.address)
-    expectPositionEq(await product.position(userB.address), { maker: 0, taker: TAKE_POSITION })
-    expectPrePositionEq(await product['pre(address)'](userB.address), {
-      openPosition: { maker: 0, taker: 0 },
-      closePosition: { maker: 0, taker: 0 },
-    })
+    expect(await product.position(userB.address)).to.equal(TAKE_POSITION)
+    expect(await product['pre(address)'](userB.address)).to.equal(0)
     expect(await product['latestVersion(address)'](userB.address)).to.equal(INITIAL_VERSION + 2)
   })
 
@@ -366,11 +336,8 @@ describe.only('Happy Path', () => {
     // User State
     expect(await product.maintenance(userB.address)).to.equal(0)
     expect(await product.maintenanceNext(userB.address)).to.equal(0)
-    expectPositionEq(await product.position(userB.address), { maker: 0, taker: 0 })
-    expectPrePositionEq(await product['pre(address)'](userB.address), {
-      openPosition: { maker: 0, taker: OPEN_TAKE_POSITION },
-      closePosition: { maker: 0, taker: CLOSE_TAKE_POSITION },
-    })
+    expect(await product.position(userB.address)).to.equal(0)
+    expect(await product['pre(address)'](userB.address)).to.equal(0)
     expect(await product['latestVersion(address)'](user.address)).to.equal(INITIAL_VERSION)
 
     // Global State
@@ -408,11 +375,8 @@ describe.only('Happy Path', () => {
     // User State
     expect(await product.maintenance(userB.address)).to.equal(0)
     expect(await product.maintenanceNext(userB.address)).to.equal(0)
-    expectPositionEq(await product.position(userB.address), { maker: 0, taker: 0 })
-    expectPrePositionEq(await product['pre(address)'](userB.address), {
-      openPosition: { maker: 0, taker: OPEN_TAKE_POSITION },
-      closePosition: { maker: 0, taker: CLOSE_TAKE_POSITION },
-    })
+    expect(await product.position(userB.address)).to.equal(0)
+    expect(await product['pre(address)'](userB.address)).to.equal(0)
     expect(await product['latestVersion(address)'](user.address)).to.equal(INITIAL_VERSION)
 
     // Global State
@@ -443,16 +407,14 @@ describe.only('Happy Path', () => {
 
     await expect(controller.connect(pauser).updatePaused(true)).to.emit(controller, 'PausedUpdated').withArgs(true)
     await expect(product.depositTo(user.address, utils.parseEther('1000'))).to.be.revertedWith('PausedError()')
-    // await expect(product.withdrawTo(user.address, utils.parseEther('1000'))).to.be.revertedWith(
-    //   'PausedError()',
-    // )
-    // await expect(product.liquidate(user.address)).to.be.revertedWith('PausedError()')
+    await expect(product.withdrawTo(user.address, utils.parseEther('1000'))).to.be.revertedWith('PausedError()')
+    await expect(product.liquidate(user.address)).to.be.revertedWith('PausedError()')
 
-    // await expect(product.openMake(utils.parseEther('0.001'))).to.be.revertedWith('PausedError()')
-    // await expect(product.closeMake(utils.parseEther('0.001'))).to.be.revertedWith('PausedError()')
-    // await expect(product.openTake(utils.parseEther('0.001'))).to.be.revertedWith('PausedError()')
-    // await expect(product.closeTake(utils.parseEther('0.001'))).to.be.revertedWith('PausedError()')
-    // await expect(product.settle()).to.be.revertedWith('PausedError()')
-    // await expect(product.settleAccount(user.address)).to.be.revertedWith('PausedError()')
+    await expect(product.openMake(utils.parseEther('0.001'))).to.be.revertedWith('PausedError()')
+    await expect(product.closeMake(utils.parseEther('0.001'))).to.be.revertedWith('PausedError()')
+    await expect(product.openTake(utils.parseEther('0.001'))).to.be.revertedWith('PausedError()')
+    await expect(product.closeTake(utils.parseEther('0.001'))).to.be.revertedWith('PausedError()')
+    await expect(product.settle()).to.be.revertedWith('PausedError()')
+    await expect(product.settleAccount(user.address)).to.be.revertedWith('PausedError()')
   })
 })

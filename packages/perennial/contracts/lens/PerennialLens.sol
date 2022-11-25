@@ -305,7 +305,7 @@ contract PerennialLens is IPerennialLens {
     function pre(address account, IProduct product)
         public
         settleAccount(account, product)
-        returns (PrePosition memory)
+        returns (Fixed18)
     {
         return product.pre(account);
     }
@@ -319,7 +319,7 @@ contract PerennialLens is IPerennialLens {
     function position(address account, IProduct product)
         public
         settleAccount(account, product)
-        returns (Position memory)
+        returns (Fixed18)
     {
         return product.position(account);
     }
@@ -334,7 +334,7 @@ contract PerennialLens is IPerennialLens {
     function userPosition(address account, IProduct product)
         public
         settleAccount(account, product)
-        returns (PrePosition memory, Position memory)
+        returns (Fixed18, Fixed18)
     {
         return (product.pre(account), product.position(account));
     }
@@ -358,9 +358,9 @@ contract PerennialLens is IPerennialLens {
     function openInterest(address account, IProduct product)
         public
         settleAccount(account, product)
-        returns (Position memory)
+        returns (Fixed18)
     {
-        return product.position(account).mul(_latestVersion(product).price.abs());
+        return product.position(account).mul(_latestVersion(product).price);
     }
 
     /**
@@ -369,17 +369,17 @@ contract PerennialLens is IPerennialLens {
      * @param product Product address
      * @return User's exposure (openInterest * utilization) after settle
      */
-    function exposure(address account, IProduct product) public settleAccount(account, product) returns (UFixed18) {
+    function exposure(address account, IProduct product) public settleAccount(account, product) returns (Fixed18) {
         (, Position memory _pos) = globalPosition(product);
-        if (_pos.maker.isZero()) { return UFixed18Lib.ZERO; }
+        if (_pos.maker.isZero()) { return Fixed18Lib.ZERO; }
 
-        Position memory _openInterest = openInterest(account, product);
-        if (!_openInterest.taker.isZero()) {
-            return _openInterest.taker; // Taker exposure is always 100% of openInterest
+        Fixed18 _openInterest = openInterest(account, product);
+        if (_openInterest.sign() == 1) {
+            return _openInterest; // Taker exposure is always 100% of openInterest
         }
 
         UFixed18 utilization = _pos.taker.div(_pos.maker);
-        return utilization.mul(_openInterest.maker); // Maker exposure is openInterest * utilization
+        return Fixed18Lib.from(utilization).mul(_openInterest); // Maker exposure is openInterest * utilization
     }
 
     /**

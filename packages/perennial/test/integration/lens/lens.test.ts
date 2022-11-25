@@ -57,24 +57,13 @@ describe('Lens', () => {
     })
 
     let userSnapshot = (await lens.callStatic['snapshots(address,address[])'](user.address, [product.address]))[0]
-    let userPre = userSnapshot.pre
-    let userPosition = userSnapshot.position
-    expectPrePositionEq(userPre, {
-      openPosition: { maker: POSITION, taker: 0 },
-      closePosition: { maker: 0, taker: 0 },
-    })
-    expectPositionEq(userPosition, { maker: 0, taker: 0 })
+    expect(userSnapshot.pre).to.equal(POSITION.mul(-1))
+    expect(userSnapshot.position).to.equal(0)
     expect(userSnapshot.maintenance).to.equal('341648925295826936134')
     expect(await lens.callStatic.maintenanceRequired(user.address, product.address, 1000)).to.equal('3416489252')
 
-    expectPositionEq(userSnapshot.openInterest, {
-      maker: 0,
-      taker: 0,
-    })
-    expectPositionEq(await lens.callStatic['openInterest(address,address)'](userB.address, product.address), {
-      maker: 0,
-      taker: 0,
-    })
+    expect(userSnapshot.openInterest).to.equal(0)
+    expect(await lens.callStatic['openInterest(address,address)'](userB.address, product.address)).to.equal(0)
 
     await chainlink.next() // Update the price
 
@@ -88,29 +77,18 @@ describe('Lens', () => {
     })
 
     userSnapshot = await lens.callStatic['snapshot(address,address)'](user.address, product.address)
-    userPre = userSnapshot.pre
-    userPosition = userSnapshot.position
-    expectPrePositionEq(userPre, {
-      openPosition: { maker: 0, taker: 0 },
-      closePosition: { maker: 0, taker: 0 },
-    })
+    expect(userSnapshot.pre).to.equal(0)
 
     // Pre -> Position
     expectPositionEq(globalPosition, {
       maker: POSITION,
       taker: POSITION,
     })
-    expectPositionEq(userPosition, {
-      maker: POSITION,
-      taker: 0,
-    })
+    expect(userSnapshot.position).to.equal(POSITION.mul(-1))
 
     const userBPosition = await lens.callStatic.userPosition(userB.address, product.address)
-    expectPrePositionEq(userBPosition[0], {
-      openPosition: { maker: 0, taker: 0 },
-      closePosition: { maker: 0, taker: 0 },
-    })
-    expectPositionEq(userBPosition[1], { maker: 0, taker: POSITION })
+    expect(userBPosition[0]).to.equal(0)
+    expect(userBPosition[1]).to.equal(POSITION)
 
     // Maintenance required is updated
     expect(await lens.callStatic.maintenanceRequired(user.address, product.address, 1000)).to.equal('3413894945')
@@ -123,14 +101,12 @@ describe('Lens', () => {
       utils.parseEther('5.00').div(SECONDS_IN_YEAR).mul(SECONDS_IN_DAY),
     )
     // OpenInterest is updated
-    expectPositionEq(await lens.callStatic['openInterest(address,address)'](user.address, product.address), {
-      maker: '1137964981955396520714', // Price * Position
-      taker: 0,
-    })
-    expectPositionEq(await lens.callStatic['openInterest(address,address)'](userB.address, product.address), {
-      maker: 0,
-      taker: '1137964981955396520714',
-    })
+    expect(await lens.callStatic['openInterest(address,address)'](user.address, product.address)).to.equal(
+      '-1137964981955396520714',
+    ) // Price * Position
+    expect(await lens.callStatic['openInterest(address,address)'](userB.address, product.address)).to.equal(
+      '-1137964981955396520714',
+    ) // Price * Position
     expectPositionEq(await lens.callStatic['openInterest(address)'](product.address), {
       maker: '1137964981955396520714',
       taker: '1137964981955396520714',

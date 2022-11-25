@@ -40,7 +40,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     mapping(uint256 => Version) _versions;
 
     PrePosition private _pre;
-    mapping(address => PrePosition) private _pres;
+    mapping(address => Fixed18) private _pres;
 
     uint256 private _latestVersion;
     mapping(address => uint256) private _latestVersions;
@@ -258,7 +258,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         // save state
         _latestVersions[account] = context.oracleVersion.version;
         _accounts[account] = context.account;
-        delete _pres[account];
+        _pres[account] = Fixed18Lib.ZERO;
 
         emit AccountSettle(account, settleOracleVersion.version, context.oracleVersion.version);
     }
@@ -278,7 +278,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         if (context.closed) revert ProductClosedError();
         if (context.account.liquidation) revert ProductInLiquidationError();
 
-        _pres[msg.sender].openTake(amount);
+        _pres[msg.sender] = _pres[msg.sender].add(Fixed18Lib.from(amount));
         _pre.openTake(amount);
 
         UFixed18 positionFee = amount.mul(context.oracleVersion.price.abs()).mul(context.takerFee);
@@ -286,7 +286,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
         if (_liquidatableNext(context, msg.sender)) revert ProductInsufficientCollateralError();
         if (_socializationNext(context).lt(UFixed18Lib.ONE)) revert ProductInsufficientLiquidityError();
-        if (context.account.isDoubleSided(_pres[msg.sender])) revert ProductDoubleSidedError();
 
         emit TakeOpened(msg.sender, _latestVersion, amount);
     }
@@ -306,12 +305,10 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         if (context.account.liquidation) revert ProductInLiquidationError();
 
         _closeTake(context, msg.sender, amount);
-
-        if (context.account.isOverClosed(_pres[msg.sender])) revert ProductOverClosedError();
     }
 
     function _closeTake(CurrentContext memory context, address account, UFixed18 amount) private {
-        _pres[account].closeTake(amount);
+        _pres[account] = _pres[account].sub(Fixed18Lib.from(amount));
         _pre.closeTake(amount);
 
         UFixed18 positionFee = amount.mul(context.oracleVersion.price.abs()).mul(context.takerFee);
@@ -335,7 +332,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         if (context.closed) revert ProductClosedError();
         if (context.account.liquidation) revert ProductInLiquidationError();
 
-        _pres[msg.sender].openMake(amount);
+        _pres[msg.sender] = _pres[msg.sender].sub(Fixed18Lib.from(amount));
         _pre.openMake(amount);
 
         UFixed18 positionFee = amount.mul(context.oracleVersion.price.abs()).mul(context.makerFee);
@@ -343,7 +340,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
         if (_liquidatableNext(context, msg.sender)) revert ProductInsufficientCollateralError();
         if (context.version.position().next(_pre).maker.gt(context.makerLimit)) revert ProductMakerOverLimitError();
-        if (context.account.isDoubleSided(_pres[msg.sender])) revert ProductDoubleSidedError();
 
         emit MakeOpened(msg.sender, _latestVersion, amount);
     }
@@ -365,11 +361,10 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         _closeMake(context, msg.sender, amount);
 
         if (_socializationNext(context).lt(UFixed18Lib.ONE)) revert ProductInsufficientLiquidityError();
-        if (context.account.isOverClosed(_pres[msg.sender])) revert ProductOverClosedError();
     }
 
     function _closeMake(CurrentContext memory context, address account, UFixed18 amount) private {
-        _pres[account].closeMake(amount);
+        _pres[msg.sender] = _pres[account].add(Fixed18Lib.from(amount));
         _pre.closeMake(amount);
 
         UFixed18 positionFee = amount.mul(context.oracleVersion.price.abs()).mul(context.makerFee);
@@ -418,11 +413,14 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         if (context.closed) revert ProductClosedError();
 
         Account storage account_ = _accounts[account];
-        Position memory position_ = account_.position.next(_pres[account]);
+        Fixed18 position_ = account_.position.add(_pres[account]);
 
         // Close all positions
-        _closeMake(context, account, position_.maker);
-        _closeTake(context, account, position_.taker);
+        if (position_.sign() == 1) {
+            _closeTake(context, account, position_.abs());
+        } else {
+            _closeMake(context, account, position_.abs());
+        }
 
         // Mark liquidation to lock position
         account_.liquidation = true;
@@ -467,7 +465,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @param account Account to return for
      * @return Current position of the account
      */
-    function position(address account) external view returns (Position memory) {
+    function position(address account) external view returns (Fixed18) {
         return _accounts[account].position;
     }
 
@@ -476,7 +474,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @param account Account to return for
      * @return Current pre-position of the account
      */
-    function pre(address account) external view returns (PrePosition memory) {
+    function pre(address account) external view returns (Fixed18) {
         return _pres[account];
     }
 
