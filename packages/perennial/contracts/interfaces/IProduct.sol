@@ -53,7 +53,7 @@ interface IProduct is IPayoffProvider, IParamProvider {
 
     event Settle(uint256 preVersion, uint256 toVersion);
     event AccountSettle(address indexed account, uint256 preVersion, uint256 toVersion);
-    event Updated(address indexed account, uint256 version, Fixed18 amount);
+    event PositionUpdated(address indexed account, uint256 version, Fixed18 amount);
     event CollateralUpdated(address indexed account, Fixed18 amount);
     event Liquidation(address indexed account, address liquidator, UFixed18 fee);
     event FeeSettled(UFixed18 protocolFeeAmount, UFixed18 productFeeAmount);
@@ -79,9 +79,8 @@ interface IProduct is IPayoffProvider, IParamProvider {
     function initialize(ProductInfo calldata productInfo_) external;
     function settle() external;
     function settleAccount(address account) external;
-    function update(Fixed18 amount) external;
+    function update(Fixed18 positionAmount, Fixed18 collateralAmount) external;
     function liquidate(address account) external;
-    function updateCollateral(address account, Fixed18 amount) external;
     function resolveShortfall(UFixed18 amount) external;
     function maintenance(address account) external view returns (UFixed18);
     function maintenanceNext(address account) external view returns (UFixed18);

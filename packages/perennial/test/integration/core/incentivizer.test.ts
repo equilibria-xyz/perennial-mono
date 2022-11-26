@@ -122,10 +122,10 @@ describe('Incentivizer', () => {
 
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
-    await expect(product.connect(user).update(utils.parseEther('-0.0001')))
+    await expect(product.connect(user).update(utils.parseEther('-0.0001'), 0))
       .to.emit(incentivizer, 'ProgramStarted')
       .withArgs(product.address, PROGRAM_ID, 2472)
-    await product.connect(userB).update(utils.parseEther('0.00005'))
+    await product.connect(userB).update(utils.parseEther('0.00005'), 0)
 
     expect(await incentivizer.available(product.address, PROGRAM_ID)).to.equal(utils.parseEther('10000'))
     expect(await incentivizer.unclaimed(product.address, user.address, PROGRAM_ID)).to.equal(0)
@@ -158,8 +158,8 @@ describe('Incentivizer', () => {
 
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
-    await product.connect(user).update(utils.parseEther('-0.0001'))
-    await product.connect(userB).update(utils.parseEther('0.00005'))
+    await product.connect(user).update(utils.parseEther('-0.0001'), 0)
+    await product.connect(userB).update(utils.parseEther('0.00005'), 0)
 
     expect(await incentivizer.available(product.address, PROGRAM_ID)).to.equal(utils.parseEther('10000'))
     expect(await incentivizer.unclaimed(product.address, user.address, PROGRAM_ID)).to.equal(0)
@@ -205,8 +205,8 @@ describe('Incentivizer', () => {
 
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
-    await product.connect(user).update(utils.parseEther('-0.0001'))
-    await product.connect(userB).update(utils.parseEther('0.00005'))
+    await product.connect(user).update(utils.parseEther('-0.0001'), 0)
+    await product.connect(userB).update(utils.parseEther('0.00005'), 0)
 
     expect(await incentivizer.available(product.address, PROGRAM_ID)).to.equal(utils.parseEther('10000'))
     expect(await incentivizer.unclaimed(product.address, user.address, PROGRAM_ID)).to.equal(0)
@@ -264,13 +264,13 @@ describe('Incentivizer', () => {
 
       await depositTo(instanceVars, user, product0, utils.parseEther('1000'))
       await depositTo(instanceVars, userB, product0, utils.parseEther('1000'))
-      await product0.connect(user).update(utils.parseEther('-0.0001'))
-      await product0.connect(userB).update(utils.parseEther('0.00005'))
+      await product0.connect(user).update(utils.parseEther('-0.0001'), 0)
+      await product0.connect(userB).update(utils.parseEther('0.00005'), 0)
 
       await depositTo(instanceVars, user, product1, utils.parseEther('1000'))
       await depositTo(instanceVars, userB, product1, utils.parseEther('1000'))
-      await product1.connect(user).update(utils.parseEther('-0.0001'))
-      await product1.connect(userB).update(utils.parseEther('0.00005'))
+      await product1.connect(user).update(utils.parseEther('-0.0001'), 0)
+      await product1.connect(userB).update(utils.parseEther('0.00005'), 0)
 
       expect(await incentivizer.available(product0.address, program0)).to.equal(utils.parseEther('7500'))
       expect(await incentivizer.available(product1.address, program1)).to.equal(utils.parseEther('3750'))

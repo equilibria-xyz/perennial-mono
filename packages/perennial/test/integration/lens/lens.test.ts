@@ -30,8 +30,8 @@ describe('Lens', () => {
 
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
-    await product.connect(user).update(POSITION.mul(-1))
-    await product.connect(userB).update(POSITION)
+    await product.connect(user).update(POSITION.mul(-1), 0)
+    await product.connect(userB).update(POSITION, 0)
 
     // Returns the product name
     const info = await lens.callStatic.info(product.address)

@@ -261,25 +261,37 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         emit AccountSettle(account, settleOracleVersion.version, context.oracleVersion.version);
     }
 
-    /**
-     * @notice Opens a taker position for `msg.sender`
-     * @param amount Amount of the position to open
-     */
-    function update(Fixed18 amount)
+    //TODO: support receiver; forwarder broken
+    function update(Fixed18 positionAmount, Fixed18 collateralAmount)
     external
     nonReentrant
     {
         CurrentContext memory context = _settle();
         _settleAccount(msg.sender, context);
 
-        _update(context, msg.sender, amount);
+        _before(context, msg.sender, positionAmount);
+        _updatePosition(context, msg.sender, positionAmount);
+        _updateCollateral(context, msg.sender, collateralAmount);
+        _after(context, msg.sender);
     }
 
-    function _update(CurrentContext memory context, address account, Fixed18 amount) private {
+    function _before(CurrentContext memory context, address account, Fixed18 positionAmount) private {
         if (context.paused) revert PausedError();
         if (liquidation[account]) revert ProductInLiquidationError();
-        if (context.closed && !_closingNext(context, amount)) revert ProductClosedError();
+        if (context.closed && !_closingNext(context, positionAmount)) revert ProductClosedError();
+    }
 
+    function _after(CurrentContext memory context, address account) private {
+        if (_liquidatable(context, account) || _liquidatableNext(context, account))
+            revert ProductInsufficientCollateralError();
+        if (_socializationNext(context).lt(UFixed18Lib.ONE)) revert ProductInsufficientLiquidityError();
+        if (context.version.position().next(_pre).maker.gt(context.makerLimit)) revert ProductMakerOverLimitError();
+        UFixed18 accountCollateral = _collateral.balances[account];
+        if (!accountCollateral.isZero() && accountCollateral.lt(controller().minCollateral()))
+            revert ProductCollateralUnderLimitError();
+    }
+
+    function _updatePosition(CurrentContext memory context, address account, Fixed18 amount) private {
         Fixed18 nextPosition = context.account.next();
         context.account.update(amount);
 
@@ -289,11 +301,14 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         UFixed18 positionFee = amount.mul(context.oracleVersion.price).abs().mul(context.takerFee);
         if (!positionFee.isZero()) _settleCollateral(account, Fixed18Lib.from(-1, positionFee));
 
-        if (_liquidatableNext(context, account)) revert ProductInsufficientCollateralError();
-        if (_socializationNext(context).lt(UFixed18Lib.ONE)) revert ProductInsufficientLiquidityError();
-        if (context.version.position().next(_pre).maker.gt(context.makerLimit)) revert ProductMakerOverLimitError();
+        emit PositionUpdated(account, _latestVersion, amount);
+    }
 
-        emit Updated(account, _latestVersion, amount);
+    function _updateCollateral(CurrentContext memory context, address account, Fixed18 amount) private {
+        _settleCollateral(account, amount, true);
+        amount.sign() == 1 ? token.pull(account, amount.abs()) : token.push(account, amount.abs());
+
+        emit CollateralUpdated(account, amount);
     }
 
     /**
@@ -311,7 +326,9 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         // Liquidate position
         if (!_liquidatable(context, account)) revert ProductCantLiquidate();
 
-        _update(context, account, _accounts[account].position().mul(Fixed18Lib.NEG_ONE));
+        Fixed18 closeAmount = _accounts[account].position().mul(Fixed18Lib.NEG_ONE);
+        _before(context, account, closeAmount);
+        _updatePosition(context, account, closeAmount);
         liquidation[account] = true;
 
         // Dispurse fee
@@ -468,33 +485,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     }
 
     /**
-     * @notice Deposits `amount` collateral from `msg.sender` to `account`'s `product`
-     *         account
-     * @param account Account to deposit the collateral for
-     * @param amount Amount of collateral to deposit
-     */
-    // TODO: combine
-    function updateCollateral(address account, Fixed18 amount)
-    external
-    nonReentrant
-    notPaused
-    {
-        CurrentContext memory context = _settle();
-        _settleAccount(account, context);
-
-        _settleCollateral(account, amount, true);
-        amount.sign() == 1 ? token.pull(msg.sender, amount.abs()) : token.push(msg.sender, amount.abs());
-
-        UFixed18 accountCollateral = _collateral.balances[account];
-        if (!accountCollateral.isZero() && accountCollateral.lt(controller().minCollateral()))
-            revert ProductCollateralUnderLimitError();
-        if (_liquidatable(context, account) || _liquidatableNext(context, account))
-            revert ProductInsufficientCollateralError();
-
-        emit CollateralUpdated(account, amount);
-    }
-
-    /**
      * @notice Credits `amount` to `account`'s collateral account
      * @dev Callable only by the corresponding product as part of the settlement flywheel.
      *      Moves collateral within a product, any collateral leaving the product due to
@@ -510,7 +500,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
     function _settleCollateral(address account, Fixed18 amount, bool noShortfall) private {
         UFixed18 newShortfall = _collateral.settleAccount(account, amount);
-        if (!newShortfall.isZero()) revert ProductShortfallError();
+        if (noShortfall && !newShortfall.isZero()) revert ProductShortfallError();
         emit CollateralSettled(account, amount, newShortfall);
     }
 

@@ -17,7 +17,7 @@ describe('Liquidate', () => {
 
     const product = await createProduct(instanceVars)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
-    await product.connect(user).update(POSITION.mul(-1))
+    await product.connect(user).update(POSITION.mul(-1), 0)
 
     expect(await product.liquidatable(user.address)).to.be.false
 
@@ -52,8 +52,8 @@ describe('Liquidate', () => {
     const product = await createProduct(instanceVars)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
-    await product.connect(user).update(POSITION.mul(-1))
-    await product.connect(userB).update(POSITION)
+    await product.connect(user).update(POSITION.mul(-1), 0)
+    await product.connect(userB).update(POSITION, 0)
 
     // Settle the product with a new oracle version
     await chainlink.next()
@@ -68,9 +68,7 @@ describe('Liquidate', () => {
     expect(await product.shortfall()).to.equal('2463736825720737646856')
 
     const userBCollateral = await product['collateral(address)'](userB.address)
-    await expect(product.connect(userB).updateCollateral(userB.address, userBCollateral.mul(-1))).to.be.revertedWith(
-      '0x11',
-    ) // underflow
+    await expect(product.connect(userB).update(0, userBCollateral.mul(-1))).to.be.revertedWith('0x11') // underflow
 
     await dsu.connect(userB).approve(product.address, constants.MaxUint256)
     await product.connect(userB).resolveShortfall('2463736825720737646856')
@@ -87,10 +85,10 @@ describe('Liquidate', () => {
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userC, product, utils.parseEther('10000'))
     await depositTo(instanceVars, userD, product, utils.parseEther('10000'))
-    await product.connect(user).update(POSITION.mul(-1))
-    await product.connect(userB).update(POSITION.mul(-1))
-    await product.connect(userC).update(POSITION)
-    await product.connect(userD).update(POSITION)
+    await product.connect(user).update(POSITION.mul(-1), 0)
+    await product.connect(userB).update(POSITION.mul(-1), 0)
+    await product.connect(userC).update(POSITION, 0)
+    await product.connect(userD).update(POSITION, 0)
 
     expect(await product.liquidatable(user.address)).to.be.false
 

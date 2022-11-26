@@ -68,7 +68,7 @@ describe('Reservoir Oracle Product', () => {
       .to.emit(controller, 'CoordinatorCreated')
       .withArgs(1, owner.address)
     await expect(controller.updateCoordinatorTreasury(1, treasuryB.address))
-      .to.emit(controller, 'CoordinatorTreasuryUpdated')
+      .to.emit(controller, 'CoordinatorTreasuryPositionUpdated')
       .withArgs(1, treasuryB.address)
 
     const productAddress = await controller.callStatic.createProduct(1, PRODUCT_INFO)
@@ -76,7 +76,7 @@ describe('Reservoir Oracle Product', () => {
     await expect(controller.createProduct(1, PRODUCT_INFO)).to.emit(controller, 'ProductCreated')
 
     await dsu.connect(user).approve(product.address, utils.parseEther('1000'))
-    await product.connect(user).updateCollateral(user.address, utils.parseEther('1000'))
+    await product.connect(user).update(0, utils.parseEther('1000'))
 
     expect(await product['collateral()']()).to.equal(utils.parseEther('1000'))
     expect(await product.shortfall()).to.equal(0)
@@ -89,8 +89,8 @@ describe('Reservoir Oracle Product', () => {
     const product = await createProduct(instanceVars, baycUSDCPayoffProvider, reservoirOracle)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
 
-    await expect(product.connect(user).update(POSITION.mul(-1)))
-      .to.emit(product, 'Updated')
+    await expect(product.connect(user).update(POSITION.mul(-1), 0))
+      .to.emit(product, 'PositionUpdated')
       .withArgs(user.address, INITIAL_VERSION, POSITION)
 
     // Check user is in the correct state
@@ -134,10 +134,10 @@ describe('Reservoir Oracle Product', () => {
     const product = await createProduct(instanceVars, baycUSDCPayoffProvider, reservoirOracle)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
 
-    await product.connect(user).update(POSITION.div(2).mul(-1))
+    await product.connect(user).update(POSITION.div(2).mul(-1), 0)
 
-    await expect(product.connect(user).update(POSITION.div(2).mul(-1)))
-      .to.emit(product, 'Updated')
+    await expect(product.connect(user).update(POSITION.div(2).mul(-1), 0))
+      .to.emit(product, 'PositionUpdated')
       .withArgs(user.address, INITIAL_VERSION, POSITION.div(2))
 
     // Check user is in the correct state
@@ -181,10 +181,10 @@ describe('Reservoir Oracle Product', () => {
 
     const product = await createProduct(instanceVars, baycUSDCPayoffProvider, reservoirOracle)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
-    await product.connect(user).update(OPEN_POSITION.mul(-1))
+    await product.connect(user).update(OPEN_POSITION.mul(-1), 0)
 
-    await expect(product.connect(user).update(CLOSE_POSITION))
-      .to.emit(product, 'Updated')
+    await expect(product.connect(user).update(CLOSE_POSITION, 0))
+      .to.emit(product, 'PositionUpdated')
       .withArgs(user.address, INITIAL_VERSION, CLOSE_POSITION)
 
     // User state
@@ -212,11 +212,11 @@ describe('Reservoir Oracle Product', () => {
 
     const product = await createProduct(instanceVars, baycUSDCPayoffProvider, reservoirOracle)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
-    await product.connect(user).update(OPEN_POSITION.mul(-1))
-    await product.connect(user).update(CLOSE_POSITION.div(2))
+    await product.connect(user).update(OPEN_POSITION.mul(-1), 0)
+    await product.connect(user).update(CLOSE_POSITION.div(2), 0)
 
-    await expect(product.connect(user).update(CLOSE_POSITION.div(2)))
-      .to.emit(product, 'Updated')
+    await expect(product.connect(user).update(CLOSE_POSITION.div(2), 0))
+      .to.emit(product, 'PositionUpdated')
       .withArgs(user.address, INITIAL_VERSION, CLOSE_POSITION.div(2))
 
     // User state
@@ -246,9 +246,9 @@ describe('Reservoir Oracle Product', () => {
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
 
-    await product.connect(user).update(MAKE_POSITION.mul(-1))
-    await expect(product.connect(userB).update(TAKE_POSITION))
-      .to.emit(product, 'Updated')
+    await product.connect(user).update(MAKE_POSITION.mul(-1), 0)
+    await expect(product.connect(userB).update(TAKE_POSITION, 0))
+      .to.emit(product, 'PositionUpdated')
       .withArgs(userB.address, INITIAL_VERSION, TAKE_POSITION)
 
     // User State
@@ -298,11 +298,11 @@ describe('Reservoir Oracle Product', () => {
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
 
-    await product.connect(user).update(MAKE_POSITION.mul(-1))
-    await product.connect(userB).update(TAKE_POSITION.div(2))
+    await product.connect(user).update(MAKE_POSITION.mul(-1), 0)
+    await product.connect(userB).update(TAKE_POSITION.div(2), 0)
 
-    await expect(product.connect(userB).update(TAKE_POSITION.div(2)))
-      .to.emit(product, 'Updated')
+    await expect(product.connect(userB).update(TAKE_POSITION.div(2), 0))
+      .to.emit(product, 'PositionUpdated')
       .withArgs(userB.address, INITIAL_VERSION, TAKE_POSITION.div(2))
 
     // User State
@@ -353,12 +353,14 @@ describe('Reservoir Oracle Product', () => {
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
 
-    await expect(product.connect(userB).update(OPEN_TAKE_POSITION)).to.be.revertedWith('InsufficientLiquidityError(0)')
-    await product.connect(user).update(OPEN_MAKE_POSITION.mul(-1))
-    await product.connect(userB).update(OPEN_TAKE_POSITION)
+    await expect(product.connect(userB).update(OPEN_TAKE_POSITION, 0)).to.be.revertedWith(
+      'InsufficientLiquidityError(0)',
+    )
+    await product.connect(user).update(OPEN_MAKE_POSITION.mul(-1), 0)
+    await product.connect(userB).update(OPEN_TAKE_POSITION, 0)
 
-    await expect(product.connect(userB).update(CLOSE_TAKE_POSITION.mul(-1)))
-      .to.emit(product, 'Updated')
+    await expect(product.connect(userB).update(CLOSE_TAKE_POSITION.mul(-1), 0))
+      .to.emit(product, 'PositionUpdated')
       .withArgs(userB.address, INITIAL_VERSION, CLOSE_TAKE_POSITION)
 
     // User State
@@ -389,13 +391,15 @@ describe('Reservoir Oracle Product', () => {
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
 
-    await expect(product.connect(userB).update(OPEN_TAKE_POSITION)).to.be.revertedWith('InsufficientLiquidityError(0)')
-    await product.connect(user).update(OPEN_MAKE_POSITION.mul(-1))
-    await product.connect(userB).update(OPEN_TAKE_POSITION)
-    await product.connect(userB).update(CLOSE_TAKE_POSITION.div(2).mul(-1))
+    await expect(product.connect(userB).update(OPEN_TAKE_POSITION, 0)).to.be.revertedWith(
+      'InsufficientLiquidityError(0)',
+    )
+    await product.connect(user).update(OPEN_MAKE_POSITION.mul(-1), 0)
+    await product.connect(userB).update(OPEN_TAKE_POSITION, 0)
+    await product.connect(userB).update(CLOSE_TAKE_POSITION.div(2).mul(-1), 0)
 
-    await expect(product.connect(userB).update(CLOSE_TAKE_POSITION.div(2).mul(-1)))
-      .to.emit(product, 'Updated')
+    await expect(product.connect(userB).update(CLOSE_TAKE_POSITION.div(2).mul(-1), 0))
+      .to.emit(product, 'PositionUpdated')
       .withArgs(userB.address, INITIAL_VERSION, CLOSE_TAKE_POSITION.div(2))
 
     // User State

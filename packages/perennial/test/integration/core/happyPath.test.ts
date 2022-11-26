@@ -59,8 +59,8 @@ describe.only('Happy Path', () => {
     const product = await createProduct(instanceVars)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
 
-    await expect(product.connect(user).update(POSITION.mul(-1)))
-      .to.emit(product, 'Updated')
+    await expect(product.connect(user).update(POSITION.mul(-1), 0))
+      .to.emit(product, 'PositionUpdated')
       .withArgs(user.address, INITIAL_VERSION, POSITION.mul(-1))
 
     // Check user is in the correct state
@@ -104,10 +104,10 @@ describe.only('Happy Path', () => {
     const product = await createProduct(instanceVars)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
 
-    await product.connect(user).update(POSITION.div(2).mul(-1))
+    await product.connect(user).update(POSITION.div(2).mul(-1), 0)
 
-    await expect(product.connect(user).update(POSITION.div(2).mul(-1)))
-      .to.emit(product, 'Updated')
+    await expect(product.connect(user).update(POSITION.div(2).mul(-1), 0))
+      .to.emit(product, 'PositionUpdated')
       .withArgs(user.address, INITIAL_VERSION, POSITION.div(2).mul(-1))
 
     // Check user is in the correct state
@@ -151,10 +151,10 @@ describe.only('Happy Path', () => {
 
     const product = await createProduct(instanceVars)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
-    await product.connect(user).update(OPEN_POSITION.mul(-1))
-    await product.connect(user).update(CLOSE_POSITION)
+    await product.connect(user).update(OPEN_POSITION.mul(-1), 0)
+    await product.connect(user).update(CLOSE_POSITION, 0)
     // await expect(product.connect(user).update(CLOSE_POSITION))
-    //   .to.emit(product, 'Updated')
+    //   .to.emit(product, 'PositionUpdated')
     //   .withArgs(user.address, INITIAL_VERSION, CLOSE_POSITION)
 
     // User state
@@ -182,11 +182,11 @@ describe.only('Happy Path', () => {
 
     const product = await createProduct(instanceVars)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
-    await product.connect(user).update(OPEN_POSITION.mul(-1))
-    await product.connect(user).update(CLOSE_POSITION.div(2))
+    await product.connect(user).update(OPEN_POSITION.mul(-1), 0)
+    await product.connect(user).update(CLOSE_POSITION.div(2), 0)
 
-    await expect(product.connect(user).update(CLOSE_POSITION.div(2)))
-      .to.emit(product, 'Updated')
+    await expect(product.connect(user).update(CLOSE_POSITION.div(2), 0))
+      .to.emit(product, 'PositionUpdated')
       .withArgs(user.address, INITIAL_VERSION, CLOSE_POSITION.div(2))
 
     // User state
@@ -216,9 +216,9 @@ describe.only('Happy Path', () => {
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
 
-    await product.connect(user).update(MAKE_POSITION.mul(-1))
-    await expect(product.connect(userB).update(TAKE_POSITION))
-      .to.emit(product, 'Updated')
+    await product.connect(user).update(MAKE_POSITION.mul(-1), 0)
+    await expect(product.connect(userB).update(TAKE_POSITION, 0))
+      .to.emit(product, 'PositionUpdated')
       .withArgs(userB.address, INITIAL_VERSION, TAKE_POSITION)
 
     // User State
@@ -268,11 +268,11 @@ describe.only('Happy Path', () => {
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
 
-    await product.connect(user).update(MAKE_POSITION.mul(-1))
-    await product.connect(userB).update(TAKE_POSITION.div(2))
+    await product.connect(user).update(MAKE_POSITION.mul(-1), 0)
+    await product.connect(userB).update(TAKE_POSITION.div(2), 0)
 
-    await expect(product.connect(userB).update(TAKE_POSITION.div(2)))
-      .to.emit(product, 'Updated')
+    await expect(product.connect(userB).update(TAKE_POSITION.div(2), 0))
+      .to.emit(product, 'PositionUpdated')
       .withArgs(userB.address, INITIAL_VERSION, TAKE_POSITION.div(2))
 
     // User State
@@ -323,14 +323,14 @@ describe.only('Happy Path', () => {
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
 
-    await expect(product.connect(userB).update(OPEN_TAKE_POSITION)).to.be.revertedWith(
+    await expect(product.connect(userB).update(OPEN_TAKE_POSITION, 0)).to.be.revertedWith(
       'ProductInsufficientLiquidityError()',
     )
-    await product.connect(user).update(OPEN_MAKE_POSITION.mul(-1))
-    await product.connect(userB).update(OPEN_TAKE_POSITION)
+    await product.connect(user).update(OPEN_MAKE_POSITION.mul(-1), 0)
+    await product.connect(userB).update(OPEN_TAKE_POSITION, 0)
 
-    await expect(product.connect(userB).update(CLOSE_TAKE_POSITION.mul(-1)))
-      .to.emit(product, 'Updated')
+    await expect(product.connect(userB).update(CLOSE_TAKE_POSITION.mul(-1), 0))
+      .to.emit(product, 'PositionUpdated')
       .withArgs(userB.address, INITIAL_VERSION, CLOSE_TAKE_POSITION.mul(-1))
 
     // User State
@@ -361,15 +361,15 @@ describe.only('Happy Path', () => {
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
 
-    await expect(product.connect(userB).update(OPEN_TAKE_POSITION)).to.be.revertedWith(
+    await expect(product.connect(userB).update(OPEN_TAKE_POSITION, 0)).to.be.revertedWith(
       'ProductInsufficientLiquidityError()',
     )
-    await product.connect(user).update(OPEN_MAKE_POSITION.mul(-1))
-    await product.connect(userB).update(OPEN_TAKE_POSITION)
-    await product.connect(userB).update(CLOSE_TAKE_POSITION.div(2).mul(-1))
+    await product.connect(user).update(OPEN_MAKE_POSITION.mul(-1), 0)
+    await product.connect(userB).update(OPEN_TAKE_POSITION, 0)
+    await product.connect(userB).update(CLOSE_TAKE_POSITION.div(2).mul(-1), 0)
 
-    await expect(product.connect(userB).update(CLOSE_TAKE_POSITION.div(2).mul(-1)))
-      .to.emit(product, 'Updated')
+    await expect(product.connect(userB).update(CLOSE_TAKE_POSITION.div(2).mul(-1), 0))
+      .to.emit(product, 'PositionUpdated')
       .withArgs(userB.address, INITIAL_VERSION, CLOSE_TAKE_POSITION.div(2).mul(-1))
 
     // User State
@@ -406,10 +406,53 @@ describe.only('Happy Path', () => {
     const product = await createProduct(instanceVars)
 
     await expect(controller.connect(pauser).updatePaused(true)).to.emit(controller, 'PausedUpdated').withArgs(true)
-    await expect(product.updateCollateral(user.address, utils.parseEther('1000'))).to.be.revertedWith('PausedError()')
+    await expect(product.update(0, utils.parseEther('1000'))).to.be.revertedWith('PausedError()')
     await expect(product.liquidate(user.address)).to.be.revertedWith('PausedError()')
-    await expect(product.update(utils.parseEther('0.001'))).to.be.revertedWith('PausedError()')
+    await expect(product.update(utils.parseEther('0.001'), 0)).to.be.revertedWith('PausedError()')
     await expect(product.settle()).to.be.revertedWith('PausedError()')
     await expect(product.settleAccount(user.address)).to.be.revertedWith('PausedError()')
+  })
+
+  it('delayed update w/ collateral (gas)', async () => {
+    const POSITION = utils.parseEther('0.0001')
+    const { user, userB, dsu, chainlink } = instanceVars
+
+    const product = await createProduct(instanceVars)
+    await dsu.connect(user).approve(product.address, utils.parseEther('1000'))
+    await dsu.connect(userB).approve(product.address, utils.parseEther('1000'))
+    await product.connect(user).update(POSITION.div(2).mul(-1), utils.parseEther('1000'))
+    await product.connect(userB).update(POSITION.div(2), utils.parseEther('1000'))
+
+    // Ensure a->b->c
+    await chainlink.next()
+    await chainlink.next()
+
+    await expect(product.connect(user).update(POSITION.div(2).mul(-1), utils.parseEther('-1')))
+      .to.emit(product, 'PositionUpdated')
+      .withArgs(user.address, INITIAL_VERSION + 2, POSITION.div(2).mul(-1))
+
+    // Check user is in the correct state
+    expect(await product.position(user.address)).to.equal(POSITION.div(2).mul(-1))
+    expect(await product['pre(address)'](user.address)).to.equal(POSITION.div(2).mul(-1))
+    expect(await product['latestVersion(address)'](user.address)).to.equal(INITIAL_VERSION + 2)
+
+    // Check global state
+    expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION + 2)
+    expectPositionEq(await product.positionAtVersion(INITIAL_VERSION + 2), {
+      maker: POSITION.div(2),
+      taker: POSITION.div(2),
+    })
+    expectPrePositionEq(await product['pre()'](), {
+      openPosition: { maker: POSITION.div(2), taker: 0 },
+      closePosition: { maker: 0, taker: 0 },
+    })
+    expectPositionEq(await product.valueAtVersion(INITIAL_VERSION + 2), {
+      maker: '-29840671308188362617140000',
+      taker: '-32892462923465729382860000',
+    })
+    expectPositionEq(await product.shareAtVersion(INITIAL_VERSION + 2), {
+      maker: '18300000000000000000000000',
+      taker: '18300000000000000000000000',
+    })
   })
 })
