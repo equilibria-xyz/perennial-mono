@@ -76,7 +76,7 @@ describe('Reservoir Oracle Product', () => {
     await expect(controller.createProduct(1, PRODUCT_INFO)).to.emit(controller, 'ProductCreated')
 
     await dsu.connect(user).approve(product.address, utils.parseEther('1000'))
-    await product.connect(user).depositTo(user.address, utils.parseEther('1000'))
+    await product.connect(user).updateCollateral(user.address, utils.parseEther('1000'))
 
     expect(await product['collateral()']()).to.equal(utils.parseEther('1000'))
     expect(await product.shortfall()).to.equal(0)

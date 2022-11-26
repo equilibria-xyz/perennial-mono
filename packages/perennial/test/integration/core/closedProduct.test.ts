@@ -145,7 +145,7 @@ describe('Closed Product', () => {
     await chainlink.next()
     await chainlink.nextWithPriceModification(price => price.mul(2))
     await expect(product.liquidate(user.address)).to.not.be.reverted
-    expect(await product.isLiquidating(user.address)).to.be.true
+    expect(await product.liquidation(user.address)).to.be.true
     const parameters = await product.parameter()
     await product.updateParameter(
       parameters.maintenance,
@@ -161,7 +161,7 @@ describe('Closed Product', () => {
     await product.settleAccount(user.address)
     await product.settleAccount(userB.address)
 
-    expect(await product.isLiquidating(user.address)).to.be.false
+    expect(await product.liquidation(user.address)).to.be.false
     const userCollateralBefore = await product['collateral(address)'](user.address)
     const userBCollateralBefore = await product['collateral(address)'](userB.address)
     const feesABefore = await dsu.balanceOf(treasuryA.address)

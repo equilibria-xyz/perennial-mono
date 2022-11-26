@@ -406,8 +406,7 @@ describe.only('Happy Path', () => {
     const product = await createProduct(instanceVars)
 
     await expect(controller.connect(pauser).updatePaused(true)).to.emit(controller, 'PausedUpdated').withArgs(true)
-    await expect(product.depositTo(user.address, utils.parseEther('1000'))).to.be.revertedWith('PausedError()')
-    await expect(product.withdrawTo(user.address, utils.parseEther('1000'))).to.be.revertedWith('PausedError()')
+    await expect(product.updateCollateral(user.address, utils.parseEther('1000'))).to.be.revertedWith('PausedError()')
     await expect(product.liquidate(user.address)).to.be.revertedWith('PausedError()')
     await expect(product.update(utils.parseEther('0.001'))).to.be.revertedWith('PausedError()')
     await expect(product.settle()).to.be.revertedWith('PausedError()')

@@ -33,7 +33,7 @@ describe('Liquidate', () => {
       .to.emit(product, 'Liquidation')
       .withArgs(user.address, product.address, userB.address, utils.parseEther('1000'))
 
-    expect(await product.isLiquidating(user.address)).to.be.true
+    expect(await product.liquidation(user.address)).to.be.true
 
     expect(await product['collateral(address)'](user.address)).to.equal(0)
     expect(await product['collateral()']()).to.equal(0)
@@ -42,7 +42,7 @@ describe('Liquidate', () => {
     await chainlink.next()
     await product.settleAccount(user.address)
 
-    expect(await product.isLiquidating(user.address)).to.be.false
+    expect(await product.liquidation(user.address)).to.be.false
   })
 
   it('creates and resolves a shortfall', async () => {
@@ -68,7 +68,9 @@ describe('Liquidate', () => {
     expect(await product.shortfall()).to.equal('2463736825720737646856')
 
     const userBCollateral = await product['collateral(address)'](userB.address)
-    await expect(product.connect(userB).withdrawTo(userB.address, userBCollateral)).to.be.revertedWith('0x11') // underflow
+    await expect(product.connect(userB).updateCollateral(userB.address, userBCollateral.mul(-1))).to.be.revertedWith(
+      '0x11',
+    ) // underflow
 
     await dsu.connect(userB).approve(product.address, constants.MaxUint256)
     await product.connect(userB).resolveShortfall('2463736825720737646856')

@@ -55,7 +55,7 @@ contract Forwarder is IForwarder {
         USDC.pull(msg.sender, amount, true);
         batcher.wrap(amount, address(this));
         DSU.approve(address(product), amount);
-        product.depositTo(account, amount);
+        product.updateCollateral(account, Fixed18Lib.from(1, amount));
         emit WrapAndDeposit(account, product, amount);
     }
 }

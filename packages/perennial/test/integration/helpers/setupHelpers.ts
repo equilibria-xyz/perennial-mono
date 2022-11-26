@@ -250,5 +250,5 @@ export async function depositTo(
 ): Promise<void> {
   const { dsu } = instanceVars
   await dsu.connect(user).approve(product.address, position)
-  await product.connect(user).depositTo(user.address, position)
+  await product.connect(user).updateCollateral(user.address, position)
 }

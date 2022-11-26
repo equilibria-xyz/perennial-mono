@@ -474,28 +474,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @param amount Amount of collateral to deposit
      */
     // TODO: combine
-    function depositTo(address account, UFixed18 amount)
-    external
-    nonReentrant
-    notPaused
-    {
-        _settleCollateral(account, Fixed18Lib.from(1, amount));
-        token.pull(msg.sender, amount);
-
-        UFixed18 accountCollateral = _collateral.balances[account];
-        if (!accountCollateral.isZero() && accountCollateral.lt(controller().minCollateral()))
-            revert ProductCollateralUnderLimitError();
-
-        emit Deposit(account, amount);
-    }
-
-    /**
-     * @notice Withdraws `amount` collateral from `msg.sender`'s `product` account
-     *         and sends it to `account`
-     * @param account Account to withdraw the collateral to
-     * @param amount Amount of collateral to withdraw
-     */
-    function withdrawTo(address account, UFixed18 amount)
+    function updateCollateral(address account, Fixed18 amount)
     external
     nonReentrant
     notPaused
@@ -503,17 +482,16 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         CurrentContext memory context = _settle();
         _settleAccount(account, context);
 
-        UFixed18 accountCollateral = _collateral.balances[account];
-        amount = amount.eq(UFixed18Lib.MAX) ? accountCollateral : amount;
-        _settleCollateral(msg.sender, Fixed18Lib.from(-1, amount), true);
-        token.push(account, amount);
+        _settleCollateral(account, amount, true);
+        amount.sign() == 1 ? token.pull(msg.sender, amount.abs()) : token.push(msg.sender, amount.abs());
 
+        UFixed18 accountCollateral = _collateral.balances[account];
         if (!accountCollateral.isZero() && accountCollateral.lt(controller().minCollateral()))
             revert ProductCollateralUnderLimitError();
         if (_liquidatable(context, account) || _liquidatableNext(context, account))
             revert ProductInsufficientCollateralError();
 
-        emit Withdrawal(msg.sender, amount);
+        emit CollateralUpdated(account, amount);
     }
 
     /**
