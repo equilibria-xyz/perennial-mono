@@ -261,7 +261,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         if (_socializationNext(context).lt(UFixed18Lib.ONE)) revert ProductInsufficientLiquidityError();
         if (context.version.position().next(_pre).maker.gt(context.makerLimit)) revert ProductMakerOverLimitError();
         UFixed18 accountCollateral = _collateral.balances[account];
-        if (!accountCollateral.isZero() && accountCollateral.lt(controller().minCollateral()))
+        if (!accountCollateral.isZero() && accountCollateral.lt(context.minCollateral))
             revert ProductCollateralUnderLimitError();
     }
 
