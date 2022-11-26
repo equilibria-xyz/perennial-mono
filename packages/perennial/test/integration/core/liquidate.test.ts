@@ -23,9 +23,7 @@ describe('Liquidate', () => {
 
     // Settle the product with a new oracle version
     await chainlink.nextWithPriceModification(price => price.mul(10))
-    await product.settle()
-
-    await product.settleAccount(user.address)
+    await product.settle(user.address)
 
     expect(await product.liquidatable(user.address)).to.be.true
 
@@ -40,7 +38,7 @@ describe('Liquidate', () => {
     expect(await dsu.balanceOf(userB.address)).to.equal(utils.parseEther('21000')) // Original 20000 + fee
 
     await chainlink.next()
-    await product.settleAccount(user.address)
+    await product.settle(user.address)
 
     expect(await product.liquidation(user.address)).to.be.false
   })
@@ -57,12 +55,11 @@ describe('Liquidate', () => {
 
     // Settle the product with a new oracle version
     await chainlink.next()
-    await product.settle()
+    await product.settle(constants.AddressZero)
 
     await chainlink.nextWithPriceModification(price => price.mul(2))
-    await product.settle()
-    await product.settleAccount(user.address)
-    await product.settleAccount(userB.address)
+    await product.settle(user.address)
+    await product.settle(userB.address)
 
     expect(await product['collateral(address)'](user.address)).to.equal(0)
     expect(await product.shortfall()).to.equal('2463736825720737646856')
@@ -102,10 +99,10 @@ describe('Liquidate', () => {
       .withArgs(user.address, product.address, userB.address, expectedLiquidationFee)
 
     await chainlink.next()
-    await product.settleAccount(user.address)
-    await product.settleAccount(userB.address)
-    await product.settleAccount(userC.address)
-    await product.settleAccount(userD.address)
+    await product.settle(user.address)
+    await product.settle(userB.address)
+    await product.settle(userC.address)
+    await product.settle(userD.address)
 
     const currA = await product['collateral(address)'](user.address)
     const currB = await product['collateral(address)'](userB.address)
@@ -115,9 +112,9 @@ describe('Liquidate', () => {
     const feesCurr = (await dsu.balanceOf(treasuryA.address)).add(await product.fees())
 
     await chainlink.next()
-    await product.settleAccount(userB.address)
-    await product.settleAccount(userC.address)
-    await product.settleAccount(userD.address)
+    await product.settle(userB.address)
+    await product.settle(userC.address)
+    await product.settle(userD.address)
 
     const newA = await product['collateral(address)'](user.address)
     const newB = await product['collateral(address)'](userB.address)

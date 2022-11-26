@@ -484,13 +484,13 @@ contract PerennialLens is IPerennialLens {
 
     /// @dev Settles the product
     modifier settle(IProduct product) {
-        product.settle();
+        product.settle(address(0));
         _;
     }
 
     /// @dev Settles the product. product.settleAccount also settles the product
     modifier settleAccount(address account, IProduct product) {
-        product.settleAccount(account);
+        product.settle(account);
         _;
     }
 

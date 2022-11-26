@@ -38,12 +38,10 @@ library OptimisticLedgerLib {
     internal returns (UFixed18 newShortfall) {
         Fixed18 newBalance = Fixed18Lib.from(self.balances[account]).add(amount);
 
-        if (newBalance.sign() == -1) {
-            newShortfall = newBalance.abs();
-            newBalance = Fixed18Lib.ZERO;
-        }
+        newShortfall = newBalance.min(Fixed18Lib.ZERO).abs();
+        newBalance = newBalance.max(Fixed18Lib.ZERO);
 
-        self.balances[account] = newBalance.abs();
+        self.balances[account] = UFixed18Lib.from(newBalance);
         self.shortfall = self.shortfall.add(newShortfall);
     }
 

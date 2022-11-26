@@ -298,7 +298,7 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
 
     /// @dev Helper to fully settle an account's state
     modifier settleForAccount(address account, IProduct product) {
-        product.settleAccount(account);
+        product.settle(account);
 
         _;
     }

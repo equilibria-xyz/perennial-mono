@@ -1,6 +1,6 @@
 import 'hardhat'
 import { expect } from 'chai'
-import { BigNumber, utils } from 'ethers'
+import { BigNumber, constants, utils } from 'ethers'
 
 import { InstanceVars, deployProtocol, createProduct, depositTo, createIncentiveProgram } from '../helpers/setupHelpers'
 import { expectProgramInfoEq } from '../../../../common/testutil/types'
@@ -131,17 +131,16 @@ describe('Incentivizer', () => {
     expect(await incentivizer.unclaimed(product.address, user.address, PROGRAM_ID)).to.equal(0)
 
     await chainlink.next()
-    await product.settle()
+    await product.settle(constants.AddressZero)
 
     await chainlink.next()
     await chainlink.next()
     await chainlink.next()
-    await product.settle()
 
-    await product.settleAccount(user.address)
+    await product.settle(user.address)
     expect(await incentivizer.unclaimed(product.address, user.address, PROGRAM_ID)).to.equal('423010973936898252')
 
-    await product.settleAccount(userB.address)
+    await product.settle(userB.address)
     expect(await incentivizer.unclaimed(product.address, userB.address, PROGRAM_ID)).to.equal('105752743484224563')
 
     expect(await incentivizer.available(product.address, PROGRAM_ID)).to.equal('9999471236282578877185')
@@ -165,26 +164,26 @@ describe('Incentivizer', () => {
     expect(await incentivizer.unclaimed(product.address, user.address, PROGRAM_ID)).to.equal(0)
 
     await chainlink.next()
-    await product.settle()
+    await product.settle(constants.AddressZero)
 
     await chainlink.next()
     await chainlink.next()
-    await product.settle()
+    await product.settle(constants.AddressZero)
 
     await chainlink.nextWithTimestampModification(ts => ts.add(YEAR))
-    await expect(product.settle())
+    await expect(product.settle(constants.AddressZero))
       .to.emit(incentiveToken, 'Transfer')
       .withArgs(incentivizer.address, treasuryA.address, '9999662208504801097393') // Refund Amount
       .to.emit(incentivizer, 'ProgramComplete')
       .withArgs(product.address, PROGRAM_ID, 2475)
 
-    await product.settleAccount(user.address)
+    await product.settle(user.address)
     expect(await incentivizer.unclaimed(product.address, user.address, PROGRAM_ID)).to.equal('188786008230451956')
     await expect(incentivizer.connect(user)['claim(address,uint256[])'](product.address, [PROGRAM_ID]))
       .to.emit(incentiveToken, 'Transfer')
       .withArgs(incentivizer.address, user.address, '188786008230451956')
 
-    await product.settleAccount(userB.address)
+    await product.settle(userB.address)
     expect(await incentivizer.unclaimed(product.address, userB.address, PROGRAM_ID)).to.equal('47196502057612989')
     await expect(incentivizer.connect(userB)['claim(address,uint256[])'](product.address, [PROGRAM_ID]))
       .to.emit(incentiveToken, 'Transfer')
@@ -212,11 +211,11 @@ describe('Incentivizer', () => {
     expect(await incentivizer.unclaimed(product.address, user.address, PROGRAM_ID)).to.equal(0)
 
     await chainlink.next()
-    await product.settle()
+    await product.settle(constants.AddressZero)
 
     await chainlink.next()
     await chainlink.next()
-    await product.settle()
+    await product.settle(constants.AddressZero)
 
     await expect(incentivizer.complete(product.address, PROGRAM_ID))
       .to.emit(incentiveToken, 'Transfer')
@@ -224,13 +223,13 @@ describe('Incentivizer', () => {
       .to.emit(incentivizer, 'ProgramComplete')
       .withArgs(product.address, PROGRAM_ID, 2475)
 
-    await product.settleAccount(user.address)
+    await product.settle(user.address)
     expect(await incentivizer.unclaimed(product.address, user.address, PROGRAM_ID)).to.equal('188786008230451956')
     await expect(incentivizer.connect(user)['claim(address,uint256[])'](product.address, [PROGRAM_ID]))
       .to.emit(incentiveToken, 'Transfer')
       .withArgs(incentivizer.address, user.address, '188786008230451956')
 
-    await product.settleAccount(userB.address)
+    await product.settle(userB.address)
     expect(await incentivizer.unclaimed(product.address, userB.address, PROGRAM_ID)).to.equal('47196502057612989')
     await expect(incentivizer.connect(userB)['claim(address,uint256[])'](product.address, [PROGRAM_ID]))
       .to.emit(incentiveToken, 'Transfer')
@@ -276,17 +275,15 @@ describe('Incentivizer', () => {
       expect(await incentivizer.available(product1.address, program1)).to.equal(utils.parseEther('3750'))
 
       await chainlink.next()
-      await product0.settle()
-      await product1.settle()
+      await product0.settle(constants.AddressZero)
+      await product1.settle(constants.AddressZero)
 
       await chainlink.next()
       await chainlink.next()
       await chainlink.next()
-      await product0.settle()
-      await product1.settle()
+      await product0.settle(user.address)
+      await product1.settle(user.address)
 
-      await product0.settleAccount(user.address)
-      await product1.settleAccount(user.address)
       expect(await incentivizer.unclaimed(product0.address, user.address, program0)).to.equal('317258230452673689')
       expect(await incentivizer.unclaimed(product1.address, user.address, program1)).to.equal('158629115226335611')
       await expect(
@@ -299,8 +296,8 @@ describe('Incentivizer', () => {
         .to.emit(incentiveToken, 'Transfer')
         .withArgs(incentivizer.address, user.address, '158629115226335611')
 
-      await product0.settleAccount(userB.address)
-      await product1.settleAccount(userB.address)
+      await product0.settle(userB.address)
+      await product1.settle(userB.address)
       expect(await incentivizer.unclaimed(product0.address, userB.address, program0)).to.equal('79314557613166572')
       expect(await incentivizer.unclaimed(product1.address, userB.address, program1)).to.equal('39657278806583286')
       await expect(

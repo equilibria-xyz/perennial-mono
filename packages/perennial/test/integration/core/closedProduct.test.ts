@@ -1,6 +1,6 @@
 import { expect } from 'chai'
 import 'hardhat'
-import { utils } from 'ethers'
+import { utils, constants } from 'ethers'
 
 import { InstanceVars, deployProtocol, createProduct, depositTo } from '../helpers/setupHelpers'
 import { Product } from '../../../types/generated'
@@ -25,7 +25,7 @@ describe('Closed Product', () => {
 
     // Settle the product with a new oracle version
     await chainlink.nextWithPriceModification(price => price.mul(10))
-    await product.settle()
+    await product.settle(constants.AddressZero)
 
     await chainlink.next()
     const parameters = await product.parameter()
@@ -82,8 +82,7 @@ describe('Closed Product', () => {
     it('reverts on attempts to liquidate', async () => {
       const { user, chainlink } = instanceVars
       await chainlink.nextWithPriceModification(price => price.mul(10))
-      await product.settle()
-      await product.settleAccount(user.address)
+      await product.settle(user.address)
 
       expect(await product.liquidatable(user.address)).to.be.true
       await expect(product.liquidate(user.address)).to.be.revertedWith('ProductClosedError()')
@@ -112,8 +111,8 @@ describe('Closed Product', () => {
       parameters.makerLimit,
       true,
     )
-    await product.settleAccount(user.address)
-    await product.settleAccount(userB.address)
+    await product.settle(user.address)
+    await product.settle(userB.address)
 
     const userCollateralBefore = await product['collateral(address)'](user.address)
     const userBCollateralBefore = await product['collateral(address)'](userB.address)
@@ -122,8 +121,8 @@ describe('Closed Product', () => {
 
     await chainlink.nextWithPriceModification(price => price.mul(4))
     await chainlink.nextWithPriceModification(price => price.mul(4))
-    await product.settleAccount(user.address)
-    await product.settleAccount(userB.address)
+    await product.settle(user.address)
+    await product.settle(userB.address)
 
     expect(await product.shortfall()).to.equal(0)
     expect(await product['collateral(address)'](user.address)).to.equal(userCollateralBefore)
@@ -158,8 +157,8 @@ describe('Closed Product', () => {
     )
     await chainlink.next()
 
-    await product.settleAccount(user.address)
-    await product.settleAccount(userB.address)
+    await product.settle(user.address)
+    await product.settle(userB.address)
 
     expect(await product.liquidation(user.address)).to.be.false
     const userCollateralBefore = await product['collateral(address)'](user.address)
@@ -169,8 +168,8 @@ describe('Closed Product', () => {
 
     await chainlink.nextWithPriceModification(price => price.mul(4))
     await chainlink.nextWithPriceModification(price => price.mul(4))
-    await product.settleAccount(user.address)
-    await product.settleAccount(userB.address)
+    await product.settle(user.address)
+    await product.settle(userB.address)
 
     expect(await product['collateral(address)'](user.address)).to.equal(userCollateralBefore)
     expect(await product['collateral(address)'](userB.address)).to.equal(userBCollateralBefore)

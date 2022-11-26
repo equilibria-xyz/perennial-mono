@@ -1,6 +1,6 @@
 import { expect } from 'chai'
 import 'hardhat'
-import { utils } from 'ethers'
+import { constants, utils } from 'ethers'
 
 import { InstanceVars, deployProtocol, createProduct, depositTo, INITIAL_VERSION } from '../helpers/setupHelpers'
 import { createPayoffDefinition, expectPositionEq, expectPrePositionEq } from '../../../../common/testutil/types'
@@ -80,7 +80,7 @@ describe.only('Happy Path', () => {
 
     // Settle the product with a new oracle version
     await chainlink.next()
-    await product.settle()
+    await product.settle(constants.AddressZero)
 
     // Check global post-settlement state
     expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION + 1)
@@ -91,7 +91,7 @@ describe.only('Happy Path', () => {
     })
 
     // Settle user and check state
-    await product.settleAccount(user.address)
+    await product.settle(user.address)
     expect(await product.position(user.address)).to.equal(POSITION.mul(-1))
     expect(await product['pre(address)'](user.address)).to.equal(0)
     expect(await product['latestVersion(address)'](user.address)).to.equal(INITIAL_VERSION + 1)
@@ -127,7 +127,7 @@ describe.only('Happy Path', () => {
 
     // Settle the product with a new oracle version
     await chainlink.next()
-    await product.settle()
+    await product.settle(constants.AddressZero)
 
     // Check global post-settlement state
     expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION + 1)
@@ -138,7 +138,7 @@ describe.only('Happy Path', () => {
     })
 
     // Settle user and check state
-    await product.settleAccount(user.address)
+    await product.settle(user.address)
     expect(await product.position(user.address)).to.equal(POSITION.mul(-1))
     expect(await product['pre(address)'](user.address)).to.equal(0)
     expect(await product['latestVersion(address)'](user.address)).to.equal(INITIAL_VERSION + 1)
@@ -242,7 +242,7 @@ describe.only('Happy Path', () => {
 
     // Another round
     await chainlink.next()
-    await product.settle()
+    await product.settle(constants.AddressZero)
 
     expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION + 2)
     expectPositionEq(await product.positionAtVersion(INITIAL_VERSION + 2), {
@@ -253,7 +253,7 @@ describe.only('Happy Path', () => {
       openPosition: { maker: 0, taker: 0 },
       closePosition: { maker: 0, taker: 0 },
     })
-    await product.settleAccount(userB.address)
+    await product.settle(userB.address)
     expect(await product.position(userB.address)).to.equal(TAKE_POSITION)
     expect(await product['pre(address)'](userB.address)).to.equal(0)
     expect(await product['latestVersion(address)'](userB.address)).to.equal(INITIAL_VERSION + 2)
@@ -296,7 +296,7 @@ describe.only('Happy Path', () => {
 
     // Another round
     await chainlink.next()
-    await product.settle()
+    await product.settle(constants.AddressZero)
 
     expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION + 2)
     expectPositionEq(await product.positionAtVersion(INITIAL_VERSION + 2), {
@@ -307,7 +307,7 @@ describe.only('Happy Path', () => {
       openPosition: { maker: 0, taker: 0 },
       closePosition: { maker: 0, taker: 0 },
     })
-    await product.settleAccount(userB.address)
+    await product.settle(userB.address)
     expect(await product.position(userB.address)).to.equal(TAKE_POSITION)
     expect(await product['pre(address)'](userB.address)).to.equal(0)
     expect(await product['latestVersion(address)'](userB.address)).to.equal(INITIAL_VERSION + 2)
@@ -395,10 +395,8 @@ describe.only('Happy Path', () => {
 
     const product = await createProduct(instanceVars)
 
-    await product.settle()
-    await product.settle()
-    await product.settleAccount(user.address)
-    await product.settleAccount(user.address)
+    await product.settle(user.address)
+    await product.settle(user.address)
   })
 
   it('disables actions when paused', async () => {
@@ -409,8 +407,7 @@ describe.only('Happy Path', () => {
     await expect(product.update(0, utils.parseEther('1000'))).to.be.revertedWith('PausedError()')
     await expect(product.liquidate(user.address)).to.be.revertedWith('PausedError()')
     await expect(product.update(utils.parseEther('0.001'), 0)).to.be.revertedWith('PausedError()')
-    await expect(product.settle()).to.be.revertedWith('PausedError()')
-    await expect(product.settleAccount(user.address)).to.be.revertedWith('PausedError()')
+    await expect(product.settle(user.address)).to.be.revertedWith('PausedError()')
   })
 
   it('delayed update w/ collateral (gas)', async () => {

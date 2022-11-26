@@ -1,6 +1,6 @@
 import { expect } from 'chai'
 import 'hardhat'
-import { utils } from 'ethers'
+import { constants, utils } from 'ethers'
 
 import { InstanceVars, deployProtocol, createProduct, depositTo, createIncentiveProgram } from '../helpers/setupHelpers'
 import { time } from '../../../../common/testutil'
@@ -147,12 +147,11 @@ describe('Lens', () => {
     )
 
     await chainlink.next()
-    await product.settle()
+    await product.settle(constants.AddressZero)
 
     await chainlink.next()
-    await product.settle()
 
-    await product.connect(user).settleAccount(user.address)
+    await product.connect(user).settle(user.address)
     // Incentive Program Rewards are updated
     let incentiveRewards = await lens.callStatic['unclaimedIncentiveRewards(address,address)'](
       user.address,

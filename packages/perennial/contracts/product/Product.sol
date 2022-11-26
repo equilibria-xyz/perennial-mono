@@ -60,6 +60,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
         UFixed18 makerLimit;
 
+        UFixed18 minCollateral;
+
         bool closed;
         bytes31 __unallocated3__;
 
@@ -67,6 +69,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         bytes31 __unallocated4__;
 
         /* Current Global State */
+        uint256 latestVersion;
+
         IOracleProvider.OracleVersion oracleVersion;
 
         Version version;
@@ -74,6 +78,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         /* Current Account State */
         Account account;
         bytes31 __unallocated0__;
+
+        uint256 latestAccountVersion;
     }
 
     /**
@@ -102,8 +108,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     /**
      * @notice Surfaces global settlement externally
      */
-    function settle() external nonReentrant {
-        CurrentContext memory context = _settle();
+    function settle(address account) external nonReentrant {
+        CurrentContext memory context = _settle(account); //TODO: address 0?
 
         if (context.paused) revert PausedError();
     }
@@ -120,61 +126,67 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      *
      *  Syncs each to instantaneously after the oracle update.
      */
-    function _settle() private returns (CurrentContext memory context) {
+    function _settle(address account) private returns (CurrentContext memory context) {
+        // Load protocol parameters
         UFixed18 minFundingFee;
-        (context.incentivizer, minFundingFee, context.paused) = controller().settlementParameters();
+        (context.incentivizer, minFundingFee, context.minCollateral, context.paused) = controller().settlementParameters();
 
+        // Load product parameters
         UFixed18 fundingFee;
         UFixed18 positionFee;
-        (
-            context.maintenance,
-            fundingFee,
-            context.makerFee,
-            context.takerFee,
-            positionFee,
-            context.makerLimit,
-            context.closed
-        ) = parameter();
-
-        // Determine periods to settle
-        context.oracleVersion = _sync();
-        context.version = _versions[_latestVersion];
-        if (context.oracleVersion.version == _latestVersion) return context; // zero periods if a == c
-
-        // Sync incentivizer programs
-        context.incentivizer.sync(context.oracleVersion);
-
-        // Load version data into memory
-        IOracleProvider.OracleVersion memory latestOracleVersion = atVersion(_latestVersion);
-        IOracleProvider.OracleVersion memory settleOracleVersion =
-            _latestVersion + 1 == context.oracleVersion.version ?
-                context.oracleVersion :
-                atVersion(_latestVersion + 1);
-
-        UFixed18 feeAccumulator;
+        (context.maintenance, fundingFee, context.makerFee, context.takerFee, positionFee, context.makerLimit, context.closed) = parameter();
         JumpRateUtilizationCurve memory _utilizationCurve = utilizationCurve();
 
-        // a->b (and settle)
-        (feeAccumulator) = context.version.accumulateAndSettle(
-            feeAccumulator,
-            pre(),
-            Period(latestOracleVersion, settleOracleVersion),
-            context.makerFee,
-            context.takerFee,
-            positionFee,
-            _utilizationCurve,
-            minFundingFee,
-            fundingFee,
-            context.closed
-        );
-        _versions[settleOracleVersion.version] = context.version;
-        delete _pre;
+        // Load product state
+        context.oracleVersion = _sync();
+        context.latestVersion = latestVersion();
+        context.version = _versions[context.latestVersion];
 
-        // b->c
-        if (settleOracleVersion.version != context.oracleVersion.version) { // skip is b == c
+        // Load account state
+        context.latestAccountVersion = latestVersion(account);
+        context.account = _accounts[account];
+
+        // Sync incentivizer programs
+        context.incentivizer.sync(context.oracleVersion); //TODO: why isn't this called twice?
+
+        // Initialize memory
+        UFixed18 feeAccumulator;
+        Fixed18 valueAccumulator;
+        IOracleProvider.OracleVersion memory fromOracleVersion;
+        IOracleProvider.OracleVersion memory toOracleVersion;
+        Version memory fromVersion;
+        Version memory toVersion;
+
+        // settle product a->b if necessary
+        if (context.oracleVersion.version > context.latestVersion) {
+            fromOracleVersion = atVersion(context.latestVersion);
+            toOracleVersion = context.latestVersion + 1 == context.oracleVersion.version ?
+                context.oracleVersion :
+                atVersion(context.latestVersion + 1);
+
+            (feeAccumulator) = context.version.accumulateAndSettle(
+                feeAccumulator,
+                pre(),
+                Period(fromOracleVersion, toOracleVersion),
+                context.makerFee,
+                context.takerFee,
+                positionFee,
+                _utilizationCurve,
+                minFundingFee,
+                fundingFee,
+                context.closed
+            );
+            _versions[toOracleVersion.version] = context.version;
+            delete _pre;
+        }
+
+        // settle product b->c if necessary
+        if (context.oracleVersion.version > toOracleVersion.version) { // skip is b == c
+            fromOracleVersion = toOracleVersion;
+            toOracleVersion = context.oracleVersion;
             (feeAccumulator) = context.version.accumulate(
                 feeAccumulator,
-                Period(settleOracleVersion, context.oracleVersion),
+                Period(fromOracleVersion, toOracleVersion),
                 _utilizationCurve,
                 minFundingFee,
                 fundingFee,
@@ -183,82 +195,45 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
             _versions[context.oracleVersion.version] = context.version;
         }
 
-        // Settle fees
-        _settleFees(feeAccumulator);
-
-        // Save state
-        _latestVersion = context.oracleVersion.version;
-
-        emit Settle(settleOracleVersion.version, context.oracleVersion.version);
-    }
-
-    /**
-    * @notice Surfaces account settlement externally
-     * @param account Account to settle
-     */
-    function settleAccount(address account) external nonReentrant {
-        CurrentContext memory context = _settle();
-        _settleAccount(account, context);
-
-        if (context.paused) revert PausedError();
-    }
-
-    /**
-     * @notice Core account settlement flywheel
-     * @notice Core account settlement flywheel
-     * @param account Account to settle
-     * @dev
-     *  a) last settle oracle version
-     *  b) latest pre position oracle version
-     *  c) current oracle version
-     *
-     *  Settles from a->b then from b->c if either interval is non-zero to account for a change
-     *  in position quantity at (b).
-     *
-     *  Syncs each to instantaneously after the oracle update.
-     */
-    function _settleAccount(address account, CurrentContext memory context) private {
-        context.account = _accounts[account];
-
-        // Get latest oracle version
-        uint256 latestVersion_ = latestVersion(account);
-        if (latestVersion_ == context.oracleVersion.version) return; // short circuit entirely if a == c
-
-        // Get settle oracle version
-        uint256 _settleVersion = latestVersion_ + 1;
-        IOracleProvider.OracleVersion memory settleOracleVersion =
-            _settleVersion == context.oracleVersion.version ?
+        // settle account a->b if necessary
+        if (context.oracleVersion.version > context.latestAccountVersion) {
+            toOracleVersion = context.latestAccountVersion + 1 == context.oracleVersion.version ?
                 context.oracleVersion : // if b == c, don't re-call provider for oracle version
-                atVersion(_settleVersion);
-        Version memory settleVersion = _versions[_settleVersion];
+                atVersion(context.latestAccountVersion + 1);
+            fromVersion = _versions[context.latestAccountVersion];
+            toVersion = _versions[context.latestAccountVersion + 1];
 
-        // initialize
-        Fixed18 valueAccumulator;
+            context.incentivizer.syncAccount(account, toOracleVersion);
 
-        // sync incentivizer before accumulator
-        context.incentivizer.syncAccount(account, settleOracleVersion);
+            valueAccumulator = context.account.accumulate(valueAccumulator, fromVersion, toVersion);
 
-        // account a->b
-        valueAccumulator = context.account.accumulate(valueAccumulator, _versions[latestVersion_], settleVersion);
-        context.account.settle();
+            context.account.settle();
+        }
 
-        // short-circuit from a->c if b == c
-        if (settleOracleVersion.version != context.oracleVersion.version) {
-            // sync incentivizer before accumulator
-            context.incentivizer.syncAccount(account, context.oracleVersion);
+        // settle account b->c if necessary
+        if (context.oracleVersion.version > toOracleVersion.version) {
+            toOracleVersion = context.oracleVersion;
+            fromVersion = toVersion;
+            toVersion = context.version;
 
-            // account b->c
-            valueAccumulator = context.account.accumulate(valueAccumulator, settleVersion, context.version);
+            context.incentivizer.syncAccount(account, toOracleVersion);
+
+            valueAccumulator = context.account.accumulate(valueAccumulator, fromVersion, toVersion);
         }
 
         // settle collateral
+        _settleFees(feeAccumulator);
         _settleCollateral(account, valueAccumulator);
 
         // save state
+        _latestVersion = context.oracleVersion.version;
         _latestVersions[account] = context.oracleVersion.version;
         _accounts[account] = context.account;
 
-        emit AccountSettle(account, settleOracleVersion.version, context.oracleVersion.version);
+        //TODO: redo events
+        // emit events
+        emit Settle(fromOracleVersion.version, context.oracleVersion.version);
+        emit AccountSettle(account, fromOracleVersion.version, context.oracleVersion.version);
     }
 
     //TODO: support receiver; forwarder broken
@@ -266,8 +241,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     external
     nonReentrant
     {
-        CurrentContext memory context = _settle();
-        _settleAccount(msg.sender, context);
+        CurrentContext memory context = _settle(msg.sender);
 
         _before(context, msg.sender, positionAmount);
         _updatePosition(context, msg.sender, positionAmount);
@@ -320,8 +294,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     external
     nonReentrant
     {
-        CurrentContext memory context = _settle();
-        _settleAccount(account, context);
+        CurrentContext memory context = _settle(account);
 
         // Liquidate position
         if (!_liquidatable(context, account)) revert ProductCantLiquidate();
