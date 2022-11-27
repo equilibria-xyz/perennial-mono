@@ -7,11 +7,13 @@ import "./Version.sol";
 
 /// @dev Account type
 struct Account {
-    /// @dev The current settled position of the account
+
     PackedFixed18 _pre;
 
     /// @dev The current settled position of the account
     PackedFixed18 _position;
+
+    UFixed18 collateral;
 }
 using AccountLib for Account global;
 
@@ -106,5 +108,23 @@ library AccountLib {
 
     function next(Account memory self) internal pure returns (Fixed18) {
         return self._position.unpack().add(self._pre.unpack());
+    }
+
+    /**
+     * @notice Credits `account` with `amount` collateral
+     * @dev Funds come from inside the product, not totals are updated
+     *      Shortfall is created if more funds are debited from an account than exist
+     * @param self The struct to operate on
+     * @param amount Amount of collateral to credit
+     * @return newShortfallAccumulator Any new shortfall incurred during this settlement
+     */
+    function settleCollateral(Account memory self, UFixed18 shortfallAccumulator, Fixed18 amount)
+    internal pure returns (UFixed18 newShortfallAccumulator) {
+        Fixed18 newBalance = Fixed18Lib.from(self.collateral).add(amount);
+
+        newShortfallAccumulator = newBalance.min(Fixed18Lib.ZERO).abs().add(shortfallAccumulator);
+        newBalance = newBalance.max(Fixed18Lib.ZERO);
+
+        self.collateral = UFixed18Lib.from(newBalance);
     }
 }

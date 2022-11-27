@@ -114,6 +114,7 @@ library VersionLib {
         versionAccumulator._value = valueAccumulator.pack();
         versionAccumulator._share = shareAccumulator.pack();
         versionAccumulator._position = latestPosition.next(pre).pack();
+        pre.clear();
         newFeeAccumulator = feeAccumulator.add(newFeeAccumulator);
     }
 

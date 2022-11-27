@@ -354,12 +354,8 @@ contract Controller is IController, UInitializable {
         return treasury(coordinatorFor[product]);
     }
 
-    function settlementParameters() external view returns (IIncentivizer, UFixed18, UFixed18, bool) {
-        return (incentivizer(), minFundingFee(), minCollateral(), paused());
-    }
-
-    function collateralParameters(IProduct product) external view returns (address, UFixed18) {
-        return (treasury(), protocolFee());
+    function settlementParameters() external view returns (IIncentivizer, UFixed18, UFixed18, bool, address, UFixed18) {
+        return (incentivizer(), minFundingFee(), minCollateral(), paused(), treasury(), protocolFee());
     }
 
     /// @dev Only allow owner of `coordinatorId` to call

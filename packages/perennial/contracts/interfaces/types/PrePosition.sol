@@ -39,7 +39,12 @@ library PrePositionLib {
         return self.openPosition.isEmpty() && self.closePosition.isEmpty();
     }
 
-    function update(PrePosition storage self, Fixed18 position, Fixed18 amount) internal {
+    function clear(PrePosition memory self) internal pure {
+        delete self.openPosition;
+        delete self.closePosition;
+    }
+
+    function update(PrePosition memory self, Fixed18 position, Fixed18 amount) internal pure {
         if (amount.sign() == 1) {
             if (position.sign() == 1) {
                 self.openPosition.taker = self.openPosition.taker.add(amount.abs());

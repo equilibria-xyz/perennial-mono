@@ -7,7 +7,6 @@ import "../controller/UControllerProvider.sol";
 import "./UPayoffProvider.sol";
 import "./UParamProvider.sol";
 import "./types/Account.sol";
-import "./types/OptimisticLedger.sol";
 
 // TODO: position needs less settle on the second period for both global and account
 // TODO: lots of params can be passed in from global settle to account settle
@@ -27,9 +26,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     /// @dev ERC20 stablecoin for collateral
     Token18 public token;
 
-    /// @dev Per product collateral state
-    OptimisticLedger private _collateral;
-
     /// @dev Protocol and product fees collected, but not yet claimed
     UFixed18 public fees;
 
@@ -44,6 +40,9 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     uint256 private _latestVersion;
     mapping(address => uint256) private _latestVersions;
 
+    /// @dev Total ledger collateral shortfall
+    UFixed18 public shortfall;
+
     /// @dev Whether the account is currently locked for liquidation
     mapping(address => bool) public liquidation;
 
@@ -52,28 +51,46 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         IIncentivizer incentivizer;
         bytes12 __unallocated2__;
 
+        UFixed18 minFundingFee;
+
+        UFixed18 minCollateral;
+
+        address protocolTreasury;
+
+        UFixed18 protocolFee;
+
+        bool paused;
+        bytes31 __unallocated4__;
+
+        /* Product Parameters */
+
         UFixed18 maintenance;
+
+        UFixed18 fundingFee;
 
         UFixed18 makerFee;
 
         UFixed18 takerFee;
 
+        UFixed18 positionFee;
+
         UFixed18 makerLimit;
 
-        UFixed18 minCollateral;
+        JumpRateUtilizationCurve utilizationCurve;
 
         bool closed;
         bytes31 __unallocated3__;
 
-        bool paused;
-        bytes31 __unallocated4__;
-
         /* Current Global State */
         uint256 latestVersion;
 
-        IOracleProvider.OracleVersion oracleVersion;
+        IOracleProvider.OracleVersion currentOracleVersion;
 
         Version version;
+
+        PrePosition pre;
+
+        UFixed18 shortfall;
 
         /* Current Account State */
         Account account;
@@ -126,80 +143,102 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      *
      *  Syncs each to instantaneously after the oracle update.
      */
+    //TODO: new events
     function _settle(address account) private returns (CurrentContext memory context) {
+        // Load state into memory
+        context = _loadContext(account);
+
+        // Transform state in memory
+        UFixed18 feeAccumulator = _settleInMem(context, account); //TODO: shouldn't return anything
+
+        // Save state
+        _saveContext(context, account, feeAccumulator);
+    }
+
+    function _loadContext(address account) private returns (CurrentContext memory context) {
         // Load protocol parameters
-        UFixed18 minFundingFee;
-        (context.incentivizer, minFundingFee, context.minCollateral, context.paused) = controller().settlementParameters();
+        (context.incentivizer, context.minFundingFee, context.minCollateral, context.paused, context.protocolTreasury, context.protocolFee) = controller().settlementParameters();
 
         // Load product parameters
-        UFixed18 fundingFee;
-        UFixed18 positionFee;
-        (context.maintenance, fundingFee, context.makerFee, context.takerFee, positionFee, context.makerLimit, context.closed) = parameter();
-        JumpRateUtilizationCurve memory _utilizationCurve = utilizationCurve();
+        (context.maintenance, context.fundingFee, context.makerFee, context.takerFee, context.positionFee, context.makerLimit, context.closed) = parameter();
+        context.utilizationCurve = utilizationCurve();
 
         // Load product state
-        context.oracleVersion = _sync();
+        context.currentOracleVersion = _sync();
         context.latestVersion = latestVersion();
         context.version = _versions[context.latestVersion];
+        context.pre = pre();
+        context.shortfall = shortfall;
 
         // Load account state
         context.latestAccountVersion = latestVersion(account);
         context.account = _accounts[account];
+    }
 
-        // Sync incentivizer programs
-        context.incentivizer.sync(context.oracleVersion); //TODO: why isn't this called twice?
+    function _saveContext(CurrentContext memory context, address account, UFixed18 feeAccumulator) private {
+        _settleFees(feeAccumulator, context.protocolTreasury, context.protocolFee); // TODO: blow up
 
+        _latestVersion = context.currentOracleVersion.version; //TODO: depdup these with the standable ones?
+        _latestVersions[account] = context.currentOracleVersion.version;
+        _accounts[account] = context.account;
+        _pre = context.pre;
+        shortfall = context.shortfall;
+    }
+
+    function _settleInMem(CurrentContext memory context, address account) private returns (UFixed18 feeAccumulator) {
         // Initialize memory
-        UFixed18 feeAccumulator;
-        Fixed18 valueAccumulator;
+        Fixed18 valueAccumulator; // TODO: remove, move collateral settle internal to account
+        UFixed18 shortfallAccumulator;
         IOracleProvider.OracleVersion memory fromOracleVersion;
         IOracleProvider.OracleVersion memory toOracleVersion;
         Version memory fromVersion;
         Version memory toVersion;
 
+        // Sync incentivizer programs
+        context.incentivizer.sync(context.currentOracleVersion); //TODO: why isn't this called twice?
+
         // settle product a->b if necessary
-        if (context.oracleVersion.version > context.latestVersion) {
+        if (context.currentOracleVersion.version > context.latestVersion) {
             fromOracleVersion = atVersion(context.latestVersion);
-            toOracleVersion = context.latestVersion + 1 == context.oracleVersion.version ?
-                context.oracleVersion :
-                atVersion(context.latestVersion + 1);
+            toOracleVersion = context.latestVersion + 1 == context.currentOracleVersion.version ?
+            context.currentOracleVersion :
+            atVersion(context.latestVersion + 1);
 
             (feeAccumulator) = context.version.accumulateAndSettle(
                 feeAccumulator,
-                pre(),
-                Period(fromOracleVersion, toOracleVersion),
+                context.pre,
+                Period(fromOracleVersion, toOracleVersion), //TODO: remove period
                 context.makerFee,
                 context.takerFee,
-                positionFee,
-                _utilizationCurve,
-                minFundingFee,
-                fundingFee,
+                context.positionFee,
+                context.utilizationCurve,
+                context.minFundingFee,
+                context.fundingFee,
                 context.closed
             );
             _versions[toOracleVersion.version] = context.version;
-            delete _pre;
         }
 
         // settle product b->c if necessary
-        if (context.oracleVersion.version > toOracleVersion.version) { // skip is b == c
+        if (context.currentOracleVersion.version > toOracleVersion.version) { // skip is b == c
             fromOracleVersion = toOracleVersion;
-            toOracleVersion = context.oracleVersion;
+            toOracleVersion = context.currentOracleVersion;
             (feeAccumulator) = context.version.accumulate(
                 feeAccumulator,
                 Period(fromOracleVersion, toOracleVersion),
-                _utilizationCurve,
-                minFundingFee,
-                fundingFee,
+                context.utilizationCurve,
+                context.minFundingFee,
+                context.fundingFee,
                 context.closed
             );
-            _versions[context.oracleVersion.version] = context.version;
+            _versions[context.currentOracleVersion.version] = context.version;
         }
 
         // settle account a->b if necessary
-        if (context.oracleVersion.version > context.latestAccountVersion) {
-            toOracleVersion = context.latestAccountVersion + 1 == context.oracleVersion.version ?
-                context.oracleVersion : // if b == c, don't re-call provider for oracle version
-                atVersion(context.latestAccountVersion + 1);
+        if (context.currentOracleVersion.version > context.latestAccountVersion) {
+            toOracleVersion = context.latestAccountVersion + 1 == context.currentOracleVersion.version ?
+            context.currentOracleVersion : // if b == c, don't re-call provider for oracle version
+            atVersion(context.latestAccountVersion + 1);
             fromVersion = _versions[context.latestAccountVersion];
             toVersion = _versions[context.latestAccountVersion + 1];
 
@@ -211,8 +250,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         }
 
         // settle account b->c if necessary
-        if (context.oracleVersion.version > toOracleVersion.version) {
-            toOracleVersion = context.oracleVersion;
+        if (context.currentOracleVersion.version > toOracleVersion.version) {
+            toOracleVersion = context.currentOracleVersion;
             fromVersion = toVersion;
             toVersion = context.version;
 
@@ -221,68 +260,51 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
             valueAccumulator = context.account.accumulate(valueAccumulator, fromVersion, toVersion);
         }
 
-        // settle collateral
-        _settleFees(feeAccumulator);
-        _settleCollateral(account, valueAccumulator);
-
-        // save state
-        _latestVersion = context.oracleVersion.version;
-        _latestVersions[account] = context.oracleVersion.version;
-        _accounts[account] = context.account;
-
-        //TODO: redo events
-        // emit events
-        emit Settle(fromOracleVersion.version, context.oracleVersion.version);
-        emit AccountSettle(account, fromOracleVersion.version, context.oracleVersion.version);
+        shortfallAccumulator = context.account.settleCollateral(shortfallAccumulator, valueAccumulator);
+        context.shortfall = context.shortfall.add(shortfallAccumulator);
     }
 
-    //TODO: support receiver; forwarder broken
-    function update(Fixed18 positionAmount, Fixed18 collateralAmount)
-    external
-    nonReentrant
-    {
-        CurrentContext memory context = _settle(msg.sender);
-
-        _before(context, msg.sender, positionAmount);
-        _updatePosition(context, msg.sender, positionAmount);
-        _updateCollateral(context, msg.sender, collateralAmount);
-        _after(context, msg.sender);
+    //TODO support depositTo and withdrawTo
+    function update(Fixed18 positionAmount, Fixed18 collateralAmount) external nonReentrant {
+        _update(msg.sender, positionAmount, collateralAmount, false);
     }
 
-    function _before(CurrentContext memory context, address account, Fixed18 positionAmount) private {
+    function _update(address account, Fixed18 positionAmount, Fixed18 collateralAmount, bool force) private returns (CurrentContext memory context) {
+        context = _settle(account);
+
+        //
+        UFixed18 shortfallAccumulator;
+
+        // before
         if (context.paused) revert PausedError();
         if (liquidation[account]) revert ProductInLiquidationError();
         if (context.closed && !_closingNext(context, positionAmount)) revert ProductClosedError();
-    }
 
-    function _after(CurrentContext memory context, address account) private {
-        if (_liquidatable(context, account) || _liquidatableNext(context, account))
-            revert ProductInsufficientCollateralError();
-        if (_socializationNext(context).lt(UFixed18Lib.ONE)) revert ProductInsufficientLiquidityError();
-        if (context.version.position().next(_pre).maker.gt(context.makerLimit)) revert ProductMakerOverLimitError();
-        UFixed18 accountCollateral = _collateral.balances[account];
-        if (!accountCollateral.isZero() && accountCollateral.lt(context.minCollateral))
-            revert ProductCollateralUnderLimitError();
-    }
-
-    function _updatePosition(CurrentContext memory context, address account, Fixed18 amount) private {
+        // position
         Fixed18 nextPosition = context.account.next();
-        context.account.update(amount);
+        UFixed18 positionFee = positionAmount.mul(context.currentOracleVersion.price).abs().mul(context.takerFee);
+
+        context.account.update(positionAmount);
+        context.pre.update(nextPosition, positionAmount);
+        shortfallAccumulator = context.account.settleCollateral(shortfallAccumulator, Fixed18Lib.from(-1, positionFee));
+        shortfallAccumulator = context.account.settleCollateral(shortfallAccumulator, collateralAmount); //TODO: these should combine with update
 
         _accounts[account] = context.account;
-        _pre.update(nextPosition, amount);
+        _pre = context.pre;
 
-        UFixed18 positionFee = amount.mul(context.oracleVersion.price).abs().mul(context.takerFee);
-        if (!positionFee.isZero()) _settleCollateral(account, Fixed18Lib.from(-1, positionFee));
+        if (collateralAmount.sign() == 1) token.pull(account, collateralAmount.abs());
+        if (collateralAmount.sign() == -1) token.push(account, collateralAmount.abs());
 
-        emit PositionUpdated(account, _latestVersion, amount);
-    }
+        // after
+        if (!shortfallAccumulator.isZero()) revert ProductShortfallError();
+        if (_liquidatable(context, account) || _liquidatableNext(context, account)) revert ProductInsufficientCollateralError();
+        if (!force && _socializationNext(context).lt(UFixed18Lib.ONE)) revert ProductInsufficientLiquidityError();
+        if (context.version.position().next(context.pre).maker.gt(context.makerLimit)) revert ProductMakerOverLimitError();
+        if (!context.account.collateral.isZero() && context.account.collateral.lt(context.minCollateral)) revert ProductCollateralUnderLimitError();
 
-    function _updateCollateral(CurrentContext memory context, address account, Fixed18 amount) private {
-        _settleCollateral(account, amount, true);
-        amount.sign() == 1 ? token.pull(account, amount.abs()) : token.push(account, amount.abs());
-
-        emit CollateralUpdated(account, amount);
+        // events
+        emit PositionUpdated(account, context.currentOracleVersion.version, positionAmount);
+        emit CollateralUpdated(account, collateralAmount);
     }
 
     /**
@@ -294,22 +316,21 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     external
     nonReentrant
     {
-        CurrentContext memory context = _settle(account);
-
-        // Liquidate position
-        if (!_liquidatable(context, account)) revert ProductCantLiquidate();
-
+        // close open position
         Fixed18 closeAmount = _accounts[account].position().mul(Fixed18Lib.NEG_ONE);
-        _before(context, account, closeAmount);
-        _updatePosition(context, account, closeAmount);
+        CurrentContext memory context = _update(account, closeAmount, Fixed18Lib.ZERO, true);
+
+        // save state
+        if (!_liquidatable(context, account)) revert ProductCantLiquidate();
         liquidation[account] = true;
 
         // Dispurse fee
+        // TODO: cleanup
         UFixed18 liquidationFee = controller().liquidationFee();
-        UFixed18 accountMaintenance = context.account.maintenance(context.oracleVersion, context.maintenance);
-        UFixed18 fee = UFixed18Lib.min(_collateral.balances[account], accountMaintenance.mul(liquidationFee));
-
-        _settleCollateral(account, Fixed18Lib.from(-1, fee));
+        UFixed18 accountMaintenance = context.account.maintenance(context.currentOracleVersion, context.maintenance);
+        UFixed18 fee = UFixed18Lib.min(context.account.collateral, accountMaintenance.mul(liquidationFee));
+        context.account.settleCollateral(UFixed18Lib.ZERO, Fixed18Lib.from(-1, fee)); // no shortfall
+        _accounts[account] = context.account;
         token.push(msg.sender, fee);
 
         emit Liquidation(account, msg.sender, fee);
@@ -337,7 +358,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     }
 
     function collateral(address account) external view returns (UFixed18) {
-        return _collateral.balances[account];
+        return _accounts[account].collateral;
     }
 
     /**
@@ -368,10 +389,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
     function collateral() external view returns (UFixed18) {
         return token.balanceOf().sub(fees);
-    }
-
-    function shortfall() external view returns (UFixed18) {
-        return _collateral.shortfall;
     }
 
     /**
@@ -428,28 +445,29 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @param account Account to return for
      * @return Whether the account can be liquidated
      */
-    function _liquidatableNext(CurrentContext memory context, address account) private view returns (bool) {
-        UFixed18 maintenanceAmount = context.account.maintenanceNext(context.oracleVersion, context.maintenance);
-        return maintenanceAmount.gt(_collateral.balances[account]);
+    function _liquidatableNext(CurrentContext memory context, address account) private pure returns (bool) {
+        UFixed18 maintenanceAmount = context.account.maintenanceNext(context.currentOracleVersion, context.maintenance);
+        return maintenanceAmount.gt(context.account.collateral);
     }
 
-    function _liquidatable(CurrentContext memory context, address account) private view returns (bool) {
-        UFixed18 maintenanceAmount = context.account.maintenance(context.oracleVersion, context.maintenance);
-        return maintenanceAmount.gt(_collateral.balances[account]);
+    function _liquidatable(CurrentContext memory context, address account) private pure returns (bool) {
+        UFixed18 maintenanceAmount = context.account.maintenance(context.currentOracleVersion, context.maintenance);
+        return maintenanceAmount.gt(context.account.collateral);
     }
 
     function liquidatable(address account) public view returns (bool) {
         (UFixed18 _maintenance, , , , , , ) = parameter();
-        UFixed18 maintenanceAmount = _accounts[account].maintenance(currentVersion(), _maintenance);
-        return maintenanceAmount.gt(_collateral.balances[account]);
+        Account memory _account = _accounts[account];
+        UFixed18 maintenanceAmount = _account.maintenance(currentVersion(), _maintenance);
+        return maintenanceAmount.gt(_account.collateral);
     }
 
-    function _socializationNext(CurrentContext memory context) private view returns (UFixed18) {
+    function _socializationNext(CurrentContext memory context) private pure returns (UFixed18) {
         if (context.closed) return UFixed18Lib.ONE;
-        return context.version.position().next(_pre).socializationFactor();
+        return context.version.position().next(context.pre).socializationFactor();
     }
 
-    function _closingNext(CurrentContext memory context, Fixed18 amount) private view returns (bool) {
+    function _closingNext(CurrentContext memory context, Fixed18 amount) private pure returns (bool) {
         Fixed18 nextAccountPosition = context.account.next();
         if (nextAccountPosition.sign() == 0) return true;
         if (context.account.position().sign() == amount.sign()) return false;
@@ -458,35 +476,13 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     }
 
     /**
-     * @notice Credits `amount` to `account`'s collateral account
-     * @dev Callable only by the corresponding product as part of the settlement flywheel.
-     *      Moves collateral within a product, any collateral leaving the product due to
-     *      fees has already been accounted for in the settleProduct flywheel.
-     *      Debits in excess of the account balance get recorded as shortfall, and can be
-     *      resolved by the product owner as needed.
-     * @param account Account to credit
-     * @param amount Amount to credit the account (can be negative)
-     */
-    function _settleCollateral(address account, Fixed18 amount) private {
-        _settleCollateral(account, amount, false);
-    }
-
-    function _settleCollateral(address account, Fixed18 amount, bool noShortfall) private {
-        UFixed18 newShortfall = _collateral.settleAccount(account, amount);
-        if (noShortfall && !newShortfall.isZero()) revert ProductShortfallError();
-        emit CollateralSettled(account, amount, newShortfall);
-    }
-
-    /**
      * @notice Debits `amount` from product's total collateral account
      * @dev Callable only by the corresponding product as part of the settlement flywheel
      *      Removes collateral from the product as fees.
      * @param amount Amount to debit from the account
      */
-    function _settleFees(UFixed18 amount) private {
-        (address protocolTreasury, UFixed18 protocolFee) =
-            controller().collateralParameters(IProduct(this));
-
+    //TODO: remove
+    function _settleFees(UFixed18 amount, address protocolTreasury, UFixed18 protocolFee) private {
         UFixed18 protocolFeeAmount = amount.mul(protocolFee);
         UFixed18 productFeeAmount = amount.sub(protocolFeeAmount);
 
@@ -498,7 +494,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
     function resolveShortfall(UFixed18 amount) external nonReentrant notPaused onlyProductOwner {
         token.pull(msg.sender, amount);
-        _collateral.resolve(amount);
+        shortfall = shortfall.sub(amount);
 
         emit ShortfallResolved(amount);
     }
