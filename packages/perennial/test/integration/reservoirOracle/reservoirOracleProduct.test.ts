@@ -177,7 +177,7 @@ describe('Reservoir Oracle Product', () => {
   it('closes a make position', async () => {
     const OPEN_POSITION = utils.parseEther('0.0001')
     const CLOSE_POSITION = utils.parseEther('0.0001')
-    const { user } = instanceVars
+    const { user, lens } = instanceVars
 
     const product = await createProduct(instanceVars, baycUSDCPayoffProvider, reservoirOracle)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
@@ -188,8 +188,8 @@ describe('Reservoir Oracle Product', () => {
       .withArgs(user.address, INITIAL_VERSION, CLOSE_POSITION)
 
     // User state
-    expect(await product.maintenance(user.address)).to.equal(0)
-    expect(await product.maintenanceNext(user.address)).to.equal(0)
+    expect(await lens.callStatic.maintenance(user.address, product.address)).to.equal(0)
+    expect(await lens.callStatic.maintenanceNext(user.address, product.address)).to.equal(0)
     expect(await product.position(user.address)).to.equal(0)
     expect(await product['pre(address)'](user.address)).to.equal(0)
     expect(await product['latestVersion(address)'](user.address)).to.equal(INITIAL_VERSION)
@@ -208,7 +208,7 @@ describe('Reservoir Oracle Product', () => {
   it('closes multiple make positions', async () => {
     const OPEN_POSITION = utils.parseEther('0.0001')
     const CLOSE_POSITION = utils.parseEther('0.0001')
-    const { user } = instanceVars
+    const { user, lens } = instanceVars
 
     const product = await createProduct(instanceVars, baycUSDCPayoffProvider, reservoirOracle)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
@@ -220,8 +220,8 @@ describe('Reservoir Oracle Product', () => {
       .withArgs(user.address, INITIAL_VERSION, CLOSE_POSITION.div(2))
 
     // User state
-    expect(await product.maintenance(user.address)).to.equal(0)
-    expect(await product.maintenanceNext(user.address)).to.equal(0)
+    expect(await lens.callStatic.maintenance(user.address, product.address)).to.equal(0)
+    expect(await lens.callStatic.maintenanceNext(user.address, product.address)).to.equal(0)
     expect(await product.position(user.address)).to.equal(0)
     expect(await product['pre(address)'](user.address)).to.equal(0)
     expect(await product['latestVersion(address)'](user.address)).to.equal(INITIAL_VERSION)
@@ -347,7 +347,7 @@ describe('Reservoir Oracle Product', () => {
     const OPEN_MAKE_POSITION = utils.parseEther('0.0001')
     const OPEN_TAKE_POSITION = utils.parseEther('0.00001')
     const CLOSE_TAKE_POSITION = utils.parseEther('0.00001')
-    const { user, userB } = instanceVars
+    const { user, userB, lens } = instanceVars
 
     const product = await createProduct(instanceVars, baycUSDCPayoffProvider, reservoirOracle)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
@@ -364,8 +364,8 @@ describe('Reservoir Oracle Product', () => {
       .withArgs(userB.address, INITIAL_VERSION, CLOSE_TAKE_POSITION)
 
     // User State
-    expect(await product.maintenance(userB.address)).to.equal(0)
-    expect(await product.maintenanceNext(userB.address)).to.equal(0)
+    expect(await lens.callStatic.maintenance(userB.address, product.address)).to.equal(0)
+    expect(await lens.callStatic.maintenanceNext(userB.address, product.address)).to.equal(0)
     expect(await product.position(user.address)).to.equal(0)
     expect(await product['pre(address)'](userB.address)).to.equal(0)
     expect(await product['latestVersion(address)'](user.address)).to.equal(INITIAL_VERSION)
@@ -385,7 +385,7 @@ describe('Reservoir Oracle Product', () => {
     const OPEN_MAKE_POSITION = utils.parseEther('0.0001')
     const OPEN_TAKE_POSITION = utils.parseEther('0.00001')
     const CLOSE_TAKE_POSITION = utils.parseEther('0.00001')
-    const { user, userB } = instanceVars
+    const { user, userB, lens } = instanceVars
 
     const product = await createProduct(instanceVars, baycUSDCPayoffProvider, reservoirOracle)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
@@ -403,8 +403,8 @@ describe('Reservoir Oracle Product', () => {
       .withArgs(userB.address, INITIAL_VERSION, CLOSE_TAKE_POSITION.div(2))
 
     // User State
-    expect(await product.maintenance(userB.address)).to.equal(0)
-    expect(await product.maintenanceNext(userB.address)).to.equal(0)
+    expect(await lens.callStatic.maintenance(userB.address, product.address)).to.equal(0)
+    expect(await lens.callStatic.maintenanceNext(userB.address, product.address)).to.equal(0)
     expect(await product.position(user.address)).to.equal(0)
     expect(await product['pre(address)'](userB.address)).to.equal(0)
     expect(await product['latestVersion(address)'](user.address)).to.equal(INITIAL_VERSION)

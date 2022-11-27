@@ -272,7 +272,11 @@ contract PerennialLens is IPerennialLens {
      * @return Maximum of user maintenance, and maintenanceNext
      */
     function maintenance(address account, IProduct product) public settleAccount(account, product) returns (UFixed18) {
-        return UFixed18Lib.max(product.maintenance(account), product.maintenanceNext(account));
+        return _maintenance(product, product.position(account));
+    }
+
+    function maintenanceNext(address account, IProduct product) public settleAccount(account, product) returns (UFixed18) {
+        return _maintenance(product, product.position(account).add(product.pre(account)));
     }
 
     /**
@@ -378,14 +382,12 @@ contract PerennialLens is IPerennialLens {
      * @param positionSize size of position for maintenance calculation
      * @return Maintenance required for position in product
      */
-    function maintenanceRequired(
-        address account,
-        IProduct product,
-        UFixed18 positionSize
-    ) public settleAccount(account, product) returns (UFixed18) {
-        (UFixed18 _maintenance, , , , , , ) = product.parameter();
-        UFixed18 notional = positionSize.mul(_latestVersion(product).price.abs());
-        return notional.mul(_maintenance);
+    function maintenanceRequired(address account, IProduct product, Fixed18 positionSize)
+        public
+        settleAccount(account, product)
+        returns (UFixed18)
+    {
+        return _maintenance(product, positionSize);
     }
 
     /**
@@ -438,6 +440,12 @@ contract PerennialLens is IPerennialLens {
     /**
      *  End UserProduct Individual Fields Functions
      */
+
+    function _maintenance(IProduct product, Fixed18 positionSize) private view returns (UFixed18) {
+        (UFixed18 maintenance_, , , , , , ) = product.parameter();
+        UFixed18 notional = positionSize.mul(_latestVersion(product).price).abs();
+        return notional.mul(maintenance_);
+    }
 
     /**
      *  Private Helper Functions

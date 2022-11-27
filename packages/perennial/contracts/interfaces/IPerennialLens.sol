@@ -69,6 +69,7 @@ interface IPerennialLens {
     // UserProduct Values
     function collateral(address account, IProduct product) external returns (UFixed18);
     function maintenance(address account, IProduct product) external returns (UFixed18);
+    function maintenanceNext(address account, IProduct product) external returns (UFixed18);
     function liquidatable(address account, IProduct product) external returns (bool);
     function liquidating(address account, IProduct product) external returns (bool);
     function pre(address account, IProduct product) external returns (Fixed18);
@@ -79,7 +80,7 @@ interface IPerennialLens {
     function maintenanceRequired(
         address account,
         IProduct product,
-        UFixed18 positionSize
+        Fixed18 positionSize
     ) external returns (UFixed18);
     function unclaimedIncentiveRewards(address account, IProduct product)
         external

@@ -344,27 +344,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         emit Liquidation(account, msg.sender, fee);
     }
 
-    /**
-     * @notice Returns the maintenance requirement for `account`
-     * @param account Account to return for
-     * @return The current maintenance requirement
-     */
-    function maintenance(address account) external view returns (UFixed18) {
-        (UFixed18 _maintenance, , , , , , ) = parameter();
-        return _accounts[account].maintenance(currentVersion(), _maintenance);
-    }
-
-    /**
-     * @notice Returns the maintenance requirement for `account` after next settlement
-     * @dev Assumes no price change and no funding, used to protect user from over-opening
-     * @param account Account to return for
-     * @return The next maintenance requirement
-     */
-    function maintenanceNext(address account) external view returns (UFixed18) {
-        (UFixed18 _maintenance, , , , , , ) = parameter();
-        return _accounts[account].maintenanceNext(currentVersion(), _maintenance);
-    }
-
     function collateral(address account) external view returns (UFixed18) {
         return _accounts[account].collateral;
     }
@@ -488,4 +467,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
         emit ShortfallResolved(amount);
     }
+
+    //TODO: claim fee
 }

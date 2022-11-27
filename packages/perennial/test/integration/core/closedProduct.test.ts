@@ -91,7 +91,7 @@ describe('Closed Product', () => {
 
   it('zeroes PnL and fees', async () => {
     const POSITION = utils.parseEther('0.0001')
-    const { user, userB, chainlink, treasuryA, dsu } = instanceVars
+    const { user, userB, chainlink } = instanceVars
 
     const product = await createProduct(instanceVars)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
@@ -116,8 +116,8 @@ describe('Closed Product', () => {
 
     const userCollateralBefore = await product['collateral(address)'](user.address)
     const userBCollateralBefore = await product['collateral(address)'](userB.address)
-    const feesABefore = await dsu.balanceOf(treasuryA.address)
-    const feesBBefore = await product.fees()
+    const feesABefore = await product.protocolFees()
+    const feesBBefore = await product.productFees()
 
     await chainlink.nextWithPriceModification(price => price.mul(4))
     await chainlink.nextWithPriceModification(price => price.mul(4))
@@ -127,13 +127,13 @@ describe('Closed Product', () => {
     expect(await product.shortfall()).to.equal(0)
     expect(await product['collateral(address)'](user.address)).to.equal(userCollateralBefore)
     expect(await product['collateral(address)'](userB.address)).to.equal(userBCollateralBefore)
-    expect(await product.fees()).to.equal(feesABefore)
-    expect(await product.fees()).to.equal(feesBBefore)
+    expect(await product.productFees()).to.equal(feesABefore)
+    expect(await product.productFees()).to.equal(feesBBefore)
   })
 
   it('handles closing during liquidations', async () => {
     const POSITION = utils.parseEther('0.0001')
-    const { user, userB, chainlink, treasuryA, dsu } = instanceVars
+    const { user, userB, chainlink } = instanceVars
 
     const product = await createProduct(instanceVars)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
@@ -163,8 +163,8 @@ describe('Closed Product', () => {
     expect(await product.liquidation(user.address)).to.be.false
     const userCollateralBefore = await product['collateral(address)'](user.address)
     const userBCollateralBefore = await product['collateral(address)'](userB.address)
-    const feesABefore = await dsu.balanceOf(treasuryA.address)
-    const feesBBefore = await product.fees()
+    const feesABefore = await product.protocolFees()
+    const feesBBefore = await product.productFees()
 
     await chainlink.nextWithPriceModification(price => price.mul(4))
     await chainlink.nextWithPriceModification(price => price.mul(4))
@@ -173,7 +173,7 @@ describe('Closed Product', () => {
 
     expect(await product['collateral(address)'](user.address)).to.equal(userCollateralBefore)
     expect(await product['collateral(address)'](userB.address)).to.equal(userBCollateralBefore)
-    expect(await dsu.balanceOf(treasuryA.address)).to.equal(feesABefore)
-    expect(await product.fees()).to.equal(feesBBefore)
+    expect(await product.protocolFees()).to.equal(feesABefore)
+    expect(await product.productFees()).to.equal(feesBBefore)
   })
 })

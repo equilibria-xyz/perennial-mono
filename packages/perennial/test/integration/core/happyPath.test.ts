@@ -147,7 +147,7 @@ describe.only('Happy Path', () => {
   it('closes a make position', async () => {
     const OPEN_POSITION = utils.parseEther('0.0001')
     const CLOSE_POSITION = utils.parseEther('0.0001')
-    const { user } = instanceVars
+    const { user, lens } = instanceVars
 
     const product = await createProduct(instanceVars)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
@@ -158,8 +158,8 @@ describe.only('Happy Path', () => {
     //   .withArgs(user.address, INITIAL_VERSION, CLOSE_POSITION)
 
     // User state
-    expect(await product.maintenance(user.address)).to.equal(0)
-    expect(await product.maintenanceNext(user.address)).to.equal(0)
+    expect(await lens.callStatic.maintenance(user.address, product.address)).to.equal(0)
+    expect(await lens.callStatic.maintenanceNext(user.address, product.address)).to.equal(0)
     expect(await product.position(user.address)).to.equal(0)
     expect(await product['pre(address)'](user.address)).to.equal(0)
     expect(await product['latestVersion(address)'](user.address)).to.equal(INITIAL_VERSION)
@@ -178,7 +178,7 @@ describe.only('Happy Path', () => {
   it('closes multiple make positions', async () => {
     const OPEN_POSITION = utils.parseEther('0.0001')
     const CLOSE_POSITION = utils.parseEther('0.0001')
-    const { user } = instanceVars
+    const { user, lens } = instanceVars
 
     const product = await createProduct(instanceVars)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
@@ -190,8 +190,8 @@ describe.only('Happy Path', () => {
       .withArgs(user.address, INITIAL_VERSION, CLOSE_POSITION.div(2))
 
     // User state
-    expect(await product.maintenance(user.address)).to.equal(0)
-    expect(await product.maintenanceNext(user.address)).to.equal(0)
+    expect(await lens.callStatic.maintenance(user.address, product.address)).to.equal(0)
+    expect(await lens.callStatic.maintenanceNext(user.address, product.address)).to.equal(0)
     expect(await product.position(user.address)).to.equal(0)
     expect(await product['pre(address)'](user.address)).to.equal(0)
     expect(await product['latestVersion(address)'](user.address)).to.equal(INITIAL_VERSION)
@@ -317,7 +317,7 @@ describe.only('Happy Path', () => {
     const OPEN_MAKE_POSITION = utils.parseEther('0.0001')
     const OPEN_TAKE_POSITION = utils.parseEther('0.00001')
     const CLOSE_TAKE_POSITION = utils.parseEther('0.00001')
-    const { user, userB } = instanceVars
+    const { user, userB, lens } = instanceVars
 
     const product = await createProduct(instanceVars)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
@@ -334,8 +334,8 @@ describe.only('Happy Path', () => {
       .withArgs(userB.address, INITIAL_VERSION, CLOSE_TAKE_POSITION.mul(-1))
 
     // User State
-    expect(await product.maintenance(userB.address)).to.equal(0)
-    expect(await product.maintenanceNext(userB.address)).to.equal(0)
+    expect(await lens.callStatic.maintenance(userB.address, product.address)).to.equal(0)
+    expect(await lens.callStatic.maintenanceNext(userB.address, product.address)).to.equal(0)
     expect(await product.position(userB.address)).to.equal(0)
     expect(await product['pre(address)'](userB.address)).to.equal(0)
     expect(await product['latestVersion(address)'](user.address)).to.equal(INITIAL_VERSION)
@@ -355,7 +355,7 @@ describe.only('Happy Path', () => {
     const OPEN_MAKE_POSITION = utils.parseEther('0.0001')
     const OPEN_TAKE_POSITION = utils.parseEther('0.00001')
     const CLOSE_TAKE_POSITION = utils.parseEther('0.00001')
-    const { user, userB } = instanceVars
+    const { user, userB, lens } = instanceVars
 
     const product = await createProduct(instanceVars)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
@@ -373,8 +373,8 @@ describe.only('Happy Path', () => {
       .withArgs(userB.address, INITIAL_VERSION, CLOSE_TAKE_POSITION.div(2).mul(-1))
 
     // User State
-    expect(await product.maintenance(userB.address)).to.equal(0)
-    expect(await product.maintenanceNext(userB.address)).to.equal(0)
+    expect(await lens.callStatic.maintenance(userB.address, product.address)).to.equal(0)
+    expect(await lens.callStatic.maintenanceNext(userB.address, product.address)).to.equal(0)
     expect(await product.position(userB.address)).to.equal(0)
     expect(await product['pre(address)'](userB.address)).to.equal(0)
     expect(await product['latestVersion(address)'](user.address)).to.equal(INITIAL_VERSION)

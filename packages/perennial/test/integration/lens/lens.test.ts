@@ -117,10 +117,9 @@ describe('Lens', () => {
     expect(await lens.callStatic.maintenance(user.address, product.address)).to.equal('341389494586618956214')
 
     // Fees before any positions are changed
-    let fees = await lens.callStatic['fees(address)'](product.address)
+    let fees = await lens.callStatic.fees(product.address)
     expect(fees.protocolFees).to.equal(0)
     expect(fees.productFees).to.equal(0)
-    expect(await lens.callStatic['fees(address,address)'](treasuryA.address, product.address)).to.equal(0)
 
     // Big price change
     await chainlink.nextWithPriceModification(price => price.mul(2))
@@ -139,12 +138,9 @@ describe('Lens', () => {
     expect(await lens.callStatic.shortfall(product.address)).to.equal('2463736825720737646856')
 
     // Fees are updated
-    fees = await lens.callStatic['fees(address)'](product.address)
+    fees = await lens.callStatic.fees(product.address)
     expect(fees.protocolFees).to.equal('4127179883640059')
     expect(fees.productFees).to.equal('12381539650920179')
-    expect(await lens.callStatic['fees(address,address)'](treasuryA.address, product.address)).to.equal(
-      '4127179883640059',
-    )
 
     await chainlink.next()
     await product.settle(constants.AddressZero)
