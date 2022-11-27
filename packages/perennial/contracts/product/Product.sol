@@ -52,7 +52,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     struct CurrentContext {
         /* Global Parameters */
         IIncentivizer incentivizer;
-        bytes12 __unallocated2__;
 
         UFixed18 minFundingFee;
 
@@ -63,7 +62,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         UFixed18 protocolFee;
 
         bool paused;
-        bytes31 __unallocated4__;
 
         /* Product Parameters */
 
@@ -82,7 +80,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         JumpRateUtilizationCurve utilizationCurve;
 
         bool closed;
-        bytes31 __unallocated3__;
 
         /* Current Global State */
         uint256 latestVersion;
@@ -100,10 +97,11 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         UFixed18 shortfall;
 
         /* Current Account State */
-        Account account;
-        bytes31 __unallocated0__;
-
         uint256 latestAccountVersion;
+
+        Account account;
+
+        bool liquidation;
     }
 
     /**
@@ -168,11 +166,12 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         // Load account state
         context.latestAccountVersion = latestVersion(account);
         context.account = _accounts[account];
+        context.liquidation = liquidation[account];
     }
 
     function _saveContext(CurrentContext memory context, address account) private {
-        _latestVersion = context.currentOracleVersion.version; //TODO: depdup these with the stand-alone ones?
-        _latestVersions[account] = context.currentOracleVersion.version;
+        _latestVersion = context.latestVersion;
+        _latestVersions[account] = context.latestAccountVersion;
         _accounts[account] = context.account;
         _pre = context.pre;
         shortfall = context.shortfall;
@@ -255,6 +254,10 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
             shortfallAccumulator = context.account.accumulate(shortfallAccumulator, fromVersion, toVersion);
         }
 
+        // save latest version
+        context.latestVersion = context.currentOracleVersion.version;
+        context.latestAccountVersion = context.currentOracleVersion.version;
+
         // save accumulator data
         UFixed18 protocolFeeAmount = feeAccumulator.mul(context.protocolFee);
         UFixed18 productFeeAmount = feeAccumulator.sub(protocolFeeAmount);
@@ -280,7 +283,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
         // before
         if (context.paused) revert PausedError();
-        if (liquidation[account]) revert ProductInLiquidationError(); //TODO: state read here
+        if (context.liquidation) revert ProductInLiquidationError();
         if (context.closed && !_closingNext(context, positionAmount)) revert ProductClosedError();
 
         // position
@@ -322,9 +325,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         Fixed18 closeAmount = _accounts[account].position().mul(Fixed18Lib.NEG_ONE);
         CurrentContext memory context = _update(account, closeAmount, Fixed18Lib.ZERO, true);
 
-        // save state
+        // check can liquidate
         if (!_liquidatable(context)) revert ProductCantLiquidate();
-        liquidation[account] = true;
 
         // Dispurse fee
         // TODO: cleanup
@@ -332,7 +334,11 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         UFixed18 accountMaintenance = context.account.maintenance(context.currentOracleVersion, context.maintenance);
         UFixed18 fee = UFixed18Lib.min(context.account.collateral, accountMaintenance.mul(liquidationFee));
         context.account.settleCollateral(UFixed18Lib.ZERO, Fixed18Lib.from(-1, fee)); // no shortfall
+
+        // save state
         _accounts[account] = context.account;
+        liquidation[account] = true;
+
         token.push(msg.sender, fee);
 
         emit Liquidation(account, msg.sender, fee);
