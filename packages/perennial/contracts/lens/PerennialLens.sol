@@ -90,7 +90,6 @@ contract PerennialLens is IPerennialLens {
         _snapshot.liquidatable = liquidatable(account, product);
         _snapshot.liquidating = liquidating(account, product);
         _snapshot.openInterest = openInterest(account, product);
-        _snapshot.fees = fees(account, product);
         _snapshot.exposure = exposure(account, product);
     }
 
@@ -235,8 +234,8 @@ contract PerennialLens is IPerennialLens {
      * @return productFees fees accrued by the product owner
      */
     function fees(IProduct product) public settle(product) returns (UFixed18 protocolFees, UFixed18 productFees) {
-        protocolFees = UFixed18Lib.ZERO; // TODO: not a thing anymore
-        productFees = product.fees();
+        protocolFees = product.protocolFees();
+        productFees = product.productFees();
     }
 
     /**
@@ -337,16 +336,6 @@ contract PerennialLens is IPerennialLens {
         returns (Fixed18, Fixed18)
     {
         return (product.pre(account), product.position(account));
-    }
-
-    /**
-     * @notice Fees accumulated by account after settle
-     * @param account Account address
-     * @param product Product address
-     * @return sum of all fees accrued by the account
-     */
-    function fees(address account, IProduct product) public settleAccount(account, product) returns (UFixed18) {
-        return product.fees();
     }
 
     /**

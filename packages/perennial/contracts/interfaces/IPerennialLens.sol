@@ -38,7 +38,6 @@ interface IPerennialLens {
         bool liquidatable;
         bool liquidating;
         Fixed18 openInterest;
-        UFixed18 fees;
         Fixed18 exposure;
     }
 
@@ -75,7 +74,6 @@ interface IPerennialLens {
     function pre(address account, IProduct product) external returns (Fixed18);
     function position(address account, IProduct product) external returns (Fixed18);
     function userPosition(address account, IProduct product) external returns (Fixed18, Fixed18);
-    function fees(address account, IProduct product) external returns (UFixed18);
     function openInterest(address account, IProduct product) external returns (Fixed18);
     function exposure(address account, IProduct product) external returns (Fixed18);
     function maintenanceRequired(

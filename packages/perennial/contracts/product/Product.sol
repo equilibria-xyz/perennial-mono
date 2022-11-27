@@ -27,7 +27,10 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     Token18 public token;
 
     /// @dev Protocol and product fees collected, but not yet claimed
-    UFixed18 public fees;
+    UFixed18 public productFees;
+
+    /// @dev Protocol and protocol fees collected, but not yet claimed
+    UFixed18 public protocolFees;
 
     /// @dev The individual state for each account
     mapping(address => Account) private _accounts;
@@ -90,6 +93,10 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
         PrePosition pre;
 
+        UFixed18 productFees;
+
+        UFixed18 protocolFees;
+
         UFixed18 shortfall;
 
         /* Current Account State */
@@ -134,35 +141,11 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         if (context.paused) revert PausedError();
 
         // Transform state in memory
-        UFixed18 feeAccumulator = _settleInMem(context, account); //TODO: shouldn't return anything
+        _settleInMem(context, account);
 
-        _saveContext(context, account, feeAccumulator);
+        _saveContext(context, account);
 
         if (context.paused) revert PausedError();
-    }
-
-    /**
-     * @notice Core global settlement flywheel
-     * @dev
-     *  a) last settle oracle version
-     *  b) latest pre position oracle version
-     *  c) current oracle version
-     *
-     *  Settles from a->b then from b->c if either interval is non-zero to account for a change
-     *  in position quantity at (b).
-     *
-     *  Syncs each to instantaneously after the oracle update.
-     */
-    //TODO: new events
-    function _settle(address account) private returns (CurrentContext memory context, UFixed18 feeAccumulator) {
-        // Load state into memory
-        context = _loadContext(account);
-
-        // Transform state in memory
-        feeAccumulator = _settleInMem(context, account); //TODO: shouldn't return anything
-
-        // Save state
-        // _saveContext(context, account, feeAccumulator);
     }
 
     function _loadContext(address account) private returns (CurrentContext memory context) {
@@ -178,6 +161,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         context.latestVersion = latestVersion();
         context.version = _versions[context.latestVersion];
         context.pre = pre();
+        context.productFees = productFees;
+        context.protocolFees = protocolFees;
         context.shortfall = shortfall;
 
         // Load account state
@@ -185,18 +170,19 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         context.account = _accounts[account];
     }
 
-    function _saveContext(CurrentContext memory context, address account, UFixed18 feeAccumulator) private {
-        _settleFees(feeAccumulator, context.protocolTreasury, context.protocolFee); // TODO: blow up
-
+    function _saveContext(CurrentContext memory context, address account) private {
         _latestVersion = context.currentOracleVersion.version; //TODO: depdup these with the stand-alone ones?
         _latestVersions[account] = context.currentOracleVersion.version;
         _accounts[account] = context.account;
         _pre = context.pre;
         shortfall = context.shortfall;
+        productFees = context.productFees;
+        protocolFees = context.protocolFees;
     }
 
-    function _settleInMem(CurrentContext memory context, address account) private returns (UFixed18 feeAccumulator) {
+    function _settleInMem(CurrentContext memory context, address account) private {
         // Initialize memory
+        UFixed18 feeAccumulator;
         UFixed18 shortfallAccumulator;
         IOracleProvider.OracleVersion memory fromOracleVersion;
         IOracleProvider.OracleVersion memory toOracleVersion;
@@ -269,6 +255,11 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
             shortfallAccumulator = context.account.accumulate(shortfallAccumulator, fromVersion, toVersion);
         }
 
+        // save accumulator data
+        UFixed18 protocolFeeAmount = feeAccumulator.mul(context.protocolFee);
+        UFixed18 productFeeAmount = feeAccumulator.sub(protocolFeeAmount);
+        context.protocolFees = context.protocolFees.add(productFeeAmount);
+        context.productFees = context.productFees.add(productFeeAmount);
         context.shortfall = context.shortfall.add(shortfallAccumulator);
     }
 
@@ -280,13 +271,12 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     function _update(address account, Fixed18 positionAmount, Fixed18 collateralAmount, bool force) private returns (CurrentContext memory context) {
         // TODO: remove
         UFixed18 shortfallAccumulator;
-        UFixed18 feeAccumulator;
 
         // Load state into memory
         context = _loadContext(account);
 
         // Transform state in memory
-        feeAccumulator = _settleInMem(context, account); //TODO: shouldn't return anything
+        _settleInMem(context, account);
 
         // before
         if (context.paused) revert PausedError();
@@ -302,14 +292,14 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         shortfallAccumulator = context.account.settleCollateral(shortfallAccumulator, Fixed18Lib.from(-1, positionFee));
         shortfallAccumulator = context.account.settleCollateral(shortfallAccumulator, collateralAmount); //TODO: these should combine with update
 
-        _saveContext(context, account, feeAccumulator);
+        _saveContext(context, account);
 
         if (collateralAmount.sign() == 1) token.pull(account, collateralAmount.abs());
         if (collateralAmount.sign() == -1) token.push(account, collateralAmount.abs());
 
         // after
         if (!shortfallAccumulator.isZero()) revert ProductShortfallError();
-        if (_liquidatable(context, account) || _liquidatableNext(context, account)) revert ProductInsufficientCollateralError();
+        if (_liquidatable(context) || _liquidatableNext(context)) revert ProductInsufficientCollateralError();
         if (!force && _socializationNext(context).lt(UFixed18Lib.ONE)) revert ProductInsufficientLiquidityError();
         if (context.version.position().next(context.pre).maker.gt(context.makerLimit)) revert ProductMakerOverLimitError();
         if (!context.account.collateral.isZero() && context.account.collateral.lt(context.minCollateral)) revert ProductCollateralUnderLimitError();
@@ -333,7 +323,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         CurrentContext memory context = _update(account, closeAmount, Fixed18Lib.ZERO, true);
 
         // save state
-        if (!_liquidatable(context, account)) revert ProductCantLiquidate();
+        if (!_liquidatable(context)) revert ProductCantLiquidate();
         liquidation[account] = true;
 
         // Dispurse fee
@@ -400,7 +390,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     }
 
     function collateral() external view returns (UFixed18) {
-        return token.balanceOf().sub(fees);
+        return token.balanceOf().sub(productFees).sub(protocolFees);
     }
 
     /**
@@ -454,15 +444,14 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @notice Returns whether `account`'s `product` collateral account can be liquidated
      *         after the next oracle version settlement
      * @dev Takes into account the current pre-position on the account
-     * @param account Account to return for
      * @return Whether the account can be liquidated
      */
-    function _liquidatableNext(CurrentContext memory context, address account) private pure returns (bool) {
+    function _liquidatableNext(CurrentContext memory context) private pure returns (bool) {
         UFixed18 maintenanceAmount = context.account.maintenanceNext(context.currentOracleVersion, context.maintenance);
         return maintenanceAmount.gt(context.account.collateral);
     }
 
-    function _liquidatable(CurrentContext memory context, address account) private pure returns (bool) {
+    function _liquidatable(CurrentContext memory context) private pure returns (bool) {
         UFixed18 maintenanceAmount = context.account.maintenance(context.currentOracleVersion, context.maintenance);
         return maintenanceAmount.gt(context.account.collateral);
     }
@@ -485,23 +474,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         if (context.account.position().sign() == amount.sign()) return false;
         if (nextAccountPosition.sign() != context.account.position().sign()) return false;
         return true;
-    }
-
-    /**
-     * @notice Debits `amount` from product's total collateral account
-     * @dev Callable only by the corresponding product as part of the settlement flywheel
-     *      Removes collateral from the product as fees.
-     * @param amount Amount to debit from the account
-     */
-    //TODO: remove
-    function _settleFees(UFixed18 amount, address protocolTreasury, UFixed18 protocolFee) private {
-        UFixed18 protocolFeeAmount = amount.mul(protocolFee);
-        UFixed18 productFeeAmount = amount.sub(protocolFeeAmount);
-
-        token.push(protocolTreasury, protocolFeeAmount);
-        fees = fees.add(productFeeAmount);
-
-        emit FeeSettled(protocolFeeAmount, productFeeAmount);
     }
 
     function resolveShortfall(UFixed18 amount) external nonReentrant notPaused onlyProductOwner {

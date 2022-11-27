@@ -75,7 +75,8 @@ interface IProduct is IPayoffProvider, IParamProvider {
     function name() external view returns (string memory);
     function symbol() external view returns (string memory);
     function token() external view returns (Token18);
-    function fees() external view returns (UFixed18);
+    function productFees() external view returns (UFixed18);
+    function protocolFees() external view returns (UFixed18);
     function initialize(ProductInfo calldata productInfo_) external;
     function settle(address account) external;
     function update(Fixed18 positionAmount, Fixed18 collateralAmount) external;
