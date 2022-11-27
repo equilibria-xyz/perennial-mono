@@ -94,5 +94,5 @@ interface IProduct is IPayoffProvider, IParamProvider {
     function pre() external view returns (PrePosition memory);
     function valueAtVersion(uint256 oracleVersion) external view returns (Accumulator memory);
     function shareAtVersion(uint256 oracleVersion) external view returns (Accumulator memory);
-    function latestVersion(address account) external view returns (uint256);
+    function latestVersions(address account) external view returns (uint256);
 }

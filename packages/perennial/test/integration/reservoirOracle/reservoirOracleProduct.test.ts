@@ -96,10 +96,10 @@ describe('Reservoir Oracle Product', () => {
     // Check user is in the correct state
     expect(await product.position(user.address)).to.equal(0)
     expect(await product['pre(address)'](user.address)).to.equal(0)
-    expect(await product['latestVersion(address)'](user.address)).to.equal(INITIAL_VERSION)
+    expect(await product.latestVersions(user.address)).to.equal(INITIAL_VERSION)
 
     // Check global state
-    expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION)
+    expect(await product.latestVersion()).to.equal(INITIAL_VERSION)
     expectPositionEq(await product.positionAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre()'](), {
       openPosition: { maker: POSITION, taker: 0 },
@@ -113,7 +113,7 @@ describe('Reservoir Oracle Product', () => {
     await product.settle(constants.AddressZero)
 
     // Check global post-settlement state
-    expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION.add(1))
+    expect(await product.latestVersion()).to.equal(INITIAL_VERSION.add(1))
     expectPositionEq(await product.positionAtVersion(INITIAL_VERSION.add(1)), { maker: POSITION, taker: 0 })
     expectPrePositionEq(await product['pre()'](), {
       openPosition: { maker: 0, taker: 0 },
@@ -124,7 +124,7 @@ describe('Reservoir Oracle Product', () => {
     await product.settle(user.address)
     expect(await product.position(user.address)).to.equal(POSITION.mul(-1))
     expect(await product['pre(address)'](user.address)).to.equal(0)
-    expect(await product['latestVersion(address)'](user.address)).to.equal(INITIAL_VERSION.add(1))
+    expect(await product.latestVersions(user.address)).to.equal(INITIAL_VERSION.add(1))
   })
 
   it('opens multiple make positions', async () => {
@@ -143,10 +143,10 @@ describe('Reservoir Oracle Product', () => {
     // Check user is in the correct state
     expect(await product.position(user.address)).to.equal(0)
     expect(await product['pre(address)'](user.address)).to.equal(0)
-    expect(await product['latestVersion(address)'](user.address)).to.equal(INITIAL_VERSION)
+    expect(await product.latestVersions(user.address)).to.equal(INITIAL_VERSION)
 
     // Check global state
-    expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION)
+    expect(await product.latestVersion()).to.equal(INITIAL_VERSION)
     expectPositionEq(await product.positionAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre()'](), {
       openPosition: { maker: POSITION, taker: 0 },
@@ -160,7 +160,7 @@ describe('Reservoir Oracle Product', () => {
     await product.settle(constants.AddressZero)
 
     // Check global post-settlement state
-    expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION.add(1))
+    expect(await product.latestVersion()).to.equal(INITIAL_VERSION.add(1))
     expectPositionEq(await product.positionAtVersion(INITIAL_VERSION.add(1)), { maker: POSITION, taker: 0 })
     expectPrePositionEq(await product['pre()'](), {
       openPosition: { maker: 0, taker: 0 },
@@ -171,7 +171,7 @@ describe('Reservoir Oracle Product', () => {
     await product.settle(user.address)
     expect(await product.position(user.address)).to.equal(POSITION.mul(-1))
     expect(await product['pre(address)'](user.address)).to.equal(0)
-    expect(await product['latestVersion(address)'](user.address)).to.equal(INITIAL_VERSION.add(1))
+    expect(await product.latestVersions(user.address)).to.equal(INITIAL_VERSION.add(1))
   })
 
   it('closes a make position', async () => {
@@ -192,10 +192,10 @@ describe('Reservoir Oracle Product', () => {
     expect(await lens.callStatic.maintenanceNext(user.address, product.address)).to.equal(0)
     expect(await product.position(user.address)).to.equal(0)
     expect(await product['pre(address)'](user.address)).to.equal(0)
-    expect(await product['latestVersion(address)'](user.address)).to.equal(INITIAL_VERSION)
+    expect(await product.latestVersions(user.address)).to.equal(INITIAL_VERSION)
 
     // Global State
-    expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION)
+    expect(await product.latestVersion()).to.equal(INITIAL_VERSION)
     expectPositionEq(await product.positionAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre()'](), {
       openPosition: { maker: 0, taker: 0 },
@@ -224,10 +224,10 @@ describe('Reservoir Oracle Product', () => {
     expect(await lens.callStatic.maintenanceNext(user.address, product.address)).to.equal(0)
     expect(await product.position(user.address)).to.equal(0)
     expect(await product['pre(address)'](user.address)).to.equal(0)
-    expect(await product['latestVersion(address)'](user.address)).to.equal(INITIAL_VERSION)
+    expect(await product.latestVersions(user.address)).to.equal(INITIAL_VERSION)
 
     // Global State
-    expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION)
+    expect(await product.latestVersion()).to.equal(INITIAL_VERSION)
     expectPositionEq(await product.positionAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre()'](), {
       openPosition: { maker: 0, taker: 0 },
@@ -254,10 +254,10 @@ describe('Reservoir Oracle Product', () => {
     // User State
     expect(await product.position(user.address)).to.equal(0)
     expect(await product['pre(address)'](userB.address)).to.equal(TAKE_POSITION)
-    expect(await product['latestVersion(address)'](userB.address)).to.equal(INITIAL_VERSION)
+    expect(await product.latestVersions(userB.address)).to.equal(INITIAL_VERSION)
 
     // Global State
-    expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION)
+    expect(await product.latestVersion()).to.equal(INITIAL_VERSION)
     expectPositionEq(await product.positionAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre()'](), {
       openPosition: { maker: MAKE_POSITION, taker: TAKE_POSITION },
@@ -274,7 +274,7 @@ describe('Reservoir Oracle Product', () => {
     await oracleFeed.next()
     await product.settle(constants.AddressZero)
 
-    expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION.add(2))
+    expect(await product.latestVersion()).to.equal(INITIAL_VERSION.add(2))
     expectPositionEq(await product.positionAtVersion(INITIAL_VERSION.add(2)), {
       maker: MAKE_POSITION,
       taker: TAKE_POSITION,
@@ -286,7 +286,7 @@ describe('Reservoir Oracle Product', () => {
     await product.settle(userB.address)
     expect(await product.position(user.address)).to.equal(TAKE_POSITION)
     expect(await product['pre(address)'](userB.address)).to.equal(0)
-    expect(await product['latestVersion(address)'](userB.address)).to.equal(INITIAL_VERSION.add(2))
+    expect(await product.latestVersions(userB.address)).to.equal(INITIAL_VERSION.add(2))
   })
 
   it('opens multiple take positions', async () => {
@@ -308,10 +308,10 @@ describe('Reservoir Oracle Product', () => {
     // User State
     expect(await product.position(user.address)).to.equal(0)
     expect(await product['pre(address)'](userB.address)).to.equal(TAKE_POSITION)
-    expect(await product['latestVersion(address)'](userB.address)).to.equal(INITIAL_VERSION)
+    expect(await product.latestVersions(userB.address)).to.equal(INITIAL_VERSION)
 
     // Global State
-    expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION)
+    expect(await product.latestVersion()).to.equal(INITIAL_VERSION)
     expectPositionEq(await product.positionAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre()'](), {
       openPosition: { maker: MAKE_POSITION, taker: TAKE_POSITION },
@@ -328,7 +328,7 @@ describe('Reservoir Oracle Product', () => {
     await oracleFeed.next()
     await product.settle(constants.AddressZero)
 
-    expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION.add(2))
+    expect(await product.latestVersion()).to.equal(INITIAL_VERSION.add(2))
     expectPositionEq(await product.positionAtVersion(INITIAL_VERSION.add(2)), {
       maker: MAKE_POSITION,
       taker: TAKE_POSITION,
@@ -340,7 +340,7 @@ describe('Reservoir Oracle Product', () => {
     await product.settle(userB.address)
     expect(await product.position(user.address)).to.equal(TAKE_POSITION)
     expect(await product['pre(address)'](userB.address)).to.equal(0)
-    expect(await product['latestVersion(address)'](userB.address)).to.equal(INITIAL_VERSION.add(2))
+    expect(await product.latestVersions(userB.address)).to.equal(INITIAL_VERSION.add(2))
   })
 
   it('closes a take position', async () => {
@@ -368,10 +368,10 @@ describe('Reservoir Oracle Product', () => {
     expect(await lens.callStatic.maintenanceNext(userB.address, product.address)).to.equal(0)
     expect(await product.position(user.address)).to.equal(0)
     expect(await product['pre(address)'](userB.address)).to.equal(0)
-    expect(await product['latestVersion(address)'](user.address)).to.equal(INITIAL_VERSION)
+    expect(await product.latestVersions(user.address)).to.equal(INITIAL_VERSION)
 
     // Global State
-    expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION)
+    expect(await product.latestVersion()).to.equal(INITIAL_VERSION)
     expectPositionEq(await product.positionAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre()'](), {
       openPosition: { maker: OPEN_MAKE_POSITION, taker: 0 },
@@ -407,10 +407,10 @@ describe('Reservoir Oracle Product', () => {
     expect(await lens.callStatic.maintenanceNext(userB.address, product.address)).to.equal(0)
     expect(await product.position(user.address)).to.equal(0)
     expect(await product['pre(address)'](userB.address)).to.equal(0)
-    expect(await product['latestVersion(address)'](user.address)).to.equal(INITIAL_VERSION)
+    expect(await product.latestVersions(user.address)).to.equal(INITIAL_VERSION)
 
     // Global State
-    expect(await product['latestVersion()']()).to.equal(INITIAL_VERSION)
+    expect(await product.latestVersion()).to.equal(INITIAL_VERSION)
     expectPositionEq(await product.positionAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
     expectPrePositionEq(await product['pre()'](), {
       openPosition: { maker: OPEN_MAKE_POSITION, taker: 0 },

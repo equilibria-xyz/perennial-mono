@@ -40,8 +40,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
     PrePosition private _pre;
 
-    uint256 private _latestVersion;
-    mapping(address => uint256) private _latestVersions;
+    uint256 public latestVersion;
+    mapping(address => uint256) public latestVersions;
 
     /// @dev Total ledger collateral shortfall
     UFixed18 public shortfall;
@@ -156,7 +156,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
         // Load product state
         context.currentOracleVersion = _sync();
-        context.latestVersion = latestVersion();
+        context.latestVersion = latestVersion;
         context.version = _versions[context.latestVersion];
         context.pre = pre();
         context.productFees = productFees;
@@ -164,14 +164,14 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         context.shortfall = shortfall;
 
         // Load account state
-        context.latestAccountVersion = latestVersion(account);
+        context.latestAccountVersion = latestVersions[account];
         context.account = _accounts[account];
         context.liquidation = liquidation[account];
     }
 
     function _saveContext(CurrentContext memory context, address account) private {
-        _latestVersion = context.latestVersion;
-        _latestVersions[account] = context.latestAccountVersion;
+        latestVersion = context.latestVersion;
+        latestVersions[account] = context.latestAccountVersion;
         _accounts[account] = context.account;
         _pre = context.pre;
         shortfall = context.shortfall;
@@ -366,14 +366,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         return _accounts[account].pre();
     }
 
-    /**
-     * @notice Returns the global latest settled oracle version
-     * @return Latest settled oracle version of the product
-     */
-    function latestVersion() public view returns (uint256) {
-        return _latestVersion;
-    }
-
     function collateral() external view returns (UFixed18) {
         return token.balanceOf().sub(productFees).sub(protocolFees);
     }
@@ -414,15 +406,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      */
     function shareAtVersion(uint256 oracleVersion) external view returns (Accumulator memory) {
         return _versions[oracleVersion].share();
-    }
-
-    /**
-     * @notice Returns `account`'s latest settled oracle version
-     * @param account Account to return for
-     * @return Latest settled oracle version of the account
-     */
-    function latestVersion(address account) public view returns (uint256) {
-        return _latestVersions[account];
     }
 
     /**

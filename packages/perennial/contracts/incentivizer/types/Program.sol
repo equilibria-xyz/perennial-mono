@@ -139,7 +139,7 @@ library ProgramLib {
         );
 
         // accruing must start between self.versionStarted and self.versionComplete
-        uint256 fromVersion = Math.min(_versionComplete, Math.max(_versionStarted, product.latestVersion(account)));
+        uint256 fromVersion = Math.min(_versionComplete, Math.max(_versionStarted, product.latestVersions(account)));
         // accruing must complete between self.versionStarted and self.versionComplete, we know self.versionStarted must be no earlier than current version
         uint256 toVersion = Math.min(_versionComplete, currentOracleVersion.version);
 
