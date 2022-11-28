@@ -118,13 +118,6 @@ library VersionLib {
         newFeeAccumulator = feeAccumulator.add(newFeeAccumulator);
     }
 
-    struct ProductParams {
-        JumpRateUtilizationCurve utilizationCurve;
-        UFixed18 minFundingFee;
-        UFixed18 fundingFee;
-        bool closed;
-    }
-
     function accumulate(
         Version memory versionAccumulator,
         UFixed18 feeAccumulator,

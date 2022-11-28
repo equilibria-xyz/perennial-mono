@@ -179,7 +179,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         protocolFees = context.protocolFees;
     }
 
-    function _settleInMem(CurrentContext memory context, address account) private {
+    function _settleInMem(CurrentContext memory context, address account) private { //TODO: should be pure
         // Initialize memory
         UFixed18 feeAccumulator;
         UFixed18 shortfallAccumulator;
@@ -195,8 +195,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         if (context.currentOracleVersion.version > context.latestVersion) {
             fromOracleVersion = atVersion(context.latestVersion);
             toOracleVersion = context.latestVersion + 1 == context.currentOracleVersion.version ?
-            context.currentOracleVersion :
-            atVersion(context.latestVersion + 1);
+                context.currentOracleVersion :
+                atVersion(context.latestVersion + 1);
 
             (feeAccumulator) = context.version.accumulateAndSettle(
                 feeAccumulator,
@@ -210,21 +210,27 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
                 context.fundingFee,
                 context.closed
             );
+            context.latestVersion = toOracleVersion.version;
             _versions[toOracleVersion.version] = context.version;
         }
 
         // settle product b->c if necessary
-        if (context.currentOracleVersion.version > toOracleVersion.version) { // skip is b == c
+        if (context.currentOracleVersion.version > context.latestVersion) { // skip is b == c
             fromOracleVersion = toOracleVersion;
             toOracleVersion = context.currentOracleVersion;
-            (feeAccumulator) = context.version.accumulate(
+            (feeAccumulator) = context.version.accumulateAndSettle(
                 feeAccumulator,
-                Period(fromOracleVersion, toOracleVersion),
+                context.pre,
+                Period(fromOracleVersion, toOracleVersion), //TODO: remove period
+                context.makerFee,
+                context.takerFee,
+                context.positionFee,
                 context.utilizationCurve,
                 context.minFundingFee,
                 context.fundingFee,
                 context.closed
             );
+            context.latestVersion = toOracleVersion.version;
             _versions[context.currentOracleVersion.version] = context.version;
         }
 
@@ -239,8 +245,9 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
             context.incentivizer.syncAccount(account, toOracleVersion);
 
             shortfallAccumulator = context.account.accumulate(shortfallAccumulator, fromVersion, toVersion);
+            context.latestAccountVersion = toOracleVersion.version;
 
-            context.account.settle();
+            context.account.settle(); //TODO: merge in?
         }
 
         // settle account b->c if necessary
@@ -252,11 +259,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
             context.incentivizer.syncAccount(account, toOracleVersion);
 
             shortfallAccumulator = context.account.accumulate(shortfallAccumulator, fromVersion, toVersion);
+            context.latestAccountVersion = toOracleVersion.version;
         }
-
-        // save latest version
-        context.latestVersion = context.currentOracleVersion.version;
-        context.latestAccountVersion = context.currentOracleVersion.version;
 
         // save accumulator data
         UFixed18 protocolFeeAmount = feeAccumulator.mul(context.protocolFee);
