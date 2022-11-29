@@ -44,7 +44,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     mapping(address => uint256) public latestVersions;
 
     /// @dev Total ledger collateral shortfall
-    UFixed18 public shortfall;
+    UFixed18 public shortfall; //TODO: make shortfall per-account instead of aggregated?
 
     /// @dev Whether the account is currently locked for liquidation
     mapping(address => bool) public liquidation;
@@ -130,17 +130,10 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     /**
      * @notice Surfaces global settlement externally
      */
+    //TODO: address 0?
     function settle(address account) external nonReentrant {
-        //TODO: address 0?
-
-        // Load state into memory
         CurrentContext memory context = _loadContext(account);
-
-        if (context.paused) revert PausedError();
-
-        // Transform state in memory
-        _settleInMem(context, account);
-
+        _settle(context, account);
         _saveContext(context, account);
 
         if (context.paused) revert PausedError();
@@ -179,12 +172,10 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         protocolFees = context.protocolFees;
     }
 
-    function _settleInMem(CurrentContext memory context, address account) private { //TODO: should be pure
+    function _settle(CurrentContext memory context, address account) private { //TODO: should be pure
         // Initialize memory
-        UFixed18 feeAccumulator;
-        UFixed18 shortfallAccumulator;
-        IOracleProvider.OracleVersion memory fromOracleVersion;
-        IOracleProvider.OracleVersion memory toOracleVersion;
+        UFixed18 feeAccumulator; //TODO: whys this still here?
+        Period memory period;
         Version memory fromVersion;
         Version memory toVersion;
 
@@ -192,82 +183,76 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         context.incentivizer.sync(context.currentOracleVersion); //TODO: why isn't this called twice?
 
         // settle product a->b if necessary
-        if (context.currentOracleVersion.version > context.latestVersion) {
-            fromOracleVersion = atVersion(context.latestVersion);
-            toOracleVersion = context.latestVersion + 1 == context.currentOracleVersion.version ?
-                context.currentOracleVersion :
-                atVersion(context.latestVersion + 1);
-
-            (feeAccumulator) = context.version.accumulateAndSettle(
-                feeAccumulator,
-                context.pre,
-                Period(fromOracleVersion, toOracleVersion), //TODO: remove period
-                context.makerFee,
-                context.takerFee,
-                context.positionFee,
-                context.utilizationCurve,
-                context.minFundingFee,
-                context.fundingFee,
-                context.closed
-            );
-            context.latestVersion = toOracleVersion.version;
-            _versions[toOracleVersion.version] = context.version;
-        }
+        period.fromVersion = atVersion(context.latestVersion);
+        period.toVersion = context.latestVersion + 1 == context.currentOracleVersion.version ?
+            context.currentOracleVersion :
+            atVersion(context.latestVersion + 1);
+        _settlePeriod(feeAccumulator, context, period);
 
         // settle product b->c if necessary
-        if (context.currentOracleVersion.version > context.latestVersion) { // skip is b == c
-            fromOracleVersion = toOracleVersion;
-            toOracleVersion = context.currentOracleVersion;
-            (feeAccumulator) = context.version.accumulateAndSettle(
-                feeAccumulator,
-                context.pre,
-                Period(fromOracleVersion, toOracleVersion), //TODO: remove period
-                context.makerFee,
-                context.takerFee,
-                context.positionFee,
-                context.utilizationCurve,
-                context.minFundingFee,
-                context.fundingFee,
-                context.closed
-            );
-            context.latestVersion = toOracleVersion.version;
-            _versions[context.currentOracleVersion.version] = context.version;
-        }
+        period.fromVersion = period.toVersion;
+        period.toVersion = context.currentOracleVersion;
+        _settlePeriod(feeAccumulator, context, period);
 
         // settle account a->b if necessary
-        if (context.currentOracleVersion.version > context.latestAccountVersion) {
-            toOracleVersion = context.latestAccountVersion + 1 == context.currentOracleVersion.version ?
+        period.toVersion = context.latestAccountVersion + 1 == context.currentOracleVersion.version ?
             context.currentOracleVersion : // if b == c, don't re-call provider for oracle version
             atVersion(context.latestAccountVersion + 1);
-            fromVersion = _versions[context.latestAccountVersion];
-            toVersion = _versions[context.latestAccountVersion + 1];
-
-            context.incentivizer.syncAccount(account, toOracleVersion);
-
-            shortfallAccumulator = context.account.accumulate(shortfallAccumulator, fromVersion, toVersion);
-            context.latestAccountVersion = toOracleVersion.version;
-
-            context.account.settle(); //TODO: merge in?
-        }
+        fromVersion = _versions[context.latestAccountVersion];
+        toVersion = _versions[context.latestAccountVersion + 1];
+        _settlePeriodAccount(context, period, fromVersion, toVersion, account);
 
         // settle account b->c if necessary
-        if (context.currentOracleVersion.version > toOracleVersion.version) {
-            toOracleVersion = context.currentOracleVersion;
-            fromVersion = toVersion;
-            toVersion = context.version;
-
-            context.incentivizer.syncAccount(account, toOracleVersion);
-
-            shortfallAccumulator = context.account.accumulate(shortfallAccumulator, fromVersion, toVersion);
-            context.latestAccountVersion = toOracleVersion.version;
-        }
+        period.toVersion = context.currentOracleVersion;
+        fromVersion = toVersion;
+        toVersion = context.version;
+        _settlePeriodAccount(context, period, fromVersion, toVersion, account);
 
         // save accumulator data
+        //TODO: move to accumulator
         UFixed18 protocolFeeAmount = feeAccumulator.mul(context.protocolFee);
         UFixed18 productFeeAmount = feeAccumulator.sub(protocolFeeAmount);
         context.protocolFees = context.protocolFees.add(productFeeAmount);
         context.productFees = context.productFees.add(productFeeAmount);
-        context.shortfall = context.shortfall.add(shortfallAccumulator);
+    }
+
+    function _settlePeriod(UFixed18 feeAccumulator, CurrentContext memory context, Period memory period)
+        private
+        returns (UFixed18 newFeeAccumulator)
+    {
+        if (context.currentOracleVersion.version > context.latestVersion) {
+            (newFeeAccumulator) = context.version.accumulateAndSettle(
+                feeAccumulator,
+                context.pre,
+                period,
+                context.makerFee,
+                context.takerFee,
+                context.positionFee,
+                context.utilizationCurve,
+                context.minFundingFee,
+                context.fundingFee,
+                context.closed
+            );
+            context.latestVersion = period.toVersion.version;
+            _versions[period.toVersion.version] = context.version;
+        }
+    }
+
+    function _settlePeriodAccount(
+        CurrentContext memory context,
+        Period memory period,
+        Version memory fromVersion,
+        Version memory toVersion,
+        address account
+    )
+        private
+    {
+        if (context.currentOracleVersion.version > context.latestAccountVersion) {
+            context.incentivizer.syncAccount(account, period.toVersion);
+
+            context.shortfall = context.account.accumulate(context.shortfall, fromVersion, toVersion);
+            context.latestAccountVersion = period.toVersion.version;
+        }
     }
 
     //TODO support depositTo and withdrawTo
@@ -281,9 +266,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
         // Load state into memory
         context = _loadContext(account);
-
-        // Transform state in memory
-        _settleInMem(context, account);
+        _settle(context, account);
 
         // before
         if (context.paused) revert PausedError();
@@ -299,6 +282,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         shortfallAccumulator = context.account.settleCollateral(shortfallAccumulator, Fixed18Lib.from(-1, positionFee));
         shortfallAccumulator = context.account.settleCollateral(shortfallAccumulator, collateralAmount); //TODO: these should combine with update
 
+        //TODO: order
         _saveContext(context, account);
 
         if (collateralAmount.sign() == 1) token.pull(account, collateralAmount.abs());
@@ -312,6 +296,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         if (!context.account.collateral.isZero() && context.account.collateral.lt(context.minCollateral)) revert ProductCollateralUnderLimitError();
 
         // events
+        //TODO: cleanup
         emit PositionUpdated(account, context.currentOracleVersion.version, positionAmount);
         emit CollateralUpdated(account, collateralAmount);
     }

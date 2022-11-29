@@ -30,15 +30,6 @@ library AccountLib {
     /**
      * @notice Settled the account's position to oracle version `toOracleVersion`
      * @param account The struct to operate on
-     */
-    function settle(Account memory account) internal pure {
-        account._position = next(account).pack();
-        account._pre = Fixed18Lib.ZERO.pack();
-    }
-
-    /**
-     * @notice Settled the account's position to oracle version `toOracleVersion`
-     * @param account The struct to operate on
      * @return newShortfallAccumulator The value accrued from settling the position
      */
     function accumulate(
@@ -52,6 +43,9 @@ library AccountLib {
             ? toVersion.value().taker.sub(fromVersion.value().taker)
             : toVersion.value().maker.sub(fromVersion.value().maker);
         newShortfallAccumulator = settleCollateral(account, shortfallAccumulator, _position.mul(versionDelta));
+
+        account._position = next(account).pack();
+        account._pre = Fixed18Lib.ZERO.pack();
     }
 
     /**
