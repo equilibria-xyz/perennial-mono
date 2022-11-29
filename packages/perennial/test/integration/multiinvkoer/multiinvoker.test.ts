@@ -16,6 +16,18 @@ describe('MultiInvoker', () => {
   })
 
   describe('#initialize', () => {
+    it('sets the correct contract addresses', async () => {
+      const { multiInvoker, usdc, dsu, batcher, controller, collateral } = instanceVars
+      const reserve = await batcher.RESERVE()
+
+      expect((await multiInvoker.USDC()).toLowerCase()).to.equal(usdc.address.toLowerCase())
+      expect((await multiInvoker.DSU()).toLowerCase()).to.equal(dsu.address.toLowerCase())
+      expect((await multiInvoker.batcher()).toLowerCase()).to.equal(batcher.address.toLowerCase())
+      expect((await multiInvoker.controller()).toLowerCase()).to.equal(controller.address.toLowerCase())
+      expect((await multiInvoker.collateral()).toLowerCase()).to.equal(collateral.address.toLowerCase())
+      expect((await multiInvoker.reserve()).toLowerCase()).to.equal(reserve.toLowerCase())
+    })
+
     it('sets the correct approvals', async () => {
       const { multiInvoker, usdc, dsu, batcher, collateral } = instanceVars
 
@@ -26,7 +38,7 @@ describe('MultiInvoker', () => {
     })
 
     it('reverts if already initialized', async () => {
-      await expect(instanceVars.multiInvoker.initialize(instanceVars.controller.address)).to.be.revertedWith(
+      await expect(instanceVars.multiInvoker.initialize()).to.be.revertedWith(
         'UInitializableAlreadyInitializedError(1)',
       )
     })
