@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.15;
 
-import "hardhat/console.sol";
 import "@equilibria/root/control/unstructured/UInitializable.sol";
 
 import "../interfaces/IMultiInvoker.sol";

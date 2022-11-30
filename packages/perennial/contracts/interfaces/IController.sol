@@ -64,7 +64,7 @@ interface IController {
     function programsPerProduct() external view returns (uint256);
     function pauser() external view returns (address);
     function paused() external view returns (bool);
-    function initialize(ICollateral collateral_, IIncentivizer incentivizer_, IBeacon productBeacon_, IMultiInvoker mulltiinvoker_) external;
+    function initialize(ICollateral collateral_, IIncentivizer incentivizer_, IBeacon productBeacon_) external;
     function createCoordinator() external returns (uint256);
     function updateCoordinatorPendingOwner(uint256 coordinatorId, address newPendingOwner) external;
     function acceptCoordinatorOwner(uint256 coordinatorId) external;

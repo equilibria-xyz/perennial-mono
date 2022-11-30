@@ -129,7 +129,7 @@ export async function deployProtocol(): Promise<InstanceVars> {
 
   // Init
   await incentivizer.initialize(controller.address)
-  await controller.initialize(collateral.address, incentivizer.address, productBeacon.address, productBeacon.address) // TODO(arjun): remove last arg when initializer revert is merged
+  await controller.initialize(collateral.address, incentivizer.address, productBeacon.address)
   await collateral.initialize(controller.address)
 
   // Setup MultiInvoker
