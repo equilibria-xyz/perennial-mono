@@ -18,7 +18,7 @@ describe('Lens', () => {
 
   it('returns correct lens values', async () => {
     const POSITION = utils.parseEther('0.0001')
-    const { user, userB, chainlink, lens, controller, treasuryA, incentiveToken } = instanceVars
+    const { user, userB, chainlink, lens, controller, incentiveToken } = instanceVars
 
     expect(await lens.callStatic.controller()).to.equal(controller.address)
     // Setup fees
@@ -34,7 +34,7 @@ describe('Lens', () => {
     await product.connect(userB).update(POSITION, 0)
 
     // Returns the product name
-    const info = await lens.callStatic.info(product.address)
+    const info = await lens.callStatic.definition(product.address)
     expect(info.name).to.equal('Squeeth')
     // Returns the product symbol
     expect(info.symbol).to.equal('SQTH')

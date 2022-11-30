@@ -5,6 +5,15 @@ import "@equilibria/root/number/types/UFixed18.sol";
 
 /// @dev Parameter type
 struct Parameter {
+    UFixed18 maintenance; // <= 429%
+    UFixed18 fundingFee;  // <= 429%
+    UFixed18 makerFee;    // <= 429%
+    UFixed18 takerFee;    // <= 429%
+    UFixed18 positionFee; // <= 429%
+    UFixed18 makerLimit;  // <= 18.45bn
+    bool closed;
+}
+struct PackedParameter {
     uint32 maintenance; // <= 429%
     uint32 fundingFee;  // <= 429%
     uint32 makerFee;    // <= 429%
@@ -19,30 +28,17 @@ type ParameterStorage is bytes32;
 using ParameterStorageLib for ParameterStorage global;
 
 library ParameterStorageLib {
+    struct ParameterStoragePointer {
+        PackedParameter value;
+    }
+
     uint256 private constant OFFSET = 10 ** 9;
 
     error ParameterStorageOverflowError();
 
-    struct ParameterStoragePointer {
-        Parameter value;
-    }
-
-    function _storagePointer(ParameterStorage self)
-    private pure returns (ParameterStoragePointer storage pointer) {
-        assembly ("memory-safe") { pointer.slot := self }
-    }
-
-    function read(ParameterStorage self) internal view returns (
-        UFixed18 maintenance,
-        UFixed18 fundingFee,
-        UFixed18 makerFee,
-        UFixed18 takerFee,
-        UFixed18 positionFee,
-        UFixed18 makerLimit,
-        bool closed
-    ) {
-        Parameter memory value = _storagePointer(self).value;
-        return (
+    function read(ParameterStorage self) internal view returns (Parameter memory) {
+        PackedParameter memory value = _pointer(self).value;
+        return Parameter(
             UFixed18.wrap(uint256(value.maintenance) * OFFSET),
             UFixed18.wrap(uint256(value.fundingFee) * OFFSET),
             UFixed18.wrap(uint256(value.makerFee) * OFFSET),
@@ -53,33 +49,28 @@ library ParameterStorageLib {
         );
     }
 
-    function store(
-        ParameterStorage self,
-        UFixed18 maintenance,
-        UFixed18 fundingFee,
-        UFixed18 makerFee,
-        UFixed18 takerFee,
-        UFixed18 positionFee,
-        UFixed18 makerLimit,
-        bool closed
-    ) internal {
-        if (maintenance.gt(UFixed18Lib.ONE)) revert ParameterStorageOverflowError();
-        if (fundingFee.gt(UFixed18Lib.ONE)) revert ParameterStorageOverflowError();
-        if (makerFee.gt(UFixed18Lib.ONE)) revert ParameterStorageOverflowError();
-        if (takerFee.gt(UFixed18Lib.ONE)) revert ParameterStorageOverflowError();
-        if (positionFee.gt(UFixed18Lib.ONE)) revert ParameterStorageOverflowError();
-        if (makerLimit.gt(UFixed18Lib.from(18_446_744_073))) revert ParameterStorageOverflowError();
+    function store(ParameterStorage self, Parameter memory parameter) internal {
+        //TODO: check mod for precision
+        if (parameter.maintenance.gt(UFixed18Lib.ONE)) revert ParameterStorageOverflowError();
+        if (parameter.fundingFee.gt(UFixed18Lib.ONE)) revert ParameterStorageOverflowError();
+        if (parameter.makerFee.gt(UFixed18Lib.ONE)) revert ParameterStorageOverflowError();
+        if (parameter.takerFee.gt(UFixed18Lib.ONE)) revert ParameterStorageOverflowError();
+        if (parameter.positionFee.gt(UFixed18Lib.ONE)) revert ParameterStorageOverflowError();
+        if (parameter.makerLimit.gt(UFixed18Lib.from(18_446_744_073))) revert ParameterStorageOverflowError();
 
-        Parameter memory parameter = Parameter(
-            uint32(UFixed18.unwrap(maintenance) / OFFSET),
-            uint32(UFixed18.unwrap(fundingFee) / OFFSET),
-            uint32(UFixed18.unwrap(makerFee) / OFFSET),
-            uint32(UFixed18.unwrap(takerFee) / OFFSET),
-            uint32(UFixed18.unwrap(positionFee) / OFFSET),
-            uint64(UFixed18.unwrap(makerLimit) / OFFSET),
-            closed,
+        _pointer(self).value = PackedParameter(
+            uint32(UFixed18.unwrap(parameter.maintenance) / OFFSET),
+            uint32(UFixed18.unwrap(parameter.fundingFee) / OFFSET),
+            uint32(UFixed18.unwrap(parameter.makerFee) / OFFSET),
+            uint32(UFixed18.unwrap(parameter.takerFee) / OFFSET),
+            uint32(UFixed18.unwrap(parameter.positionFee) / OFFSET),
+            uint64(UFixed18.unwrap(parameter.makerLimit) / OFFSET),
+            parameter.closed,
             bytes3(0x000000)
         );
-        _storagePointer(self).value = parameter;
+    }
+
+    function _pointer(ParameterStorage self) private pure returns (ParameterStoragePointer storage pointer) {
+        assembly ("memory-safe") { pointer.slot := self }
     }
 }

@@ -21,27 +21,33 @@ describe.only('Happy Path', () => {
       .to.emit(controller, 'CoordinatorTreasuryUpdated')
       .withArgs(1, treasuryB.address)
 
-    const productInfo = {
+    const definition = {
       name: 'Squeeth',
       symbol: 'SQTH',
       token: dsu.address,
       payoffDefinition: createPayoffDefinition({ contractAddress: contractPayoffProvider.address }),
       oracle: chainlinkOracle.address,
+    }
+    const parameter = {
       maintenance: utils.parseEther('0.3'),
       fundingFee: utils.parseEther('0.1'),
       makerFee: 0,
       takerFee: 0,
       positionFee: 0,
       makerLimit: utils.parseEther('1'),
-      utilizationCurve: {
-        minRate: 0,
-        maxRate: utils.parseEther('5.00'),
-        targetRate: utils.parseEther('0.80'),
-        targetUtilization: utils.parseEther('0.80'),
-      },
+      closed: true,
     }
-    const productAddress = await controller.callStatic.createProduct(1, productInfo)
-    await expect(controller.createProduct(1, productInfo)).to.emit(controller, 'ProductCreated')
+    const utilizationCurve = {
+      minRate: 0,
+      maxRate: utils.parseEther('5.00'),
+      targetRate: utils.parseEther('0.80'),
+      targetUtilization: utils.parseEther('0.80'),
+    }
+    const productAddress = await controller.callStatic.createProduct(1, definition, parameter, utilizationCurve)
+    await expect(controller.createProduct(1, definition, parameter, utilizationCurve)).to.emit(
+      controller,
+      'ProductCreated',
+    )
     const product = Product__factory.connect(productAddress, owner)
 
     await dsu.connect(user).approve(productAddress, utils.parseEther('1000'))

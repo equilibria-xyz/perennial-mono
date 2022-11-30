@@ -16,24 +16,27 @@ import { deployments } from 'hardhat'
 
 const VERSION_OFFSET = BigNumber.from('73786976294838209800')
 const INITIAL_VERSION = BigNumber.from(1)
-const PRODUCT_INFO = {
+const DEFINITION = {
   name: 'Squeeth',
   symbol: 'SQTH',
   token: constants.AddressZero,
   payoffDefinition: createPayoffDefinition(),
   oracle: '',
+}
+const PARAMETER = {
   maintenance: utils.parseEther('0.3'),
   fundingFee: utils.parseEther('0.1'),
   makerFee: 0,
   takerFee: 0,
   positionFee: 0,
   makerLimit: utils.parseEther('1'),
-  utilizationCurve: {
-    minRate: 0,
-    maxRate: utils.parseEther('5.00'),
-    targetRate: utils.parseEther('0.80'),
-    targetUtilization: utils.parseEther('0.80'),
-  },
+  closed: true,
+}
+const UTILIZATION_CURVE = {
+  minRate: 0,
+  maxRate: utils.parseEther('5.00'),
+  targetRate: utils.parseEther('0.80'),
+  targetUtilization: utils.parseEther('0.80'),
 }
 
 describe('Reservoir Oracle Product', () => {
@@ -45,7 +48,7 @@ describe('Reservoir Oracle Product', () => {
   beforeEach(async () => {
     instanceVars = await deployProtocol()
     const { owner, dsu } = instanceVars
-    PRODUCT_INFO.token = dsu.address
+    DEFINITION.token = dsu.address
 
     // Reservoir has not deployed their feed adaptor to mainnet, so for now use Chainlink's DPI feed as a standin
     // TODO(arjun): Update this with Reservoir's mainnet deploy
@@ -55,8 +58,8 @@ describe('Reservoir Oracle Product', () => {
 
     reservoirOracle = await new ReservoirFeedOracle__factory(owner).deploy(oracleFeed.feed.address, VERSION_OFFSET)
     baycUSDCPayoffProvider = await new TestnetContractPayoffProvider__factory(owner).deploy()
-    PRODUCT_INFO.oracle = reservoirOracle.address
-    PRODUCT_INFO.payoffDefinition = createPayoffDefinition({ contractAddress: baycUSDCPayoffProvider.address })
+    DEFINITION.oracle = reservoirOracle.address
+    DEFINITION.payoffDefinition = createPayoffDefinition({ contractAddress: baycUSDCPayoffProvider.address })
 
     await oracleFeed.next()
   })
@@ -71,9 +74,12 @@ describe('Reservoir Oracle Product', () => {
       .to.emit(controller, 'CoordinatorTreasuryPositionUpdated')
       .withArgs(1, treasuryB.address)
 
-    const productAddress = await controller.callStatic.createProduct(1, PRODUCT_INFO)
+    const productAddress = await controller.callStatic.createProduct(1, DEFINITION, PARAMETER, UTILIZATION_CURVE)
     const product = Product__factory.connect(productAddress, owner)
-    await expect(controller.createProduct(1, PRODUCT_INFO)).to.emit(controller, 'ProductCreated')
+    await expect(controller.createProduct(1, DEFINITION, PARAMETER, UTILIZATION_CURVE)).to.emit(
+      controller,
+      'ProductCreated',
+    )
 
     await dsu.connect(user).approve(product.address, utils.parseEther('1000'))
     await product.connect(user).update(0, utils.parseEther('1000'))

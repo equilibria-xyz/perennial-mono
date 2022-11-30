@@ -148,17 +148,23 @@ contract Controller is IController, UInitializable {
      * @notice Creates a new product market with `provider`
      * @dev Can only be called by the coordinator owner
      * @param coordinatorId Coordinator that will own the product
-     * @param productInfo Product params used to initialize the product
      * @return New product contract address
      */
-    function createProduct(uint256 coordinatorId, IProduct.ProductInfo calldata productInfo)
-    external onlyOwner(coordinatorId) returns (IProduct) {
+    function createProduct(
+        uint256 coordinatorId,
+        IProduct.ProductDefinition calldata definition,
+        Parameter calldata parameter,
+        JumpRateUtilizationCurve calldata utilizationCurve
+    ) external onlyOwner(coordinatorId) returns (IProduct) {
         if (coordinatorId == 0) revert ControllerNoZeroCoordinatorError();
 
-        BeaconProxy newProductProxy = new BeaconProxy(address(productBeacon()), abi.encodeCall(IProduct.initialize, productInfo));
+        BeaconProxy newProductProxy = new BeaconProxy(
+            address(productBeacon()),
+            abi.encodeCall(IProduct.initialize, (definition, parameter, utilizationCurve))
+        );
         IProduct newProduct = IProduct(address(newProductProxy));
         coordinatorFor[newProduct] = coordinatorId;
-        emit ProductCreated(newProduct, productInfo);
+        emit ProductCreated(newProduct, definition, parameter, utilizationCurve);
 
         return newProduct;
     }

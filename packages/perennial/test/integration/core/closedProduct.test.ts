@@ -29,15 +29,8 @@ describe('Closed Product', () => {
 
     await chainlink.next()
     const parameters = await product.parameter()
-    await product.updateParameter(
-      parameters.maintenance,
-      parameters.fundingFee,
-      parameters.makerFee,
-      parameters.takerFee,
-      parameters.positionFee,
-      parameters.makerLimit,
-      true,
-    )
+    parameters.closed = true
+    await product.updateParameter(parameters)
     // await expect(product.updateClosed(true))
     //   .to.emit(product, 'PositionUpdated')
     //   .withArgs(true, 2474)
@@ -60,15 +53,8 @@ describe('Closed Product', () => {
       await product.connect(user).update(POSITION.mul(-1), 0)
       await product.connect(userB).update(POSITION, 0)
       const parameters = await product.parameter()
-      await product.updateParameter(
-        parameters.maintenance,
-        parameters.fundingFee,
-        parameters.makerFee,
-        parameters.takerFee,
-        parameters.positionFee,
-        parameters.makerLimit,
-        true,
-      )
+      parameters.closed = true
+      await product.updateParameter(parameters)
     })
 
     it('reverts on new open positions', async () => {
@@ -80,11 +66,11 @@ describe('Closed Product', () => {
     })
 
     it('reverts on attempts to liquidate', async () => {
-      const { user, chainlink } = instanceVars
+      const { user, chainlink, lens } = instanceVars
       await chainlink.nextWithPriceModification(price => price.mul(10))
       await product.settle(user.address)
 
-      expect(await product.liquidatable(user.address)).to.be.true
+      expect(await lens.callStatic.liquidatable(user.address, product.address)).to.be.true
       await expect(product.liquidate(user.address)).to.be.revertedWith('ProductClosedError()')
     })
   })
@@ -102,15 +88,8 @@ describe('Closed Product', () => {
     await chainlink.next()
     await chainlink.next()
     const parameters = await product.parameter()
-    await product.updateParameter(
-      parameters.maintenance,
-      parameters.fundingFee,
-      parameters.makerFee,
-      parameters.takerFee,
-      parameters.positionFee,
-      parameters.makerLimit,
-      true,
-    )
+    parameters.closed = true
+    await product.updateParameter(parameters)
     await product.settle(user.address)
     await product.settle(userB.address)
 
@@ -146,15 +125,8 @@ describe('Closed Product', () => {
     await expect(product.liquidate(user.address)).to.not.be.reverted
     expect(await product.liquidation(user.address)).to.be.true
     const parameters = await product.parameter()
-    await product.updateParameter(
-      parameters.maintenance,
-      parameters.fundingFee,
-      parameters.makerFee,
-      parameters.takerFee,
-      parameters.positionFee,
-      parameters.makerLimit,
-      true,
-    )
+    parameters.closed = true
+    await product.updateParameter(parameters)
     await chainlink.next()
 
     await product.settle(user.address)

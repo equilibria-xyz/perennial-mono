@@ -14,43 +14,12 @@ import "../product/types/Version.sol"; //TODO: these have to be in interface
 import "../product/types/Account.sol";
 
 interface IProduct is IPayoffProvider, IParamProvider {
-    /// @dev Product Creation parameters
-    struct ProductInfo {
-        /// @dev name of the product
+    struct ProductDefinition {
         string name;
-
-        /// @dev symbol of the product
         string symbol;
-
-        /// @dev stablecoin collateral token
         Token18 token;
-
-        /// @dev product payoff definition
-        PayoffDefinition payoffDefinition;
-
-        /// @dev oracle address
         IOracleProvider oracle;
-
-        /// @dev product maintenance ratio
-        UFixed18 maintenance;
-
-        /// @dev product funding fee
-        UFixed18 fundingFee;
-
-        /// @dev product maker fee
-        UFixed18 makerFee;
-
-        /// @dev product taker fee
-        UFixed18 takerFee;
-
-        /// @dev product position fee
-        UFixed18 positionFee;
-
-        /// @dev product maker limit
-        UFixed18 makerLimit;
-
-        /// @dev utulization curve definition
-        JumpRateUtilizationCurve utilizationCurve;
+        PayoffDefinition payoffDefinition;
     }
 
     event Settle(uint256 preVersion, uint256 toVersion);
@@ -73,12 +42,16 @@ interface IProduct is IPayoffProvider, IParamProvider {
     error ProductCollateralUnderLimitError();
     error ProductCantLiquidate();
 
+    function initialize(
+        ProductDefinition calldata definition_,
+        Parameter calldata parameter_,
+        JumpRateUtilizationCurve calldata utilizationCurve_
+    ) external;
     function name() external view returns (string memory);
     function symbol() external view returns (string memory);
     function token() external view returns (Token18);
     function productFees() external view returns (UFixed18);
     function protocolFees() external view returns (UFixed18);
-    function initialize(ProductInfo calldata productInfo_) external;
     function settle(address account) external;
     function update(Fixed18 positionAmount, Fixed18 collateralAmount) external;
     function liquidate(address account) external;

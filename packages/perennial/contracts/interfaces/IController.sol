@@ -34,7 +34,12 @@ interface IController {
     event CoordinatorOwnerUpdated(uint256 indexed coordinatorId, address newOwner);
     event CoordinatorTreasuryUpdated(uint256 indexed coordinatorId, address newTreasury);
     event CoordinatorCreated(uint256 indexed coordinatorId, address owner);
-    event ProductCreated(IProduct indexed product, IProduct.ProductInfo productInfo);
+    event ProductCreated(
+        IProduct indexed product,
+        IProduct.ProductDefinition definition,
+        Parameter parameter,
+        JumpRateUtilizationCurve utilizationCurve
+    );
 
     error ControllerNoZeroCoordinatorError();
     error ControllerNotPauserError();
@@ -63,7 +68,12 @@ interface IController {
     function updateCoordinatorPendingOwner(uint256 coordinatorId, address newPendingOwner) external;
     function acceptCoordinatorOwner(uint256 coordinatorId) external;
     function updateCoordinatorTreasury(uint256 coordinatorId, address newTreasury) external;
-    function createProduct(uint256 coordinatorId, IProduct.ProductInfo calldata productInfo) external returns (IProduct);
+    function createProduct(
+        uint256 coordinatorId,
+        IProduct.ProductDefinition calldata definition,
+        Parameter calldata parameter,
+        JumpRateUtilizationCurve calldata utilizationCurve
+    ) external returns (IProduct);
     function updateIncentivizer(IIncentivizer newIncentivizer) external;
     function updateProductBeacon(IBeacon newProductBeacon) external;
     function updateProtocolFee(UFixed18 newProtocolFee) external;

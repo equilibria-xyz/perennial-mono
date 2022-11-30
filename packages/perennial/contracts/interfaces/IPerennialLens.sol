@@ -12,12 +12,13 @@ import "./IController.sol";
 interface IPerennialLens {
     /// @dev Snapshot of Product information
     struct ProductSnapshot {
-        IProduct.ProductInfo productInfo;
+        IProduct.ProductDefinition definition;
+        Parameter parameter;
+        JumpRateUtilizationCurve utilizationCurve;
         address productAddress;
         Fixed18 rate;
         Fixed18 dailyRate;
         IOracleProvider.OracleVersion latestVersion;
-        UFixed18 maintenance;
         UFixed18 collateral;
         UFixed18 shortfall;
         PrePosition pre;
@@ -53,7 +54,10 @@ interface IPerennialLens {
     // Product Values
     function name(IProduct product) external view returns (string memory);
     function symbol(IProduct product) external view returns (string memory);
-    function info(IProduct product) external view returns (IProduct.ProductInfo memory _info);
+    function token(IProduct product) external view returns (Token18);
+    function definition(IProduct product) external view returns (IProduct.ProductDefinition memory);
+    function parameter(IProduct product) external view returns (Parameter memory);
+    function utilizationCurve(IProduct product) external view returns (JumpRateUtilizationCurve memory);
     function collateral(IProduct product) external returns (UFixed18);
     function shortfall(IProduct product) external returns (UFixed18);
     function pre(IProduct product) external returns (PrePosition memory);
@@ -61,7 +65,7 @@ interface IPerennialLens {
     function position(IProduct product) external returns (Position memory);
     function globalPosition(IProduct product) external returns (PrePosition memory, Position memory);
     function latestVersion(IProduct product) external returns (IOracleProvider.OracleVersion memory);
-    function atVersions(IProduct product, uint[] memory versions) external returns (IOracleProvider.OracleVersion[] memory prices);
+    function atVersions(IProduct product, uint[] memory versions) external returns (IOracleProvider.OracleVersion[] memory);
     function rate(IProduct product) external returns (Fixed18);
     function openInterest(IProduct product) external returns (Position memory);
     function dailyRate(IProduct product) external returns (Fixed18);

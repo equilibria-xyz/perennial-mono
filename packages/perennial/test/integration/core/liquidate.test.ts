@@ -19,13 +19,13 @@ describe('Liquidate', () => {
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await product.connect(user).update(POSITION.mul(-1), 0)
 
-    expect(await product.liquidatable(user.address)).to.be.false
+    expect(await lens.callStatic.liquidatable(user.address, product.address)).to.be.false
 
     // Settle the product with a new oracle version
     await chainlink.nextWithPriceModification(price => price.mul(10))
     await product.settle(user.address)
 
-    expect(await product.liquidatable(user.address)).to.be.true
+    expect(await lens.callStatic.liquidatable(user.address, product.address)).to.be.true
 
     await expect(product.connect(userB).liquidate(user.address))
       .to.emit(product, 'Liquidation')
@@ -75,7 +75,7 @@ describe('Liquidate', () => {
 
   it('uses a socialization factor', async () => {
     const POSITION = utils.parseEther('0.0001')
-    const { user, userB, userC, userD, chainlink, treasuryA, dsu } = instanceVars
+    const { user, userB, userC, userD, chainlink, lens } = instanceVars
 
     const product = await createProduct(instanceVars)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
@@ -87,7 +87,7 @@ describe('Liquidate', () => {
     await product.connect(userC).update(POSITION, 0)
     await product.connect(userD).update(POSITION, 0)
 
-    expect(await product.liquidatable(user.address)).to.be.false
+    expect(await lens.callStatic.liquidatable(user.address, product.address)).to.be.false
 
     // Settle the product with a new oracle version
     await chainlink.nextWithPriceModification(price => price.mul(2))

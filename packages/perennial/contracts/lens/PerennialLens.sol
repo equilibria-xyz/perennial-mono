@@ -41,12 +41,13 @@ contract PerennialLens is IPerennialLens {
      * @return _snapshot for the product after settle
      */
     function snapshot(IProduct product) public settle(product) returns (ProductSnapshot memory _snapshot) {
-        _snapshot.productInfo = info(product);
+        _snapshot.definition = definition(product);
+        _snapshot.parameter = parameter(product);
+        _snapshot.utilizationCurve = utilizationCurve(product);
         _snapshot.productAddress = address(product);
         _snapshot.rate = rate(product);
         _snapshot.dailyRate = dailyRate(product);
         _snapshot.latestVersion = latestVersion(product);
-        (_snapshot.maintenance, , , , , , ) = product.parameter();
         _snapshot.collateral = collateral(product);
         _snapshot.shortfall = shortfall(product);
         _snapshot.pre = pre(product);
@@ -119,18 +120,24 @@ contract PerennialLens is IPerennialLens {
         return product.symbol();
     }
 
-    /**
-     * @notice Returns the info of the provided `product`
-     * @param product Product address
-     * @return _info of the product
-     */
-    function info(IProduct product) public view returns (IProduct.ProductInfo memory _info) {
-        _info.name = name(product);
-        _info.symbol = symbol(product);
-        _info.payoffDefinition = product.payoffDefinition();
-        _info.oracle = product.oracle();
-        (_info.maintenance, _info.fundingFee, _info.makerFee, _info.makerFee, _info.positionFee, _info.makerLimit, ) = product.parameter();
-        _info.utilizationCurve = product.utilizationCurve();
+    function token(IProduct product) public view returns (Token18) {
+        return product.token();
+    }
+
+    function definition(IProduct product) public view returns (IProduct.ProductDefinition memory _definition) {
+        _definition.name = name(product);
+        _definition.symbol = symbol(product);
+        _definition.token = token(product);
+        _definition.payoffDefinition = product.payoffDefinition();
+        _definition.oracle = product.oracle();
+    }
+
+    function parameter(IProduct product) public view returns (Parameter memory) {
+        return product.parameter();
+    }
+
+    function utilizationCurve(IProduct product) public view returns (JumpRateUtilizationCurve memory) {
+        return product.utilizationCurve();
     }
 
     /**
@@ -289,7 +296,6 @@ contract PerennialLens is IPerennialLens {
      * @return Whether or not the user's position eligible to be liquidated
      */
     function liquidatable(address account, IProduct product) public settleAccount(account, product) returns (bool) {
-        (UFixed18 maintenance_, , , , , , ) = product.parameter();
         Account memory productAccount = product.accounts(account);
         UFixed18 maintenanceAmount = _maintenance(product, productAccount.position());
         return maintenanceAmount.gt(productAccount.collateral);
@@ -452,7 +458,7 @@ contract PerennialLens is IPerennialLens {
      */
 
     function _maintenance(IProduct product, Fixed18 positionSize) private view returns (UFixed18) {
-        (UFixed18 maintenance_, , , , , , ) = product.parameter();
+        UFixed18 maintenance_ = product.parameter().maintenance;
         UFixed18 notional = positionSize.mul(_latestVersion(product).price).abs();
         return notional.mul(maintenance_);
     }

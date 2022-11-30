@@ -11,25 +11,14 @@ import "./types/Parameter.sol";
 abstract contract UParamProvider is IParamProvider, UControllerProvider {
     /**
      * @notice Initializes the contract state
-     * @param maintenance_ product maintenance ratio
-     * @param fundingFee_ product funding fee
-     * @param makerFee_ product maker fee
-     * @param takerFee_ product taker fee
-     * @param positionFee_ product position fee
-     * @param makerLimit_ product maker limit
      * @param utilizationCurve_ utulization curve definition
      */
     // solhint-disable-next-line func-name-mixedcase
     function __UParamProvider__initialize(
-        UFixed18 maintenance_,
-        UFixed18 fundingFee_,
-        UFixed18 makerFee_,
-        UFixed18 takerFee_,
-        UFixed18 positionFee_,
-        UFixed18 makerLimit_,
+        Parameter memory parameter_,
         JumpRateUtilizationCurve memory utilizationCurve_
     ) internal onlyInitializer {
-        _updateParameter(maintenance_, fundingFee_, makerFee_, takerFee_, positionFee_, makerLimit_, false);
+        _updateParameter(parameter_);
         _updateUtilizationCurve(utilizationCurve_);
     }
 
@@ -43,45 +32,20 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
 
     /// @dev The parameter values
     ParameterStorage private constant _parameter = ParameterStorage.wrap(keccak256("equilibria.perennial.UParamProvider.parameter"));
-    function parameter() public view returns (UFixed18 maintenance, UFixed18 fundingFee, UFixed18 makerFee, UFixed18 takerFee, UFixed18 positionFee, UFixed18 makerLimit, bool closed) {
-        (maintenance, fundingFee, makerFee, takerFee, positionFee, makerLimit, closed) = _parameter.read();
-    }
+    function parameter() public view returns (Parameter memory) { return _parameter.read(); }
 
     /// @dev The JumpRateUtilizationCurve params
     JumpRateUtilizationCurveStorage private constant _utilizationCurve =
         JumpRateUtilizationCurveStorage.wrap(keccak256("equilibria.perennial.UParamProvider.jumpRateUtilizationCurve"));
     function utilizationCurve() public view returns (JumpRateUtilizationCurve memory) { return _utilizationCurve.read(); }
 
-    function _updateParameter(
-        UFixed18 newMaintenance,
-        UFixed18 newFundingFee,
-        UFixed18 newMakerFee,
-        UFixed18 newTakerFee,
-        UFixed18 newPositionFee,
-        UFixed18 newMakerLimit,
-        bool newClosed
-    ) private {
-        _parameter.store(newMaintenance, newFundingFee, newMakerFee, newTakerFee, newPositionFee, newMakerLimit, newClosed);
-
-        emit MaintenanceUpdated(newFundingFee);
-        emit FundingFeeUpdated(newFundingFee);
-        emit MakerFeeUpdated(newMakerFee);
-        emit TakerFeeUpdated(newTakerFee);
-        emit PositionFeeUpdated(newPositionFee);
-        emit MakerLimitUpdated(newMakerLimit);
-        emit ClosedUpdated(newClosed);
+    function _updateParameter(Parameter memory newParameter) private {
+        _parameter.store(newParameter);
+        emit ParameterUpdated(newParameter);
     }
 
-    function updateParameter(
-        UFixed18 newMaintenance,
-        UFixed18 newFundingFee,
-        UFixed18 newMakerFee,
-        UFixed18 newTakerFee,
-        UFixed18 newPositionFee,
-        UFixed18 newMakerLimit,
-        bool newClosed
-    ) external onlyProductOwner {
-        _updateParameter(newMaintenance, newFundingFee, newMakerFee, newTakerFee, newPositionFee, newMakerLimit, newClosed);
+    function updateParameter(Parameter memory newParameter) external onlyProductOwner {
+        _updateParameter(newParameter);
     }
 
     /**
@@ -90,12 +54,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
      */
     function _updateUtilizationCurve(JumpRateUtilizationCurve memory newUtilizationCurve) private {
         _utilizationCurve.store(newUtilizationCurve);
-        emit JumpRateUtilizationCurveUpdated(
-            newUtilizationCurve.minRate.unpack(),
-            newUtilizationCurve.maxRate.unpack(),
-            newUtilizationCurve.targetRate.unpack(),
-            newUtilizationCurve.targetUtilization.unpack()
-        );
+        emit JumpRateUtilizationCurveUpdated(newUtilizationCurve);
     }
 
     /**

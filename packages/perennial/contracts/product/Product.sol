@@ -33,21 +33,9 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
         /* Product Parameters */
 
-        UFixed18 maintenance;
-
-        UFixed18 fundingFee;
-
-        UFixed18 makerFee;
-
-        UFixed18 takerFee;
-
-        UFixed18 positionFee;
-
-        UFixed18 makerLimit;
+        Parameter parameter;
 
         JumpRateUtilizationCurve utilizationCurve;
-
-        bool closed;
 
         /* Current Global State */
         uint256 latestVersion;
@@ -106,25 +94,20 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
     /**
      * @notice Initializes the contract state
-     * @param productInfo_ Product initialization params
      */
-    function initialize(ProductInfo calldata productInfo_) external initializer(1) {
+    function initialize(
+        IProduct.ProductDefinition calldata definition_,
+        Parameter calldata parameter_,
+        JumpRateUtilizationCurve calldata utilizationCurve_
+    ) external initializer(1) {
         __UControllerProvider__initialize(IController(msg.sender));
-        __UPayoffProvider__initialize(productInfo_.oracle, productInfo_.payoffDefinition);
+        __UPayoffProvider__initialize(definition_.oracle, definition_.payoffDefinition);
         __UReentrancyGuard__initialize();
-        __UParamProvider__initialize(
-            productInfo_.maintenance,
-            productInfo_.fundingFee,
-            productInfo_.makerFee,
-            productInfo_.takerFee,
-            productInfo_.positionFee,
-            productInfo_.makerLimit,
-            productInfo_.utilizationCurve
-        );
+        __UParamProvider__initialize(parameter_, utilizationCurve_);
 
-        name = productInfo_.name;
-        symbol = productInfo_.symbol;
-        token = productInfo_.token;
+        name = definition_.name;
+        symbol = definition_.symbol;
+        token = definition_.token;
     }
 
     /**
@@ -163,7 +146,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         // Dispurse fee
         // TODO: cleanup
         UFixed18 liquidationFee = controller().liquidationFee();
-        UFixed18 accountMaintenance = context.account.maintenance(context.currentOracleVersion, context.maintenance);
+        UFixed18 accountMaintenance = context.account.maintenance(context.currentOracleVersion, context.parameter.maintenance);
         UFixed18 fee = UFixed18Lib.min(context.account.collateral, accountMaintenance.mul(liquidationFee));
         context.account.settleCollateral(UFixed18Lib.ZERO, Fixed18Lib.from(-1, fee)); // no shortfall
 
@@ -206,28 +189,28 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         // before
         if (context.paused) revert PausedError();
         if (context.liquidation) revert ProductInLiquidationError();
-        if (context.closed && !_closingNext(context, positionAmount)) revert ProductClosedError();
+        if (context.parameter.closed && !_closingNext(context, positionAmount)) revert ProductClosedError();
 
         // update
         (Fixed18 makerAmount, Fixed18 takerAmount) = context.account.update(
             positionAmount,
             collateralAmount,
             context.currentOracleVersion,
-            context.makerFee,
-            context.takerFee
+            context.parameter.makerFee,
+            context.parameter.takerFee
         );
         context.pre.update(
             makerAmount,
             takerAmount,
             context.currentOracleVersion,
-            context.makerFee,
-            context.takerFee
+            context.parameter.makerFee,
+            context.parameter.takerFee
         );
 
         // after
         if (_liquidatable(context) || _liquidatableNext(context)) revert ProductInsufficientCollateralError();
         if (!force && _socializationNext(context).lt(UFixed18Lib.ONE)) revert ProductInsufficientLiquidityError();
-        if (context.version.position().next(context.pre).maker.gt(context.makerLimit)) revert ProductMakerOverLimitError();
+        if (context.version.position().next(context.pre).maker.gt(context.parameter.makerLimit)) revert ProductMakerOverLimitError();
         if (!context.account.collateral.isZero() && context.account.collateral.lt(context.minCollateral)) revert ProductCollateralUnderLimitError();
 
         // save
@@ -248,7 +231,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         (context.incentivizer, context.minFundingFee, context.minCollateral, context.paused, context.protocolTreasury, context.protocolFee) = controller().settlementParameters();
 
         // Load product parameters
-        (context.maintenance, context.fundingFee, context.makerFee, context.takerFee, context.positionFee, context.makerLimit, context.closed) = parameter();
+        context.parameter = parameter();
         context.utilizationCurve = utilizationCurve();
 
         // Load product state
@@ -329,11 +312,11 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
                 feeAccumulator,
                 context.pre,
                 period,
-                context.positionFee,
+                context.parameter.positionFee,
                 context.utilizationCurve,
                 context.minFundingFee,
-                context.fundingFee,
-                context.closed
+                context.parameter.fundingFee,
+                context.parameter.closed
             );
             context.latestVersion = period.toVersion.version;
             _versions[period.toVersion.version] = context.version;
@@ -364,17 +347,17 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @return Whether the account can be liquidated
      */
     function _liquidatableNext(CurrentContext memory context) private pure returns (bool) {
-        UFixed18 maintenanceAmount = context.account.maintenanceNext(context.currentOracleVersion, context.maintenance);
+        UFixed18 maintenanceAmount = context.account.maintenanceNext(context.currentOracleVersion, context.parameter.maintenance);
         return maintenanceAmount.gt(context.account.collateral);
     }
 
     function _liquidatable(CurrentContext memory context) private pure returns (bool) {
-        UFixed18 maintenanceAmount = context.account.maintenance(context.currentOracleVersion, context.maintenance);
+        UFixed18 maintenanceAmount = context.account.maintenance(context.currentOracleVersion, context.parameter.maintenance);
         return maintenanceAmount.gt(context.account.collateral);
     }
 
     function _socializationNext(CurrentContext memory context) private pure returns (UFixed18) {
-        if (context.closed) return UFixed18Lib.ONE;
+        if (context.parameter.closed) return UFixed18Lib.ONE;
         return context.version.position().next(context.pre).socializationFactor();
     }
 
