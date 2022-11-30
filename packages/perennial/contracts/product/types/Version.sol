@@ -63,13 +63,11 @@ library VersionLib {
      * @param period The oracle version period to settle for
      * @return newFeeAccumulator The fee accrued from opening or closing a new position
      */
-    function accumulateAndSettle(
+    function accumulate(
         Version memory versionAccumulator,
         UFixed18 feeAccumulator,
         PrePosition memory pre,
         Period memory period,
-        UFixed18 makerFee,
-        UFixed18 takerFee,
         UFixed18 positionFee,
         JumpRateUtilizationCurve memory utilizationCurve,
         UFixed18 minFundingFee,
@@ -99,59 +97,13 @@ library VersionLib {
         _accumulateShare(shareAccumulator, latestPosition, period);
 
         // accumulate position fee
-        feeAccumulator = _accumulatePositionFee(
-            valueAccumulator,
-            feeAccumulator,
-            period,
-            latestPosition,
-            pre,
-            makerFee,
-            takerFee,
-            positionFee
-        );
+        feeAccumulator = _accumulatePositionFee(valueAccumulator, feeAccumulator, latestPosition, pre, positionFee);
 
         // pack
         versionAccumulator._value = valueAccumulator.pack();
         versionAccumulator._share = shareAccumulator.pack();
         versionAccumulator._position = latestPosition.next(pre).pack();
         pre.clear();
-        newFeeAccumulator = feeAccumulator.add(newFeeAccumulator);
-    }
-
-    function accumulate(
-        Version memory versionAccumulator,
-        UFixed18 feeAccumulator,
-        Period memory period,
-        JumpRateUtilizationCurve memory utilizationCurve,
-        UFixed18 minFundingFee,
-        UFixed18 fundingFee,
-        bool closed
-    ) internal pure returns (UFixed18 newFeeAccumulator) {
-        // unpack
-        (Accumulator memory valueAccumulator, Accumulator memory shareAccumulator, Position memory latestPosition) =
-            (versionAccumulator.value(), versionAccumulator.share(), versionAccumulator.position());
-
-        // accumulate funding
-        feeAccumulator = _accumulateFunding(
-            valueAccumulator,
-            feeAccumulator,
-            latestPosition,
-            period,
-            utilizationCurve,
-            minFundingFee,
-            fundingFee,
-            closed
-        );
-
-        // accumulate position
-        _accumulatePosition(valueAccumulator, latestPosition, period, closed);
-
-        // accumulate share
-        _accumulateShare(shareAccumulator, latestPosition, period);
-
-        // pack
-        versionAccumulator._value = valueAccumulator.pack();
-        versionAccumulator._share = shareAccumulator.pack();
         newFeeAccumulator = feeAccumulator.add(newFeeAccumulator);
     }
 
@@ -168,16 +120,13 @@ library VersionLib {
     function _accumulatePositionFee(
         Accumulator memory valueAccumulator,
         UFixed18 feeAccumulator,
-        Period memory period,
         Position memory latestPosition,
         PrePosition memory pre,
-        UFixed18 makerFee,
-        UFixed18 takerFee,
-        UFixed18 positionFee
+        UFixed18 positionFee //TODO: move this to update also?
     ) private pure returns (UFixed18 newFeeAccumulator) {
         if (pre.isEmpty()) return feeAccumulator;
 
-        Position memory positionFeeAmount = pre.computeFee(period.fromVersion, makerFee, takerFee);
+        Position memory positionFeeAmount = pre.fees();
         Position memory protocolFeeAmount = positionFeeAmount.mul(positionFee);
         positionFeeAmount = positionFeeAmount.sub(protocolFeeAmount);
         newFeeAccumulator = protocolFeeAmount.sum();

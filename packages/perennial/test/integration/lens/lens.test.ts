@@ -44,8 +44,10 @@ describe('Lens', () => {
     let globalPre = productSnapshot.pre
     let globalPosition = productSnapshot.position
     expectPrePositionEq(globalPre, {
-      openPosition: { maker: POSITION, taker: POSITION },
-      closePosition: { maker: 0, taker: 0 },
+      _maker: POSITION,
+      _taker: POSITION,
+      _makerFee: 0,
+      _takerFee: 0,
     })
     expectPositionEq(globalPosition, { maker: 0, taker: 0 })
     expect(productSnapshot.latestVersion.price).to.equal('11388297509860897871140900')
@@ -72,8 +74,10 @@ describe('Lens', () => {
     globalPre = productSnapshot.pre
     globalPosition = productSnapshot.position
     expectPrePositionEq(globalPre, {
-      openPosition: { maker: 0, taker: 0 },
-      closePosition: { maker: 0, taker: 0 },
+      _maker: 0,
+      _taker: 0,
+      _makerFee: 0,
+      _takerFee: 0,
     })
 
     userSnapshot = await lens.callStatic['snapshot(address,address)'](user.address, product.address)

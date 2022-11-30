@@ -221,12 +221,10 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         returns (UFixed18 newFeeAccumulator)
     {
         if (context.currentOracleVersion.version > context.latestVersion) {
-            (newFeeAccumulator) = context.version.accumulateAndSettle(
+            (newFeeAccumulator) = context.version.accumulate(
                 feeAccumulator,
                 context.pre,
                 period,
-                context.makerFee,
-                context.takerFee,
                 context.positionFee,
                 context.utilizationCurve,
                 context.minFundingFee,
@@ -261,10 +259,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     }
 
     function _update(address account, Fixed18 positionAmount, Fixed18 collateralAmount, bool force) private returns (CurrentContext memory context) {
-        // TODO: remove
-        UFixed18 shortfallAccumulator;
-
-        // Load state into memory
+        // load
         context = _loadContext(account);
         _settle(context, account);
 
@@ -273,27 +268,34 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         if (context.liquidation) revert ProductInLiquidationError();
         if (context.closed && !_closingNext(context, positionAmount)) revert ProductClosedError();
 
-        // position
-        Fixed18 nextPosition = context.account.next();
-        UFixed18 positionFee = positionAmount.mul(context.currentOracleVersion.price).abs().mul(context.takerFee);
-
-        context.account.update(positionAmount);
-        context.pre.update(nextPosition, positionAmount);
-        shortfallAccumulator = context.account.settleCollateral(shortfallAccumulator, Fixed18Lib.from(-1, positionFee));
-        shortfallAccumulator = context.account.settleCollateral(shortfallAccumulator, collateralAmount); //TODO: these should combine with update
-
-        //TODO: order
-        _saveContext(context, account);
-
-        if (collateralAmount.sign() == 1) token.pull(account, collateralAmount.abs());
-        if (collateralAmount.sign() == -1) token.push(account, collateralAmount.abs());
+        // update
+        (Fixed18 makerAmount, Fixed18 takerAmount) = context.account.update(
+            positionAmount,
+            collateralAmount,
+            context.currentOracleVersion,
+            context.makerFee,
+            context.takerFee
+        );
+        context.pre.update(
+            makerAmount,
+            takerAmount,
+            context.currentOracleVersion,
+            context.makerFee,
+            context.takerFee
+        );
 
         // after
-        if (!shortfallAccumulator.isZero()) revert ProductShortfallError();
         if (_liquidatable(context) || _liquidatableNext(context)) revert ProductInsufficientCollateralError();
         if (!force && _socializationNext(context).lt(UFixed18Lib.ONE)) revert ProductInsufficientLiquidityError();
         if (context.version.position().next(context.pre).maker.gt(context.makerLimit)) revert ProductMakerOverLimitError();
         if (!context.account.collateral.isZero() && context.account.collateral.lt(context.minCollateral)) revert ProductCollateralUnderLimitError();
+
+        // save
+        _saveContext(context, account);
+
+        // fund
+        if (collateralAmount.sign() == 1) token.pull(account, collateralAmount.abs());
+        if (collateralAmount.sign() == -1) token.push(account, collateralAmount.abs());
 
         // events
         //TODO: cleanup

@@ -123,7 +123,10 @@ library PositionLib {
      * @return Next Position
      */
     function next(Position memory self, PrePosition memory pre) internal pure returns (Position memory) {
-        return sub(add(self, pre.openPosition), pre.closePosition);
+        return Position(
+            UFixed18Lib.from(Fixed18Lib.from(self.maker).add(pre.maker())),
+            UFixed18Lib.from(Fixed18Lib.from(self.taker).add(pre.taker()))
+        );
     }
 
     /**

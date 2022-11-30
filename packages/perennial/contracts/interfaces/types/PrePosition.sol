@@ -8,11 +8,10 @@ import "../IProduct.sol";
 
 /// @dev PrePosition type
 struct PrePosition {
-    /// @dev Size of position to open at oracle version
-    Position openPosition;
-
-    /// @dev Size of position to close at oracle version
-    Position closePosition;
+    PackedFixed18 _maker;
+    PackedFixed18 _taker;
+    PackedUFixed18 _makerFee;
+    PackedUFixed18 _takerFee; //TODO: introduce intra-version netting for fees
 }
 using PrePositionLib for PrePosition global;
 
@@ -28,6 +27,18 @@ using PrePositionLib for PrePosition global;
  *      global state types.
  */
 library PrePositionLib {
+    function maker(PrePosition memory self) internal pure returns (Fixed18) {
+        return self._maker.unpack();
+    }
+
+    function taker(PrePosition memory self) internal pure returns (Fixed18) {
+        return self._taker.unpack();
+    }
+
+    function fees(PrePosition memory self) internal pure returns (Position memory) {
+        return Position(self._makerFee.unpack(), self._takerFee.unpack());
+    }
+
     /**
      * @notice Returns whether there is no pending-settlement position delta
      * @dev Can be "empty" even with a non-zero oracleVersion if a position is opened and
@@ -36,62 +47,33 @@ library PrePositionLib {
      * @return Whether the pending-settlement position delta is empty
      */
     function isEmpty(PrePosition memory self) internal pure returns (bool) {
-        return self.openPosition.isEmpty() && self.closePosition.isEmpty();
+        return self.maker().isZero() && self.taker().isZero() && self.fees().isEmpty();
     }
 
     function clear(PrePosition memory self) internal pure {
-        delete self.openPosition;
-        delete self.closePosition;
+        self._maker = PackedFixed18.wrap(0);
+        self._taker = PackedFixed18.wrap(0);
+        self._makerFee = PackedUFixed18.wrap(0);
+        self._takerFee = PackedUFixed18.wrap(0);
     }
 
-    function update(PrePosition memory self, Fixed18 position, Fixed18 amount) internal pure {
-        if (amount.sign() == 1) {
-            if (position.sign() == 1) {
-                self.openPosition.taker = self.openPosition.taker.add(amount.abs());
-            } else {
-                if (position.sign() == position.add(amount).sign() || position.add(amount).sign() == 0) {
-                    self.closePosition.maker = self.closePosition.maker.add(amount.abs());
-                } else {
-                    self.closePosition.maker = self.closePosition.maker.add(position.abs());
-                    self.openPosition.taker = self.openPosition.taker.add(amount.abs().sub(position.abs()));
-                }
-            }
-        } else {
-            if (position.sign() == 1) {
-                if (position.sign() == position.add(amount).sign() || position.add(amount).sign() == 0) {
-                    self.closePosition.taker = self.closePosition.taker.add(amount.abs());
-                } else {
-                    self.closePosition.taker = self.closePosition.taker.add(position.abs());
-                    self.openPosition.maker = self.openPosition.maker.add(amount.abs().sub(position.abs()));
-                }
-            } else {
-                self.openPosition.maker = self.openPosition.maker.add(amount.abs());
-            }
-        }
-    }
-
-    /**
-     * @notice Computes the fee incurred for opening or closing the pending-settlement position
-     * @dev Must be called from a valid product to get the proper fee amounts
-     * @param self The struct to operate on
-     * @param toOracleVersion The oracle version at which settlement takes place
-     * @param makerFee The fee for opening or closing a maker position
-     * @param takerFee The fee for opening or closing a taker position
-     * @return positionFee The maker / taker fee incurred
-     */
-    function computeFee(
+    function update(
         PrePosition memory self,
-        IOracleProvider.OracleVersion memory toOracleVersion,
+        Fixed18 makerAmount,
+        Fixed18 takerAmount,
+        IOracleProvider.OracleVersion memory currentOracleVersion,
         UFixed18 makerFee,
         UFixed18 takerFee
-    ) internal pure returns (Position memory) {
-        Position memory positionDelta = self.openPosition.add(self.closePosition);
-
-        (UFixed18 makerNotional, UFixed18 takerNotional) = (
-            Fixed18Lib.from(positionDelta.maker).mul(toOracleVersion.price).abs(),
-            Fixed18Lib.from(positionDelta.taker).mul(toOracleVersion.price).abs()
-        );
-
-        return Position(makerNotional.mul(makerFee), takerNotional.mul(takerFee));
+    ) internal pure {
+        self._maker = self.maker().add(makerAmount).pack();
+        self._taker = self.taker().add(takerAmount).pack();
+        self._makerFee = self._makerFee //TODO: double computing
+            .unpack()
+            .add(makerAmount.mul(currentOracleVersion.price).abs().mul(makerFee))
+            .pack();
+        self._takerFee = self._takerFee
+            .unpack()
+            .add(takerAmount.mul(currentOracleVersion.price).abs().mul(takerFee))
+            .pack();
     }
 }

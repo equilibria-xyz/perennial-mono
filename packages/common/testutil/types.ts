@@ -7,8 +7,10 @@ export interface Position {
 }
 
 export interface PrePosition {
-  openPosition: Position
-  closePosition: Position
+  _maker: BigNumberish
+  _taker: BigNumberish
+  _makerFee: BigNumberish
+  _takerFee: BigNumberish
 }
 
 export interface ProgramInfo {
@@ -28,8 +30,10 @@ export function expectPositionEq(a: Position, b: Position): void {
 }
 
 export function expectPrePositionEq(a: PrePosition, b: PrePosition): void {
-  expectPositionEq(a.openPosition, b.openPosition)
-  expectPositionEq(a.closePosition, b.closePosition)
+  expect(a._maker).to.equal(b._maker)
+  expect(a._taker).to.equal(b._taker)
+  expect(a._makerFee).to.equal(b._makerFee)
+  expect(a._takerFee).to.equal(b._takerFee)
 }
 
 export function expectProgramInfoEq(a: ProgramInfo, b: ProgramInfo): void {

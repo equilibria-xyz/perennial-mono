@@ -22,9 +22,38 @@ using AccountLib for Account global;
  * @notice Library that manages an account-level position.
  */
 library AccountLib {
+    error AccountShortfallError();
 
-    function update(Account memory account, Fixed18 amount) internal pure {
-        account._pre = account._pre.unpack().add(amount).pack();
+    function update(
+        Account memory account,
+        Fixed18 positionAmount,
+        Fixed18 collateralAmount,
+        IOracleProvider.OracleVersion memory currentOracleVersion,
+        UFixed18 makerFee,
+        UFixed18 takerFee
+    ) internal pure returns (Fixed18 makerAmount, Fixed18 takerAmount) {
+        // compute position update
+        Fixed18 currentNext = next(account);
+        (Fixed18 currentMaker, Fixed18 currentTaker) =
+            (currentNext.min(Fixed18Lib.ZERO).mul(Fixed18Lib.NEG_ONE), currentNext.max(Fixed18Lib.ZERO));
+
+        Fixed18 nextNext = currentNext.add(positionAmount);
+        (Fixed18 nextMaker, Fixed18 nextTaker) =
+            (nextNext.min(Fixed18Lib.ZERO).mul(Fixed18Lib.NEG_ONE), nextNext.max(Fixed18Lib.ZERO));
+
+        (makerAmount, takerAmount) = (nextMaker.sub(currentMaker), nextTaker.sub(currentTaker));
+
+        // compute collateral update
+        collateralAmount = collateralAmount
+            .sub(Fixed18Lib.from(makerAmount.mul(currentOracleVersion.price).abs().mul(makerFee)))
+            .sub(Fixed18Lib.from(takerAmount.mul(currentOracleVersion.price).abs().mul(takerFee)));
+
+        // update collateral
+        UFixed18 shortfall = settleCollateral(account, UFixed18Lib.ZERO, collateralAmount);
+        if (!shortfall.isZero()) revert AccountShortfallError();
+
+        // update position
+        account._pre = account._pre.unpack().add(positionAmount).pack();
     }
 
     /**
