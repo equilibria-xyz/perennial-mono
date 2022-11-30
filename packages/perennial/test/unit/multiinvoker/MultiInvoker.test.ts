@@ -175,6 +175,39 @@ describe('MultiInvoker', () => {
       expect(usdc.transfer).to.have.been.calledWith(user.address, usdcAmount)
     })
 
+    it('wraps USDC to DSU then deposits DSU on WRAP_AND_DEPOSIT action', async () => {
+      await expect(multiInvoker.connect(user).invoke([actions.WRAP_AND_DEPOSIT])).to.not.be.reverted
+
+      expect(usdc.transferFrom).to.have.been.calledWith(user.address, multiInvoker.address, usdcAmount)
+      expect(batcher.wrap).to.have.been.calledWith(amount, multiInvoker.address)
+      expect(collateral.depositTo).to.have.been.calledWith(user.address, product.address, amount)
+    })
+
+    it('wraps USDC to DSU using RESERVE then deposits DSU on WRAP_AND_DEPOSIT action if amount is greater than batcher balance', async () => {
+      dsu.balanceOf.whenCalledWith(batcher.address).returns(0)
+      dsu.transfer.whenCalledWith(multiInvoker.address, amount).returns(true)
+
+      await expect(multiInvoker.connect(user).invoke([actions.WRAP_AND_DEPOSIT])).to.not.be.reverted
+
+      expect(usdc.transferFrom).to.have.been.calledWith(user.address, multiInvoker.address, usdcAmount)
+      expect(reserve.mint).to.have.been.calledWith(amount)
+      expect(collateral.depositTo).to.have.been.calledWith(user.address, product.address, amount)
+    })
+
+    it('withdraws then unwraps on WITHDRAW_AND_UNWRAP action', async () => {
+      await expect(multiInvoker.connect(user).invoke([actions.WITHDRAW_AND_UNWRAP])).to.not.be.reverted
+
+      expect(collateral.withdrawFrom).to.have.been.calledWith(
+        user.address,
+        multiInvoker.address,
+        product.address,
+        amount,
+      )
+
+      expect(reserve.redeem).to.have.been.calledWith(amount)
+      expect(usdc.transfer).to.have.been.calledWith(user.address, usdcAmount)
+    })
+
     it('performs a multi invoke', async () => {
       await expect(multiInvoker.connect(user).invoke(Object.values(actions))).to.not.be.reverted
 

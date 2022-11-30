@@ -96,6 +96,17 @@ contract MultiInvoker is IMultiInvoker, UInitializable, UControllerProvider {
             } else if (invocation.action == PerennialAction.UNWRAP) {
                 (address receiver, UFixed18 amount) = abi.decode(invocation.args, (address, UFixed18));
                 unwrap(receiver, amount);
+
+            // Wrap `msg.sender`s USDC into DSU and deposit into `account`s `product` collateral account
+            } else if (invocation.action == PerennialAction.WRAP_AND_DEPOSIT) {
+                (address account, IProduct product, UFixed18 amount) = abi.decode(invocation.args, (address, IProduct, UFixed18));
+                wrapAndDeposit(account, product, amount);
+            }
+
+            // Withdraw DSU from `msg.sender`s `product` collateral account, unwrap into USDC, and return the USDC to `receiver`
+            else if (invocation.action == PerennialAction.WITHDRAW_AND_UNWRAP) {
+                (address receiver, IProduct product, UFixed18 amount) = abi.decode(invocation.args, (address, IProduct, UFixed18));
+                withdrawAndUnwrap(receiver, product, amount);
             }
         }
     }
@@ -125,15 +136,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable, UControllerProvider {
         // Pull USDC from the `msg.sender`
         USDC.pull(msg.sender, amount, true);
 
-        Token18 token = controller().collateral().token();
-        // If the batcher doesn't have enough for this wrap, go directly to the reserve
-        if (amount.gt(token.balanceOf(address(batcher)))) {
-            batcher.RESERVE().mint(amount);
-            token.push(receiver, amount);
-        } else {
-            // Wrap the USDC into DSU and return to the receiver
-            batcher.wrap(amount, receiver);
-        }
+        _wrap(controller().collateral().token(), receiver, amount);
     }
 
     /**
@@ -145,6 +148,62 @@ contract MultiInvoker is IMultiInvoker, UInitializable, UControllerProvider {
         // Pull the token from the `msg.sender`
         controller().collateral().token().pull(msg.sender, amount);
 
+        _unwrap(receiver, amount);
+    }
+
+    /**
+     * @notice Wraps `amount` USDC from `msg.sender` into DSU, then deposits the USDC into `account`s `product` collateral account
+     * @param account Account to deposit funds on behalf of
+     * @param product Product to deposit funds for
+     * @param amount Amount of USDC to deposit into the collateral account
+     */
+    function wrapAndDeposit(address account, IProduct product, UFixed18 amount) private {
+        // Pull USDC from the `msg.sender`
+        USDC.pull(msg.sender, amount, true);
+
+        ICollateral _collateral = controller().collateral();
+        _wrap(_collateral.token(), address(this), amount);
+
+        // Deposit the amount to the collateral account
+        _collateral.depositTo(account, product, amount);
+    }
+
+    /**
+     * @notice Withdraws `amount` DSU from `msg.sender`s `product` collateral account, then unwraps the DSU into USDC and sends it to `receiver`
+     * @param receiver Address to receive the USDC
+     * @param product Product to withdraw funds for
+     * @param amount Amount of DSU to withdraw from the collateral account
+     */
+    function withdrawAndUnwrap(address receiver, IProduct product, UFixed18 amount) private {
+        // Withdraw the amount from the collateral account
+        controller().collateral().withdrawFrom(msg.sender, address(this), product, amount);
+
+        _unwrap(receiver, amount);
+    }
+
+    /**
+     * @notice Helper function to wrap `amount` USDC from `msg.sender` into DSU using the batcher or reserve
+     * @param token DSU token address
+     * @param receiver Address to receive the DSU
+     * @param amount Amount of USDC to wrap
+     */
+    function _wrap(Token18 token, address receiver, UFixed18 amount) private {
+        // If the batcher doesn't have enough for this wrap, go directly to the reserve
+        if (amount.gt(token.balanceOf(address(batcher)))) {
+            batcher.RESERVE().mint(amount);
+            if (receiver != address(this)) token.push(receiver, amount);
+        } else {
+            // Wrap the USDC into DSU and return to the receiver
+            batcher.wrap(amount, receiver);
+        }
+    }
+
+    /**
+     * @notice Helper function to unwrap `amount` DSU into USDC and send to `receiver`
+     * @param receiver Address to receive the USDC
+     * @param amount Amount of DSU to unwrap
+     */
+    function _unwrap(address receiver, UFixed18 amount) private {
         // Unwrap the DSU into USDC and return to the receiver
         // The current batcher does not have UNWRAP functionality yet, so just go directly to the reserve
         batcher.RESERVE().redeem(amount);

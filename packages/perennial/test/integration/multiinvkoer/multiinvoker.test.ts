@@ -101,6 +101,20 @@ describe('MultiInvoker', () => {
         .withArgs(user.address, 2472, position)
     })
 
+    it('performs a WRAP_AND_DEPOSIT and OPEN_MAKE chain', async () => {
+      const { user, multiInvoker, batcher, collateral, usdc } = instanceVars
+
+      await expect(multiInvoker.connect(user).invoke([actions.WRAP_AND_DEPOSIT, actions.OPEN_MAKE]))
+        .to.emit(usdc, 'Transfer')
+        .withArgs(user.address, multiInvoker.address, 100000e6)
+        .to.emit(batcher, 'Wrap')
+        .withArgs(user.address, amount)
+        .to.emit(collateral, 'Deposit')
+        .withArgs(user.address, product.address, amount)
+        .to.emit(product, 'MakeOpened')
+        .withArgs(user.address, 2472, position)
+    })
+
     it('performs a DEPOSIT and OPEN_MAKE chain', async () => {
       const { user, multiInvoker, collateral } = instanceVars
 
@@ -160,6 +174,23 @@ describe('MultiInvoker', () => {
       await product.connect(userB).openMake(position.mul(2))
 
       await expect(multiInvoker.connect(user).invoke([actions.WRAP, actions.DEPOSIT, actions.OPEN_TAKE]))
+        .to.emit(usdc, 'Transfer')
+        .withArgs(user.address, multiInvoker.address, 10000e6)
+        .to.emit(batcher, 'Wrap')
+        .withArgs(user.address, amount)
+        .to.emit(collateral, 'Deposit')
+        .withArgs(user.address, product.address, amount)
+        .to.emit(product, 'TakeOpened')
+        .withArgs(user.address, 2472, position)
+    })
+
+    it('performs a WRAP_AND_DEPOSIT and OPEN_TAKE chain', async () => {
+      const { user, userB, multiInvoker, batcher, collateral, usdc } = instanceVars
+
+      await depositTo(instanceVars, userB, product, amount.mul(2))
+      await product.connect(userB).openMake(position.mul(2))
+
+      await expect(multiInvoker.connect(user).invoke([actions.WRAP_AND_DEPOSIT, actions.OPEN_TAKE]))
         .to.emit(usdc, 'Transfer')
         .withArgs(user.address, multiInvoker.address, 10000e6)
         .to.emit(batcher, 'Wrap')
@@ -237,6 +268,26 @@ describe('MultiInvoker', () => {
       await multiInvoker.connect(user).invoke([actions.DEPOSIT])
 
       await expect(multiInvoker.connect(user).invoke([actions.WITHDRAW, actions.UNWRAP]))
+        .to.emit(collateral, 'Withdraw')
+        .withArgs(user.address, product.address, amount)
+        .to.emit(batcher.RESERVE(), 'Redeem')
+        .withArgs(multiInvoker.address, amount)
+        .to.emit(usdc, 'Transfer')
+        .withArgs(multiInvoker.address, user.address, 10000e6)
+    })
+
+    it('performs WITHDRAW_AND_UNWRAP', async () => {
+      const { user, multiInvoker, batcher, usdc, collateral } = instanceVars
+
+      // Load the Reserve with some USDC
+      await usdc.connect(user).approve(batcher.address, constants.MaxUint256)
+      await batcher.connect(user).wrap(amount, user.address)
+      await batcher.rebalance()
+
+      // Deposit the collateral to withdraw
+      await multiInvoker.connect(user).invoke([actions.DEPOSIT])
+
+      await expect(multiInvoker.connect(user).invoke([actions.WITHDRAW_AND_UNWRAP]))
         .to.emit(collateral, 'Withdraw')
         .withArgs(user.address, product.address, amount)
         .to.emit(batcher.RESERVE(), 'Redeem')
