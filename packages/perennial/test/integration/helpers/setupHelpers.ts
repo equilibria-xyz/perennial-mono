@@ -25,14 +25,16 @@ import {
   PerennialLens__factory,
   Forwarder,
   Forwarder__factory,
-  IBatcher,
-  IBatcher__factory,
+  Batcher,
+  Batcher__factory,
   ERC20PresetMinterPauser,
   ERC20PresetMinterPauser__factory,
   ProxyAdmin,
   ProxyAdmin__factory,
   TransparentUpgradeableProxy__factory,
   ReservoirFeedOracle,
+  MultiInvoker,
+  MultiInvoker__factory,
 } from '../../../types/generated'
 import { ChainlinkContext } from './chainlinkHelpers'
 import { createPayoffDefinition } from '../../../../common/testutil/types'
@@ -65,9 +67,10 @@ export interface InstanceVars {
   chainlinkOracle: ChainlinkOracle
   productBeacon: IBeacon
   productImpl: Product
+  multiInvoker: MultiInvoker
   incentivizer: Incentivizer
   lens: PerennialLens
-  batcher: IBatcher
+  batcher: Batcher
   forwarder: Forwarder
   incentiveToken: ERC20PresetMinterPauser
 }
@@ -91,7 +94,7 @@ export async function deployProtocol(): Promise<InstanceVars> {
   const contractPayoffProvider = await new TestnetContractPayoffProvider__factory(owner).deploy()
   const dsu = await IERC20Metadata__factory.connect((await deployments.get('DSU')).address, owner)
   const usdc = await IERC20Metadata__factory.connect((await deployments.get('USDC')).address, owner)
-  const batcher = await IBatcher__factory.connect((await deployments.get('Batcher')).address, owner)
+  const batcher = await Batcher__factory.connect((await deployments.get('Batcher')).address, owner)
 
   // Deploy protocol contracts
   const proxyAdmin = await new ProxyAdmin__factory(owner).deploy()
@@ -110,6 +113,7 @@ export async function deployProtocol(): Promise<InstanceVars> {
     proxyAdmin.address,
     [],
   )
+
   const collateralProxy = await new TransparentUpgradeableProxy__factory(owner).deploy(
     collateralImpl.address,
     proxyAdmin.address,
@@ -128,6 +132,20 @@ export async function deployProtocol(): Promise<InstanceVars> {
   await controller.initialize(collateral.address, incentivizer.address, productBeacon.address)
   await collateral.initialize(controller.address)
 
+  // Setup MultiInvoker
+  const multiInvokerImpl = await new MultiInvoker__factory(owner).deploy(
+    usdc.address,
+    batcher.address,
+    controllerProxy.address,
+  )
+  const multiInvokerProxy = await new TransparentUpgradeableProxy__factory(owner).deploy(
+    multiInvokerImpl.address,
+    proxyAdmin.address,
+    [],
+  )
+  const multiInvoker = await new MultiInvoker__factory(owner).attach(multiInvokerProxy.address)
+  await multiInvoker.initialize()
+
   // Params - TODO: finalize before launch
   await controller.updatePauser(pauser.address)
   await controller.updateCoordinatorTreasury(0, treasuryA.address)
@@ -137,6 +155,7 @@ export async function deployProtocol(): Promise<InstanceVars> {
   await controller.updateIncentivizationFee(utils.parseEther('0.00'))
   await controller.updateMinCollateral(utils.parseEther('500'))
   await controller.updateProgramsPerProduct(2)
+  await controller.updateMultiInvoker(multiInvoker.address)
 
   // Set state
   const dsuHolder = await impersonate.impersonateWithBalance(DSU_HOLDER, utils.parseEther('10'))
@@ -178,6 +197,7 @@ export async function deployProtocol(): Promise<InstanceVars> {
     controller,
     productBeacon,
     productImpl,
+    multiInvoker,
     incentivizer,
     collateral,
     lens,
@@ -212,6 +232,7 @@ export async function createProduct(
     fundingFee: utils.parseEther('0.1'),
     makerFee: 0,
     takerFee: 0,
+    positionFee: 0,
     makerLimit: utils.parseEther('1'),
     utilizationCurve: {
       minRate: 0,

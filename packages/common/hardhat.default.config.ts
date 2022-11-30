@@ -110,7 +110,7 @@ export default function defaultConfig({
               ? {}
               : {
                   '*': {
-                    '*': ['storageLayout'],
+                    '*': ['storageLayout'], // This is needed by Smock for mocking functions
                   },
                 },
           },
@@ -140,7 +140,7 @@ export default function defaultConfig({
       parallel: MOCHA_PARALLEL,
       reporter: MOCHA_REPORTER,
       slow: 1000,
-      timeout: 120000,
+      timeout: 180000,
     },
     contractSizer: {
       alphaSort: true,

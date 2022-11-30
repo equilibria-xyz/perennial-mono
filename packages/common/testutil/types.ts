@@ -1,4 +1,4 @@
-import { BigNumberish } from 'ethers'
+import { BigNumber, BigNumberish, constants } from 'ethers'
 import { expect } from 'chai'
 
 export interface Position {
@@ -66,4 +66,16 @@ export function createPayoffDefinition({
   }
 
   return definition
+}
+
+export class Big18Math {
+  public static BASE = constants.WeiPerEther
+
+  public static mul(a: BigNumber, b: BigNumber): BigNumber {
+    return a.mul(b).div(this.BASE)
+  }
+
+  public static div(a: BigNumber, b: BigNumber): BigNumber {
+    return a.mul(this.BASE).div(b)
+  }
 }

@@ -33,8 +33,6 @@ using PrePositionLib for PrePosition global;
 library PrePositionLib {
     /**
      * @notice Returns whether there is no pending-settlement position delta
-     * @dev Can be "empty" even with a non-zero oracleVersion if a position is opened and
-     *      closed in the same version netting out to a zero position delta
      * @param self The struct to operate on
      * @return Whether the pending-settlement position delta is empty
      */
@@ -44,7 +42,6 @@ library PrePositionLib {
 
     /**
      * @notice Increments the maker side of the open position delta
-     * @dev Nets out open and close deltas to minimize the size of each
      * @param self The struct to operate on
      * @param currentVersion The current oracle version index
      * @param amount The position amount to open
@@ -52,12 +49,10 @@ library PrePositionLib {
     function openMake(PrePosition storage self, uint256 currentVersion, UFixed18 amount) internal {
         self.openPosition.maker = self.openPosition.maker.add(amount);
         self.oracleVersion = currentVersion;
-        _netMake(self);
     }
 
     /**
      * @notice Increments the maker side of the close position delta
-     * @dev Nets out open and close deltas to minimize the size of each
      * @param self The struct to operate on
      * @param currentVersion The current oracle version index
      * @param amount The maker position amount to close
@@ -65,12 +60,10 @@ library PrePositionLib {
     function closeMake(PrePosition storage self, uint256 currentVersion, UFixed18 amount) internal {
         self.closePosition.maker = self.closePosition.maker.add(amount);
         self.oracleVersion = currentVersion;
-        _netMake(self);
     }
 
     /**
      * @notice Increments the taker side of the open position delta
-     * @dev Nets out open and close deltas to minimize the size of each
      * @param self The struct to operate on
      * @param currentVersion The current oracle version index
      * @param amount The taker position amount to open
@@ -78,12 +71,10 @@ library PrePositionLib {
     function openTake(PrePosition storage self, uint256 currentVersion, UFixed18 amount) internal {
         self.openPosition.taker = self.openPosition.taker.add(amount);
         self.oracleVersion = currentVersion;
-        _netTake(self);
     }
 
     /**
      * @notice Increments the taker side of the close position delta
-     * @dev Nets out open and close deltas to minimize the size of each
      * @param self The struct to operate on
      * @param currentVersion The current oracle version index
      * @param amount The taker position amount to close
@@ -91,35 +82,6 @@ library PrePositionLib {
     function closeTake(PrePosition storage self, uint256 currentVersion, UFixed18 amount) internal {
         self.closePosition.taker = self.closePosition.taker.add(amount);
         self.oracleVersion = currentVersion;
-        _netTake(self);
-    }
-
-    /**
-     * @notice Nets out the open and close on the maker side of the position delta
-     * @param self The struct to operate on
-     */
-    function _netMake(PrePosition storage self) private {
-        if (self.openPosition.maker.gt(self.closePosition.maker)) {
-            self.openPosition.maker = self.openPosition.maker.sub(self.closePosition.maker);
-            self.closePosition.maker = UFixed18Lib.ZERO;
-        } else {
-            self.closePosition.maker = self.closePosition.maker.sub(self.openPosition.maker);
-            self.openPosition.maker = UFixed18Lib.ZERO;
-        }
-    }
-
-    /**
-     * @notice Nets out the open and close on the taker side of the position delta
-     * @param self The struct to operate on
-     */
-    function _netTake(PrePosition storage self) private {
-        if (self.openPosition.taker.gt(self.closePosition.taker)) {
-            self.openPosition.taker = self.openPosition.taker.sub(self.closePosition.taker);
-            self.closePosition.taker = UFixed18Lib.ZERO;
-        } else {
-            self.closePosition.taker = self.closePosition.taker.sub(self.openPosition.taker);
-            self.openPosition.taker = UFixed18Lib.ZERO;
-        }
     }
 
     /**
@@ -140,22 +102,22 @@ library PrePositionLib {
      * @notice Computes the fee incurred for opening or closing the pending-settlement position
      * @dev Must be called from a valid product to get the proper fee amounts
      * @param self The struct to operate on
-     * @param toOracleVersion The oracle version at which settlement takes place
-     * @return positionFee The maker / taker fee incurred
+     * @param latestOracleVersion The oracle version at which position was modified
+     * @return The maker / taker fee incurred
      */
     function computeFee(
         PrePosition memory self,
-        IOracleProvider.OracleVersion memory toOracleVersion
-    ) internal view returns (UFixed18) {
+        IOracleProvider.OracleVersion memory latestOracleVersion
+    ) internal view returns (Position memory) {
         Position memory positionDelta = self.openPosition.add(self.closePosition);
 
         (UFixed18 makerNotional, UFixed18 takerNotional) = (
-            Fixed18Lib.from(positionDelta.maker).mul(toOracleVersion.price).abs(),
-            Fixed18Lib.from(positionDelta.taker).mul(toOracleVersion.price).abs()
+            Fixed18Lib.from(positionDelta.maker).mul(latestOracleVersion.price).abs(),
+            Fixed18Lib.from(positionDelta.taker).mul(latestOracleVersion.price).abs()
         );
 
         IProduct product = IProduct(address(this));
-        return makerNotional.mul(product.makerFee()).add(takerNotional.mul(product.takerFee()));
+        return Position(makerNotional.mul(product.makerFee()), takerNotional.mul(product.takerFee()));
     }
 
     /**
