@@ -135,7 +135,7 @@ export async function deployProtocol(): Promise<InstanceVars> {
 
   // Init
   await incentivizer.initialize(controller.address)
-  await controller.initialize(collateral.address, incentivizer.address, productBeacon.address, multiInvoker.address)
+  await controller.initialize(collateral.address, incentivizer.address, productBeacon.address)
   await collateral.initialize(controller.address)
   await multiInvoker.initialize(controller.address)
 
@@ -148,6 +148,7 @@ export async function deployProtocol(): Promise<InstanceVars> {
   await controller.updateIncentivizationFee(utils.parseEther('0.00'))
   await controller.updateMinCollateral(utils.parseEther('500'))
   await controller.updateProgramsPerProduct(2)
+  await controller.updateMultiInvoker(multiInvoker.address)
 
   // Set state
   const dsuHolder = await impersonate.impersonateWithBalance(DSU_HOLDER, utils.parseEther('10'))
