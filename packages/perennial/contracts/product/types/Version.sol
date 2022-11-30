@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.17;
 
-import "../../interfaces/IProduct.sol";
+import "@equilibria/root/curve/types/JumpRateUtilizationCurve.sol";
 import "../../interfaces/types/Accumulator.sol";
+import "../../interfaces/types/PackedAccumulator.sol";
+import "../../interfaces/types/PackedPosition.sol";
+import "../../interfaces/types/PrePosition.sol";
 import "./Period.sol";
 
 /// @dev Version type

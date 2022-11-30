@@ -10,6 +10,8 @@ import "./types/PayoffDefinition.sol";
 import "./types/Position.sol";
 import "./types/PrePosition.sol";
 import "./types/Accumulator.sol";
+import "../product/types/Version.sol"; //TODO: these have to be in interface
+import "../product/types/Account.sol";
 
 interface IProduct is IPayoffProvider, IParamProvider {
     /// @dev Product Creation parameters
@@ -82,16 +84,11 @@ interface IProduct is IPayoffProvider, IParamProvider {
     function liquidate(address account) external;
     function resolveShortfall(UFixed18 amount) external;
     function liquidation(address account) external view returns (bool);
-    function collateral(address account) external view returns (UFixed18);
-    function position(address account) external view returns (Fixed18);
-    function pre(address account) external view returns (Fixed18);
     function liquidatable(address account) external view returns (bool);
     function latestVersion() external view returns (uint256);
-    function collateral() external view returns (UFixed18);
     function shortfall() external view returns (UFixed18);
-    function positionAtVersion(uint256 oracleVersion) external view returns (Position memory);
+    function accounts(address account) external view returns (Account memory);
+    function versions(uint256 oracleVersion) external view returns (Version memory);
     function pre() external view returns (PrePosition memory);
-    function valueAtVersion(uint256 oracleVersion) external view returns (Accumulator memory);
-    function shareAtVersion(uint256 oracleVersion) external view returns (Accumulator memory);
     function latestVersions(address account) external view returns (uint256);
 }

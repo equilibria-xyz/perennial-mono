@@ -139,7 +139,7 @@ contract PerennialLens is IPerennialLens {
      * @return Total collateral for product
      */
     function collateral(IProduct product) public settle(product) returns (UFixed18) {
-        return product.collateral();
+        return product.token().balanceOf(address(product)).sub(product.protocolFees()).sub(product.productFees());
     }
 
     /**
@@ -262,7 +262,8 @@ contract PerennialLens is IPerennialLens {
      * @return User deposited collateral for product
      */
     function collateral(address account, IProduct product) public settleAccount(account, product) returns (UFixed18) {
-        return product.collateral(account);
+        Account memory productAccount = product.accounts(account);
+        return productAccount.collateral;
     }
 
     /**
@@ -272,11 +273,13 @@ contract PerennialLens is IPerennialLens {
      * @return Maximum of user maintenance, and maintenanceNext
      */
     function maintenance(address account, IProduct product) public settleAccount(account, product) returns (UFixed18) {
-        return _maintenance(product, product.position(account));
+        Account memory productAccount = product.accounts(account);
+        return _maintenance(product, productAccount.position());
     }
 
     function maintenanceNext(address account, IProduct product) public settleAccount(account, product) returns (UFixed18) {
-        return _maintenance(product, product.position(account).add(product.pre(account)));
+        Account memory productAccount = product.accounts(account);
+        return _maintenance(product, productAccount.position().add(productAccount.pre()));
     }
 
     /**
@@ -310,7 +313,8 @@ contract PerennialLens is IPerennialLens {
         settleAccount(account, product)
         returns (Fixed18)
     {
-        return product.pre(account);
+        Account memory productAccount = product.accounts(account);
+        return productAccount.pre();
     }
 
     /**
@@ -324,7 +328,8 @@ contract PerennialLens is IPerennialLens {
         settleAccount(account, product)
         returns (Fixed18)
     {
-        return product.position(account);
+        Account memory productAccount = product.accounts(account);
+        return productAccount.position();
     }
 
     /**
@@ -339,7 +344,8 @@ contract PerennialLens is IPerennialLens {
         settleAccount(account, product)
         returns (Fixed18, Fixed18)
     {
-        return (product.pre(account), product.position(account));
+        Account memory productAccount = product.accounts(account);
+        return (productAccount.pre(), productAccount.position());
     }
 
     /**
@@ -353,7 +359,8 @@ contract PerennialLens is IPerennialLens {
         settleAccount(account, product)
         returns (Fixed18)
     {
-        return product.position(account).mul(_latestVersion(product).price);
+        Account memory productAccount = product.accounts(account);
+        return productAccount.position().mul(_latestVersion(product).price);
     }
 
     /**
@@ -458,7 +465,7 @@ contract PerennialLens is IPerennialLens {
      * @return Latest position for the product
      */
     function _latestPosition(IProduct product) private view returns (Position memory) {
-        return product.positionAtVersion(product.latestVersion());
+        return product.versions(product.latestVersion()).position();
     }
 
     /**

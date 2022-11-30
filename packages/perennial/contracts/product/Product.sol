@@ -38,7 +38,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     /// @dev Mapping of the historical version data
     mapping(uint256 => Version) _versions;
 
-    PrePosition private _pre;
+    PrePosition private _pre; //TODO: still outside?
 
     uint256 public latestVersion;
     mapping(address => uint256) public latestVersions;
@@ -127,6 +127,18 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         token = productInfo_.token;
     }
 
+    function accounts(address account) external view returns (Account memory) {
+        return _accounts[account];
+    }
+
+    function versions(uint256 oracleVersion) external view returns (Version memory) {
+        return _versions[oracleVersion];
+    }
+
+    function pre() external view returns (PrePosition memory) {
+        return _pre;
+    }
+
     /**
      * @notice Surfaces global settlement externally
      */
@@ -151,7 +163,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         context.currentOracleVersion = _sync();
         context.latestVersion = latestVersion;
         context.version = _versions[context.latestVersion];
-        context.pre = pre();
+        context.pre = _pre;
         context.productFees = productFees;
         context.protocolFees = protocolFees;
         context.shortfall = shortfall;
@@ -335,69 +347,10 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         emit Liquidation(account, msg.sender, fee);
     }
 
-    function collateral(address account) external view returns (UFixed18) {
-        return _accounts[account].collateral;
-    }
-
-    /**
-     * @notice Returns `account`'s current position
-     * @param account Account to return for
-     * @return Current position of the account
-     */
-    function position(address account) external view returns (Fixed18) {
-        return _accounts[account].position();
-    }
-
-    /**
-     * @notice Returns `account`'s current pending-settlement position
-     * @param account Account to return for
-     * @return Current pre-position of the account
-     */
-    function pre(address account) external view returns (Fixed18) {
-        return _accounts[account].pre();
-    }
-
-    function collateral() external view returns (UFixed18) {
-        return token.balanceOf().sub(productFees).sub(protocolFees);
-    }
-
-    /**
-     * @notice Returns the global position at oracleVersion `oracleVersion`
-     * @dev Only valid for the version at which a global settlement occurred
-     * @param oracleVersion Oracle version to return for
-     * @return Global position at oracle version
-     */
-    function positionAtVersion(uint256 oracleVersion) public view returns (Position memory) {
-        return _versions[oracleVersion].position();
-    }
-
     /**
      * @notice Returns the current global pending-settlement position
      * @return Global pending-settlement position
      */
-    function pre() public view returns (PrePosition memory) {
-        return _pre;
-    }
-
-    /**
-     * @notice Returns the global accumulator value at oracleVersion `oracleVersion`
-     * @dev Only valid for the version at which a global settlement occurred
-     * @param oracleVersion Oracle version to return for
-     * @return Global accumulator value at oracle version
-     */
-    function valueAtVersion(uint256 oracleVersion) external view returns (Accumulator memory) {
-        return _versions[oracleVersion].value();
-    }
-
-    /**
-     * @notice Returns the global accumulator share at oracleVersion `oracleVersion`
-     * @dev Only valid for the version at which a global settlement occurred
-     * @param oracleVersion Oracle version to return for
-     * @return Global accumulator share at oracle version
-     */
-    function shareAtVersion(uint256 oracleVersion) external view returns (Accumulator memory) {
-        return _versions[oracleVersion].share();
-    }
 
     /**
      * @notice Returns whether `account`'s `product` collateral account can be liquidated

@@ -62,7 +62,7 @@ describe('Reservoir Oracle Product', () => {
   })
 
   it('creates a product', async () => {
-    const { owner, user, controller, treasuryB, dsu } = instanceVars
+    const { owner, user, controller, treasuryB, dsu, lens } = instanceVars
 
     await expect(controller.connect(owner).createCoordinator())
       .to.emit(controller, 'CoordinatorCreated')
@@ -78,7 +78,7 @@ describe('Reservoir Oracle Product', () => {
     await dsu.connect(user).approve(product.address, utils.parseEther('1000'))
     await product.connect(user).update(0, utils.parseEther('1000'))
 
-    expect(await product['collateral()']()).to.equal(utils.parseEther('1000'))
+    expect(await lens.callStatic['collateral(address)'](product.address)).to.equal(utils.parseEther('1000'))
     expect(await product.shortfall()).to.equal(0)
   })
 
@@ -94,21 +94,21 @@ describe('Reservoir Oracle Product', () => {
       .withArgs(user.address, INITIAL_VERSION, POSITION)
 
     // Check user is in the correct state
-    expect(await product.position(user.address)).to.equal(0)
-    expect(await product['pre(address)'](user.address)).to.equal(0)
+    expect((await product.accounts(user.address))._position).to.equal(0)
+    expect((await product.accounts(user.address))._pre).to.equal(0)
     expect(await product.latestVersions(user.address)).to.equal(INITIAL_VERSION)
 
     // Check global state
     expect(await product.latestVersion()).to.equal(INITIAL_VERSION)
-    expectPositionEq(await product.positionAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
-    expectPrePositionEq(await product['pre()'](), {
+    expectPositionEq((await product.versions(INITIAL_VERSION))._position, { maker: 0, taker: 0 })
+    expectPrePositionEq(await product.pre(), {
       _maker: POSITION,
       _taker: 0,
       _makerFee: 0,
       _takerFee: 0,
     })
-    expectPositionEq(await product.valueAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
-    expectPositionEq(await product.shareAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
+    expectPositionEq((await product.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
+    expectPositionEq((await product.versions(INITIAL_VERSION))._share, { maker: 0, taker: 0 })
 
     // Settle the product with a new oracle version
     await oracleFeed.next()
@@ -116,8 +116,8 @@ describe('Reservoir Oracle Product', () => {
 
     // Check global post-settlement state
     expect(await product.latestVersion()).to.equal(INITIAL_VERSION.add(1))
-    expectPositionEq(await product.positionAtVersion(INITIAL_VERSION.add(1)), { maker: POSITION, taker: 0 })
-    expectPrePositionEq(await product['pre()'](), {
+    expectPositionEq((await product.versions(INITIAL_VERSION.add(1)))._position, { maker: POSITION, taker: 0 })
+    expectPrePositionEq(await product.pre(), {
       _maker: 0,
       _taker: 0,
       _makerFee: 0,
@@ -126,8 +126,8 @@ describe('Reservoir Oracle Product', () => {
 
     // Settle user and check state
     await product.settle(user.address)
-    expect(await product.position(user.address)).to.equal(POSITION.mul(-1))
-    expect(await product['pre(address)'](user.address)).to.equal(0)
+    expect((await product.accounts(user.address))._position).to.equal(POSITION.mul(-1))
+    expect((await product.accounts(user.address))._pre).to.equal(0)
     expect(await product.latestVersions(user.address)).to.equal(INITIAL_VERSION.add(1))
   })
 
@@ -145,21 +145,21 @@ describe('Reservoir Oracle Product', () => {
       .withArgs(user.address, INITIAL_VERSION, POSITION.div(2))
 
     // Check user is in the correct state
-    expect(await product.position(user.address)).to.equal(0)
-    expect(await product['pre(address)'](user.address)).to.equal(0)
+    expect((await product.accounts(user.address))._position).to.equal(0)
+    expect((await product.accounts(user.address))._pre).to.equal(0)
     expect(await product.latestVersions(user.address)).to.equal(INITIAL_VERSION)
 
     // Check global state
     expect(await product.latestVersion()).to.equal(INITIAL_VERSION)
-    expectPositionEq(await product.positionAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
-    expectPrePositionEq(await product['pre()'](), {
+    expectPositionEq((await product.versions(INITIAL_VERSION))._position, { maker: 0, taker: 0 })
+    expectPrePositionEq(await product.pre(), {
       _maker: POSITION,
       _taker: 0,
       _makerFee: 0,
       _takerFee: 0,
     })
-    expectPositionEq(await product.valueAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
-    expectPositionEq(await product.shareAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
+    expectPositionEq((await product.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
+    expectPositionEq((await product.versions(INITIAL_VERSION))._share, { maker: 0, taker: 0 })
 
     // Settle the product with a new oracle version
     await oracleFeed.next()
@@ -167,8 +167,8 @@ describe('Reservoir Oracle Product', () => {
 
     // Check global post-settlement state
     expect(await product.latestVersion()).to.equal(INITIAL_VERSION.add(1))
-    expectPositionEq(await product.positionAtVersion(INITIAL_VERSION.add(1)), { maker: POSITION, taker: 0 })
-    expectPrePositionEq(await product['pre()'](), {
+    expectPositionEq((await product.versions(INITIAL_VERSION.add(1)))._position, { maker: POSITION, taker: 0 })
+    expectPrePositionEq(await product.pre(), {
       _maker: 0,
       _taker: 0,
       _makerFee: 0,
@@ -177,8 +177,8 @@ describe('Reservoir Oracle Product', () => {
 
     // Settle user and check state
     await product.settle(user.address)
-    expect(await product.position(user.address)).to.equal(POSITION.mul(-1))
-    expect(await product['pre(address)'](user.address)).to.equal(0)
+    expect((await product.accounts(user.address))._position).to.equal(POSITION.mul(-1))
+    expect((await product.accounts(user.address))._pre).to.equal(0)
     expect(await product.latestVersions(user.address)).to.equal(INITIAL_VERSION.add(1))
   })
 
@@ -198,21 +198,21 @@ describe('Reservoir Oracle Product', () => {
     // User state
     expect(await lens.callStatic.maintenance(user.address, product.address)).to.equal(0)
     expect(await lens.callStatic.maintenanceNext(user.address, product.address)).to.equal(0)
-    expect(await product.position(user.address)).to.equal(0)
-    expect(await product['pre(address)'](user.address)).to.equal(0)
+    expect((await product.accounts(user.address))._position).to.equal(0)
+    expect((await product.accounts(user.address))._pre).to.equal(0)
     expect(await product.latestVersions(user.address)).to.equal(INITIAL_VERSION)
 
     // Global State
     expect(await product.latestVersion()).to.equal(INITIAL_VERSION)
-    expectPositionEq(await product.positionAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
-    expectPrePositionEq(await product['pre()'](), {
+    expectPositionEq((await product.versions(INITIAL_VERSION))._position, { maker: 0, taker: 0 })
+    expectPrePositionEq(await product.pre(), {
       _maker: 0,
       _taker: 0,
       _makerFee: 0,
       _takerFee: 0,
     })
-    expectPositionEq(await product.valueAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
-    expectPositionEq(await product.shareAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
+    expectPositionEq((await product.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
+    expectPositionEq((await product.versions(INITIAL_VERSION))._share, { maker: 0, taker: 0 })
   })
 
   it('closes multiple make positions', async () => {
@@ -232,21 +232,21 @@ describe('Reservoir Oracle Product', () => {
     // User state
     expect(await lens.callStatic.maintenance(user.address, product.address)).to.equal(0)
     expect(await lens.callStatic.maintenanceNext(user.address, product.address)).to.equal(0)
-    expect(await product.position(user.address)).to.equal(0)
-    expect(await product['pre(address)'](user.address)).to.equal(0)
+    expect((await product.accounts(user.address))._position).to.equal(0)
+    expect((await product.accounts(user.address))._pre).to.equal(0)
     expect(await product.latestVersions(user.address)).to.equal(INITIAL_VERSION)
 
     // Global State
     expect(await product.latestVersion()).to.equal(INITIAL_VERSION)
-    expectPositionEq(await product.positionAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
-    expectPrePositionEq(await product['pre()'](), {
+    expectPositionEq((await product.versions(INITIAL_VERSION))._position, { maker: 0, taker: 0 })
+    expectPrePositionEq(await product.pre(), {
       _maker: 0,
       _taker: 0,
       _makerFee: 0,
       _takerFee: 0,
     })
-    expectPositionEq(await product.valueAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
-    expectPositionEq(await product.shareAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
+    expectPositionEq((await product.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
+    expectPositionEq((await product.versions(INITIAL_VERSION))._share, { maker: 0, taker: 0 })
   })
 
   it('opens a take position', async () => {
@@ -264,21 +264,21 @@ describe('Reservoir Oracle Product', () => {
       .withArgs(userB.address, INITIAL_VERSION, TAKE_POSITION)
 
     // User State
-    expect(await product.position(user.address)).to.equal(0)
-    expect(await product['pre(address)'](userB.address)).to.equal(TAKE_POSITION)
+    expect((await product.accounts(user.address))._position).to.equal(0)
+    expect((await product.accounts(userB.address))._pre).to.equal(TAKE_POSITION)
     expect(await product.latestVersions(userB.address)).to.equal(INITIAL_VERSION)
 
     // Global State
     expect(await product.latestVersion()).to.equal(INITIAL_VERSION)
-    expectPositionEq(await product.positionAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
-    expectPrePositionEq(await product['pre()'](), {
+    expectPositionEq((await product.versions(INITIAL_VERSION))._position, { maker: 0, taker: 0 })
+    expectPrePositionEq(await product.pre(), {
       _maker: MAKE_POSITION,
       _taker: TAKE_POSITION,
       _makerFee: 0,
       _takerFee: 0,
     })
-    expectPositionEq(await product.valueAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
-    expectPositionEq(await product.shareAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
+    expectPositionEq((await product.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
+    expectPositionEq((await product.versions(INITIAL_VERSION))._share, { maker: 0, taker: 0 })
 
     // One round
     await oracleFeed.next()
@@ -289,19 +289,19 @@ describe('Reservoir Oracle Product', () => {
     await product.settle(constants.AddressZero)
 
     expect(await product.latestVersion()).to.equal(INITIAL_VERSION.add(2))
-    expectPositionEq(await product.positionAtVersion(INITIAL_VERSION.add(2)), {
+    expectPositionEq((await product.versions(INITIAL_VERSION.add(2)))._position, {
       maker: MAKE_POSITION,
       taker: TAKE_POSITION,
     })
-    expectPrePositionEq(await product['pre()'](), {
+    expectPrePositionEq(await product.pre(), {
       _maker: 0,
       _taker: 0,
       _makerFee: 0,
       _takerFee: 0,
     })
     await product.settle(userB.address)
-    expect(await product.position(user.address)).to.equal(TAKE_POSITION)
-    expect(await product['pre(address)'](userB.address)).to.equal(0)
+    expect((await product.accounts(user.address))._position).to.equal(TAKE_POSITION)
+    expect((await product.accounts(userB.address))._pre).to.equal(0)
     expect(await product.latestVersions(userB.address)).to.equal(INITIAL_VERSION.add(2))
   })
 
@@ -322,21 +322,21 @@ describe('Reservoir Oracle Product', () => {
       .withArgs(userB.address, INITIAL_VERSION, TAKE_POSITION.div(2))
 
     // User State
-    expect(await product.position(user.address)).to.equal(0)
-    expect(await product['pre(address)'](userB.address)).to.equal(TAKE_POSITION)
+    expect((await product.accounts(user.address))._position).to.equal(0)
+    expect((await product.accounts(userB.address))._pre).to.equal(TAKE_POSITION)
     expect(await product.latestVersions(userB.address)).to.equal(INITIAL_VERSION)
 
     // Global State
     expect(await product.latestVersion()).to.equal(INITIAL_VERSION)
-    expectPositionEq(await product.positionAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
-    expectPrePositionEq(await product['pre()'](), {
+    expectPositionEq((await product.versions(INITIAL_VERSION))._position, { maker: 0, taker: 0 })
+    expectPrePositionEq(await product.pre(), {
       _maker: MAKE_POSITION,
       _taker: TAKE_POSITION,
       _makerFee: 0,
       _takerFee: 0,
     })
-    expectPositionEq(await product.valueAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
-    expectPositionEq(await product.shareAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
+    expectPositionEq((await product.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
+    expectPositionEq((await product.versions(INITIAL_VERSION))._share, { maker: 0, taker: 0 })
 
     // One round
     await oracleFeed.next()
@@ -347,19 +347,19 @@ describe('Reservoir Oracle Product', () => {
     await product.settle(constants.AddressZero)
 
     expect(await product.latestVersion()).to.equal(INITIAL_VERSION.add(2))
-    expectPositionEq(await product.positionAtVersion(INITIAL_VERSION.add(2)), {
+    expectPositionEq((await product.versions(INITIAL_VERSION.add(2)))._position, {
       maker: MAKE_POSITION,
       taker: TAKE_POSITION,
     })
-    expectPrePositionEq(await product['pre()'](), {
+    expectPrePositionEq(await product.pre(), {
       _maker: 0,
       _taker: 0,
       _makerFee: 0,
       _takerFee: 0,
     })
     await product.settle(userB.address)
-    expect(await product.position(user.address)).to.equal(TAKE_POSITION)
-    expect(await product['pre(address)'](userB.address)).to.equal(0)
+    expect((await product.accounts(user.address))._position).to.equal(TAKE_POSITION)
+    expect((await product.accounts(userB.address))._pre).to.equal(0)
     expect(await product.latestVersions(userB.address)).to.equal(INITIAL_VERSION.add(2))
   })
 
@@ -386,21 +386,21 @@ describe('Reservoir Oracle Product', () => {
     // User State
     expect(await lens.callStatic.maintenance(userB.address, product.address)).to.equal(0)
     expect(await lens.callStatic.maintenanceNext(userB.address, product.address)).to.equal(0)
-    expect(await product.position(user.address)).to.equal(0)
-    expect(await product['pre(address)'](userB.address)).to.equal(0)
+    expect((await product.accounts(user.address))._position).to.equal(0)
+    expect((await product.accounts(userB.address))._pre).to.equal(0)
     expect(await product.latestVersions(user.address)).to.equal(INITIAL_VERSION)
 
     // Global State
     expect(await product.latestVersion()).to.equal(INITIAL_VERSION)
-    expectPositionEq(await product.positionAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
-    expectPrePositionEq(await product['pre()'](), {
+    expectPositionEq((await product.versions(INITIAL_VERSION))._position, { maker: 0, taker: 0 })
+    expectPrePositionEq(await product.pre(), {
       _maker: OPEN_MAKE_POSITION,
       _taker: 0,
       _makerFee: 0,
       _takerFee: 0,
     })
-    expectPositionEq(await product.valueAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
-    expectPositionEq(await product.shareAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
+    expectPositionEq((await product.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
+    expectPositionEq((await product.versions(INITIAL_VERSION))._share, { maker: 0, taker: 0 })
   })
 
   it('closes multiple take positions', async () => {
@@ -427,21 +427,21 @@ describe('Reservoir Oracle Product', () => {
     // User State
     expect(await lens.callStatic.maintenance(userB.address, product.address)).to.equal(0)
     expect(await lens.callStatic.maintenanceNext(userB.address, product.address)).to.equal(0)
-    expect(await product.position(user.address)).to.equal(0)
-    expect(await product['pre(address)'](userB.address)).to.equal(0)
+    expect((await product.accounts(user.address))._position).to.equal(0)
+    expect((await product.accounts(userB.address))._pre).to.equal(0)
     expect(await product.latestVersions(user.address)).to.equal(INITIAL_VERSION)
 
     // Global State
     expect(await product.latestVersion()).to.equal(INITIAL_VERSION)
-    expectPositionEq(await product.positionAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
-    expectPrePositionEq(await product['pre()'](), {
+    expectPositionEq((await product.versions(INITIAL_VERSION))._position, { maker: 0, taker: 0 })
+    expectPrePositionEq(await product.pre(), {
       _maker: OPEN_MAKE_POSITION,
       _taker: 0,
       _makerFee: 0,
       _takerFee: 0,
     })
-    expectPositionEq(await product.valueAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
-    expectPositionEq(await product.shareAtVersion(INITIAL_VERSION), { maker: 0, taker: 0 })
+    expectPositionEq((await product.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
+    expectPositionEq((await product.versions(INITIAL_VERSION))._share, { maker: 0, taker: 0 })
   })
 
   it('settle no op (gas test)', async () => {

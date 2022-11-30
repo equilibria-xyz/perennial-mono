@@ -13,7 +13,7 @@ describe('Liquidate', () => {
 
   it('liquidates a user', async () => {
     const POSITION = utils.parseEther('0.0001')
-    const { user, userB, dsu, chainlink } = instanceVars
+    const { user, userB, dsu, chainlink, lens } = instanceVars
 
     const product = await createProduct(instanceVars)
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
@@ -33,8 +33,8 @@ describe('Liquidate', () => {
 
     expect(await product.liquidation(user.address)).to.be.true
 
-    expect(await product['collateral(address)'](user.address)).to.equal(0)
-    expect(await product['collateral()']()).to.equal(0)
+    expect((await product.accounts(user.address)).collateral).to.equal(0)
+    expect(await lens.callStatic['collateral(address)'](product.address)).to.equal(0)
     expect(await dsu.balanceOf(userB.address)).to.equal(utils.parseEther('21000')) // Original 20000 + fee
 
     await chainlink.next()
@@ -61,10 +61,10 @@ describe('Liquidate', () => {
     await product.settle(user.address)
     await product.settle(userB.address)
 
-    expect(await product['collateral(address)'](user.address)).to.equal(0)
+    expect((await product.accounts(user.address)).collateral).to.equal(0)
     expect(await product.shortfall()).to.equal('2463736825720737646856')
 
-    const userBCollateral = await product['collateral(address)'](userB.address)
+    const userBCollateral = (await product.accounts(userB.address)).collateral
     await expect(product.connect(userB).update(0, userBCollateral.mul(-1))).to.be.revertedWith('0x11') // underflow
 
     await dsu.connect(userB).approve(product.address, constants.MaxUint256)
@@ -104,10 +104,10 @@ describe('Liquidate', () => {
     await product.settle(userC.address)
     await product.settle(userD.address)
 
-    const currA = await product['collateral(address)'](user.address)
-    const currB = await product['collateral(address)'](userB.address)
-    const currC = await product['collateral(address)'](userC.address)
-    const currD = await product['collateral(address)'](userD.address)
+    const currA = (await product.accounts(user.address)).collateral
+    const currB = (await product.accounts(userB.address)).collateral
+    const currC = (await product.accounts(userC.address)).collateral
+    const currD = (await product.accounts(userD.address)).collateral
     const totalCurr = currA.add(currB).add(currC).add(currD)
     const feesCurr = (await product.protocolFees()).add(await product.productFees())
 
@@ -116,10 +116,10 @@ describe('Liquidate', () => {
     await product.settle(userC.address)
     await product.settle(userD.address)
 
-    const newA = await product['collateral(address)'](user.address)
-    const newB = await product['collateral(address)'](userB.address)
-    const newC = await product['collateral(address)'](userC.address)
-    const newD = await product['collateral(address)'](userD.address)
+    const newA = (await product.accounts(user.address)).collateral
+    const newB = (await product.accounts(userB.address)).collateral
+    const newC = (await product.accounts(userC.address)).collateral
+    const newD = (await product.accounts(userD.address)).collateral
     const totalNew = newA.add(newB).add(newC).add(newD)
 
     // Expect the loss from B to be socialized equally to C and D
