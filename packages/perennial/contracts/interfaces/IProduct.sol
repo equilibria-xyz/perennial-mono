@@ -84,7 +84,6 @@ interface IProduct is IPayoffProvider, IParamProvider {
     function liquidate(address account) external;
     function resolveShortfall(UFixed18 amount) external;
     function liquidation(address account) external view returns (bool);
-    function liquidatable(address account) external view returns (bool);
     function latestVersion() external view returns (uint256);
     function shortfall() external view returns (UFixed18);
     function accounts(address account) external view returns (Account memory);

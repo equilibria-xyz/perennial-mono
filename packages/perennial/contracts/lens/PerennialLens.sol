@@ -289,7 +289,10 @@ contract PerennialLens is IPerennialLens {
      * @return Whether or not the user's position eligible to be liquidated
      */
     function liquidatable(address account, IProduct product) public settleAccount(account, product) returns (bool) {
-        return product.liquidatable(account);
+        (UFixed18 maintenance_, , , , , , ) = product.parameter();
+        Account memory productAccount = product.accounts(account);
+        UFixed18 maintenanceAmount = _maintenance(product, productAccount.position());
+        return maintenanceAmount.gt(productAccount.collateral);
     }
 
     /**
