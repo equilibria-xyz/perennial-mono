@@ -5,6 +5,7 @@ import "@equilibria/root/token/types/Token6.sol";
 import "@equilibria/emptyset-batcher/batcher/Batcher.sol";
 
 import "./IController.sol";
+import "./ICollateral.sol";
 import "./IProduct.sol";
 
 interface IMultiInvoker {
@@ -30,8 +31,12 @@ interface IMultiInvoker {
         bytes args;
     }
 
-    function initialize(IController controller_) external;
+    function initialize() external;
     function USDC() external view returns (Token6); // solhint-disable-line func-name-mixedcase
+    function DSU() external view returns (Token18); // solhint-disable-line func-name-mixedcase
     function batcher() external view returns (Batcher);
+    function controller() external view returns (IController);
+    function collateral() external view returns (ICollateral);
+    function reserve() external view returns (IEmptySetReserve);
     function invoke(Invocation[] calldata invocations) external;
 }

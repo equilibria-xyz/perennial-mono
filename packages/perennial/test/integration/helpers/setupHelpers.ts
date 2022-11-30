@@ -102,7 +102,6 @@ export async function deployProtocol(): Promise<InstanceVars> {
   const controllerImpl = await new Controller__factory(owner).deploy()
   const incentivizerImpl = await new Incentivizer__factory(owner).deploy()
   const collateralImpl = await new Collateral__factory(owner).deploy(dsu.address)
-  const multiInvokerImpl = await new MultiInvoker__factory(owner).deploy(usdc.address, batcher.address)
 
   const controllerProxy = await new TransparentUpgradeableProxy__factory(owner).deploy(
     controllerImpl.address,
@@ -114,11 +113,7 @@ export async function deployProtocol(): Promise<InstanceVars> {
     proxyAdmin.address,
     [],
   )
-  const multiInvokerProxy = await new TransparentUpgradeableProxy__factory(owner).deploy(
-    multiInvokerImpl.address,
-    proxyAdmin.address,
-    [],
-  )
+
   const collateralProxy = await new TransparentUpgradeableProxy__factory(owner).deploy(
     collateralImpl.address,
     proxyAdmin.address,
@@ -131,13 +126,25 @@ export async function deployProtocol(): Promise<InstanceVars> {
 
   const productImpl = await new Product__factory(owner).deploy()
   const productBeacon = await new UpgradeableBeacon__factory(owner).deploy(productImpl.address)
-  const multiInvoker = await new MultiInvoker__factory(owner).attach(multiInvokerProxy.address)
 
   // Init
   await incentivizer.initialize(controller.address)
   await controller.initialize(collateral.address, incentivizer.address, productBeacon.address)
   await collateral.initialize(controller.address)
-  await multiInvoker.initialize(controller.address)
+
+  // Setup MultiInvoker
+  const multiInvokerImpl = await new MultiInvoker__factory(owner).deploy(
+    usdc.address,
+    batcher.address,
+    controllerProxy.address,
+  )
+  const multiInvokerProxy = await new TransparentUpgradeableProxy__factory(owner).deploy(
+    multiInvokerImpl.address,
+    proxyAdmin.address,
+    [],
+  )
+  const multiInvoker = await new MultiInvoker__factory(owner).attach(multiInvokerProxy.address)
+  await multiInvoker.initialize()
 
   // Params - TODO: finalize before launch
   await controller.updatePauser(pauser.address)

@@ -38,6 +38,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   console.log('using Batcher address: ' + batcherAddress)
   console.log('using Multisig address: ' + multisigAddress)
 
+  const dsu = await IERC20__factory.connect(dsuAddress, deployerSigner)
+
   // IMPLEMENTATIONS
 
   const collateralImpl: Deployment = await deploy('Collateral_Impl', {
@@ -190,11 +192,11 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     process.stdout.write('complete.\n')
   }
 
-  if ((await multiInvoker.controller()) === controller.address) {
+  if ((await dsu.callStatic.allowance(multiInvoker.address, batcherAddress)).eq(ethers.constants.MaxUint256)) {
     console.log('MultiInvoker already initialized.')
   } else {
     process.stdout.write('initializing MultiInvoker... ')
-    await (await multiInvoker.initialize(controller.address)).wait(2)
+    await (await multiInvoker.initialize()).wait(2)
     process.stdout.write('complete.\n')
   }
 
