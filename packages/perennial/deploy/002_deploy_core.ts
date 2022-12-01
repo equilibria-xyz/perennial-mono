@@ -7,8 +7,10 @@ import {
   Collateral__factory,
   Controller,
   Controller__factory,
+  IERC20__factory,
   Incentivizer,
   Incentivizer__factory,
+  MultiInvoker__factory,
   ProxyAdmin,
   ProxyAdmin__factory,
 } from '../types/generated'
@@ -26,11 +28,17 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const networkName = getNetworkName()
   const dsuAddress = (await getOrNull('DSU'))?.address || (await get('TestnetDSU')).address
+  const usdcAddress = (await getOrNull('USDC'))?.address || (await get('TestnetUSDC')).address
+  const batcherAddress = (await getOrNull('Batcher'))?.address || (await get('TestnetBatcher')).address
   const multisigAddress = getMultisigAddress(networkName) || deployer
   const deployerSigner: SignerWithAddress = await ethers.getSigner(deployer)
 
   console.log('using DSU address: ' + dsuAddress)
+  console.log('using USDC address: ' + usdcAddress)
+  console.log('using Batcher address: ' + batcherAddress)
   console.log('using Multisig address: ' + multisigAddress)
+
+  const dsu = await IERC20__factory.connect(dsuAddress, deployerSigner)
 
   // IMPLEMENTATIONS
 
@@ -53,6 +61,15 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const incentivizerImpl: Deployment = await deploy('Incentivizer_Impl', {
     contract: 'Incentivizer',
+    from: deployer,
+    skipIfAlreadyDeployed: true,
+    log: true,
+    autoMine: true,
+  })
+
+  const multiInvokerImpl: Deployment = await deploy('MultiInvoker_Impl', {
+    contract: 'MultiInvoker',
+    args: [usdcAddress, batcherAddress],
     from: deployer,
     skipIfAlreadyDeployed: true,
     log: true,
@@ -116,6 +133,15 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     autoMine: true,
   })
 
+  await deploy('MultiInvoker_Proxy', {
+    contract: 'TransparentUpgradeableProxy',
+    args: [multiInvokerImpl.address, proxyAdmin.address, '0x'],
+    from: deployer,
+    skipIfAlreadyDeployed: true,
+    log: true,
+    autoMine: true,
+  })
+
   await deploy('Controller_Proxy', {
     contract: 'TransparentUpgradeableProxy',
     args: [controllerImpl.address, proxyAdmin.address, '0x'],
@@ -132,6 +158,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const incentivizer: Incentivizer = new Incentivizer__factory(deployerSigner).attach(
     (await get('Incentivizer_Proxy')).address,
   )
+  const multiInvoker = await new MultiInvoker__factory(deployerSigner).attach((await get('MultiInvoker_Proxy')).address)
 
   if ((await collateral.controller()) === controller.address) {
     console.log('Collateral already initialized.')
@@ -154,6 +181,22 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   } else {
     process.stdout.write('initializing Controller... ')
     await (await controller.initialize(collateral.address, incentivizer.address, productBeacon.address)).wait(2)
+    process.stdout.write('complete.\n')
+  }
+
+  if ((await controller.multiInvoker()) === multiInvoker.address) {
+    console.log('Controller MutliInvoker already set.')
+  } else {
+    process.stdout.write('setting Controller MultiInvoker... ')
+    await (await controller.updateMultiInvoker(multiInvoker.address)).wait(2)
+    process.stdout.write('complete.\n')
+  }
+
+  if ((await dsu.callStatic.allowance(multiInvoker.address, batcherAddress)).eq(ethers.constants.MaxUint256)) {
+    console.log('MultiInvoker already initialized.')
+  } else {
+    process.stdout.write('initializing MultiInvoker... ')
+    await (await multiInvoker.initialize()).wait(2)
     process.stdout.write('complete.\n')
   }
 

@@ -5,7 +5,15 @@ import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "../controller/UControllerProvider.sol";
 import "../interfaces/IParamProvider.sol";
 import "../interfaces/IProduct.sol";
+import "../interfaces/types/PendingFeeUpdates.sol";
 
+/**
+ * @title UParamProvider
+ * @notice Library for manage storing, surfacing, and upgrading a product's parameters.
+ * @dev Uses an unstructured storage pattern to store the parameters which allows this
+        provider to be safely used with upgradeable contracts. For certain paramters, a
+        staged update pattern is used.
+ */
 abstract contract UParamProvider is IParamProvider, UControllerProvider {
     /**
      * @notice Initializes the contract state
@@ -14,7 +22,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
      * @param makerFee_ product maker fee
      * @param takerFee_ product taker fee
      * @param makerLimit_ product maker limit
-     * @param utilizationCurve_ utulization curve definition
+     * @param utilizationCurve_ utilization curve definition
      */
     // solhint-disable-next-line func-name-mixedcase
     function __UParamProvider__initialize(
@@ -22,6 +30,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
         UFixed18 fundingFee_,
         UFixed18 makerFee_,
         UFixed18 takerFee_,
+        UFixed18 positionFee_,
         UFixed18 makerLimit_,
         JumpRateUtilizationCurve memory utilizationCurve_
     ) internal onlyInitializer {
@@ -29,16 +38,9 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
         _updateFundingFee(fundingFee_);
         _updateMakerFee(makerFee_);
         _updateTakerFee(takerFee_);
+        _updatePositionFee(positionFee_);
         _updateMakerLimit(makerLimit_);
         _updateUtilizationCurve(utilizationCurve_);
-    }
-
-    /// @dev Only allow the Product's coordinator owner to call
-    modifier onlyProductOwner {
-        uint256 coordinatorId = controller().coordinatorFor(IProduct(address(this)));
-        if (controller().owner(coordinatorId) != msg.sender) revert NotOwnerError(coordinatorId);
-
-        _;
     }
 
     /// @dev The maintenance value
@@ -57,6 +59,10 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
     UFixed18Storage private constant _takerFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.takerFee"));
     function takerFee() public view returns (UFixed18) { return _takerFee.read(); }
 
+    /// @dev The positon fee share value
+    UFixed18Storage private constant _positionFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.positionFee"));
+    function positionFee() public view returns (UFixed18) { return _positionFee.read(); }
+
     /// @dev The maker limit value
     UFixed18Storage private constant _makerLimit = UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.makerLimit"));
     function makerLimit() public view returns (UFixed18) { return _makerLimit.read(); }
@@ -66,13 +72,18 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
         JumpRateUtilizationCurveStorage.wrap(keccak256("equilibria.perennial.UParamProvider.jumpRateUtilizationCurve"));
     function utilizationCurve() public view returns (JumpRateUtilizationCurve memory) { return _utilizationCurve.read(); }
 
+    /// @dev The pending fee updates value
+    PendingFeeUpdatesStorage private constant _pendingFeeUpdates =
+        PendingFeeUpdatesStorage.wrap(keccak256("equilibria.perennial.UParamProvider.pendingFeeUpdates"));
+    function pendingFeeUpdates() public view returns (PendingFeeUpdates memory) { return _pendingFeeUpdates.read(); }
+
     /**
      * @notice Updates the maintenance to `newMaintenance`
      * @param newMaintenance new maintenance value
      */
     function _updateMaintenance(UFixed18 newMaintenance) private {
         _maintenance.store(newMaintenance);
-        emit MaintenanceUpdated(newMaintenance);
+        emit MaintenanceUpdated(newMaintenance, _productVersion());
     }
 
     /**
@@ -80,7 +91,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
      * @dev only callable by product owner
      * @param newMaintenance new maintenance value
      */
-    function updateMaintenance(UFixed18 newMaintenance) external onlyProductOwner {
+    function updateMaintenance(UFixed18 newMaintenance) external onlyProductOwner settleProduct {
         _updateMaintenance(newMaintenance);
     }
 
@@ -91,7 +102,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
     function _updateFundingFee(UFixed18 newFundingFee) private {
         if (newFundingFee.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidFundingFee();
         _fundingFee.store(newFundingFee);
-        emit FundingFeeUpdated(newFundingFee);
+        emit FundingFeeUpdated(newFundingFee, _productVersion());
     }
 
     /**
@@ -99,7 +110,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
      * @dev only callable by product owner
      * @param newFundingFee new funding fee value
      */
-    function updateFundingFee(UFixed18 newFundingFee) external onlyProductOwner {
+    function updateFundingFee(UFixed18 newFundingFee) external onlyProductOwner settleProduct {
         _updateFundingFee(newFundingFee);
     }
 
@@ -108,9 +119,21 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
      * @param newMakerFee new maker fee value
      */
     function _updateMakerFee(UFixed18 newMakerFee) private {
-        if (newMakerFee.gt(UFixed18Lib.ZERO)) revert ParamProviderInvalidMakerFee();
+        if (newMakerFee.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidMakerFee();
         _makerFee.store(newMakerFee);
-        emit MakerFeeUpdated(newMakerFee);
+        emit MakerFeeUpdated(newMakerFee, _productVersion());
+    }
+
+    /**
+     * @notice Updates the pending maker fee to `newMakerFee`
+     * @param newMakerFee new maker fee value
+     */
+    function _updatePendingMakerFee(UFixed18 newMakerFee) private {
+        if (newMakerFee.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidMakerFee();
+        PendingFeeUpdates memory pendingFees_ = pendingFeeUpdates();
+        pendingFees_.updateMakerFee(newMakerFee);
+        _pendingFeeUpdates.store(pendingFees_);
+        emit PendingMakerFeeUpdated(newMakerFee);
     }
 
     /**
@@ -118,8 +141,12 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
      * @dev only callable by product owner
      * @param newMakerFee new maker fee value
      */
-    function updateMakerFee(UFixed18 newMakerFee) external onlyProductOwner {
-        _updateMakerFee(newMakerFee);
+    function updateMakerFee(UFixed18 newMakerFee) external onlyProductOwner settleProduct {
+        if (!_noPendingPositions()) {
+            _updatePendingMakerFee(newMakerFee);
+        } else {
+            _updateMakerFee(newMakerFee);
+        }
     }
 
     /**
@@ -127,9 +154,21 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
      * @param newTakerFee new taker fee value
      */
     function _updateTakerFee(UFixed18 newTakerFee) private {
-        if (newTakerFee.gt(UFixed18Lib.ZERO)) revert ParamProviderInvalidTakerFee();
+        if (newTakerFee.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidTakerFee();
         _takerFee.store(newTakerFee);
-        emit TakerFeeUpdated(newTakerFee);
+        emit TakerFeeUpdated(newTakerFee, _productVersion());
+    }
+
+    /**
+     * @notice Updates the pending taker fee to `newTakerFee`
+     * @param newTakerFee new taker fee value
+     */
+    function _updatePendingTakerFee(UFixed18 newTakerFee) private {
+        if (newTakerFee.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidTakerFee();
+        PendingFeeUpdates memory pendingFees_ = pendingFeeUpdates();
+        pendingFees_.updateTakerFee(newTakerFee);
+        _pendingFeeUpdates.store(pendingFees_);
+        emit PendingTakerFeeUpdated(newTakerFee);
     }
 
     /**
@@ -137,8 +176,47 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
      * @dev only callable by product owner
      * @param newTakerFee new taker fee value
      */
-    function updateTakerFee(UFixed18 newTakerFee) external onlyProductOwner {
-        _updateTakerFee(newTakerFee);
+    function updateTakerFee(UFixed18 newTakerFee) external onlyProductOwner settleProduct {
+        if (!_noPendingPositions()) {
+            _updatePendingTakerFee(newTakerFee);
+        } else {
+            _updateTakerFee(newTakerFee);
+        }
+    }
+
+    /**
+     * @notice Updates the position fee to `newPositionFee`
+     * @param newPositionFee new position fee value
+     */
+    function _updatePositionFee(UFixed18 newPositionFee) private {
+        if (newPositionFee.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidPositionFee();
+        _positionFee.store(newPositionFee);
+        emit PositionFeeUpdated(newPositionFee, _productVersion());
+    }
+
+    /**
+     * @notice Updates the pending position fee to `newPositionFee`
+     * @param newPositionFee new position fee value
+     */
+    function _updatePendingPositionFee(UFixed18 newPositionFee) private {
+        if (newPositionFee.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidPositionFee();
+        PendingFeeUpdates memory pendingFees_ = pendingFeeUpdates();
+        pendingFees_.updatePositionFee(newPositionFee);
+        _pendingFeeUpdates.store(pendingFees_);
+        emit PendingPositionFeeUpdated(newPositionFee);
+    }
+
+    /**
+     * @notice Updates the position fee to `newPositionFee`
+     * @dev only callable by product owner
+     * @param newPositionFee new position fee value
+     */
+    function updatePositionFee(UFixed18 newPositionFee) external onlyProductOwner settleProduct {
+        if (!_noPendingPositions()) {
+            _updatePendingPositionFee(newPositionFee);
+        } else {
+            _updatePositionFee(newPositionFee);
+        }
     }
 
     /**
@@ -147,7 +225,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
      */
     function _updateMakerLimit(UFixed18 newMakerLimit) private {
         _makerLimit.store(newMakerLimit);
-        emit MakerLimitUpdated(newMakerLimit);
+        emit MakerLimitUpdated(newMakerLimit, _productVersion());
     }
 
     /**
@@ -155,7 +233,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
      * @dev only callable by product owner
      * @param newMakerLimit new maker limit value
      */
-    function updateMakerLimit(UFixed18 newMakerLimit) external onlyProductOwner {
+    function updateMakerLimit(UFixed18 newMakerLimit) external onlyProductOwner settleProduct {
         _updateMakerLimit(newMakerLimit);
     }
 
@@ -165,12 +243,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
      */
     function _updateUtilizationCurve(JumpRateUtilizationCurve memory newUtilizationCurve) private {
         _utilizationCurve.store(newUtilizationCurve);
-        emit JumpRateUtilizationCurveUpdated(
-            newUtilizationCurve.minRate.unpack(),
-            newUtilizationCurve.maxRate.unpack(),
-            newUtilizationCurve.targetRate.unpack(),
-            newUtilizationCurve.targetUtilization.unpack()
-        );
+        emit JumpRateUtilizationCurveUpdated(newUtilizationCurve, _productVersion());
     }
 
     /**
@@ -178,7 +251,47 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
      * @dev only callable by product owner
      * @param newUtilizationCurve new utilization curve value
      */
-    function updateUtilizationCurve(JumpRateUtilizationCurve calldata newUtilizationCurve) external onlyProductOwner {
+    function updateUtilizationCurve(JumpRateUtilizationCurve calldata newUtilizationCurve) external onlyProductOwner settleProduct {
         _updateUtilizationCurve(newUtilizationCurve);
+    }
+
+    function _settleFeeUpdates() internal {
+        PendingFeeUpdates memory pendingFeeUpdates_ = pendingFeeUpdates();
+        if (!pendingFeeUpdates_.hasUpdates()) return;
+        if (pendingFeeUpdates_.makerFeeUpdated) _updateMakerFee(pendingFeeUpdates_.makerFee());
+        if (pendingFeeUpdates_.takerFeeUpdated) _updateTakerFee(pendingFeeUpdates_.takerFee());
+        if (pendingFeeUpdates_.positionFeeUpdated) _updatePositionFee(pendingFeeUpdates_.positionFee());
+
+        pendingFeeUpdates_.clear();
+        _pendingFeeUpdates.store(pendingFeeUpdates_);
+    }
+
+    function _productVersion() private view returns (uint256) {
+        // If this product is being constructed then return 0
+        if (!Address.isContract(address(this))) return 0;
+        return IProduct(address(this)).latestVersion();
+    }
+
+    /**
+     * @notice Checks whether the Product's `pre` position is empty
+     * @return Whether or not the pre position is empty
+     */
+    function _noPendingPositions() private view returns (bool) {
+        return IProduct(address(this)).pre().isEmpty();
+    }
+
+    /// @dev Only allow the Product's coordinator owner to call
+    modifier onlyProductOwner {
+        uint256 coordinatorId = controller().coordinatorFor(IProduct(address(this)));
+        if (controller().owner(coordinatorId) != msg.sender) revert NotOwnerError(coordinatorId);
+
+        _;
+    }
+
+    /// @dev Settles the product
+    modifier settleProduct {
+        IProduct(address(this)).settle();
+
+        _;
     }
 }

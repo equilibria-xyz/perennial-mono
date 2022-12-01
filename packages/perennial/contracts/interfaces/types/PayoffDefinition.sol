@@ -118,6 +118,6 @@ library PayoffDefinitionStorageLib {
     function _storagePointer(
       PayoffDefinitionStorage self
     ) private pure returns (PayoffDefinition storage pointer) {
-        assembly { pointer.slot := self }
+        assembly { pointer.slot := self } // solhint-disable-line no-inline-assembly
     }
 }

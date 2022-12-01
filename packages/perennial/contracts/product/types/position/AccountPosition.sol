@@ -26,14 +26,13 @@ library AccountPositionLib {
      * @notice Settled the account's position to oracle version `toOracleVersion`
      * @param self The struct to operate on
      * @param toOracleVersion The oracle version to accumulate to
-     * @return positionFee The fee accrued from opening or closing a new position
      */
     function settle(
         AccountPosition storage self,
         IOracleProvider.OracleVersion memory toOracleVersion
-    ) internal returns (UFixed18 positionFee) {
+    ) internal {
         bool settled;
-        (self.position, positionFee, settled) = self.position.settled(self.pre, toOracleVersion);
+        (self.position, settled) = self.position.settled(self.pre, toOracleVersion);
         if (settled) {
             delete self.pre;
             self.liquidation = false;

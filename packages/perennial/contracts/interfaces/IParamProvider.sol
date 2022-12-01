@@ -3,24 +3,28 @@ pragma solidity ^0.8.13;
 
 import "@equilibria/root/number/types/UFixed18.sol";
 import "@equilibria/root/curve/types/JumpRateUtilizationCurve.sol";
+import "./types/PendingFeeUpdates.sol";
 
 interface IParamProvider {
-    event MaintenanceUpdated(UFixed18 newMaintenance);
-    event FundingFeeUpdated(UFixed18 newFundingFee);
-    event MakerFeeUpdated(UFixed18 newMakerFee);
-    event TakerFeeUpdated(UFixed18 newTakerFee);
-    event MakerLimitUpdated(UFixed18 newMakerLimit);
+    event MaintenanceUpdated(UFixed18 newMaintenance, uint256 version);
+    event FundingFeeUpdated(UFixed18 newFundingFee, uint256 version);
+    event MakerFeeUpdated(UFixed18 newMakerFee, uint256 version);
+    event PendingMakerFeeUpdated(UFixed18 newMakerFee);
+    event TakerFeeUpdated(UFixed18 newTakerFee, uint256 version);
+    event PendingTakerFeeUpdated(UFixed18 newTakerFee);
+    event PositionFeeUpdated(UFixed18 newPositionFee, uint256 version);
+    event PendingPositionFeeUpdated(UFixed18 newPositionFee);
+    event MakerLimitUpdated(UFixed18 newMakerLimit, uint256 version);
     event JumpRateUtilizationCurveUpdated(
-        Fixed18 minRate,
-        Fixed18 maxRate,
-        Fixed18 targetRate,
-        UFixed18 targetUtilization
+        JumpRateUtilizationCurve,
+        uint256 version
     );
 
     error ParamProviderInvalidMakerFee();
     error ParamProviderInvalidTakerFee();
+    error ParamProviderInvalidPositionFee();
     error ParamProviderInvalidFundingFee();
-    
+
     function maintenance() external view returns (UFixed18);
     function updateMaintenance(UFixed18 newMaintenance) external;
     function fundingFee() external view returns (UFixed18);
@@ -29,8 +33,11 @@ interface IParamProvider {
     function updateMakerFee(UFixed18 newMakerFee) external;
     function takerFee() external view returns (UFixed18);
     function updateTakerFee(UFixed18 newTakerFee) external;
+    function positionFee() external view returns (UFixed18);
+    function updatePositionFee(UFixed18 newPositionFee) external;
     function makerLimit() external view returns (UFixed18);
     function updateMakerLimit(UFixed18 newMakerLimit) external;
     function utilizationCurve() external view returns (JumpRateUtilizationCurve memory);
     function updateUtilizationCurve(JumpRateUtilizationCurve memory newUtilizationCurve) external;
+    function pendingFeeUpdates() external view returns (PendingFeeUpdates memory);
 }

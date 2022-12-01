@@ -11,6 +11,7 @@ import {
   Controller__factory,
   Product__factory,
   Incentivizer__factory,
+  MultiInvoker__factory,
   IContractPayoffProvider__factory,
   IBeacon__factory,
   IOracleProvider__factory,
@@ -34,6 +35,7 @@ describe('Controller', () => {
   let oracle: MockContract
   let incentivizer: MockContract
   let productBeacon: MockContract
+  let multiInvoker: MockContract
 
   let controller: Controller
   let productImpl: Product
@@ -54,6 +56,7 @@ describe('Controller', () => {
     payoffProvider = await deployMockContract(owner, IContractPayoffProvider__factory.abi)
     oracle = await deployMockContract(owner, IOracleProvider__factory.abi)
     incentivizer = await deployMockContract(owner, Incentivizer__factory.abi)
+    multiInvoker = await deployMockContract(owner, MultiInvoker__factory.abi)
 
     productBeacon = await deployMockContract(owner, IBeacon__factory.abi)
     productImpl = await new Product__factory(owner).deploy()
@@ -61,6 +64,7 @@ describe('Controller', () => {
 
     controller = await new Controller__factory(owner).deploy()
     await controller.initialize(collateral.address, incentivizer.address, productBeacon.address)
+    await controller.updateMultiInvoker(multiInvoker.address)
   })
 
   describe('#initialize', async () => {
@@ -74,6 +78,7 @@ describe('Controller', () => {
       expect(await controller.collateral()).to.equal(collateral.address)
       expect(await controller.incentivizer()).to.equal(incentivizer.address)
       expect(await controller.productBeacon()).to.equal(productBeacon.address)
+      expect(await controller.multiInvoker()).to.equal(multiInvoker.address)
       expect(await controller['owner()']()).to.equal(owner.address)
       expect(await controller['owner(uint256)'](0)).to.equal(owner.address)
       expect(await controller['pendingOwner()']()).to.equal(ethers.constants.AddressZero)
@@ -305,6 +310,7 @@ describe('Controller', () => {
       fundingFee: ethers.constants.Zero,
       makerFee: ethers.constants.Zero,
       takerFee: ethers.constants.Zero,
+      positionFee: ethers.constants.Zero,
       makerLimit: ethers.constants.Zero,
       utilizationCurve: {
         minRate: utils.parseEther('0.10'),
@@ -418,6 +424,31 @@ describe('Controller', () => {
 
     it('reverts on invalid address', async () => {
       await expect(controller.updateProductBeacon(user.address)).to.be.revertedWithCustomError(
+        controller,
+        'ControllerNotContractAddressError',
+      )
+    })
+  })
+
+  describe('#updateMultiInvoker', async () => {
+    it('updates the multiInvoker address', async () => {
+      const newMultiInvoker = await deployMockContract(owner, MultiInvoker__factory.abi)
+      await expect(controller.updateMultiInvoker(newMultiInvoker.address))
+        .to.emit(controller, 'MultiInvokerUpdated')
+        .withArgs(newMultiInvoker.address)
+
+      expect(await controller.multiInvoker()).to.equal(newMultiInvoker.address)
+    })
+
+    it('reverts if not owner', async () => {
+      const newMultiInvoker = await deployMockContract(owner, MultiInvoker__factory.abi)
+      await expect(controller.connect(user).updateMultiInvoker(newMultiInvoker.address))
+        .to.be.revertedWithCustomError(controller, 'ControllerNotOwnerError')
+        .withArgs(0)
+    })
+
+    it('reverts on invalid address', async () => {
+      await expect(controller.updateMultiInvoker(user.address)).to.be.revertedWithCustomError(
         controller,
         'ControllerNotContractAddressError',
       )

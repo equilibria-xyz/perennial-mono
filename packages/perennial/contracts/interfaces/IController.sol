@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/proxy/beacon/IBeacon.sol";
 import "./ICollateral.sol";
 import "./IIncentivizer.sol";
 import "./IProduct.sol";
+import "./IMultiInvoker.sol";
 import "./types/PayoffDefinition.sol";
 
 interface IController {
@@ -24,6 +25,7 @@ interface IController {
     event CollateralUpdated(ICollateral newCollateral);
     event IncentivizerUpdated(IIncentivizer newIncentivizer);
     event ProductBeaconUpdated(IBeacon newProductBeacon);
+    event MultiInvokerUpdated(IMultiInvoker newMultiInvoker);
     event ProtocolFeeUpdated(UFixed18 newProtocolFee);
     event MinFundingFeeUpdated(UFixed18 newMinFundingFee);
     event LiquidationFeeUpdated(UFixed18 newLiquidationFee);
@@ -51,6 +53,7 @@ interface IController {
     function collateral() external view returns (ICollateral);
     function incentivizer() external view returns (IIncentivizer);
     function productBeacon() external view returns (IBeacon);
+    function multiInvoker() external view returns (IMultiInvoker);
     function coordinators(uint256 collateralId) external view returns (Coordinator memory);
     function coordinatorFor(IProduct product) external view returns (uint256);
     function protocolFee() external view returns (UFixed18);
@@ -70,6 +73,7 @@ interface IController {
     function updateCollateral(ICollateral newCollateral) external;
     function updateIncentivizer(IIncentivizer newIncentivizer) external;
     function updateProductBeacon(IBeacon newProductBeacon) external;
+    function updateMultiInvoker(IMultiInvoker newMultiInvoker) external;
     function updateProtocolFee(UFixed18 newProtocolFee) external;
     function updateMinFundingFee(UFixed18 newMinFundingFee) external;
     function updateLiquidationFee(UFixed18 newLiquidationFee) external;

@@ -61,9 +61,6 @@
     "typechain": "^8.1.0",
     "typescript": "^4.3.2"
   },
-  "resolutions": {
-    "@solidity-parser/parser": "npm:@equilibria/parser"
-  },
   "lint-staged": {
     "*.{ts,.js}": [
       "prettier --write",
