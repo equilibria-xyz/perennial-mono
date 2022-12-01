@@ -6,7 +6,7 @@ import { Controller, Controller__factory, Product, Product__factory } from '../.
 
 const { ethers } = HRE
 
-describe.only('Product - Milli-Squeeth - Mainnet Verification', () => {
+describe('Product - Milli-Squeeth - Mainnet Verification', () => {
   let deployments: { [name: string]: Deployment }
   let controller: Controller
   let mSqueeth: Product
@@ -33,6 +33,7 @@ describe.only('Product - Milli-Squeeth - Mainnet Verification', () => {
         fundingFee: 0,
         makerFee: 0,
         takerFee: 0,
+        positionFee: 0,
         makerLimit: 0,
         utilizationCurve: {
           minRate: 0,
@@ -41,7 +42,7 @@ describe.only('Product - Milli-Squeeth - Mainnet Verification', () => {
           targetUtilization: 0,
         },
       }),
-    ).to.be.revertedWith('UInitializableAlreadyInitializedError')
+    ).to.be.revertedWithCustomError(mSqueeth, 'UInitializableAlreadyInitializedError')
   })
 
   it('has the correct parameters and configuration', async () => {

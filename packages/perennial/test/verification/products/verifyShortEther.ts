@@ -33,6 +33,7 @@ describe('Product - Short Ether - Mainnet Verification', () => {
         fundingFee: 0,
         makerFee: 0,
         takerFee: 0,
+        positionFee: 0,
         makerLimit: 0,
         utilizationCurve: {
           minRate: 0,
@@ -41,7 +42,7 @@ describe('Product - Short Ether - Mainnet Verification', () => {
           targetUtilization: 0,
         },
       }),
-    ).to.be.revertedWith('UInitializableAlreadyInitializedError')
+    ).to.be.revertedWithCustomError(shortEther, 'UInitializableAlreadyInitializedError')
   })
 
   it('has the correct parameters and configuration', async () => {

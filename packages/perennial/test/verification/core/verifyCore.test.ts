@@ -17,6 +17,8 @@ import {
   ProxyAdmin__factory,
   TimelockController,
   TimelockController__factory,
+  UpgradeableBeacon,
+  UpgradeableBeacon__factory,
 } from '../../../types/generated'
 import { getMultisigAddress } from '../../../../common/testutil/constants'
 
@@ -28,6 +30,7 @@ describe('Core - Mainnet Verification', () => {
   let collateral: Collateral
   let incentivizer: Incentivizer
   let proxyAdmin: ProxyAdmin
+  let upgradeableBeacon: UpgradeableBeacon
   let timelock: TimelockController
   let forwarder: Forwarder
   let lens: PerennialLens
@@ -39,6 +42,7 @@ describe('Core - Mainnet Verification', () => {
     collateral = Collateral__factory.connect(deployments['Collateral_Proxy'].address, signer)
     incentivizer = Incentivizer__factory.connect(deployments['Incentivizer_Proxy'].address, signer)
     proxyAdmin = ProxyAdmin__factory.connect(deployments['ProxyAdmin'].address, signer)
+    upgradeableBeacon = UpgradeableBeacon__factory.connect(deployments['UpgradeableBeacon'].address, signer)
     timelock = TimelockController__factory.connect(deployments['TimelockController'].address, signer)
     forwarder = Forwarder__factory.connect(deployments['Forwarder'].address, signer)
     lens = PerennialLens__factory.connect(deployments['PerennialLens_V01'].address, signer)
@@ -47,12 +51,8 @@ describe('Core - Mainnet Verification', () => {
   describe('controller', () => {
     it('is already initialized', async () => {
       await expect(
-        controller.callStatic.initialize(
-          collateral.address,
-          incentivizer.address,
-          deployments['UpgradeableBeacon'].address,
-        ),
-      ).to.be.revertedWith('UInitializableAlreadyInitializedError')
+        controller.callStatic.initialize(collateral.address, incentivizer.address, upgradeableBeacon.address),
+      ).to.be.revertedWithCustomError(controller, 'UInitializableAlreadyInitializedError')
     })
 
     it('has the correct parameters and configuration', async () => {
@@ -60,7 +60,7 @@ describe('Core - Mainnet Verification', () => {
 
       expect(await controller.collateral()).to.equal(collateral.address)
       expect(await controller.incentivizer()).to.equal(incentivizer.address)
-      expect(await controller.productBeacon()).to.equal(deployments['UpgradeableBeacon'].address)
+      expect(await controller.productBeacon()).to.equal(upgradeableBeacon.address)
 
       // Protocol owner
       expect(await controller['owner()']()).to.equal(timelockAddress)
@@ -105,7 +105,8 @@ describe('Core - Mainnet Verification', () => {
 
   describe('collateral', () => {
     it('is already initialized', async () => {
-      await expect(collateral.callStatic.initialize(controller.address)).to.be.revertedWith(
+      await expect(collateral.callStatic.initialize(controller.address)).to.be.revertedWithCustomError(
+        collateral,
         'UInitializableAlreadyInitializedError',
       )
     })
@@ -118,7 +119,8 @@ describe('Core - Mainnet Verification', () => {
 
   describe('incentivizer', () => {
     it('is already initialized', async () => {
-      await expect(incentivizer.callStatic.initialize(controller.address)).to.be.revertedWith(
+      await expect(incentivizer.callStatic.initialize(controller.address)).to.be.revertedWithCustomError(
+        incentivizer,
         'UInitializableAlreadyInitializedError',
       )
     })
@@ -149,16 +151,30 @@ describe('Core - Mainnet Verification', () => {
     })
   })
 
+  describe('upgradeablebeacon', () => {
+    it('has the correct configuration', async () => {
+      expect(await upgradeableBeacon.owner()).to.equal(
+        '0x66a7fDB96C583c59597de16d8b2B989231415339' /* timelock.address */,
+      )
+      expect(await upgradeableBeacon.implementation()).to.equal(deployments['Product_Impl'].address)
+    })
+  })
+
   describe('timelock', () => {
     it('has the correct configuration', async () => {
       expect(await timelock.getMinDelay()).to.equal(172800) // 48 hours
       const timelockAdminRole = await timelock.TIMELOCK_ADMIN_ROLE()
+      const timelockProposerRole = await timelock.PROPOSER_ROLE()
+      const timelockExecutorRole = await timelock.EXECUTOR_ROLE()
       expect(
         await timelock.hasRole(
           timelockAdminRole,
           '0x66a7fDB96C583c59597de16d8b2B989231415339' /* getMultisigAddress('mainnet')! */,
         ),
       ).to.be.true
+
+      expect(await timelock.hasRole(timelockProposerRole, getMultisigAddress('mainnet')))
+      expect(await timelock.hasRole(timelockExecutorRole, ethers.constants.AddressZero))
     })
   })
 
