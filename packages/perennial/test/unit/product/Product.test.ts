@@ -1,9 +1,9 @@
 import { smock, MockContract as SmockContract } from '@defi-wonderland/smock'
-import { MockContract } from '@ethereum-waffle/mock-contract'
+import { MockContract, deployMockContract } from '@ethereum-waffle/mock-contract'
 import { BigNumber, utils } from 'ethers'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { expect, use } from 'chai'
-import HRE, { waffle } from 'hardhat'
+import HRE from 'hardhat'
 
 import { impersonate } from '../../../../common/testutil'
 
@@ -66,13 +66,13 @@ describe('Product', () => {
 
   beforeEach(async () => {
     ;[owner, user, userB, userC, multiInvokerMock] = await ethers.getSigners()
-    oracle = await waffle.deployMockContract(owner, IOracleProvider__factory.abi)
-    incentivizer = await waffle.deployMockContract(owner, Incentivizer__factory.abi)
+    oracle = await deployMockContract(owner, IOracleProvider__factory.abi)
+    incentivizer = await deployMockContract(owner, Incentivizer__factory.abi)
 
-    collateral = await waffle.deployMockContract(owner, Collateral__factory.abi)
+    collateral = await deployMockContract(owner, Collateral__factory.abi)
     collateralSigner = await impersonate.impersonateWithBalance(collateral.address, utils.parseEther('10'))
 
-    controller = await waffle.deployMockContract(owner, Controller__factory.abi)
+    controller = await deployMockContract(owner, Controller__factory.abi)
     controllerSigner = await impersonate.impersonateWithBalance(controller.address, utils.parseEther('10'))
 
     product = await (await smock.mock<Product__factory>('Product')).deploy()
@@ -112,14 +112,16 @@ describe('Product', () => {
     })
 
     it('reverts if already initialized', async () => {
-      await expect(product.initialize(PRODUCT_INFO)).to.be.revertedWith('UInitializableAlreadyInitializedError(1)')
+      await expect(product.initialize(PRODUCT_INFO))
+        .to.be.revertedWithCustomError(product, 'UInitializableAlreadyInitializedError')
+        .withArgs(1)
     })
 
     it('reverts if oracle is not a contract', async () => {
       const otherProduct = await new Product__factory(owner).deploy()
       await expect(
         otherProduct.connect(controllerSigner).initialize({ ...PRODUCT_INFO, oracle: user.address }),
-      ).to.be.revertedWith('PayoffProviderInvalidOracle()')
+      ).to.be.revertedWithCustomError(otherProduct, 'PayoffProviderInvalidOracle')
     })
 
     describe('payoffDefinition validity', () => {
@@ -135,7 +137,7 @@ describe('Product', () => {
 
         await expect(
           otherProduct.connect(controllerSigner).initialize({ ...PRODUCT_INFO, payoffDefinition }),
-        ).to.be.revertedWith('PayoffProviderInvalidPayoffDefinitionError()')
+        ).to.be.revertedWithCustomError(otherProduct, 'PayoffProviderInvalidPayoffDefinitionError')
       })
 
       it('reverts if product provider is not a contract', async () => {
@@ -144,7 +146,7 @@ describe('Product', () => {
             ...PRODUCT_INFO,
             payoffDefinition: createPayoffDefinition({ contractAddress: user.address }),
           }),
-        ).to.be.revertedWith('PayoffProviderInvalidPayoffDefinitionError()')
+        ).to.be.revertedWithCustomError(otherProduct, 'PayoffProviderInvalidPayoffDefinitionError')
       })
     })
   })
@@ -303,38 +305,42 @@ describe('Product', () => {
     })
 
     it('reverts if not owner', async () => {
-      await expect(product.connect(user).updateMaintenance(utils.parseEther('0.1'))).to.be.be.revertedWith(
-        'NotOwnerError(1)',
-      )
-      await expect(product.connect(user).updateFundingFee(utils.parseEther('0.2'))).to.be.be.revertedWith(
-        'NotOwnerError(1)',
-      )
-      await expect(product.connect(user).updateMakerFee(utils.parseEther('0.3'))).to.be.be.revertedWith(
-        'NotOwnerError(1)',
-      )
-      await expect(product.connect(user).updateTakerFee(utils.parseEther('0.4'))).to.be.be.revertedWith(
-        'NotOwnerError(1)',
-      )
-      await expect(product.connect(user).updatePositionFee(utils.parseEther('0.4'))).to.be.be.revertedWith(
-        'NotOwnerError(1)',
-      )
-      await expect(product.connect(user).updateMakerLimit(utils.parseEther('0.5'))).to.be.be.revertedWith(
-        'NotOwnerError(1)',
-      )
+      await expect(product.connect(user).updateMaintenance(utils.parseEther('0.1')))
+        .to.be.be.revertedWithCustomError(product, 'NotOwnerError')
+        .withArgs(1)
+      await expect(product.connect(user).updateFundingFee(utils.parseEther('0.2')))
+        .to.be.be.revertedWithCustomError(product, 'NotOwnerError')
+        .withArgs(1)
+      await expect(product.connect(user).updateMakerFee(utils.parseEther('0.3')))
+        .to.be.be.revertedWithCustomError(product, 'NotOwnerError')
+        .withArgs(1)
+      await expect(product.connect(user).updateTakerFee(utils.parseEther('0.4')))
+        .to.be.be.revertedWithCustomError(product, 'NotOwnerError')
+        .withArgs(1)
+      await expect(product.connect(user).updatePositionFee(utils.parseEther('0.4')))
+        .to.be.be.revertedWithCustomError(product, 'NotOwnerError')
+        .withArgs(1)
+      await expect(product.connect(user).updateMakerLimit(utils.parseEther('0.5')))
+        .to.be.be.revertedWithCustomError(product, 'NotOwnerError')
+        .withArgs(1)
     })
 
     it('reverts if fees are too high', async () => {
-      await expect(product.updateFundingFee(utils.parseEther('1.01'))).to.be.be.revertedWith(
-        'ParamProviderInvalidFundingFee()',
+      await expect(product.updateFundingFee(utils.parseEther('1.01'))).to.be.be.revertedWithCustomError(
+        product,
+        'ParamProviderInvalidFundingFee',
       )
-      await expect(product.updateMakerFee(utils.parseEther('1.01'))).to.be.be.revertedWith(
-        'ParamProviderInvalidMakerFee()',
+      await expect(product.updateMakerFee(utils.parseEther('1.01'))).to.be.be.revertedWithCustomError(
+        product,
+        'ParamProviderInvalidMakerFee',
       )
-      await expect(product.updateTakerFee(utils.parseEther('1.01'))).to.be.be.revertedWith(
-        'ParamProviderInvalidTakerFee()',
+      await expect(product.updateTakerFee(utils.parseEther('1.01'))).to.be.be.revertedWithCustomError(
+        product,
+        'ParamProviderInvalidTakerFee',
       )
-      await expect(product.updatePositionFee(utils.parseEther('1.01'))).to.be.be.revertedWith(
-        'ParamProviderInvalidPositionFee()',
+      await expect(product.updatePositionFee(utils.parseEther('1.01'))).to.be.be.revertedWithCustomError(
+        product,
+        'ParamProviderInvalidPositionFee',
       )
     })
   })
@@ -779,7 +785,10 @@ describe('Product', () => {
         // Liquidate the user
         await product.connect(collateralSigner).closeAll(user.address)
         // User can't open a new position yet
-        await expect(product.connect(user).openMake(POSITION)).to.be.revertedWith('ProductInLiquidationError()')
+        await expect(product.connect(user).openMake(POSITION)).to.be.revertedWithCustomError(
+          product,
+          'ProductInLiquidationError',
+        )
 
         // Advance version
         await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
@@ -798,14 +807,18 @@ describe('Product', () => {
         await oracle.mock.atVersion.withArgs(0).returns(ORACLE_VERSION_0)
         await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_0)
 
-        await expect(product.connect(user).openMake(POSITION)).to.be.revertedWith('ProductOracleBootstrappingError()')
+        await expect(product.connect(user).openMake(POSITION)).to.be.revertedWithCustomError(
+          product,
+          'ProductOracleBootstrappingError',
+        )
       })
 
       it('reverts if can liquidate', async () => {
         await collateral.mock.liquidatableNext.withArgs(user.address, product.address).returns(true)
 
-        await expect(product.connect(user).openMake(POSITION)).to.be.revertedWith(
-          'ProductInsufficientCollateralError()',
+        await expect(product.connect(user).openMake(POSITION)).to.be.revertedWithCustomError(
+          product,
+          'ProductInsufficientCollateralError',
         )
       })
 
@@ -813,27 +826,39 @@ describe('Product', () => {
         await product.connect(userB).openMake(POSITION.mul(2))
         await product.connect(user).openTake(POSITION)
 
-        await expect(product.connect(user).openMake(POSITION)).to.be.revertedWith('ProductDoubleSidedError()')
+        await expect(product.connect(user).openMake(POSITION)).to.be.revertedWithCustomError(
+          product,
+          'ProductDoubleSidedError',
+        )
       })
 
       it('reverts if in liquidation', async () => {
         await product.connect(collateralSigner).closeAll(user.address)
-        await expect(product.connect(user).openMake(POSITION)).to.be.revertedWith('ProductInLiquidationError()')
+        await expect(product.connect(user).openMake(POSITION)).to.be.revertedWithCustomError(
+          product,
+          'ProductInLiquidationError',
+        )
       })
 
       it('reverts if paused', async () => {
         await controller.mock.paused.withArgs().returns(true)
-        await expect(product.connect(user).openMake(POSITION)).to.be.revertedWith('PausedError()')
+        await expect(product.connect(user).openMake(POSITION)).to.be.revertedWithCustomError(product, 'PausedError')
       })
 
       it('reverts if over maker limit', async () => {
         await product.updateMakerLimit(POSITION.div(2))
-        await expect(product.connect(user).openMake(POSITION)).to.be.revertedWith('ProductMakerOverLimitError()')
+        await expect(product.connect(user).openMake(POSITION)).to.be.revertedWithCustomError(
+          product,
+          'ProductMakerOverLimitError',
+        )
       })
 
       it('reverts if closed', async () => {
         await product.updateClosed(true)
-        await expect(product.connect(user).openMake(POSITION)).to.be.revertedWith('ProductClosedError()')
+        await expect(product.connect(user).openMake(POSITION)).to.be.revertedWithCustomError(
+          product,
+          'ProductClosedError',
+        )
       })
     })
 
@@ -1218,23 +1243,29 @@ describe('Product', () => {
         it('reverts if taker > maker', async () => {
           await product.connect(userB).openTake(POSITION)
 
-          await expect(product.connect(user).closeMake(POSITION)).to.be.revertedWith(
-            `ProductInsufficientLiquidityError(0)`,
-          )
+          await expect(product.connect(user).closeMake(POSITION))
+            .to.be.revertedWithCustomError(product, `ProductInsufficientLiquidityError`)
+            .withArgs(0)
         })
 
         it('reverts if underflow', async () => {
-          await expect(product.connect(user).closeMake(POSITION.mul(2))).to.be.revertedWith('ProductOverClosedError()')
+          await expect(product.connect(user).closeMake(POSITION.mul(2))).to.be.revertedWithCustomError(
+            product,
+            'ProductOverClosedError',
+          )
         })
 
         it('reverts if in liquidation', async () => {
           await product.connect(collateralSigner).closeAll(user.address)
-          await expect(product.connect(user).closeMake(POSITION)).to.be.revertedWith('ProductInLiquidationError()')
+          await expect(product.connect(user).closeMake(POSITION)).to.be.revertedWithCustomError(
+            product,
+            'ProductInLiquidationError',
+          )
         })
 
         it('reverts if paused', async () => {
           await controller.mock.paused.withArgs().returns(true)
-          await expect(product.connect(user).closeMake(POSITION)).to.be.revertedWith('PausedError()')
+          await expect(product.connect(user).closeMake(POSITION)).to.be.revertedWithCustomError(product, 'PausedError')
         })
       })
     })
@@ -1544,7 +1575,10 @@ describe('Product', () => {
         // Liquidate the user
         await product.connect(collateralSigner).closeAll(user.address)
         // User can't open a new position yet
-        await expect(product.connect(user).openTake(POSITION)).to.be.revertedWith('ProductInLiquidationError()')
+        await expect(product.connect(user).openTake(POSITION)).to.be.revertedWithCustomError(
+          product,
+          'ProductInLiquidationError',
+        )
 
         // Advance version
         await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
@@ -1560,29 +1594,38 @@ describe('Product', () => {
 
       it('reverts if taker > maker', async () => {
         const socialization = utils.parseEther('0.5')
-        await expect(product.connect(user).openTake(POSITION.mul(4))).to.be.revertedWith(
-          `ProductInsufficientLiquidityError(${socialization})`,
-        )
+        await expect(product.connect(user).openTake(POSITION.mul(4)))
+          .to.be.revertedWithCustomError(product, 'ProductInsufficientLiquidityError')
+          .withArgs(socialization)
       })
 
       it('reverts if double sided position', async () => {
         await product.connect(user).openMake(POSITION)
-        await expect(product.connect(user).openTake(POSITION)).to.be.revertedWith('ProductDoubleSidedError()')
+        await expect(product.connect(user).openTake(POSITION)).to.be.revertedWithCustomError(
+          product,
+          'ProductDoubleSidedError',
+        )
       })
 
       it('reverts if in liquidation', async () => {
         await product.connect(collateralSigner).closeAll(user.address)
-        await expect(product.connect(user).openTake(POSITION)).to.be.revertedWith('ProductInLiquidationError()')
+        await expect(product.connect(user).openTake(POSITION)).to.be.revertedWithCustomError(
+          product,
+          'ProductInLiquidationError',
+        )
       })
 
       it('reverts if paused', async () => {
         await controller.mock.paused.withArgs().returns(true)
-        await expect(product.connect(user).openTake(POSITION)).to.be.revertedWith('PausedError()')
+        await expect(product.connect(user).openTake(POSITION)).to.be.revertedWithCustomError(product, 'PausedError')
       })
 
       it('reverts if closed', async () => {
         await product.updateClosed(true)
-        await expect(product.connect(user).openTake(POSITION)).to.be.revertedWith('ProductClosedError()')
+        await expect(product.connect(user).openTake(POSITION)).to.be.revertedWithCustomError(
+          product,
+          'ProductClosedError',
+        )
       })
     })
 
@@ -2124,17 +2167,23 @@ describe('Product', () => {
         })
 
         it('reverts if underflow', async () => {
-          await expect(product.connect(user).closeTake(POSITION.mul(2))).to.be.revertedWith('ProductOverClosedError()')
+          await expect(product.connect(user).closeTake(POSITION.mul(2))).to.be.revertedWithCustomError(
+            product,
+            'ProductOverClosedError',
+          )
         })
 
         it('reverts if in liquidation', async () => {
           await product.connect(collateralSigner).closeAll(user.address)
-          await expect(product.connect(user).closeTake(POSITION)).to.be.revertedWith('ProductInLiquidationError()')
+          await expect(product.connect(user).closeTake(POSITION)).to.be.revertedWithCustomError(
+            product,
+            'ProductInLiquidationError',
+          )
         })
 
         it('reverts if paused', async () => {
           await controller.mock.paused.withArgs().returns(true)
-          await expect(product.connect(user).closeTake(POSITION)).to.be.revertedWith('PausedError()')
+          await expect(product.connect(user).closeTake(POSITION)).to.be.revertedWithCustomError(product, 'PausedError')
         })
       })
     })
@@ -2206,7 +2255,10 @@ describe('Product', () => {
       })
 
       it('reverts if already initialized', async () => {
-        await expect(product.connect(user).closeAll(user.address)).to.be.revertedWith(`NotCollateralError()`)
+        await expect(product.connect(user).closeAll(user.address)).to.be.revertedWithCustomError(
+          product,
+          `NotCollateralError`,
+        )
       })
     })
 
@@ -3033,12 +3085,15 @@ describe('Product', () => {
 
       it('reverts if paused', async () => {
         await controller.mock.paused.withArgs().returns(true)
-        await expect(product.connect(user).settle()).to.be.revertedWith('PausedError()')
+        await expect(product.connect(user).settle()).to.be.revertedWithCustomError(product, 'PausedError')
       })
 
       it('reverts if paused', async () => {
         await controller.mock.paused.withArgs().returns(true)
-        await expect(product.connect(user).settleAccount(user.address)).to.be.revertedWith('PausedError()')
+        await expect(product.connect(user).settleAccount(user.address)).to.be.revertedWithCustomError(
+          product,
+          'PausedError',
+        )
       })
     })
 
@@ -3060,9 +3115,9 @@ describe('Product', () => {
         })
 
         it('reverts if not from multiInvoker or user', async () => {
-          await expect(product.connect(userB).openMakeFor(user.address, POSITION)).to.be.revertedWith(
-            `NotAccountOrMultiInvokerError("${user.address}", "${userB.address}")`,
-          )
+          await expect(product.connect(userB).openMakeFor(user.address, POSITION))
+            .to.be.revertedWithCustomError(product, 'NotAccountOrMultiInvokerError')
+            .withArgs(user.address, userB.address)
         })
       })
 
@@ -3100,9 +3155,9 @@ describe('Product', () => {
         })
 
         it('reverts if not from multiInvoker or user', async () => {
-          await expect(product.connect(userB).closeTakeFor(user.address, POSITION)).to.be.revertedWith(
-            `NotAccountOrMultiInvokerError("${user.address}", "${userB.address}")`,
-          )
+          await expect(product.connect(userB).closeTakeFor(user.address, POSITION))
+            .to.be.revertedWithCustomError(product, 'NotAccountOrMultiInvokerError')
+            .withArgs(user.address, userB.address)
         })
       })
 
@@ -3127,9 +3182,9 @@ describe('Product', () => {
         })
 
         it('reverts if not from multiInvoker or user', async () => {
-          await expect(product.connect(userB).openTakeFor(user.address, POSITION)).to.be.revertedWith(
-            `NotAccountOrMultiInvokerError("${user.address}", "${userB.address}")`,
-          )
+          await expect(product.connect(userB).openTakeFor(user.address, POSITION))
+            .to.be.revertedWithCustomError(product, 'NotAccountOrMultiInvokerError')
+            .withArgs(user.address, userB.address)
         })
       })
 
@@ -3168,9 +3223,9 @@ describe('Product', () => {
         })
 
         it('reverts if not from multiInvoker or user', async () => {
-          await expect(product.connect(userB).closeTakeFor(user.address, POSITION)).to.be.revertedWith(
-            `NotAccountOrMultiInvokerError("${user.address}", "${userB.address}")`,
-          )
+          await expect(product.connect(userB).closeTakeFor(user.address, POSITION))
+            .to.be.revertedWithCustomError(product, 'NotAccountOrMultiInvokerError')
+            .withArgs(user.address, userB.address)
         })
       })
     })
@@ -3779,7 +3834,10 @@ describe('Product', () => {
         // Liquidate the user
         await product.connect(collateralSigner).closeAll(user.address)
         // User can't open a new position yet
-        await expect(product.connect(user).openMake(POSITION)).to.be.revertedWith('ProductInLiquidationError()')
+        await expect(product.connect(user).openMake(POSITION)).to.be.revertedWithCustomError(
+          product,
+          'ProductInLiquidationError',
+        )
 
         // Advance version
         await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
@@ -3797,14 +3855,18 @@ describe('Product', () => {
         await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_0)
         await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_0)
 
-        await expect(product.connect(user).openMake(POSITION)).to.be.revertedWith('ProductOracleBootstrappingError()')
+        await expect(product.connect(user).openMake(POSITION)).to.be.revertedWithCustomError(
+          product,
+          'ProductOracleBootstrappingError',
+        )
       })
 
       it('reverts if can liquidate', async () => {
         await collateral.mock.liquidatableNext.withArgs(user.address, product.address).returns(true)
 
-        await expect(product.connect(user).openMake(POSITION)).to.be.revertedWith(
-          'ProductInsufficientCollateralError()',
+        await expect(product.connect(user).openMake(POSITION)).to.be.revertedWithCustomError(
+          product,
+          'ProductInsufficientCollateralError',
         )
       })
 
@@ -3812,27 +3874,39 @@ describe('Product', () => {
         await product.connect(userB).openMake(POSITION.mul(2))
         await product.connect(user).openTake(POSITION)
 
-        await expect(product.connect(user).openMake(POSITION)).to.be.revertedWith('ProductDoubleSidedError()')
+        await expect(product.connect(user).openMake(POSITION)).to.be.revertedWithCustomError(
+          product,
+          'ProductDoubleSidedError',
+        )
       })
 
       it('reverts if in liquidation', async () => {
         await product.connect(collateralSigner).closeAll(user.address)
-        await expect(product.connect(user).openMake(POSITION)).to.be.revertedWith('ProductInLiquidationError()')
+        await expect(product.connect(user).openMake(POSITION)).to.be.revertedWithCustomError(
+          product,
+          'ProductInLiquidationError',
+        )
       })
 
       it('reverts if paused', async () => {
         await controller.mock.paused.withArgs().returns(true)
-        await expect(product.connect(user).openMake(POSITION)).to.be.revertedWith('PausedError()')
+        await expect(product.connect(user).openMake(POSITION)).to.be.revertedWithCustomError(product, 'PausedError')
       })
 
       it('reverts if over maker limit', async () => {
         await product.updateMakerLimit(POSITION.div(2))
-        await expect(product.connect(user).openMake(POSITION)).to.be.revertedWith('ProductMakerOverLimitError()')
+        await expect(product.connect(user).openMake(POSITION)).to.be.revertedWithCustomError(
+          product,
+          'ProductMakerOverLimitError',
+        )
       })
 
       it('reverts if closed', async () => {
         await product.updateClosed(true)
-        await expect(product.connect(user).openMake(POSITION)).to.be.revertedWith('ProductClosedError()')
+        await expect(product.connect(user).openMake(POSITION)).to.be.revertedWithCustomError(
+          product,
+          'ProductClosedError',
+        )
       })
     })
 
@@ -4215,23 +4289,29 @@ describe('Product', () => {
         it('reverts if taker > maker', async () => {
           await product.connect(userB).openTake(POSITION)
 
-          await expect(product.connect(user).closeMake(POSITION)).to.be.revertedWith(
-            `ProductInsufficientLiquidityError(0)`,
-          )
+          await expect(product.connect(user).closeMake(POSITION))
+            .to.be.revertedWithCustomError(product, `ProductInsufficientLiquidityError`)
+            .withArgs(0)
         })
 
         it('reverts if underflow', async () => {
-          await expect(product.connect(user).closeMake(POSITION.mul(2))).to.be.revertedWith('ProductOverClosedError()')
+          await expect(product.connect(user).closeMake(POSITION.mul(2))).to.be.revertedWithCustomError(
+            product,
+            'ProductOverClosedError',
+          )
         })
 
         it('reverts if in liquidation', async () => {
           await product.connect(collateralSigner).closeAll(user.address)
-          await expect(product.connect(user).closeMake(POSITION)).to.be.revertedWith('ProductInLiquidationError()')
+          await expect(product.connect(user).closeMake(POSITION)).to.be.revertedWithCustomError(
+            product,
+            'ProductInLiquidationError',
+          )
         })
 
         it('reverts if paused', async () => {
           await controller.mock.paused.withArgs().returns(true)
-          await expect(product.connect(user).closeMake(POSITION)).to.be.revertedWith('PausedError()')
+          await expect(product.connect(user).closeMake(POSITION)).to.be.revertedWithCustomError(product, 'PausedError')
         })
       })
     })
@@ -4541,7 +4621,10 @@ describe('Product', () => {
         // Liquidate the user
         await product.connect(collateralSigner).closeAll(user.address)
         // User can't open a new position yet
-        await expect(product.connect(user).openTake(POSITION)).to.be.revertedWith('ProductInLiquidationError()')
+        await expect(product.connect(user).openTake(POSITION)).to.be.revertedWithCustomError(
+          product,
+          'ProductInLiquidationError',
+        )
 
         // Advance version
         await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3)
@@ -4558,36 +4641,46 @@ describe('Product', () => {
       it('reverts if can liquidate', async () => {
         await collateral.mock.liquidatableNext.withArgs(user.address, product.address).returns(true)
 
-        await expect(product.connect(user).openTake(POSITION)).to.be.revertedWith(
-          'ProductInsufficientCollateralError()',
+        await expect(product.connect(user).openTake(POSITION)).to.be.revertedWithCustomError(
+          product,
+          'ProductInsufficientCollateralError',
         )
       })
 
       it('reverts if taker > maker', async () => {
         const socialization = utils.parseEther('0.5')
-        await expect(product.connect(user).openTake(POSITION.mul(4))).to.be.revertedWith(
-          `ProductInsufficientLiquidityError(${socialization})`,
-        )
+        await expect(product.connect(user).openTake(POSITION.mul(4)))
+          .to.be.revertedWithCustomError(product, `ProductInsufficientLiquidityError`)
+          .withArgs(socialization)
       })
 
       it('reverts if double sided position', async () => {
         await product.connect(user).openMake(POSITION)
-        await expect(product.connect(user).openTake(POSITION)).to.be.revertedWith('ProductDoubleSidedError()')
+        await expect(product.connect(user).openTake(POSITION)).to.be.revertedWithCustomError(
+          product,
+          'ProductDoubleSidedError',
+        )
       })
 
       it('reverts if in liquidation', async () => {
         await product.connect(collateralSigner).closeAll(user.address)
-        await expect(product.connect(user).openTake(POSITION)).to.be.revertedWith('ProductInLiquidationError()')
+        await expect(product.connect(user).openTake(POSITION)).to.be.revertedWithCustomError(
+          product,
+          'ProductInLiquidationError',
+        )
       })
 
       it('reverts if paused', async () => {
         await controller.mock.paused.withArgs().returns(true)
-        await expect(product.connect(user).openTake(POSITION)).to.be.revertedWith('PausedError()')
+        await expect(product.connect(user).openTake(POSITION)).to.be.revertedWithCustomError(product, 'PausedError')
       })
 
       it('reverts if closed', async () => {
         await product.updateClosed(true)
-        await expect(product.connect(user).openTake(POSITION)).to.be.revertedWith('ProductClosedError()')
+        await expect(product.connect(user).openTake(POSITION)).to.be.revertedWithCustomError(
+          product,
+          'ProductClosedError',
+        )
       })
     })
 
@@ -5128,17 +5221,23 @@ describe('Product', () => {
         })
 
         it('reverts if underflow', async () => {
-          await expect(product.connect(user).closeTake(POSITION.mul(2))).to.be.revertedWith('ProductOverClosedError()')
+          await expect(product.connect(user).closeTake(POSITION.mul(2))).to.be.revertedWithCustomError(
+            product,
+            'ProductOverClosedError',
+          )
         })
 
         it('reverts if in liquidation', async () => {
           await product.connect(collateralSigner).closeAll(user.address)
-          await expect(product.connect(user).closeTake(POSITION)).to.be.revertedWith('ProductInLiquidationError()')
+          await expect(product.connect(user).closeTake(POSITION)).to.be.revertedWithCustomError(
+            product,
+            'ProductInLiquidationError',
+          )
         })
 
         it('reverts if paused', async () => {
           await controller.mock.paused.withArgs().returns(true)
-          await expect(product.connect(user).closeTake(POSITION)).to.be.revertedWith('PausedError()')
+          await expect(product.connect(user).closeTake(POSITION)).to.be.revertedWithCustomError(product, 'PausedError')
         })
       })
     })
@@ -5210,7 +5309,10 @@ describe('Product', () => {
       })
 
       it('reverts if already initialized', async () => {
-        await expect(product.connect(user).closeAll(user.address)).to.be.revertedWith(`NotCollateralError()`)
+        await expect(product.connect(user).closeAll(user.address)).to.be.revertedWithCustomError(
+          product,
+          `NotCollateralError`,
+        )
       })
     })
 
@@ -6035,12 +6137,15 @@ describe('Product', () => {
 
       it('reverts if paused', async () => {
         await controller.mock.paused.withArgs().returns(true)
-        await expect(product.connect(user).settle()).to.be.revertedWith('PausedError()')
+        await expect(product.connect(user).settle()).to.be.revertedWithCustomError(product, 'PausedError')
       })
 
       it('reverts if paused', async () => {
         await controller.mock.paused.withArgs().returns(true)
-        await expect(product.connect(user).settleAccount(user.address)).to.be.revertedWith('PausedError()')
+        await expect(product.connect(user).settleAccount(user.address)).to.be.revertedWithCustomError(
+          product,
+          'PausedError',
+        )
       })
     })
 

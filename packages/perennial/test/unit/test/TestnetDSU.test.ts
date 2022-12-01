@@ -37,14 +37,15 @@ describe('TestnetDSU', () => {
     })
 
     it('reverts if minting over limit', async () => {
-      await expect(testnetDSU.connect(minter).mint(user.address, utils.parseEther('1231231'))).to.be.revertedWith(
-        'TestnetDSUOverLimitError()',
-      )
+      await expect(
+        testnetDSU.connect(minter).mint(user.address, utils.parseEther('1231231')),
+      ).to.be.revertedWithCustomError(testnetDSU, 'TestnetDSUOverLimitError')
     })
 
     it('reverts if non-minter calls', async () => {
-      await expect(testnetDSU.mint(user.address, utils.parseEther('1'))).to.be.revertedWith(
-        'TestnetDSUNotMinterError()',
+      await expect(testnetDSU.mint(user.address, utils.parseEther('1'))).to.be.revertedWithCustomError(
+        testnetDSU,
+        'TestnetDSUNotMinterError',
       )
     })
   })
@@ -57,7 +58,10 @@ describe('TestnetDSU', () => {
     })
 
     it('reverts if not called by minter', async () => {
-      await expect(testnetDSU.updateMinter(user.address)).to.be.revertedWith('TestnetDSUNotMinterError()')
+      await expect(testnetDSU.updateMinter(user.address)).to.be.revertedWithCustomError(
+        testnetDSU,
+        'TestnetDSUNotMinterError',
+      )
     })
   })
 })

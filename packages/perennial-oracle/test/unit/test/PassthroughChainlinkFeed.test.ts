@@ -1,13 +1,13 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { expect } from 'chai'
-import HRE, { waffle } from 'hardhat'
+import HRE from 'hardhat'
 
 import {
   FeedRegistryInterface__factory,
   PassthroughChainlinkFeed,
   PassthroughChainlinkFeed__factory,
 } from '../../../../perennial/types/generated'
-import { MockContract } from '@ethereum-waffle/mock-contract'
+import { MockContract, deployMockContract } from '@ethereum-waffle/mock-contract'
 
 const { ethers } = HRE
 
@@ -20,7 +20,7 @@ describe('PassthroughChainlinkFeed', () => {
 
   beforeEach(async () => {
     ;[user, eth, usd] = await ethers.getSigners()
-    feedRegistry = await waffle.deployMockContract(user, FeedRegistryInterface__factory.abi)
+    feedRegistry = await deployMockContract(user, FeedRegistryInterface__factory.abi)
     passthroughChainlinkFeed = await new PassthroughChainlinkFeed__factory(user).deploy(feedRegistry.address)
   })
 
