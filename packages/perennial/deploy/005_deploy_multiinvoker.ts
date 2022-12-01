@@ -28,7 +28,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   console.log('using ProxyAdmin address: ' + proxyAdminAddress)
   console.log('using Multisig address: ' + multisigAddress)
 
-  const dsu = await IERC20__factory.connect(dsuAddress, deployerSigner)
+  const usdc = await IERC20__factory.connect(usdcAddress, deployerSigner)
 
   const multiInvokerImpl: Deployment = await deploy('MultiInvoker_Impl', {
     contract: 'MultiInvoker',
@@ -51,7 +51,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   // INITIALIZE
   const multiInvoker = await new MultiInvoker__factory(deployerSigner).attach((await get('MultiInvoker_Proxy')).address)
 
-  if ((await dsu.callStatic.allowance(multiInvoker.address, batcherAddress)).eq(ethers.constants.MaxUint256)) {
+  if ((await usdc.callStatic.allowance(multiInvoker.address, batcherAddress)).eq(ethers.constants.MaxUint256)) {
     console.log('MultiInvoker already initialized.')
   } else {
     process.stdout.write('initializing MultiInvoker... ')
