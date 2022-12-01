@@ -94,10 +94,10 @@
   resolved "https://registry.yarnpkg.com/@ensdomains/resolver/-/resolver-0.2.4.tgz#c10fe28bf5efbf49bff4666d909aed0265efbc89"
   integrity sha512-bvaTH34PMCbv6anRa9I/0zjLJgY4EuznbEMgbV77JBCQ9KNC46rzi0avuxpOfu+xDjPEtSFGqVEOr5GlUSGudA==
 
-"@equilibria/emptyset-batcher@0.0.4":
-  version "0.0.4"
-  resolved "https://registry.yarnpkg.com/@equilibria/emptyset-batcher/-/emptyset-batcher-0.0.4.tgz#9d1de051c1fa147b5d44a090a19201dbb234b230"
-  integrity sha512-WTTpUiy6DFh1UWGk+6lM/D/cZMMZLp7Ix3q6H2wsVH4KyqYE2kfqtM1cwYbw8zIQWenrIPJeD8APL2Al77Lohg==
+"@equilibria/emptyset-batcher@0.1.0":
+  version "0.1.0"
+  resolved "https://registry.yarnpkg.com/@equilibria/emptyset-batcher/-/emptyset-batcher-0.1.0.tgz#2068d202d38614a337d115d4109f05cf72e48d09"
+  integrity sha512-joALMtS47fdXw9nvSO4gmmcsYvfErXlC92nYDGV2wRGqyUneOZKPVC1s0TctSBK/OeXJ+ielzXVLqB84H5PZKg==
   dependencies:
     "@equilibria/root" "0.1.5"
     "@openzeppelin/contracts" "4.6.0"

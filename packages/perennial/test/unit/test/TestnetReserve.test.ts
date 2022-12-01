@@ -17,13 +17,12 @@ use(smock.matchers)
 describe('TestnetReserve', () => {
   let owner: SignerWithAddress
   let user: SignerWithAddress
-  let account: SignerWithAddress
   let usdc: FakeContract<IERC20Metadata>
   let dsu: FakeContract<ERC20PresetMinterPauser>
   let reserve: TestnetReserve
 
   beforeEach(async () => {
-    ;[owner, user, account] = await ethers.getSigners()
+    ;[owner, user] = await ethers.getSigners()
 
     usdc = await smock.fake<IERC20Metadata>('IERC20Metadata')
     dsu = await smock.fake<ERC20PresetMinterPauser>('ERC20PresetMinterPauser')
@@ -41,17 +40,16 @@ describe('TestnetReserve', () => {
   describe('#mint', () => {
     it('pulls USDC from the sender, wraps it as DSU', async () => {
       usdc.transferFrom.whenCalledWith(user.address, reserve.address, 10e6).returns(true)
-      dsu.mint.whenCalledWith(account.address, utils.parseEther('10')).returns(true)
+      dsu.mint.whenCalledWith(user.address, utils.parseEther('10')).returns(true)
 
       await expect(
         reserve.connect(user).mint(
           utils.parseEther('10'),
-          account.address,
           { gasLimit: 30e6 }, // https://github.com/defi-wonderland/smock/issues/99
         ),
       )
         .to.emit(reserve, 'Mint')
-        .withArgs(account.address, utils.parseEther('10'))
+        .withArgs(user.address, utils.parseEther('10'))
     })
   })
 
@@ -59,17 +57,16 @@ describe('TestnetReserve', () => {
     it('pulls DSU from the sender, unwraps it to USDC', async () => {
       dsu.transferFrom.whenCalledWith(user.address, reserve.address, utils.parseEther('10')).returns(true)
       dsu.burn.whenCalledWith(utils.parseEther('10')).returns(true)
-      usdc.transfer.whenCalledWith(account.address, 10e6).returns(true)
+      usdc.transfer.whenCalledWith(user.address, 10e6).returns(true)
 
       await expect(
         reserve.connect(user).redeem(
           utils.parseEther('10'),
-          account.address,
           { gasLimit: 30e6 }, // https://github.com/defi-wonderland/smock/issues/99
         ),
       )
         .to.emit(reserve, 'Redeem')
-        .withArgs(account.address, utils.parseEther('10'))
+        .withArgs(user.address, utils.parseEther('10'))
     })
   })
 })

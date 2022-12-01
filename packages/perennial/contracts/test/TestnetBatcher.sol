@@ -8,13 +8,17 @@ import "@equilibria/root/token/types/Token6.sol";
 import "./TestnetReserve.sol";
 
 contract TestnetBatcher is IBatcher {
-    TestnetReserve public reserve;
+    IEmptySetReserve public RESERVE;
+    Token6 public USDC;
+    Token18 public DSU;
 
-    constructor(TestnetReserve reserve_) {
-        reserve = reserve_;
+    constructor(IEmptySetReserve reserve_, Token6 usdc_, Token18 dsu_) {
+        RESERVE = reserve_;
+        USDC = usdc_;
+        DSU = dsu_;
 
-        reserve.USDC().approve(address(reserve));
-        reserve.DSU().approve(address(reserve));
+        USDC.approve(address(RESERVE));
+        DSU.approve(address(RESERVE));
     }
 
     function totalBalance() external pure returns (UFixed18) {
@@ -23,14 +27,19 @@ contract TestnetBatcher is IBatcher {
 
     // Passthrough to Reserve
     function wrap(UFixed18 amount, address to) external {
-        reserve.USDC().pull(msg.sender, amount, true);
-        reserve.mint(amount, to);
+        USDC.pull(msg.sender, amount, true);
+        RESERVE.mint(amount);
+        DSU.push(to, amount);
 
         emit Wrap(to, amount);
     }
 
-    function unwrap(UFixed18, address) external pure {
-        revert BatcherNotImplementedError();
+    function unwrap(UFixed18 amount, address to) external {
+        DSU.pull(msg.sender, amount);
+        RESERVE.redeem(amount);
+        USDC.push(to, amount);
+
+        emit Unwrap(to, amount);
     }
 
     // No-op

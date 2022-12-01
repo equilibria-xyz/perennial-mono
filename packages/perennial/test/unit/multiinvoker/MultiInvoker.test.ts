@@ -13,7 +13,7 @@ import {
   IProduct,
   IIncentivizer,
   IEmptySetReserve,
-  Batcher,
+  IBatcher,
 } from '../../../types/generated'
 import { IMultiInvoker } from '../../../types/generated/contracts/interfaces/IMultiInvoker'
 import { InvokerAction, buildInvokerActions } from '../../util'
@@ -29,7 +29,7 @@ describe('MultiInvoker', () => {
   let product: FakeContract<IProduct>
   let collateral: FakeContract<ICollateral>
   let controller: FakeContract<IController>
-  let batcher: FakeContract<Batcher>
+  let batcher: FakeContract<IBatcher>
   let incentivizer: FakeContract<IIncentivizer>
   let reserve: FakeContract<IEmptySetReserve>
   let multiInvoker: MultiInvoker
@@ -40,7 +40,7 @@ describe('MultiInvoker', () => {
     usdc = await smock.fake<IERC20>('IERC20')
     dsu = await smock.fake<IERC20>('IERC20')
     collateral = await smock.fake<ICollateral>('ICollateral')
-    batcher = await smock.fake<Batcher>('Batcher')
+    batcher = await smock.fake<IBatcher>('Batcher')
     controller = await smock.fake<IController>('IController')
     incentivizer = await smock.fake<IIncentivizer>('IIncentivizer')
     product = await smock.fake<IProduct>('IProduct')
@@ -66,6 +66,7 @@ describe('MultiInvoker', () => {
     usdc.approve.whenCalledWith(batcher.address, ethers.constants.MaxUint256).returns(true)
     usdc.allowance.whenCalledWith(multiInvoker.address, reserve.address).returns(0)
     usdc.approve.whenCalledWith(reserve.address, ethers.constants.MaxUint256).returns(true)
+    usdc.balanceOf.whenCalledWith(batcher.address).returns(1_000_000e6)
 
     await multiInvoker.initialize()
   })
@@ -84,6 +85,7 @@ describe('MultiInvoker', () => {
   describe('#initialize', () => {
     it('initializes correctly', async () => {
       expect(dsu.approve).to.be.calledWith(collateral.address, ethers.constants.MaxUint256)
+      expect(dsu.approve).to.be.calledWith(batcher.address, ethers.constants.MaxUint256)
       expect(dsu.approve).to.be.calledWith(reserve.address, ethers.constants.MaxUint256)
       expect(usdc.approve).to.be.calledWith(batcher.address, ethers.constants.MaxUint256)
       expect(usdc.approve).to.be.calledWith(reserve.address, ethers.constants.MaxUint256)
@@ -146,7 +148,7 @@ describe('MultiInvoker', () => {
     })
 
     it('claims incentive rewards on CLAIM action', async () => {
-      await multiInvoker.connect(user).invoke([actions.CLAIM])
+      await expect(multiInvoker.connect(user).invoke([actions.CLAIM])).to.not.be.reverted
 
       expect(incentivizer.claimFor).to.have.been.calledWith(user.address, product.address, programs)
     })
@@ -162,7 +164,7 @@ describe('MultiInvoker', () => {
       dsu.balanceOf.whenCalledWith(batcher.address).returns(0)
       dsu.transfer.whenCalledWith(user.address, amount).returns(true)
 
-      await multiInvoker.connect(user).invoke([actions.WRAP])
+      await expect(multiInvoker.connect(user).invoke([actions.WRAP])).to.not.be.reverted
 
       expect(usdc.transferFrom).to.have.been.calledWith(user.address, multiInvoker.address, usdcAmount)
       expect(reserve.mint).to.have.been.calledWith(amount)
@@ -170,7 +172,17 @@ describe('MultiInvoker', () => {
     })
 
     it('unwraps DSU to USDC on UNWRAP action', async () => {
-      await multiInvoker.connect(user).invoke([actions.UNWRAP])
+      await expect(multiInvoker.connect(user).invoke([actions.UNWRAP])).to.not.be.reverted
+
+      expect(dsu.transferFrom).to.have.been.calledWith(user.address, multiInvoker.address, amount)
+      expect(batcher.unwrap).to.have.been.calledWith(amount, user.address)
+    })
+
+    it('unwraps DSU to USDC using RESERVE on UNWRAP action if amount is greater than batcher balance', async () => {
+      usdc.balanceOf.whenCalledWith(batcher.address).returns(0)
+      usdc.transfer.whenCalledWith(user.address, amount).returns(true)
+
+      await expect(multiInvoker.connect(user).invoke([actions.UNWRAP])).to.not.be.reverted
 
       expect(dsu.transferFrom).to.have.been.calledWith(user.address, multiInvoker.address, amount)
       expect(reserve.redeem).to.have.been.calledWith(amount)
@@ -196,7 +208,22 @@ describe('MultiInvoker', () => {
       expect(collateral.depositTo).to.have.been.calledWith(user.address, product.address, amount)
     })
 
-    it('withdraws then unwraps on WITHDRAW_AND_UNWRAP action', async () => {
+    it('withdraws then unwraps DSU to USDC on WITHDRAW_AND_UNWRAP action', async () => {
+      await expect(multiInvoker.connect(user).invoke([actions.WITHDRAW_AND_UNWRAP])).to.not.be.reverted
+
+      expect(collateral.withdrawFrom).to.have.been.calledWith(
+        user.address,
+        multiInvoker.address,
+        product.address,
+        amount,
+      )
+
+      expect(batcher.unwrap).to.have.been.calledWith(amount, user.address)
+    })
+
+    it('withdraws then unwraps DSU to USDC using RESERVE on WITHDRAW_AND_UNWRAP action if amount is greater than batcher balance', async () => {
+      usdc.balanceOf.whenCalledWith(batcher.address).returns(0)
+
       await expect(multiInvoker.connect(user).invoke([actions.WITHDRAW_AND_UNWRAP])).to.not.be.reverted
 
       expect(collateral.withdrawFrom).to.have.been.calledWith(
@@ -228,12 +255,11 @@ describe('MultiInvoker', () => {
 
       // Wrap/Unwrap
       expect(batcher.wrap).to.have.been.calledWith(amount, user.address)
-      expect(reserve.redeem).to.have.been.calledWith(amount)
+      expect(batcher.unwrap).to.have.been.calledWith(amount, user.address)
 
       // Underlying Transfers
       expect(dsu.transferFrom).to.have.been.calledWith(user.address, multiInvoker.address, amount)
       expect(usdc.transferFrom).to.have.been.calledWith(user.address, multiInvoker.address, usdcAmount)
-      expect(usdc.transfer).to.have.been.calledWith(user.address, usdcAmount)
     })
   })
 })
