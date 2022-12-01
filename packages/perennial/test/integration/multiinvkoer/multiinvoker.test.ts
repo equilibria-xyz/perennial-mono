@@ -17,24 +17,23 @@ describe('MultiInvoker', () => {
 
   describe('#initialize', () => {
     it('sets the correct contract addresses', async () => {
-      const { multiInvoker, usdc, dsu, batcher, controller, collateral } = instanceVars
-      const reserve = await batcher.RESERVE()
+      const { multiInvoker, usdc, dsu, batcher, controller, collateral, reserve } = instanceVars
 
       expect((await multiInvoker.USDC()).toLowerCase()).to.equal(usdc.address.toLowerCase())
       expect((await multiInvoker.DSU()).toLowerCase()).to.equal(dsu.address.toLowerCase())
       expect((await multiInvoker.batcher()).toLowerCase()).to.equal(batcher.address.toLowerCase())
       expect((await multiInvoker.controller()).toLowerCase()).to.equal(controller.address.toLowerCase())
       expect((await multiInvoker.collateral()).toLowerCase()).to.equal(collateral.address.toLowerCase())
-      expect((await multiInvoker.reserve()).toLowerCase()).to.equal(reserve.toLowerCase())
+      expect((await multiInvoker.reserve()).toLowerCase()).to.equal(reserve.address.toLowerCase())
     })
 
     it('sets the correct approvals', async () => {
-      const { multiInvoker, usdc, dsu, batcher, collateral } = instanceVars
+      const { multiInvoker, usdc, dsu, batcher, collateral, reserve } = instanceVars
 
       expect(await dsu.allowance(multiInvoker.address, collateral.address)).to.equal(constants.MaxUint256)
-      expect(await dsu.allowance(multiInvoker.address, await batcher.RESERVE())).to.equal(constants.MaxUint256)
+      expect(await dsu.allowance(multiInvoker.address, reserve.address)).to.equal(constants.MaxUint256)
       expect(await usdc.allowance(multiInvoker.address, batcher.address)).to.equal(constants.MaxUint256)
-      expect(await usdc.allowance(multiInvoker.address, await batcher.RESERVE())).to.equal(constants.MaxUint256)
+      expect(await usdc.allowance(multiInvoker.address, reserve.address)).to.equal(constants.MaxUint256)
     })
 
     it('reverts if already initialized', async () => {
@@ -81,7 +80,7 @@ describe('MultiInvoker', () => {
     })
 
     it('calls the reserve directly if WRAP amount is greater than batcher balance', async () => {
-      const { user, dsu, batcher, usdc, usdcHolder, multiInvoker } = instanceVars
+      const { user, dsu, usdc, usdcHolder, multiInvoker, reserve } = instanceVars
 
       await usdc.connect(usdcHolder).transfer(user.address, 1_000_000e6)
 
@@ -93,8 +92,8 @@ describe('MultiInvoker', () => {
       await expect(multiInvoker.connect(user).invoke([WRAP]))
         .to.emit(usdc, 'Transfer')
         .withArgs(user.address, multiInvoker.address, 2_000_000e6)
-        .to.emit(batcher.RESERVE(), 'Mint')
-        .withArgs(multiInvoker.address, amount)
+        .to.emit(dsu, 'Transfer')
+        .withArgs(reserve.address, multiInvoker.address, amount)
         .to.emit(dsu, 'Transfer')
         .withArgs(multiInvoker.address, user.address, amount)
     })
@@ -104,7 +103,7 @@ describe('MultiInvoker', () => {
 
       await expect(multiInvoker.connect(user).invoke([actions.WRAP, actions.DEPOSIT, actions.OPEN_MAKE]))
         .to.emit(usdc, 'Transfer')
-        .withArgs(user.address, multiInvoker.address, 100000e6)
+        .withArgs(user.address, multiInvoker.address, 10000e6)
         .to.emit(batcher, 'Wrap')
         .withArgs(user.address, amount)
         .to.emit(collateral, 'Deposit')
@@ -118,9 +117,9 @@ describe('MultiInvoker', () => {
 
       await expect(multiInvoker.connect(user).invoke([actions.WRAP_AND_DEPOSIT, actions.OPEN_MAKE]))
         .to.emit(usdc, 'Transfer')
-        .withArgs(user.address, multiInvoker.address, 100000e6)
+        .withArgs(user.address, multiInvoker.address, 10000e6)
         .to.emit(batcher, 'Wrap')
-        .withArgs(user.address, amount)
+        .withArgs(multiInvoker.address, amount)
         .to.emit(collateral, 'Deposit')
         .withArgs(user.address, product.address, amount)
         .to.emit(product, 'MakeOpened')
@@ -158,8 +157,8 @@ describe('MultiInvoker', () => {
         multiInvoker.connect(user).invoke([partialActions.CLOSE_MAKE, partialActions.WITHDRAW, actions.CLAIM]),
       )
         .to.emit(product, 'MakeClosed')
-        .withArgs(user.address, 2473, position.div(2))
-        .to.emit(collateral, 'Withdraw')
+        .withArgs(user.address, 2476, position.div(2))
+        .to.emit(collateral, 'Withdrawal')
         .withArgs(user.address, product.address, amount.div(2))
         .to.emit(incentivizer, 'Claim')
         .withArgs(product.address, user.address, programs[0], '423010973936898252')
@@ -206,7 +205,7 @@ describe('MultiInvoker', () => {
         .to.emit(usdc, 'Transfer')
         .withArgs(user.address, multiInvoker.address, 10000e6)
         .to.emit(batcher, 'Wrap')
-        .withArgs(user.address, amount)
+        .withArgs(multiInvoker.address, amount)
         .to.emit(collateral, 'Deposit')
         .withArgs(user.address, product.address, amount)
         .to.emit(product, 'TakeOpened')
@@ -261,15 +260,15 @@ describe('MultiInvoker', () => {
         multiInvoker.connect(user).invoke([partialActions.CLOSE_TAKE, partialActions.WITHDRAW, actions.CLAIM]),
       )
         .to.emit(product, 'TakeClosed')
-        .withArgs(user.address, 2473, position.div(2))
-        .to.emit(collateral, 'Withdraw')
+        .withArgs(user.address, 2476, position.div(2))
+        .to.emit(collateral, 'Withdrawal')
         .withArgs(user.address, product.address, amount.div(2))
         .to.emit(incentivizer, 'Claim')
         .withArgs(product.address, user.address, programs[0], '105752743484224563')
     })
 
     it('performs a WITHDRAW and UNWRAP chain', async () => {
-      const { user, multiInvoker, batcher, usdc, collateral } = instanceVars
+      const { user, multiInvoker, batcher, usdc, collateral, reserve } = instanceVars
 
       // Load the Reserve with some USDC
       await usdc.connect(user).approve(batcher.address, constants.MaxUint256)
@@ -280,16 +279,16 @@ describe('MultiInvoker', () => {
       await multiInvoker.connect(user).invoke([actions.DEPOSIT])
 
       await expect(multiInvoker.connect(user).invoke([actions.WITHDRAW, actions.UNWRAP]))
-        .to.emit(collateral, 'Withdraw')
+        .to.emit(collateral, 'Withdrawal')
         .withArgs(user.address, product.address, amount)
-        .to.emit(batcher.RESERVE(), 'Redeem')
-        .withArgs(multiInvoker.address, amount)
+        .to.emit(usdc, 'Transfer')
+        .withArgs(reserve.address, multiInvoker.address, 10000e6)
         .to.emit(usdc, 'Transfer')
         .withArgs(multiInvoker.address, user.address, 10000e6)
     })
 
     it('performs WITHDRAW_AND_UNWRAP', async () => {
-      const { user, multiInvoker, batcher, usdc, collateral } = instanceVars
+      const { user, multiInvoker, batcher, usdc, collateral, reserve } = instanceVars
 
       // Load the Reserve with some USDC
       await usdc.connect(user).approve(batcher.address, constants.MaxUint256)
@@ -300,10 +299,10 @@ describe('MultiInvoker', () => {
       await multiInvoker.connect(user).invoke([actions.DEPOSIT])
 
       await expect(multiInvoker.connect(user).invoke([actions.WITHDRAW_AND_UNWRAP]))
-        .to.emit(collateral, 'Withdraw')
+        .to.emit(collateral, 'Withdrawal')
         .withArgs(user.address, product.address, amount)
-        .to.emit(batcher.RESERVE(), 'Redeem')
-        .withArgs(multiInvoker.address, amount)
+        .to.emit(usdc, 'Transfer')
+        .withArgs(reserve.address, multiInvoker.address, 10000e6)
         .to.emit(usdc, 'Transfer')
         .withArgs(multiInvoker.address, user.address, 10000e6)
     })
