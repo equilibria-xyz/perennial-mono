@@ -52,7 +52,7 @@ describe('MultiInvoker', () => {
     batcher.RESERVE.returns(reserve.address)
     batcher.DSU.returns(dsu.address)
 
-    multiInvoker = await new MultiInvoker__factory(owner).deploy(usdc.address, batcher.address)
+    multiInvoker = await new MultiInvoker__factory(owner).deploy(usdc.address, batcher.address, controller.address)
 
     dsu.allowance.whenCalledWith(multiInvoker.address, collateral.address).returns(0)
     dsu.approve.whenCalledWith(collateral.address, ethers.constants.MaxUint256).returns(true)
@@ -68,20 +68,22 @@ describe('MultiInvoker', () => {
     usdc.approve.whenCalledWith(reserve.address, ethers.constants.MaxUint256).returns(true)
     usdc.balanceOf.whenCalledWith(batcher.address).returns(1_000_000e6)
 
-    await multiInvoker.initialize(controller.address)
+    await multiInvoker.initialize()
   })
 
   describe('#constructor', () => {
     it('constructs correctly', async () => {
       expect((await multiInvoker.USDC()).toLowerCase()).to.equal(usdc.address.toLowerCase())
+      expect((await multiInvoker.DSU()).toLowerCase()).to.equal(dsu.address.toLowerCase())
       expect((await multiInvoker.batcher()).toLowerCase()).to.equal(batcher.address.toLowerCase())
+      expect((await multiInvoker.controller()).toLowerCase()).to.equal(controller.address.toLowerCase())
+      expect((await multiInvoker.collateral()).toLowerCase()).to.equal(collateral.address.toLowerCase())
+      expect((await multiInvoker.reserve()).toLowerCase()).to.equal(reserve.address.toLowerCase())
     })
   })
 
   describe('#initialize', () => {
     it('initializes correctly', async () => {
-      expect((await multiInvoker.controller()).toLowerCase()).to.equal(controller.address.toLowerCase())
-
       expect(dsu.approve).to.be.calledWith(collateral.address, ethers.constants.MaxUint256)
       expect(dsu.approve).to.be.calledWith(reserve.address, ethers.constants.MaxUint256)
       expect(usdc.approve).to.be.calledWith(batcher.address, ethers.constants.MaxUint256)
