@@ -180,25 +180,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     console.log('Controller already initialized.')
   } else {
     process.stdout.write('initializing Controller... ')
-    await (
-      await controller.initialize(collateral.address, incentivizer.address, productBeacon.address, multiInvoker.address)
-    ).wait(2)
-    process.stdout.write('complete.\n')
-  }
-
-  if ((await multiInvoker.controller()) === controller.address) {
-    console.log('MultiInvoker already initialized.')
-  } else {
-    process.stdout.write('initializing MultiInvoker... ')
-    await (await multiInvoker.initialize(controller.address)).wait(2)
-    process.stdout.write('complete.\n')
-  }
-
-  if ((await controller.multiInvoker()) === multiInvoker.address) {
-    console.log('Controller MutliInvoker already set.')
-  } else {
-    process.stdout.write('setting Controller MultiInvoker... ')
-    await (await controller.updateMultiInvoker(multiInvoker.address)).wait(2)
+    await (await controller.initialize(collateral.address, incentivizer.address, productBeacon.address)).wait(2)
     process.stdout.write('complete.\n')
   }
 
