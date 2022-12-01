@@ -49,7 +49,6 @@ contract PerennialLens is IPerennialLens {
         _snapshot.dailyRate = dailyRate(product);
         _snapshot.latestVersion = latestVersion(product);
         _snapshot.collateral = collateral(product);
-        _snapshot.shortfall = shortfall(product);
         _snapshot.pre = pre(product);
         _snapshot.position = position(product);
         (_snapshot.productFee, _snapshot.protocolFee) = fees(product);
@@ -145,17 +144,10 @@ contract PerennialLens is IPerennialLens {
      * @param product Product address
      * @return Total collateral for product
      */
-    function collateral(IProduct product) public settle(product) returns (UFixed18) {
-        return product.token().balanceOf(address(product)).sub(product.protocolFees()).sub(product.productFees());
-    }
-
-    /**
-     * @notice Product total shortfall amount after settle
-     * @param product Product address
-     * @return Total shortfall for product
-     */
-    function shortfall(IProduct product) public settle(product) returns (UFixed18) {
-        return product.shortfall();
+    function collateral(IProduct product) public settle(product) returns (Fixed18) {
+        return Fixed18Lib.from(product.token().balanceOf(address(product)))
+            .sub(Fixed18Lib.from(product.protocolFees()))
+            .sub(Fixed18Lib.from(product.productFees()));
     }
 
     /**
@@ -268,7 +260,7 @@ contract PerennialLens is IPerennialLens {
      * @param product Product address
      * @return User deposited collateral for product
      */
-    function collateral(address account, IProduct product) public settleAccount(account, product) returns (UFixed18) {
+    function collateral(address account, IProduct product) public settleAccount(account, product) returns (Fixed18) {
         Account memory productAccount = product.accounts(account);
         return productAccount.collateral;
     }
@@ -298,7 +290,7 @@ contract PerennialLens is IPerennialLens {
     function liquidatable(address account, IProduct product) public settleAccount(account, product) returns (bool) {
         Account memory productAccount = product.accounts(account);
         UFixed18 maintenanceAmount = _maintenance(product, productAccount.position());
-        return maintenanceAmount.gt(productAccount.collateral);
+        return Fixed18Lib.from(maintenanceAmount).gt(productAccount.collateral);
     }
 
     /**

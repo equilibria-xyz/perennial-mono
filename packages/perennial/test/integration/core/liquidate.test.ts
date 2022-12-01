@@ -61,16 +61,15 @@ describe('Liquidate', () => {
     await product.settle(user.address)
     await product.settle(userB.address)
 
-    expect((await product.accounts(user.address)).collateral).to.equal(0)
-    expect(await product.shortfall()).to.equal('2463736825720737646856')
+    expect((await product.accounts(user.address)).collateral).to.equal('-2463736825720737646856')
 
     const userBCollateral = (await product.accounts(userB.address)).collateral
     await expect(product.connect(userB).update(0, userBCollateral.mul(-1))).to.be.revertedWith('0x11') // underflow
 
     await dsu.connect(userB).approve(product.address, constants.MaxUint256)
-    await product.connect(userB).resolveShortfall('2463736825720737646856')
+    await product.connect(user).update(0, '2463736825720737646856') //TODO: from userB?
 
-    expect(await product.shortfall()).to.equal(0)
+    expect((await product.accounts(user.address)).collateral).to.equal(0)
   })
 
   it('uses a socialization factor', async () => {

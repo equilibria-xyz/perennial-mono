@@ -29,11 +29,11 @@ interface IProduct is IPayoffProvider, IParamProvider {
     event Liquidation(address indexed account, address liquidator, UFixed18 fee);
     event FeeSettled(UFixed18 protocolFeeAmount, UFixed18 productFeeAmount);
     event CollateralSettled(address indexed account, Fixed18 amount, UFixed18 newShortfall);
-    event ShortfallResolved(UFixed18 amount);
 
     error ProductInsufficientLiquidityError();
     error ProductInsufficientCollateralError();
     error ProductInLiquidationError();
+    error ProductInDebtError();
     error ProductMakerOverLimitError();
     error ProductOracleBootstrappingError();
     error ProductNotOwnerError();
@@ -55,10 +55,8 @@ interface IProduct is IPayoffProvider, IParamProvider {
     function settle(address account) external;
     function update(Fixed18 positionAmount, Fixed18 collateralAmount) external;
     function liquidate(address account) external;
-    function resolveShortfall(UFixed18 amount) external;
     function liquidation(address account) external view returns (bool);
     function latestVersion() external view returns (uint256);
-    function shortfall() external view returns (UFixed18);
     function accounts(address account) external view returns (Account memory);
     function versions(uint256 oracleVersion) external view returns (Version memory);
     function pre() external view returns (PrePosition memory);

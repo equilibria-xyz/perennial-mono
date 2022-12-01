@@ -50,8 +50,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
         UFixed18 protocolFees;
 
-        UFixed18 shortfall;
-
         /* Current Account State */
         uint256 latestAccountVersion;
 
@@ -85,9 +83,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
     uint256 public latestVersion;
     mapping(address => uint256) public latestVersions;
-
-    /// @dev Total ledger collateral shortfall
-    UFixed18 public shortfall;
 
     /// @dev Whether the account is currently locked for liquidation
     mapping(address => bool) public liquidation;
@@ -147,8 +142,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         // TODO: cleanup
         UFixed18 liquidationFee = controller().liquidationFee();
         UFixed18 accountMaintenance = context.account.maintenance(context.currentOracleVersion, context.parameter.maintenance);
-        UFixed18 fee = UFixed18Lib.min(context.account.collateral, accountMaintenance.mul(liquidationFee));
-        context.account.settleCollateral(UFixed18Lib.ZERO, Fixed18Lib.from(-1, fee)); // no shortfall
+        UFixed18 fee = UFixed18Lib.min(context.account.collateral.max(Fixed18Lib.ZERO).abs(), accountMaintenance.mul(liquidationFee));
+        context.account.collateral = context.account.collateral.sub(Fixed18Lib.from(-1, fee)); // no shortfall
 
         // save state
         _accounts[account] = context.account;
@@ -157,14 +152,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         token.push(msg.sender, fee);
 
         emit Liquidation(account, msg.sender, fee);
-    }
-
-    //TODO: make shortfall per-account instead of aggregated? (remove totally if so w/ depositTo)
-    function resolveShortfall(UFixed18 amount) external nonReentrant notPaused onlyProductOwner {
-        token.pull(msg.sender, amount);
-        shortfall = shortfall.sub(amount);
-
-        emit ShortfallResolved(amount);
     }
 
     //TODO: claim fee
@@ -208,10 +195,11 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         );
 
         // after
+        if (context.account.collateral.sign() == -1 && collateralAmount.sign() == -1) revert ProductInDebtError();
         if (_liquidatable(context) || _liquidatableNext(context)) revert ProductInsufficientCollateralError();
         if (!force && _socializationNext(context).lt(UFixed18Lib.ONE)) revert ProductInsufficientLiquidityError();
         if (context.version.position().next(context.pre).maker.gt(context.parameter.makerLimit)) revert ProductMakerOverLimitError();
-        if (!context.account.collateral.isZero() && context.account.collateral.lt(context.minCollateral)) revert ProductCollateralUnderLimitError();
+        if (!context.account.collateral.isZero() && context.account.collateral.lt(Fixed18Lib.from(context.minCollateral))) revert ProductCollateralUnderLimitError();
 
         // save
         _saveContext(context, account);
@@ -241,7 +229,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         context.pre = _pre;
         context.productFees = productFees;
         context.protocolFees = protocolFees;
-        context.shortfall = shortfall;
 
         // Load account state
         context.latestAccountVersion = latestVersions[account];
@@ -254,7 +241,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         latestVersions[account] = context.latestAccountVersion;
         _accounts[account] = context.account;
         _pre = context.pre;
-        shortfall = context.shortfall;
         productFees = context.productFees;
         protocolFees = context.protocolFees;
     }
@@ -335,7 +321,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         if (context.currentOracleVersion.version > context.latestAccountVersion) {
             context.incentivizer.syncAccount(account, period.toVersion);
 
-            context.shortfall = context.account.accumulate(context.shortfall, fromVersion, toVersion);
+            context.account.accumulate(fromVersion, toVersion);
             context.latestAccountVersion = period.toVersion.version;
         }
     }
@@ -348,12 +334,12 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      */
     function _liquidatableNext(CurrentContext memory context) private pure returns (bool) {
         UFixed18 maintenanceAmount = context.account.maintenanceNext(context.currentOracleVersion, context.parameter.maintenance);
-        return maintenanceAmount.gt(context.account.collateral);
+        return Fixed18Lib.from(maintenanceAmount).gt(context.account.collateral);
     }
 
     function _liquidatable(CurrentContext memory context) private pure returns (bool) {
         UFixed18 maintenanceAmount = context.account.maintenance(context.currentOracleVersion, context.parameter.maintenance);
-        return maintenanceAmount.gt(context.account.collateral);
+        return Fixed18Lib.from(maintenanceAmount).gt(context.account.collateral);
     }
 
     function _socializationNext(CurrentContext memory context) private pure returns (UFixed18) {

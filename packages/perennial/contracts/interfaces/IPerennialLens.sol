@@ -19,8 +19,7 @@ interface IPerennialLens {
         Fixed18 rate;
         Fixed18 dailyRate;
         IOracleProvider.OracleVersion latestVersion;
-        UFixed18 collateral;
-        UFixed18 shortfall;
+        Fixed18 collateral;
         PrePosition pre;
         Position position;
         UFixed18 productFee;
@@ -32,7 +31,7 @@ interface IPerennialLens {
     struct UserProductSnapshot {
         address productAddress;
         address userAddress;
-        UFixed18 collateral;
+        Fixed18 collateral;
         UFixed18 maintenance;
         Fixed18 pre;
         Fixed18 position;
@@ -58,8 +57,7 @@ interface IPerennialLens {
     function definition(IProduct product) external view returns (IProduct.ProductDefinition memory);
     function parameter(IProduct product) external view returns (Parameter memory);
     function utilizationCurve(IProduct product) external view returns (JumpRateUtilizationCurve memory);
-    function collateral(IProduct product) external returns (UFixed18);
-    function shortfall(IProduct product) external returns (UFixed18);
+    function collateral(IProduct product) external returns (Fixed18);
     function pre(IProduct product) external returns (PrePosition memory);
     function fees(IProduct product) external returns (UFixed18 protocolFees, UFixed18 productFees);
     function position(IProduct product) external returns (Position memory);
@@ -71,7 +69,7 @@ interface IPerennialLens {
     function dailyRate(IProduct product) external returns (Fixed18);
 
     // UserProduct Values
-    function collateral(address account, IProduct product) external returns (UFixed18);
+    function collateral(address account, IProduct product) external returns (Fixed18);
     function maintenance(address account, IProduct product) external returns (UFixed18);
     function maintenanceNext(address account, IProduct product) external returns (UFixed18);
     function liquidatable(address account, IProduct product) external returns (bool);

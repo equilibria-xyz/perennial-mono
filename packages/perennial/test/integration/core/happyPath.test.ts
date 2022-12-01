@@ -55,7 +55,6 @@ describe.only('Happy Path', () => {
 
     expect((await product.accounts(user.address)).collateral).to.equal(utils.parseEther('1000'))
     expect(await lens.callStatic['collateral(address)'](product.address)).to.equal(utils.parseEther('1000'))
-    expect(await product.shortfall()).to.equal(0)
   })
 
   it('opens a make position', async () => {

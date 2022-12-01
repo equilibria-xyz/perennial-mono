@@ -103,7 +103,6 @@ describe('Closed Product', () => {
     await product.settle(user.address)
     await product.settle(userB.address)
 
-    expect(await product.shortfall()).to.equal(0)
     expect((await product.accounts(user.address)).collateral).to.equal(userCollateralBefore)
     expect((await product.accounts(userB.address)).collateral).to.equal(userBCollateralBefore)
     expect(await product.productFees()).to.equal(feesABefore)
