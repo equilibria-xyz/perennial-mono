@@ -37,8 +37,7 @@ interface IController {
     event ProductCreated(
         IProduct indexed product,
         IProduct.ProductDefinition definition,
-        Parameter parameter,
-        JumpRateUtilizationCurve utilizationCurve
+        Parameter parameter
     );
 
     error ControllerNoZeroCoordinatorError();
@@ -71,8 +70,7 @@ interface IController {
     function createProduct(
         uint256 coordinatorId,
         IProduct.ProductDefinition calldata definition,
-        Parameter calldata parameter,
-        JumpRateUtilizationCurve calldata utilizationCurve
+        Parameter calldata parameter
     ) external returns (IProduct);
     function updateIncentivizer(IIncentivizer newIncentivizer) external;
     function updateProductBeacon(IBeacon newProductBeacon) external;

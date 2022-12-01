@@ -36,18 +36,15 @@ describe.only('Happy Path', () => {
       positionFee: 0,
       makerLimit: utils.parseEther('1'),
       closed: true,
+      utilizationCurve: {
+        minRate: 0,
+        maxRate: utils.parseEther('5.00'),
+        targetRate: utils.parseEther('0.80'),
+        targetUtilization: utils.parseEther('0.80'),
+      },
     }
-    const utilizationCurve = {
-      minRate: 0,
-      maxRate: utils.parseEther('5.00'),
-      targetRate: utils.parseEther('0.80'),
-      targetUtilization: utils.parseEther('0.80'),
-    }
-    const productAddress = await controller.callStatic.createProduct(1, definition, parameter, utilizationCurve)
-    await expect(controller.createProduct(1, definition, parameter, utilizationCurve)).to.emit(
-      controller,
-      'ProductCreated',
-    )
+    const productAddress = await controller.callStatic.createProduct(1, definition, parameter)
+    await expect(controller.createProduct(1, definition, parameter)).to.emit(controller, 'ProductCreated')
     const product = Product__factory.connect(productAddress, owner)
 
     await dsu.connect(user).approve(productAddress, utils.parseEther('1000'))

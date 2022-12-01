@@ -14,7 +14,6 @@ interface IPerennialLens {
     struct ProductSnapshot {
         IProduct.ProductDefinition definition;
         Parameter parameter;
-        JumpRateUtilizationCurve utilizationCurve;
         address productAddress;
         Fixed18 rate;
         Fixed18 dailyRate;
@@ -56,7 +55,6 @@ interface IPerennialLens {
     function token(IProduct product) external view returns (Token18);
     function definition(IProduct product) external view returns (IProduct.ProductDefinition memory);
     function parameter(IProduct product) external view returns (Parameter memory);
-    function utilizationCurve(IProduct product) external view returns (JumpRateUtilizationCurve memory);
     function collateral(IProduct product) external returns (Fixed18);
     function pre(IProduct product) external returns (PrePosition memory);
     function fees(IProduct product) external returns (UFixed18 protocolFees, UFixed18 productFees);

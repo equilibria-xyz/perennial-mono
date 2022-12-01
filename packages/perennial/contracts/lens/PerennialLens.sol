@@ -43,7 +43,6 @@ contract PerennialLens is IPerennialLens {
     function snapshot(IProduct product) public settle(product) returns (ProductSnapshot memory _snapshot) {
         _snapshot.definition = definition(product);
         _snapshot.parameter = parameter(product);
-        _snapshot.utilizationCurve = utilizationCurve(product);
         _snapshot.productAddress = address(product);
         _snapshot.rate = rate(product);
         _snapshot.dailyRate = dailyRate(product);
@@ -135,10 +134,6 @@ contract PerennialLens is IPerennialLens {
         return product.parameter();
     }
 
-    function utilizationCurve(IProduct product) public view returns (JumpRateUtilizationCurve memory) {
-        return product.utilizationCurve();
-    }
-
     /**
      * @notice Product total collateral amount after settle
      * @param product Product address
@@ -211,7 +206,7 @@ contract PerennialLens is IPerennialLens {
      */
     function rate(IProduct product) public settle(product) returns (Fixed18) {
         Position memory position_ = _latestPosition(product);
-        JumpRateUtilizationCurve memory utilizationCurve_ = product.utilizationCurve();
+        JumpRateUtilizationCurve memory utilizationCurve_ = product.parameter().utilizationCurve;
         return utilizationCurve_.compute(position_.utilization()).div(Fixed18Lib.from(365 days));
     }
 
@@ -222,7 +217,7 @@ contract PerennialLens is IPerennialLens {
      */
     function dailyRate(IProduct product) public settle(product) returns (Fixed18) {
         Position memory position_ = _latestPosition(product);
-        JumpRateUtilizationCurve memory utilizationCurve_ = product.utilizationCurve();
+        JumpRateUtilizationCurve memory utilizationCurve_ = product.parameter().utilizationCurve;
         return utilizationCurve_.compute(position_.utilization()).div(Fixed18Lib.from(365));
     }
 

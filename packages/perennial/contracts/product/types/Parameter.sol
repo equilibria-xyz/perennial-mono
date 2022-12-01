@@ -2,6 +2,7 @@
 pragma solidity ^0.8.13;
 
 import "@equilibria/root/number/types/UFixed18.sol";
+import "@equilibria/root/curve/types/JumpRateUtilizationCurve.sol";
 
 /// @dev Parameter type
 struct Parameter {
@@ -12,6 +13,7 @@ struct Parameter {
     UFixed18 positionFee; // <= 429%
     UFixed18 makerLimit;  // <= 18.45bn
     bool closed;
+    JumpRateUtilizationCurve utilizationCurve;
 }
 struct PackedParameter {
     uint32 maintenance; // <= 429%
@@ -23,6 +25,8 @@ struct PackedParameter {
     bool closed;
 
     bytes3 __unallocated__;
+
+    JumpRateUtilizationCurve utilizationCurve;
 }
 type ParameterStorage is bytes32;
 using ParameterStorageLib for ParameterStorage global;
@@ -45,7 +49,8 @@ library ParameterStorageLib {
             UFixed18.wrap(uint256(value.takerFee) * OFFSET),
             UFixed18.wrap(uint256(value.positionFee) * OFFSET),
             UFixed18.wrap(uint256(value.makerLimit) * OFFSET),
-            value.closed
+            value.closed,
+            value.utilizationCurve
         );
     }
 
@@ -66,7 +71,8 @@ library ParameterStorageLib {
             uint32(UFixed18.unwrap(parameter.positionFee) / OFFSET),
             uint64(UFixed18.unwrap(parameter.makerLimit) / OFFSET),
             parameter.closed,
-            bytes3(0x000000)
+            bytes3(0x000000),
+            parameter.utilizationCurve
         );
     }
 

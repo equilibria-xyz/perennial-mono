@@ -42,11 +42,7 @@ interface IProduct is IPayoffProvider, IParamProvider {
     error ProductCollateralUnderLimitError();
     error ProductCantLiquidate();
 
-    function initialize(
-        ProductDefinition calldata definition_,
-        Parameter calldata parameter_,
-        JumpRateUtilizationCurve calldata utilizationCurve_
-    ) external;
+    function initialize(ProductDefinition calldata definition_, Parameter calldata parameter_) external;
     function name() external view returns (string memory);
     function symbol() external view returns (string memory);
     function token() external view returns (Token18);

@@ -35,8 +35,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
         Parameter parameter;
 
-        JumpRateUtilizationCurve utilizationCurve;
-
         /* Current Global State */
         uint256 latestVersion;
 
@@ -92,13 +90,12 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      */
     function initialize(
         IProduct.ProductDefinition calldata definition_,
-        Parameter calldata parameter_,
-        JumpRateUtilizationCurve calldata utilizationCurve_
+        Parameter calldata parameter_
     ) external initializer(1) {
         __UControllerProvider__initialize(IController(msg.sender));
         __UPayoffProvider__initialize(definition_.oracle, definition_.payoffDefinition);
         __UReentrancyGuard__initialize();
-        __UParamProvider__initialize(parameter_, utilizationCurve_);
+        __UParamProvider__initialize(parameter_);
 
         name = definition_.name;
         symbol = definition_.symbol;
@@ -220,7 +217,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
         // Load product parameters
         context.parameter = parameter();
-        context.utilizationCurve = utilizationCurve();
 
         // Load product state
         context.currentOracleVersion = _sync();
@@ -299,7 +295,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
                 context.pre,
                 period,
                 context.parameter.positionFee,
-                context.utilizationCurve,
+                context.parameter.utilizationCurve,
                 context.minFundingFee,
                 context.parameter.fundingFee,
                 context.parameter.closed

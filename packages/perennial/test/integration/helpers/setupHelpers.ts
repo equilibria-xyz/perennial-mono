@@ -201,15 +201,15 @@ export async function createProduct(
     positionFee: 0,
     makerLimit: utils.parseEther('1'),
     closed: false,
+    utilizationCurve: {
+      minRate: 0,
+      maxRate: utils.parseEther('5.00'),
+      targetRate: utils.parseEther('0.80'),
+      targetUtilization: utils.parseEther('0.80'),
+    },
   }
-  const utilizationCurve = {
-    minRate: 0,
-    maxRate: utils.parseEther('5.00'),
-    targetRate: utils.parseEther('0.80'),
-    targetUtilization: utils.parseEther('0.80'),
-  }
-  const productAddress = await controller.callStatic.createProduct(1, definition, parameter, utilizationCurve)
-  await controller.createProduct(1, definition, parameter, utilizationCurve)
+  const productAddress = await controller.callStatic.createProduct(1, definition, parameter)
+  await controller.createProduct(1, definition, parameter)
 
   return Product__factory.connect(productAddress, owner)
 }

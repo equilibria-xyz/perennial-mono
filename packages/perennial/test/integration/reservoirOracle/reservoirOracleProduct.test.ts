@@ -31,12 +31,12 @@ const PARAMETER = {
   positionFee: 0,
   makerLimit: utils.parseEther('1'),
   closed: true,
-}
-const UTILIZATION_CURVE = {
-  minRate: 0,
-  maxRate: utils.parseEther('5.00'),
-  targetRate: utils.parseEther('0.80'),
-  targetUtilization: utils.parseEther('0.80'),
+  utilizationCurve: {
+    minRate: 0,
+    maxRate: utils.parseEther('5.00'),
+    targetRate: utils.parseEther('0.80'),
+    targetUtilization: utils.parseEther('0.80'),
+  },
 }
 
 describe('Reservoir Oracle Product', () => {
@@ -74,12 +74,9 @@ describe('Reservoir Oracle Product', () => {
       .to.emit(controller, 'CoordinatorTreasuryPositionUpdated')
       .withArgs(1, treasuryB.address)
 
-    const productAddress = await controller.callStatic.createProduct(1, DEFINITION, PARAMETER, UTILIZATION_CURVE)
+    const productAddress = await controller.callStatic.createProduct(1, DEFINITION, PARAMETER)
     const product = Product__factory.connect(productAddress, owner)
-    await expect(controller.createProduct(1, DEFINITION, PARAMETER, UTILIZATION_CURVE)).to.emit(
-      controller,
-      'ProductCreated',
-    )
+    await expect(controller.createProduct(1, DEFINITION, PARAMETER)).to.emit(controller, 'ProductCreated')
 
     await dsu.connect(user).approve(product.address, utils.parseEther('1000'))
     await product.connect(user).update(0, utils.parseEther('1000'))

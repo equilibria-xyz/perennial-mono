@@ -7,10 +7,7 @@ import "../product/types/Parameter.sol";
 
 interface IParamProvider {
     event ParameterUpdated(Parameter newParameter);
-    event JumpRateUtilizationCurveUpdated(JumpRateUtilizationCurve newUtilizationCurve);
     
     function parameter() external view returns (Parameter memory);
     function updateParameter(Parameter memory parameter) external;
-    function utilizationCurve() external view returns (JumpRateUtilizationCurve memory);
-    function updateUtilizationCurve(JumpRateUtilizationCurve memory newUtilizationCurve) external;
 }
