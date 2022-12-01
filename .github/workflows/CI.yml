@@ -6,7 +6,7 @@ on:
   pull_request:
     branches:
       - master
-      - repo-cleanup-base
+      - dev
 
 env:
   CI: true
@@ -88,7 +88,7 @@ jobs:
       - name: Run tests
         env:
           MOCHA_REPORTER: dot
-          ALCHEMY_MAINNET: ${{ secrets.ALCHEMY_MAINNET }}
+          MAINNET_NODE_URL: ${{ secrets.MAINNET_NODE_URL }}
         run: | # for now, just run for perennial
           yarn workspace @equilibria/perennial run ${{ env.PARSER_BROKEN != 'true' && 'coverage:integration' || 'test:integration' }}
       - name: Integration Test Code Coverage Report

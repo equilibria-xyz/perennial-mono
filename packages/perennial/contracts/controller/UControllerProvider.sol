@@ -19,6 +19,7 @@ abstract contract UControllerProvider is UInitializable {
     error NotCollateralError();
     error PausedError();
     error InvalidControllerError();
+    error NotAccountOrMultiInvokerError(address account, address operator);
 
     /// @dev The controller contract address
     AddressStorage private constant _controller = AddressStorage.wrap(keccak256("equilibria.perennial.UControllerProvider.controller"));
@@ -66,6 +67,14 @@ abstract contract UControllerProvider is UInitializable {
     modifier notPaused() {
         if (controller().paused()) revert PausedError();
 
+        _;
+    }
+
+    /// @dev Ensure the `msg.sender` is ether the `account` or the Controller's multiInvoker
+    modifier onlyAccountOrMultiInvoker(address account) {
+        if (!(msg.sender == account || msg.sender == address(controller().multiInvoker()))) {
+            revert NotAccountOrMultiInvokerError(account, msg.sender);
+        }
         _;
     }
 }

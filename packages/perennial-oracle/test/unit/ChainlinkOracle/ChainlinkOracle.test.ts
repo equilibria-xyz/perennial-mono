@@ -1,8 +1,8 @@
-import { MockContract } from '@ethereum-waffle/mock-contract'
+import { MockContract, deployMockContract } from '@ethereum-waffle/mock-contract'
 import { utils } from 'ethers'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { expect } from 'chai'
-import HRE, { waffle } from 'hardhat'
+import HRE from 'hardhat'
 
 import { ChainlinkOracle, ChainlinkOracle__factory, FeedRegistryInterface__factory } from '../../../types/generated'
 import { currentBlockTimestamp } from '../../../../common/testutil/time'
@@ -24,7 +24,7 @@ describe('ChainlinkOracle', () => {
 
   beforeEach(async () => {
     ;[owner, user, eth, usd] = await ethers.getSigners()
-    registry = await waffle.deployMockContract(owner, FeedRegistryInterface__factory.abi)
+    registry = await deployMockContract(owner, FeedRegistryInterface__factory.abi)
   })
 
   describe('#constructor', async () => {

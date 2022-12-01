@@ -1,13 +1,13 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { expect } from 'chai'
-import HRE, { waffle } from 'hardhat'
+import HRE from 'hardhat'
 
 import {
   AggregatorV3Interface__factory,
   PassthroughDataFeed,
   PassthroughDataFeed__factory,
 } from '../../../types/generated'
-import { MockContract } from '@ethereum-waffle/mock-contract'
+import { MockContract, deployMockContract } from '@ethereum-waffle/mock-contract'
 
 const { ethers } = HRE
 
@@ -18,7 +18,7 @@ describe('PassthroughDataFeed', () => {
 
   beforeEach(async () => {
     ;[user] = await ethers.getSigners()
-    feed = await waffle.deployMockContract(user, AggregatorV3Interface__factory.abi)
+    feed = await deployMockContract(user, AggregatorV3Interface__factory.abi)
     PassthroughDataFeed = await new PassthroughDataFeed__factory(user).deploy(feed.address)
   })
 

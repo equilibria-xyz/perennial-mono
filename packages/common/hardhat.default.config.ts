@@ -7,7 +7,7 @@ import { NetworkUserConfig } from 'hardhat/types'
 
 import '@typechain/hardhat'
 import '@nomiclabs/hardhat-ethers'
-import '@nomiclabs/hardhat-waffle'
+import '@nomicfoundation/hardhat-chai-matchers'
 import '@nomiclabs/hardhat-etherscan'
 import 'solidity-coverage'
 import 'hardhat-gas-reporter'
@@ -20,11 +20,11 @@ export const SOLIDITY_VERSION = '0.8.15'
 const PRIVATE_KEY_MAINNET = process.env.PRIVATE_KEY || ''
 const PRIVATE_KEY_TESTNET = process.env.PRIVATE_KEY_TESTNET || ''
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || ''
-const ALCHEMY_MAINNET = process.env.ALCHEMY_MAINNET || ''
-const ALCHEMY_ROPSTEN = process.env.ALCHEMY_ROPSTEN || ''
-const ALCHEMY_KOVAN = process.env.ALCHEMY_KOVAN || ''
+const MAINNET_NODE_URL = process.env.MAINNET_NODE_URL || ''
+const ROPSTEN_NODE_URL = process.env.ROPSTEN_NODE_URL || ''
+const KOVAN_NODE_URL = process.env.KOVAN_NODE_URL || ''
 const FORK_ENABLED = process.env.FORK_ENABLED === 'true' || false
-const ALCHEMY_GOERLI = process.env.ALCHEMY_GOERLI || ''
+const GOERLI_NODE_URL = process.env.GOERLI_NODE_URL || ''
 const FORK_NETWORK = process.env.FORK_NETWORK || 'mainnet'
 const FORK_BLOCK_NUMBER = process.env.FORK_BLOCK_NUMBER ? parseInt(process.env.FORK_BLOCK_NUMBER) : undefined
 const NODE_INTERVAL_MINING = process.env.NODE_INTERVAL_MINING ? parseInt(process.env.NODE_INTERVAL_MINING) : undefined
@@ -36,13 +36,13 @@ function getUrl(networkName: string): string {
   switch (networkName) {
     case 'mainnet':
     case 'mainnet-fork':
-      return ALCHEMY_MAINNET
+      return MAINNET_NODE_URL
     case 'ropsten':
-      return ALCHEMY_ROPSTEN
+      return ROPSTEN_NODE_URL
     case 'kovan':
-      return ALCHEMY_KOVAN
+      return KOVAN_NODE_URL
     case 'goerli':
-      return ALCHEMY_GOERLI
+      return GOERLI_NODE_URL
     default:
       return ''
   }
@@ -110,7 +110,7 @@ export default function defaultConfig({
               ? {}
               : {
                   '*': {
-                    '*': ['storageLayout'],
+                    '*': ['storageLayout'], // This is needed by Smock for mocking functions
                   },
                 },
           },
@@ -140,7 +140,7 @@ export default function defaultConfig({
       parallel: MOCHA_PARALLEL,
       reporter: MOCHA_REPORTER,
       slow: 1000,
-      timeout: 120000,
+      timeout: 180000,
     },
     contractSizer: {
       alphaSort: true,

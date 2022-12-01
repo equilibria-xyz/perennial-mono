@@ -29,6 +29,7 @@ interface IIncentivizer {
     function sync(IOracleProvider.OracleVersion memory currentOracleVersion) external;
     function syncAccount(address account, IOracleProvider.OracleVersion memory currentOracleVersion) external;
     function claim(IProduct product, uint256[] calldata programIds) external;
+    function claimFor(address account, IProduct product, uint256[] calldata programIds) external;
     function claim(IProduct[] calldata products, uint256[][] calldata programIds) external;
     function claimFee(Token18[] calldata tokens) external;
     function active(IProduct product) external view returns (uint256);

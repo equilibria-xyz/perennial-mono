@@ -71,7 +71,7 @@ describe('Liquidate', () => {
     const userBCollateral = await collateral['collateral(address,address)'](userB.address, product.address)
     await expect(
       collateral.connect(userB).withdrawTo(userB.address, product.address, userBCollateral),
-    ).to.be.revertedWith('0x11') // underflow
+    ).to.be.revertedWithPanic('0x11') // underflow
 
     await dsu.connect(userB).approve(collateral.address, constants.MaxUint256)
     await collateral.connect(userB).resolveShortfall(product.address, '2463736825720737646856')

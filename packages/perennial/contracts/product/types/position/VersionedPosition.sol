@@ -38,19 +38,16 @@ library VersionedPositionLib {
      * @param self The struct to operate on
      * @param latestVersion The latest settled oracle version
      * @param toOracleVersion The oracle version to settle to
-     * @return positionFee The fee accrued from opening or closing a new position
      */
     function settle(
         VersionedPosition storage self,
         uint256 latestVersion,
         IOracleProvider.OracleVersion memory toOracleVersion
-    ) internal returns (UFixed18) {
-        (Position memory newPosition, UFixed18 positionFee, bool settled) =
+    ) internal {
+        (Position memory newPosition, bool settled) =
             positionAtVersion(self, latestVersion).settled(self.pre, toOracleVersion);
 
         self._positionAtVersion[toOracleVersion.version] = newPosition.pack();
         if (settled) delete self.pre;
-
-        return positionFee;
     }
 }

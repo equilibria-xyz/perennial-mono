@@ -11,7 +11,7 @@ import { Product } from '../../../types/generated'
 const MINUTE = 60
 const HOUR = 60 * MINUTE
 const DAY = 24 * HOUR
-const YEAR = 365 * DAY
+export const YEAR = 365 * DAY
 const PRODUCT_COORDINATOR_ID = 1
 
 describe('Incentivizer', () => {
@@ -30,9 +30,9 @@ describe('Incentivizer', () => {
   it('reverts if already initialized', async () => {
     const { incentivizer, controller } = instanceVars
 
-    await expect(incentivizer.initialize(controller.address)).to.be.revertedWith(
-      'UInitializableAlreadyInitializedError(1)',
-    )
+    await expect(incentivizer.initialize(controller.address))
+      .to.be.revertedWithCustomError(incentivizer, 'UInitializableAlreadyInitializedError')
+      .withArgs(1)
   })
 
   it('creates a protocol owned program', async () => {

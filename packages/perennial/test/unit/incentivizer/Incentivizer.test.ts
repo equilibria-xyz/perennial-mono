@@ -1,8 +1,8 @@
-import { MockContract } from '@ethereum-waffle/mock-contract'
+import { MockContract, deployMockContract } from '@ethereum-waffle/mock-contract'
 import { BigNumber, BigNumberish, utils } from 'ethers'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { expect } from 'chai'
-import HRE, { waffle } from 'hardhat'
+import HRE from 'hardhat'
 
 import { impersonate } from '../../../../common/testutil'
 
@@ -36,6 +36,7 @@ describe('Incentivizer', () => {
   let controllerSigner: SignerWithAddress
   let productSigner: SignerWithAddress
   let productSignerB: SignerWithAddress
+  let multiInvokerMock: SignerWithAddress
   let controller: MockContract
   let collateral: MockContract
   let token: MockContract
@@ -45,18 +46,19 @@ describe('Incentivizer', () => {
   let incentivizer: Incentivizer
 
   beforeEach(async () => {
-    ;[user, owner, treasury, productOwner, productTreasury, productOwnerB, productTreasuryB] = await ethers.getSigners()
-    product = await waffle.deployMockContract(owner, Product__factory.abi)
-    productB = await waffle.deployMockContract(owner, Product__factory.abi)
+    ;[user, owner, treasury, productOwner, productTreasury, productOwnerB, productTreasuryB, multiInvokerMock] =
+      await ethers.getSigners()
+    product = await deployMockContract(owner, Product__factory.abi)
+    productB = await deployMockContract(owner, Product__factory.abi)
     productSigner = await impersonate.impersonateWithBalance(product.address, utils.parseEther('10'))
     productSignerB = await impersonate.impersonateWithBalance(productB.address, utils.parseEther('10'))
 
-    token = await waffle.deployMockContract(owner, IERC20Metadata__factory.abi)
+    token = await deployMockContract(owner, IERC20Metadata__factory.abi)
     await token.mock.decimals.withArgs().returns(18)
 
-    collateral = await waffle.deployMockContract(owner, Collateral__factory.abi)
+    collateral = await deployMockContract(owner, Collateral__factory.abi)
 
-    controller = await waffle.deployMockContract(owner, Controller__factory.abi)
+    controller = await deployMockContract(owner, Controller__factory.abi)
     controllerSigner = await impersonate.impersonateWithBalance(controller.address, utils.parseEther('10'))
 
     incentivizer = await new Incentivizer__factory(owner).deploy()
@@ -78,6 +80,7 @@ describe('Incentivizer', () => {
     await controller.mock.coordinatorFor.withArgs(productB.address).returns(2)
     await controller.mock.incentivizationFee.withArgs().returns(0)
     await controller.mock.programsPerProduct.withArgs().returns(2)
+    await controller.mock.multiInvoker.withArgs().returns(multiInvokerMock.address)
   })
 
   describe('#initialize', async () => {
@@ -86,15 +89,16 @@ describe('Incentivizer', () => {
     })
 
     it('reverts if already initialized', async () => {
-      await expect(incentivizer.connect(owner).initialize(controller.address)).to.be.revertedWith(
-        'UInitializableAlreadyInitializedError(1)',
-      )
+      await expect(incentivizer.connect(owner).initialize(controller.address))
+        .to.be.revertedWithCustomError(incentivizer, 'UInitializableAlreadyInitializedError')
+        .withArgs(1)
     })
 
     it('reverts if controller is zero address', async () => {
       const incentivizerFresh = await new Incentivizer__factory(owner).deploy()
-      await expect(incentivizerFresh.initialize(ethers.constants.AddressZero)).to.be.revertedWith(
-        'InvalidControllerError()',
+      await expect(incentivizerFresh.initialize(ethers.constants.AddressZero)).to.be.revertedWithCustomError(
+        incentivizerFresh,
+        'InvalidControllerError',
       )
     })
   })
@@ -242,9 +246,9 @@ describe('Incentivizer', () => {
         duration: 30 * DAY,
       }
 
-      await expect(incentivizer.connect(owner).create(product.address, PROGRAM_INFO)).to.be.revertedWith(
-        `NotProductError("${product.address}")`,
-      )
+      await expect(incentivizer.connect(owner).create(product.address, PROGRAM_INFO))
+        .to.be.revertedWithCustomError(incentivizer, `NotProductError`)
+        .withArgs(product.address)
     })
 
     it('reverts if too many programs', async () => {
@@ -271,8 +275,9 @@ describe('Incentivizer', () => {
       expect(await incentivizer.count(product.address)).to.equal(2)
       expect(await incentivizer.active(product.address)).to.equal(2)
 
-      await expect(incentivizer.connect(owner).create(product.address, PROGRAM_INFO)).to.be.revertedWith(
-        `IncentivizerTooManyProgramsError()`,
+      await expect(incentivizer.connect(owner).create(product.address, PROGRAM_INFO)).to.be.revertedWithCustomError(
+        incentivizer,
+        `IncentivizerTooManyProgramsError`,
       )
     })
 
@@ -290,9 +295,9 @@ describe('Incentivizer', () => {
         duration: 30 * DAY,
       }
 
-      await expect(incentivizer.connect(user).create(product.address, PROGRAM_INFO)).to.be.revertedWith(
-        `NotOwnerError(0)`,
-      )
+      await expect(incentivizer.connect(user).create(product.address, PROGRAM_INFO))
+        .to.be.revertedWithCustomError(incentivizer, `NotOwnerError`)
+        .withArgs(0)
     })
 
     it('reverts if not product owner', async () => {
@@ -309,9 +314,9 @@ describe('Incentivizer', () => {
         duration: 30 * DAY,
       }
 
-      await expect(incentivizer.connect(owner).create(product.address, PROGRAM_INFO)).to.be.revertedWith(
-        `NotOwnerError(1)`,
-      )
+      await expect(incentivizer.connect(owner).create(product.address, PROGRAM_INFO))
+        .to.be.revertedWithCustomError(incentivizer, `NotOwnerError`)
+        .withArgs(1)
     })
 
     it('reverts if not coordinator', async () => {
@@ -328,9 +333,9 @@ describe('Incentivizer', () => {
         duration: 30 * DAY,
       }
 
-      await expect(incentivizer.connect(productOwnerB).create(product.address, PROGRAM_INFO)).to.be.revertedWith(
-        `IncentivizerNotAllowedError("${product.address}")`,
-      )
+      await expect(incentivizer.connect(productOwnerB).create(product.address, PROGRAM_INFO))
+        .to.be.revertedWithCustomError(incentivizer, `IncentivizerNotAllowedError`)
+        .withArgs(product.address)
     })
 
     it('reverts if already started', async () => {
@@ -347,8 +352,9 @@ describe('Incentivizer', () => {
         duration: 30 * DAY,
       }
 
-      await expect(incentivizer.connect(owner).create(product.address, PROGRAM_INFO)).to.be.revertedWith(
-        `ProgramInvalidStartError()`,
+      await expect(incentivizer.connect(owner).create(product.address, PROGRAM_INFO)).to.be.revertedWithCustomError(
+        incentivizer,
+        `ProgramInvalidStartError`,
       )
     })
 
@@ -366,8 +372,9 @@ describe('Incentivizer', () => {
         duration: 12 * HOUR,
       }
 
-      await expect(incentivizer.connect(owner).create(product.address, PROGRAM_INFO)).to.be.revertedWith(
-        `ProgramInvalidDurationError()`,
+      await expect(incentivizer.connect(owner).create(product.address, PROGRAM_INFO)).to.be.revertedWithCustomError(
+        incentivizer,
+        `ProgramInvalidDurationError`,
       )
     })
 
@@ -385,8 +392,9 @@ describe('Incentivizer', () => {
         duration: 4 * YEAR,
       }
 
-      await expect(incentivizer.connect(owner).create(product.address, PROGRAM_INFO)).to.be.revertedWith(
-        `ProgramInvalidDurationError()`,
+      await expect(incentivizer.connect(owner).create(product.address, PROGRAM_INFO)).to.be.revertedWithCustomError(
+        incentivizer,
+        `ProgramInvalidDurationError`,
       )
     })
 
@@ -406,8 +414,9 @@ describe('Incentivizer', () => {
         duration: 30 * DAY,
       }
 
-      await expect(incentivizer.connect(owner).create(product.address, PROGRAM_INFO)).to.be.revertedWith(
-        `PausedError()`,
+      await expect(incentivizer.connect(owner).create(product.address, PROGRAM_INFO)).to.be.revertedWithCustomError(
+        incentivizer,
+        `PausedError`,
       )
     })
   })
@@ -986,7 +995,9 @@ describe('Incentivizer', () => {
           timestamp: now,
           version: 23 + 1,
         }),
-      ).to.be.revertedWith(`NotProductError("${user.address}")`)
+      )
+        .to.be.revertedWithCustomError(incentivizer, `NotProductError`)
+        .withArgs(user.address)
     })
   })
 
@@ -1740,9 +1751,9 @@ describe('Incentivizer', () => {
     it('reverts if not product', async () => {
       await controller.mock.isProduct.withArgs(user.address).returns(false)
 
-      await expect(
-        incentivizer.connect(user).syncAccount(user.address, { price: 0, timestamp: 0, version: 0 }),
-      ).to.be.revertedWith(`NotProductError("${user.address}")`)
+      await expect(incentivizer.connect(user).syncAccount(user.address, { price: 0, timestamp: 0, version: 0 }))
+        .to.be.revertedWithCustomError(incentivizer, `NotProductError`)
+        .withArgs(user.address)
     })
   })
 
@@ -1961,20 +1972,23 @@ describe('Incentivizer', () => {
     })
 
     it('reverts if not valid program', async () => {
-      await expect(incentivizer.connect(productOwner).complete(product.address, 1)).to.be.revertedWith(
-        `IncentivizerInvalidProgramError("${product.address}", 1)`,
-      )
+      await expect(incentivizer.connect(productOwner).complete(product.address, 1))
+        .to.be.revertedWithCustomError(incentivizer, `IncentivizerInvalidProgramError`)
+        .withArgs(product.address, 1)
     })
 
     it('reverts if not owner', async () => {
-      await expect(incentivizer.connect(user).complete(product.address, 0)).to.be.revertedWith(
-        `IncentivizerNotProgramOwnerError("${product.address}", 0)`,
-      )
+      await expect(incentivizer.connect(user).complete(product.address, 0))
+        .to.be.revertedWithCustomError(incentivizer, `IncentivizerNotProgramOwnerError`)
+        .withArgs(product.address, 0)
     })
 
     it('reverts if paused', async () => {
       await controller.mock.paused.withArgs().returns(true)
-      await expect(incentivizer.connect(productOwner).complete(product.address, 0)).to.be.revertedWith(`PausedError()`)
+      await expect(incentivizer.connect(productOwner).complete(product.address, 0)).to.be.revertedWithCustomError(
+        incentivizer,
+        `PausedError`,
+      )
     })
   })
 
@@ -2139,17 +2153,17 @@ describe('Incentivizer', () => {
 
     it('reverts if not valid product', async () => {
       await controller.mock['isProduct(address)'].withArgs(user.address).returns(false)
-      await expect(incentivizer.connect(user)['claim(address,uint256[])'](user.address, [2])).to.be.revertedWith(
-        `NotProductError("${user.address}")`,
-      )
+      await expect(incentivizer.connect(user)['claim(address,uint256[])'](user.address, [2]))
+        .to.be.revertedWithCustomError(incentivizer, `NotProductError`)
+        .withArgs(user.address)
     })
 
     it('reverts if not valid program (single)', async () => {
       await product.mock.settleAccount.withArgs(user.address).returns()
 
-      await expect(incentivizer.connect(user)['claim(address,uint256[])'](product.address, [2])).to.be.revertedWith(
-        `IncentivizerInvalidProgramError("${product.address}", 2)`,
-      )
+      await expect(incentivizer.connect(user)['claim(address,uint256[])'](product.address, [2]))
+        .to.be.revertedWithCustomError(incentivizer, `IncentivizerInvalidProgramError`)
+        .withArgs(product.address, 2)
     })
 
     it('reverts if not valid program (multiple)', async () => {
@@ -2157,14 +2171,16 @@ describe('Incentivizer', () => {
 
       await expect(
         incentivizer.connect(user)['claim(address[],uint256[][])']([product.address, productB.address], [[2], [1]]),
-      ).to.be.revertedWith(`IncentivizerInvalidProgramError("${product.address}", 2)`)
+      )
+        .to.be.revertedWithCustomError(incentivizer, `IncentivizerInvalidProgramError`)
+        .withArgs(product.address, 2)
     })
 
     it('reverts if paused', async () => {
       await controller.mock.paused.withArgs().returns(true)
-      await expect(incentivizer.connect(user)['claim(address,uint256[])'](product.address, [1])).to.be.revertedWith(
-        `PausedError()`,
-      )
+      await expect(
+        incentivizer.connect(user)['claim(address,uint256[])'](product.address, [1]),
+      ).to.be.revertedWithCustomError(incentivizer, `PausedError`)
     })
 
     it('reverts if argument lengths mismatch', async () => {
@@ -2174,7 +2190,166 @@ describe('Incentivizer', () => {
 
       await expect(
         incentivizer.connect(user)['claim(address[],uint256[][])']([product.address, productB.address], [[0, 1]]),
-      ).to.be.revertedWith('IncentivizerBatchClaimArgumentMismatchError()')
+      ).to.be.revertedWithCustomError(incentivizer, 'IncentivizerBatchClaimArgumentMismatchError')
+    })
+  })
+
+  describe('#claimFor', async () => {
+    // reward pre second * share delta * position
+    // 8000 * 10^18 / (60 * 60 * 24 * 30) * 180 * 10 = 5555555555555555555
+    const EXPECTED_REWARD = ethers.BigNumber.from('5555555555555554200')
+
+    beforeEach(async () => {
+      // Setup programs
+      await token.mock.transferFrom
+        .withArgs(productOwner.address, incentivizer.address, utils.parseEther('10000'))
+        .returns(true)
+      await token.mock.transferFrom
+        .withArgs(productOwner.address, incentivizer.address, utils.parseEther('20000'))
+        .returns(true)
+      await token.mock.transferFrom
+        .withArgs(productOwnerB.address, incentivizer.address, utils.parseEther('10000'))
+        .returns(true)
+      await token.mock.transferFrom
+        .withArgs(productOwnerB.address, incentivizer.address, utils.parseEther('20000'))
+        .returns(true)
+
+      const now = await currentBlockTimestamp()
+
+      await incentivizer.connect(productOwner).create(product.address, {
+        coordinatorId: PRODUCT_COORDINATOR_ID,
+        token: token.address,
+        amount: {
+          maker: utils.parseEther('8000'),
+          taker: utils.parseEther('2000'),
+        },
+        start: now + HOUR,
+        duration: 30 * DAY,
+      })
+
+      await incentivizer.connect(productOwner).create(product.address, {
+        coordinatorId: PRODUCT_COORDINATOR_ID,
+        token: token.address,
+        amount: {
+          maker: utils.parseEther('16000'),
+          taker: utils.parseEther('4000'),
+        },
+        start: now + HOUR,
+        duration: 60 * DAY,
+      })
+
+      await incentivizer.connect(productOwnerB).create(productB.address, {
+        coordinatorId: 2,
+        token: token.address,
+        amount: {
+          maker: utils.parseEther('8000'),
+          taker: utils.parseEther('2000'),
+        },
+        start: now + HOUR,
+        duration: 30 * DAY,
+      })
+
+      await incentivizer.connect(productOwnerB).create(productB.address, {
+        coordinatorId: 2,
+        token: token.address,
+        amount: {
+          maker: utils.parseEther('16000'),
+          taker: utils.parseEther('4000'),
+        },
+        start: now + HOUR,
+        duration: 60 * DAY,
+      })
+
+      // Sync global
+      await increase(2 * HOUR)
+
+      const START_ORACLE_VERSION = {
+        price: utils.parseEther('1'),
+        timestamp: await currentBlockTimestamp(),
+        version: 17,
+      }
+      await incentivizer.connect(productSigner).sync(START_ORACLE_VERSION)
+      await incentivizer.connect(productSignerB).sync(START_ORACLE_VERSION)
+
+      // Sync account
+      const LATEST_USER_VERSION = 20
+      const CURRENT_ORACLE_VERSION = {
+        price: utils.parseEther('1'),
+        timestamp: await currentBlockTimestamp(),
+        version: 23,
+      }
+
+      await product.mock['latestVersion(address)'].withArgs(user.address).returns(LATEST_USER_VERSION)
+      await product.mock['position(address)'].withArgs(user.address).returns({
+        maker: utils.parseEther('10'),
+        taker: utils.parseEther('0'),
+      })
+      await product.mock.shareAtVersion.withArgs(LATEST_USER_VERSION).returns({
+        maker: utils.parseEther('180'),
+        taker: utils.parseEther('360'),
+      })
+      await product.mock.shareAtVersion.withArgs(CURRENT_ORACLE_VERSION.version).returns({
+        maker: utils.parseEther('360'),
+        taker: utils.parseEther('720'),
+      })
+      await incentivizer.connect(productSigner).syncAccount(user.address, CURRENT_ORACLE_VERSION)
+
+      await productB.mock['latestVersion(address)'].withArgs(user.address).returns(LATEST_USER_VERSION)
+      await productB.mock['position(address)'].withArgs(user.address).returns({
+        maker: utils.parseEther('10'),
+        taker: utils.parseEther('0'),
+      })
+      await productB.mock.shareAtVersion.withArgs(LATEST_USER_VERSION).returns({
+        maker: utils.parseEther('180'),
+        taker: utils.parseEther('360'),
+      })
+      await productB.mock.shareAtVersion.withArgs(CURRENT_ORACLE_VERSION.version).returns({
+        maker: utils.parseEther('360'),
+        taker: utils.parseEther('720'),
+      })
+      await incentivizer.connect(productSignerB).syncAccount(user.address, CURRENT_ORACLE_VERSION)
+    })
+
+    it('claims individual product for user', async () => {
+      await product.mock.settleAccount.withArgs(user.address).returns()
+      await token.mock.transfer.withArgs(user.address, EXPECTED_REWARD).returns(true)
+
+      await expect(incentivizer.connect(multiInvokerMock).claimFor(user.address, product.address, [0, 1]))
+        .to.emit(incentivizer, 'Claim')
+        .withArgs(product.address, user.address, 0, EXPECTED_REWARD)
+        .to.emit(incentivizer, 'Claim')
+        .withArgs(product.address, user.address, 1, EXPECTED_REWARD)
+
+      expect(await incentivizer.unclaimed(product.address, user.address, 0)).to.equal(0)
+      expect(await incentivizer.unclaimed(product.address, user.address, 1)).to.equal(0)
+    })
+
+    it('reverts if not called by multiinvoker or user', async () => {
+      await expect(incentivizer.connect(owner).claimFor(user.address, user.address, [2]))
+        .to.be.revertedWithCustomError(incentivizer, 'NotAccountOrMultiInvokerError')
+        .withArgs(user.address, owner.address)
+    })
+
+    it('reverts if not valid product', async () => {
+      await controller.mock['isProduct(address)'].withArgs(user.address).returns(false)
+      await expect(incentivizer.connect(multiInvokerMock).claimFor(user.address, user.address, [2]))
+        .to.be.revertedWithCustomError(incentivizer, 'NotProductError')
+        .withArgs(user.address)
+    })
+
+    it('reverts if not valid program (single)', async () => {
+      await product.mock.settleAccount.withArgs(user.address).returns()
+
+      await expect(incentivizer.connect(multiInvokerMock).claimFor(user.address, product.address, [2]))
+        .to.be.revertedWithCustomError(incentivizer, 'IncentivizerInvalidProgramError')
+        .withArgs(product.address, 2)
+    })
+
+    it('reverts if paused', async () => {
+      await controller.mock.paused.withArgs().returns(true)
+      await expect(
+        incentivizer.connect(multiInvokerMock).claimFor(user.address, product.address, [1]),
+      ).to.be.revertedWithCustomError(incentivizer, `PausedError`)
     })
   })
 
@@ -2226,7 +2401,10 @@ describe('Incentivizer', () => {
 
     it('reverts if paused (protocol)', async () => {
       await controller.mock.paused.withArgs().returns(true)
-      await expect(incentivizer.connect(user).claimFee([token.address])).to.be.revertedWith(`PausedError()`)
+      await expect(incentivizer.connect(user).claimFee([token.address])).to.be.revertedWithCustomError(
+        incentivizer,
+        `PausedError`,
+      )
     })
   })
 })
