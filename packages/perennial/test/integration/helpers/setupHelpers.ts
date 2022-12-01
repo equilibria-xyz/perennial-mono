@@ -35,6 +35,8 @@ import {
   ReservoirFeedOracle,
   MultiInvoker,
   MultiInvoker__factory,
+  IEmptySetReserve,
+  IEmptySetReserve__factory,
 } from '../../../types/generated'
 import { ChainlinkContext } from './chainlinkHelpers'
 import { createPayoffDefinition } from '../../../../common/testutil/types'
@@ -71,6 +73,7 @@ export interface InstanceVars {
   incentivizer: Incentivizer
   lens: PerennialLens
   batcher: Batcher
+  reserve: IEmptySetReserve
   forwarder: Forwarder
   incentiveToken: ERC20PresetMinterPauser
 }
@@ -176,6 +179,7 @@ export async function deployProtocol(): Promise<InstanceVars> {
   )
 
   const incentiveToken = await new ERC20PresetMinterPauser__factory(owner).deploy('Incentive Token', 'ITKN')
+  const reserve = IEmptySetReserve__factory.connect(await batcher.RESERVE(), owner)
 
   return {
     owner,
@@ -202,6 +206,7 @@ export async function deployProtocol(): Promise<InstanceVars> {
     collateral,
     lens,
     batcher,
+    reserve,
     forwarder,
     incentiveToken,
   }

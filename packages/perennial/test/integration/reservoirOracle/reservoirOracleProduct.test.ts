@@ -453,9 +453,9 @@ describe('Reservoir Oracle Product', () => {
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
 
-    await expect(product.connect(userB).openTake(OPEN_TAKE_POSITION)).to.be.revertedWith(
-      'InsufficientLiquidityError(0)',
-    )
+    await expect(product.connect(userB).openTake(OPEN_TAKE_POSITION))
+      .to.be.revertedWithCustomError(product, 'ProductInsufficientLiquidityError')
+      .withArgs(0)
     await product.connect(user).openMake(OPEN_MAKE_POSITION)
     await product.connect(userB).openTake(OPEN_TAKE_POSITION)
 
@@ -521,9 +521,9 @@ describe('Reservoir Oracle Product', () => {
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
 
-    await expect(product.connect(userB).openTake(OPEN_TAKE_POSITION)).to.be.revertedWith(
-      'InsufficientLiquidityError(0)',
-    )
+    await expect(product.connect(userB).openTake(OPEN_TAKE_POSITION))
+      .to.be.revertedWithCustomError(product, 'ProductInsufficientLiquidityError')
+      .withArgs(0)
     await product.connect(user).openMake(OPEN_MAKE_POSITION)
     await product.connect(userB).openTake(OPEN_TAKE_POSITION)
     await product.connect(userB).closeTake(CLOSE_TAKE_POSITION.div(2))

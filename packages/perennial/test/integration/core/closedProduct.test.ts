@@ -52,8 +52,14 @@ describe('Closed Product', () => {
     })
 
     it('reverts on new open positions', async () => {
-      await expect(product.connect(instanceVars.user).openMake(POSITION)).to.be.revertedWith('ProductClosedError()')
-      await expect(product.connect(instanceVars.userB).openTake(POSITION)).to.be.revertedWith('ProductClosedError()')
+      await expect(product.connect(instanceVars.user).openMake(POSITION)).to.be.revertedWithCustomError(
+        product,
+        'ProductClosedError',
+      )
+      await expect(product.connect(instanceVars.userB).openTake(POSITION)).to.be.revertedWithCustomError(
+        product,
+        'ProductClosedError',
+      )
     })
 
     it('allows insufficient liquidity for close positions', async () => {
@@ -67,7 +73,10 @@ describe('Closed Product', () => {
       await product.settleAccount(user.address)
 
       expect(await collateral.liquidatable(user.address, product.address)).to.be.true
-      await expect(collateral.liquidate(user.address, product.address)).to.be.revertedWith('ProductClosedError()')
+      await expect(collateral.liquidate(user.address, product.address)).to.be.revertedWithCustomError(
+        product,
+        'ProductClosedError',
+      )
     })
   })
 

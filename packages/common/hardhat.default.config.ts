@@ -7,7 +7,7 @@ import { NetworkUserConfig } from 'hardhat/types'
 
 import '@typechain/hardhat'
 import '@nomiclabs/hardhat-ethers'
-import '@nomiclabs/hardhat-waffle'
+import '@nomicfoundation/hardhat-chai-matchers'
 import '@nomiclabs/hardhat-etherscan'
 import 'solidity-coverage'
 import 'hardhat-gas-reporter'
