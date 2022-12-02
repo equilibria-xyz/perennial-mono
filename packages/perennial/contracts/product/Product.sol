@@ -7,6 +7,7 @@ import "../controller/UControllerProvider.sol";
 import "./UPayoffProvider.sol";
 import "./UParamProvider.sol";
 import "./types/Account.sol";
+import "hardhat/console.sol";
 
 // TODO: position needs less settle on the second period for both global and account
 // TODO: lots of params can be passed in from global settle to account settle
@@ -54,6 +55,11 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         Account account;
 
         bool liquidation;
+
+        /* Debugging */
+        uint256 gasCounter;
+
+        string gasCounterMessage;
     }
 
     /// @dev The name of the product
@@ -170,6 +176,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         context = _loadContext(account);
         _settle(context, account);
 
+        _startGas(context, "_update before-update-after: %s");
+
         // before
         if (context.paused) revert PausedError();
         if (context.liquidation) revert ProductInLiquidationError();
@@ -198,8 +206,12 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         if (context.version.position().next(context.pre).maker.gt(context.parameter.makerLimit)) revert ProductMakerOverLimitError();
         if (!context.account.collateral.isZero() && context.account.collateral.lt(Fixed18Lib.from(context.minCollateral))) revert ProductCollateralUnderLimitError();
 
+        _endGas(context);
+
         // save
         _saveContext(context, account);
+
+        _startGas(context, "_update fund-events: %s");
 
         // fund
         if (collateralAmount.sign() == 1) token.pull(account, collateralAmount.abs());
@@ -209,9 +221,13 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         //TODO: cleanup
         emit PositionUpdated(account, context.currentOracleVersion.version, positionAmount);
         emit CollateralUpdated(account, collateralAmount);
+
+        _endGas(context);
     }
 
     function _loadContext(address account) private returns (CurrentContext memory context) {
+        _startGas(context, "_loadContext: %s");
+
         // Load protocol parameters
         (context.incentivizer, context.minFundingFee, context.minCollateral, context.paused, context.protocolTreasury, context.protocolFee) = controller().settlementParameters();
 
@@ -223,25 +239,33 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         context.latestVersion = latestVersion;
         context.version = _versions[context.latestVersion];
         context.pre = _pre;
-        context.productFees = productFees;
+        context.productFees = productFees; //TODO: pack these
         context.protocolFees = protocolFees;
 
         // Load account state
         context.latestAccountVersion = latestVersions[account];
         context.account = _accounts[account];
         context.liquidation = liquidation[account];
+
+        _endGas(context);
     }
 
     function _saveContext(CurrentContext memory context, address account) private {
+        _startGas(context, "_saveContext: %s");
+
         latestVersion = context.latestVersion;
         latestVersions[account] = context.latestAccountVersion;
         _accounts[account] = context.account;
         _pre = context.pre;
         productFees = context.productFees;
         protocolFees = context.protocolFees;
+
+        _endGas(context);
     }
 
     function _settle(CurrentContext memory context, address account) private { //TODO: should be pure
+        _startGas(context, "_settle: %s");
+
         // Initialize memory
         UFixed18 feeAccumulator; //TODO: whys this still here?
         Period memory period;
@@ -252,10 +276,12 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         context.incentivizer.sync(context.currentOracleVersion); //TODO: why isn't this called twice?
 
         // settle product a->b if necessary
-        period.fromVersion = atVersion(context.latestVersion);
+        period.fromVersion = context.latestVersion == context.currentOracleVersion.version ? // TODO: make a lazy loader here
+            context.currentOracleVersion :
+            atVersion(context.latestVersion);
         period.toVersion = context.latestVersion + 1 == context.currentOracleVersion.version ?
-        context.currentOracleVersion :
-        atVersion(context.latestVersion + 1);
+            context.currentOracleVersion :
+            atVersion(context.latestVersion + 1);
         _settlePeriod(feeAccumulator, context, period);
 
         // settle product b->c if necessary
@@ -265,9 +291,9 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
         // settle account a->b if necessary
         period.toVersion = context.latestAccountVersion + 1 == context.currentOracleVersion.version ?
-        context.currentOracleVersion : // if b == c, don't re-call provider for oracle version
-        atVersion(context.latestAccountVersion + 1);
-        fromVersion = _versions[context.latestAccountVersion];
+            context.currentOracleVersion : // if b == c, don't re-call provider for oracle version
+            atVersion(context.latestAccountVersion + 1);
+        fromVersion = _versions[context.latestAccountVersion]; //TODO: can we lazy load version too?
         toVersion = _versions[context.latestAccountVersion + 1];
         _settlePeriodAccount(context, period, fromVersion, toVersion, account);
 
@@ -283,6 +309,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         UFixed18 productFeeAmount = feeAccumulator.sub(protocolFeeAmount);
         context.protocolFees = context.protocolFees.add(productFeeAmount);
         context.productFees = context.productFees.add(productFeeAmount);
+
+        _endGas(context);
     }
 
     function _settlePeriod(UFixed18 feeAccumulator, CurrentContext memory context, Period memory period)
@@ -349,5 +377,16 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         if (context.account.position().sign() == amount.sign()) return false;
         if (nextAccountPosition.sign() != context.account.position().sign()) return false;
         return true;
+    }
+
+    // Debug
+    function _startGas(CurrentContext memory context, string memory message) private view {
+        context.gasCounterMessage = message;
+        context.gasCounter = gasleft();
+    }
+
+    function _endGas(CurrentContext memory context) private view {
+        uint256 endGas = gasleft();
+        console.log(context.gasCounterMessage,  context.gasCounter - endGas);
     }
 }
