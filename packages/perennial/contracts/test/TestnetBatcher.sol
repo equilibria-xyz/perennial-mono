@@ -34,6 +34,7 @@ contract TestnetBatcher is IBatcher {
         emit Wrap(to, amount);
     }
 
+    // Passthrough to Reserve
     function unwrap(UFixed18 amount, address to) external {
         DSU.pull(msg.sender, amount);
         RESERVE.redeem(amount);

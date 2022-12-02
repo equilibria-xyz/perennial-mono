@@ -42,14 +42,9 @@ describe('TestnetReserve', () => {
       usdc.transferFrom.whenCalledWith(user.address, reserve.address, 10e6).returns(true)
       dsu.mint.whenCalledWith(user.address, utils.parseEther('10')).returns(true)
 
-      await expect(
-        reserve.connect(user).mint(
-          utils.parseEther('10'),
-          { gasLimit: 30e6 }, // https://github.com/defi-wonderland/smock/issues/99
-        ),
-      )
+      await expect(reserve.connect(user).mint(utils.parseEther('10')))
         .to.emit(reserve, 'Mint')
-        .withArgs(user.address, utils.parseEther('10'))
+        .withArgs(user.address, utils.parseEther('10'), 10e6)
     })
   })
 
@@ -59,14 +54,9 @@ describe('TestnetReserve', () => {
       dsu.burn.whenCalledWith(utils.parseEther('10')).returns(true)
       usdc.transfer.whenCalledWith(user.address, 10e6).returns(true)
 
-      await expect(
-        reserve.connect(user).redeem(
-          utils.parseEther('10'),
-          { gasLimit: 30e6 }, // https://github.com/defi-wonderland/smock/issues/99
-        ),
-      )
+      await expect(reserve.connect(user).redeem(utils.parseEther('10')))
         .to.emit(reserve, 'Redeem')
-        .withArgs(user.address, utils.parseEther('10'))
+        .withArgs(user.address, utils.parseEther('10'), 10e6)
     })
   })
 })

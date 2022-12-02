@@ -8,9 +8,6 @@ import "@equilibria/root/token/types/Token18.sol";
 import "@equilibria/root/token/types/Token6.sol";
 
 contract TestnetReserve is IEmptySetReserve {
-    event Mint(address indexed to, UFixed18 amount);
-    event Redeem(address indexed to, UFixed18 amount);
-
     Token18 public immutable DSU; // solhint-disable-line var-name-mixedcase
     Token6 public immutable USDC; // solhint-disable-line var-name-mixedcase
 
@@ -23,7 +20,8 @@ contract TestnetReserve is IEmptySetReserve {
         USDC.pull(msg.sender, amount, true);
         ERC20PresetMinterPauser(Token18.unwrap(DSU)).mint(msg.sender, UFixed18.unwrap(amount));
 
-        emit Mint(msg.sender, amount);
+        uint256 pulledAmount = Math.ceilDiv(UFixed18.unwrap(amount), 1e12);
+        emit Mint(msg.sender, UFixed18.unwrap(amount), pulledAmount);
     }
 
     function redeem(UFixed18 amount) external {
@@ -31,7 +29,8 @@ contract TestnetReserve is IEmptySetReserve {
         ERC20Burnable(Token18.unwrap(DSU)).burn(UFixed18.unwrap(amount));
         USDC.push(msg.sender, amount, true);
 
-        emit Redeem(msg.sender, amount);
+        uint256 pushedAmount = UFixed18.unwrap(amount) / 1e12;
+        emit Redeem(msg.sender, UFixed18.unwrap(amount), pushedAmount);
     }
 
     function debt(address) external pure returns (UFixed18) {
