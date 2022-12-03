@@ -5,6 +5,8 @@ import "../../interfaces/IProduct.sol";
 import "../../interfaces/types/PrePosition.sol";
 import "./Version.sol";
 
+//TODO: add interface fee?
+
 /// @dev Fee type
 struct Fee {
     uint128 _protocol; // 18 decimals

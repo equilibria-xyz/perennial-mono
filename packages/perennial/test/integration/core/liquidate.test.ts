@@ -110,7 +110,7 @@ describe('Liquidate', () => {
     const currC = (await product.accounts(userC.address))._collateral
     const currD = (await product.accounts(userD.address))._collateral
     const totalCurr = currA.add(currB).add(currC).add(currD)
-    const feesCurr = (await product.protocolFees()).add(await product.productFees())
+    const feesCurr = (await product.fee())._protocol.add((await product.fee())._product)
 
     await chainlink.next()
     await product.settle(userB.address)
@@ -129,7 +129,7 @@ describe('Liquidate', () => {
     expect(currC.lt(newC)).to.equal(true)
     expect(currD.lt(newD)).to.equal(true)
 
-    const feesNew = (await product.protocolFees()).add(await product.productFees())
+    const feesNew = (await product.fee())._protocol.add((await product.fee())._product)
 
     expect(totalCurr.add(feesCurr)).to.be.gte(totalNew.add(feesNew))
     expect(totalCurr.add(feesCurr)).to.be.closeTo(totalNew.add(feesNew), 1)

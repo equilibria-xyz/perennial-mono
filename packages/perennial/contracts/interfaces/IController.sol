@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/proxy/beacon/IBeacon.sol";
 import "./IIncentivizer.sol";
 import "./IProduct.sol";
 import "./types/PayoffDefinition.sol";
+import "../controller/types/ProtocolParameter.sol"; //TODO: not right package
 
 interface IController {
     /// @dev Coordinator of a one or many products
@@ -22,23 +23,16 @@ interface IController {
 
     event IncentivizerUpdated(IIncentivizer newIncentivizer);
     event ProductBeaconUpdated(IBeacon newProductBeacon);
-    event ProtocolFeeUpdated(UFixed18 newProtocolFee);
-    event MinFundingFeeUpdated(UFixed18 newMinFundingFee);
+    event ParameterUpdated(ProtocolParameter newParameter);
     event LiquidationFeeUpdated(UFixed18 newLiquidationFee);
     event IncentivizationFeeUpdated(UFixed18 newIncentivizationFee);
-    event MinCollateralUpdated(UFixed18 newMinCollateral);
     event ProgramsPerProductUpdated(uint256 newProgramsPerProduct);
     event PauserUpdated(address newPauser);
-    event PausedUpdated(bool newPaused);
     event CoordinatorPendingOwnerUpdated(uint256 indexed coordinatorId, address newPendingOwner);
     event CoordinatorOwnerUpdated(uint256 indexed coordinatorId, address newOwner);
     event CoordinatorTreasuryUpdated(uint256 indexed coordinatorId, address newTreasury);
     event CoordinatorCreated(uint256 indexed coordinatorId, address owner);
-    event ProductCreated(
-        IProduct indexed product,
-        IProduct.ProductDefinition definition,
-        Parameter parameter
-    );
+    event ProductCreated(IProduct indexed product, IProduct.ProductDefinition definition, Parameter parameter);
 
     error ControllerNoZeroCoordinatorError();
     error ControllerNotPauserError();
@@ -54,14 +48,11 @@ interface IController {
     function productBeacon() external view returns (IBeacon);
     function coordinators(uint256 collateralId) external view returns (Coordinator memory);
     function coordinatorFor(IProduct product) external view returns (uint256);
-    function protocolFee() external view returns (UFixed18);
-    function minFundingFee() external view returns (UFixed18);
+    function parameter() external view returns (ProtocolParameter memory);
     function liquidationFee() external view returns (UFixed18);
     function incentivizationFee() external view returns (UFixed18);
-    function minCollateral() external view returns (UFixed18);
     function programsPerProduct() external view returns (uint256);
     function pauser() external view returns (address);
-    function paused() external view returns (bool);
     function initialize(IIncentivizer incentivizer_, IBeacon productBeacon_) external;
     function createCoordinator() external returns (uint256);
     function updateCoordinatorPendingOwner(uint256 coordinatorId, address newPendingOwner) external;
@@ -74,11 +65,9 @@ interface IController {
     ) external returns (IProduct);
     function updateIncentivizer(IIncentivizer newIncentivizer) external;
     function updateProductBeacon(IBeacon newProductBeacon) external;
-    function updateProtocolFee(UFixed18 newProtocolFee) external;
-    function updateMinFundingFee(UFixed18 newMinFundingFee) external;
+    function updateParameter(ProtocolParameter memory newParameter) external;
     function updateLiquidationFee(UFixed18 newLiquidationFee) external;
     function updateIncentivizationFee(UFixed18 newIncentivizationFee) external;
-    function updateMinCollateral(UFixed18 newMinCollateral) external;
     function updateProgramsPerProduct(uint256 newProductsPerProduct) external;
     function updatePauser(address newPauser) external;
     function updatePaused(bool newPaused) external;
@@ -89,5 +78,5 @@ interface IController {
     function treasury() external view returns (address);
     function treasury(uint256 coordinatorId) external view returns (address);
     function treasury(IProduct product) external view returns (address);
-    function settlementParameters() external returns (IIncentivizer, UFixed18, UFixed18, bool, address, UFixed18);
+    function settlementParameters() external returns (ProtocolParameter memory, IIncentivizer, address);
 }

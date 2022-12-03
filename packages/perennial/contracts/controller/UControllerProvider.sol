@@ -56,7 +56,7 @@ abstract contract UControllerProvider is UInitializable {
 
     /// @dev Only allow if the protocol is currently unpaused
     modifier notPaused() {
-        if (controller().paused()) revert PausedError();
+        if (controller().parameter().paused) revert PausedError();
 
         _;
     }

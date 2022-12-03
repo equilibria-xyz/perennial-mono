@@ -429,7 +429,8 @@ describe.only('Happy Path', () => {
     const { controller, pauser, user } = instanceVars
     const product = await createProduct(instanceVars)
 
-    await expect(controller.connect(pauser).updatePaused(true)).to.emit(controller, 'PausedUpdated').withArgs(true)
+    const protocolParameter = await controller.parameter()
+    await expect(controller.connect(pauser).updatePaused(true)).to.emit(controller, 'ParameterUpdated')
     await expect(product.update(0, utils.parseEther('1000'))).to.be.revertedWith('PausedError()')
     await expect(product.liquidate(user.address)).to.be.revertedWith('PausedError()')
     await expect(product.update(utils.parseEther('0.001'), 0)).to.be.revertedWith('PausedError()')

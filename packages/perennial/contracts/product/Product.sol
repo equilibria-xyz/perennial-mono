@@ -20,17 +20,11 @@ import "hardhat/console.sol";
 contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, UReentrancyGuard {
     struct CurrentContext {
         /* Global Parameters */
+        ProtocolParameter protocolParameter;
+
         IIncentivizer incentivizer;
 
-        UFixed18 minFundingFee;
-
-        UFixed18 minCollateral;
-
         address protocolTreasury;
-
-        UFixed18 protocolFee;
-
-        bool paused;
 
         /* Product Parameters */
 
@@ -187,7 +181,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         _startGas(context, "_update before-update-after: %s");
 
         // before
-        if (context.paused) revert PausedError();
         if (context.liquidation) revert ProductInLiquidationError();
         if (context.parameter.closed && !_closingNext(context, positionAmount)) revert ProductClosedError();
 
@@ -212,7 +205,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         if (_liquidatable(context) || _liquidatableNext(context)) revert ProductInsufficientCollateralError();
         if (!force && _socializationNext(context).lt(UFixed18Lib.ONE)) revert ProductInsufficientLiquidityError();
         if (context.version.position().next(context.pre).maker.gt(context.parameter.makerLimit)) revert ProductMakerOverLimitError();
-        if (!context.account.collateral().isZero() && context.account.collateral().lt(Fixed18Lib.from(context.minCollateral))) revert ProductCollateralUnderLimitError();
+        if (!context.account.collateral().isZero() && context.account.collateral().lt(Fixed18Lib.from(context.protocolParameter.minCollateral))) revert ProductCollateralUnderLimitError();
 
         _endGas(context);
 
@@ -234,7 +227,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         _startGas(context, "_loadContext: %s");
 
         // Load protocol parameters
-        (context.incentivizer, context.minFundingFee, context.minCollateral, context.paused, context.protocolTreasury, context.protocolFee) = controller().settlementParameters();
+        (context.protocolParameter, context.incentivizer, context.protocolTreasury) = controller().settlementParameters();
 
         // Load product parameters
         context.parameter = parameter();
@@ -252,7 +245,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         context.liquidation = liquidation[account];
 
         // after
-        if (context.paused) revert PausedError();
+        if (context.protocolParameter.paused) revert PausedError();
 
         _endGas(context);
     }
@@ -263,7 +256,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         latestVersion = context.latestVersion;
         latestVersions[account] = context.latestAccountVersion;
         _accounts[account] = context.account;
-        liquidation[account] = context.liquidation;
+        liquidation[account] = context.liquidation; //TODO: can pack this in account, only saves gas on liq.
         _pre = context.pre;
         _fee = context.fee;
 
@@ -321,11 +314,11 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
                 period,
                 context.parameter.positionFee,
                 context.parameter.utilizationCurve,
-                context.minFundingFee,
+                context.protocolParameter.minFundingFee,
                 context.parameter.fundingFee,
                 context.parameter.closed
             );
-            context.fee.update(feeAmount, context.protocolFee);
+            context.fee.update(feeAmount, context.protocolParameter.protocolFee);
             context.latestVersion = period.toVersion.version;
             _versions[period.toVersion.version] = context.version;
         }

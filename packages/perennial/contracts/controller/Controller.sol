@@ -12,6 +12,9 @@ import "../interfaces/IProduct.sol";
  * @notice Manages creating new products and global protocol parameters.
  */
 contract Controller is IController, UInitializable {
+    ProtocolParameterStorage private constant _parameter = ProtocolParameterStorage.wrap(keccak256("equilibria.perennial.UParamProvider.parameter"));
+    function parameter() public view returns (ProtocolParameter memory) { return _parameter.read(); }
+
     /// @dev Incentivizer contract address for the protocol
     AddressStorage private constant _incentivizer = AddressStorage.wrap(keccak256("equilibria.perennial.Controller.incentivizer"));
     function incentivizer() public view returns (IIncentivizer) { return IIncentivizer(_incentivizer.read()); }
@@ -20,14 +23,6 @@ contract Controller is IController, UInitializable {
     AddressStorage private constant _productBeacon = AddressStorage.wrap(keccak256("equilibria.perennial.Controller.productBeacon"));
     function productBeacon() public view returns (IBeacon) { return IBeacon(_productBeacon.read()); }
 
-    /// @dev Percent of collected fees that go to the protocol treasury vs the product treasury
-    UFixed18Storage private constant _protocolFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.Controller.protocolFee"));
-    function protocolFee() public view returns (UFixed18) { return _protocolFee.read(); }
-
-    /// @dev Minimum allowable funding fee for a product
-    UFixed18Storage private constant _minFundingFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.Controller.minFundingFee"));
-    function minFundingFee() public view returns (UFixed18) { return _minFundingFee.read(); }
-
     /// @dev Fee on maintenance for liquidation
     UFixed18Storage private constant _liquidationFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.Controller.liquidationFee"));
     function liquidationFee() public view returns (UFixed18) { return _liquidationFee.read(); }
@@ -35,10 +30,6 @@ contract Controller is IController, UInitializable {
     /// @dev Fee on incentivization programs
     UFixed18Storage private constant _incentivizationFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.Controller.incentivizationFee"));
     function incentivizationFee() public view returns (UFixed18) { return _incentivizationFee.read(); }
-
-    /// @dev Minimum allowable collateral amount per user account
-    UFixed18Storage private constant _minCollateral = UFixed18Storage.wrap(keccak256("equilibria.perennial.Controller.minCollateral"));
-    function minCollateral() public view returns (UFixed18) { return _minCollateral.read(); }
 
     /// @dev Maximum incentivization programs per product allowed
     Uint256Storage private constant _programsPerProduct = Uint256Storage.wrap(keccak256("equilibria.perennial.Controller.programsPerProduct"));
@@ -50,10 +41,6 @@ contract Controller is IController, UInitializable {
         address pauser_ = _pauser.read();
         return pauser_ == address(0) ? owner() : pauser_;
     }
-
-    /// @dev The paused status of the protocol
-    BoolStorage private constant _paused = BoolStorage.wrap(keccak256("equilibria.perennial.Controller.paused"));
-    function paused() public view returns (bool) { return _paused.read(); }
 
     /// @dev List of product coordinators
     Coordinator[] private _coordinators;
@@ -153,17 +140,17 @@ contract Controller is IController, UInitializable {
     function createProduct(
         uint256 coordinatorId,
         IProduct.ProductDefinition calldata definition,
-        Parameter calldata parameter
+        Parameter calldata productParameter
     ) external onlyOwner(coordinatorId) returns (IProduct) {
         if (coordinatorId == 0) revert ControllerNoZeroCoordinatorError();
 
         BeaconProxy newProductProxy = new BeaconProxy(
             address(productBeacon()),
-            abi.encodeCall(IProduct.initialize, (definition, parameter))
+            abi.encodeCall(IProduct.initialize, (definition, productParameter))
         );
         IProduct newProduct = IProduct(address(newProductProxy));
         coordinatorFor[newProduct] = coordinatorId;
-        emit ProductCreated(newProduct, definition, parameter);
+        emit ProductCreated(newProduct, definition, productParameter);
 
         return newProduct;
     }
@@ -188,26 +175,9 @@ contract Controller is IController, UInitializable {
         emit ProductBeaconUpdated(newProductBeacon);
     }
 
-    /**
-     * @notice Updates the protocol-product fee split
-     * @param newProtocolFee New protocol-product fee split
-     */
-    function updateProtocolFee(UFixed18 newProtocolFee) public onlyOwner(0) {
-        if (newProtocolFee.gt(UFixed18Lib.ONE)) revert ControllerInvalidProtocolFeeError();
-
-        _protocolFee.store(newProtocolFee);
-        emit ProtocolFeeUpdated(newProtocolFee);
-    }
-
-    /**
-     * @notice Updates the minimum allowed funding fee
-     * @param newMinFundingFee New minimum allowed funding fee
-     */
-    function updateMinFundingFee(UFixed18 newMinFundingFee) public onlyOwner(0) {
-        if (newMinFundingFee.gt(UFixed18Lib.ONE)) revert ControllerInvalidMinFundingFeeError();
-
-        _minFundingFee.store(newMinFundingFee);
-        emit MinFundingFeeUpdated(newMinFundingFee);
+    function updateParameter(ProtocolParameter memory newParameter) public onlyOwner(0) {
+        _parameter.store(newParameter);
+        emit ParameterUpdated(newParameter);
     }
 
     /**
@@ -233,15 +203,6 @@ contract Controller is IController, UInitializable {
     }
 
     /**
-     * @notice Updates the minimum allowed collateral amount per user account
-     * @param newMinCollateral New minimum allowed collateral amount
-     */
-    function updateMinCollateral(UFixed18 newMinCollateral) public onlyOwner(0) {
-        _minCollateral.store(newMinCollateral);
-        emit MinCollateralUpdated(newMinCollateral);
-    }
-
-    /**
      * @notice Updates the maximum incentivization programs per product allowed
      * @param newProgramsPerProduct New maximum incentivization programs per product allowed
      */
@@ -264,8 +225,10 @@ contract Controller is IController, UInitializable {
      * @param newPaused New protocol paused state
      */
     function updatePaused(bool newPaused) public onlyPauser {
-        _paused.store(newPaused);
-        emit PausedUpdated(newPaused);
+        ProtocolParameter memory newParameter = parameter();
+        newParameter.paused = newPaused;
+        _parameter.store(newParameter);
+        emit ParameterUpdated(newParameter);
     }
 
     /**
@@ -359,8 +322,8 @@ contract Controller is IController, UInitializable {
         return treasury(coordinatorFor[product]);
     }
 
-    function settlementParameters() external view returns (IIncentivizer, UFixed18, UFixed18, bool, address, UFixed18) {
-        return (incentivizer(), minFundingFee(), minCollateral(), paused(), treasury(), protocolFee());
+    function settlementParameters() external view returns (ProtocolParameter memory, IIncentivizer, address) {
+        return (parameter(), incentivizer(), treasury());
     }
 
     /// @dev Only allow owner of `coordinatorId` to call

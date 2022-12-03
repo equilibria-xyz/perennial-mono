@@ -95,8 +95,8 @@ describe('Closed Product', () => {
 
     const userCollateralBefore = (await product.accounts(user.address))._collateral
     const userBCollateralBefore = (await product.accounts(userB.address))._collateral
-    const feesABefore = await product.protocolFees()
-    const feesBBefore = await product.productFees()
+    const feesABefore = (await product.fee())._protocol
+    const feesBBefore = (await product.fee())._product
 
     await chainlink.nextWithPriceModification(price => price.mul(4))
     await chainlink.nextWithPriceModification(price => price.mul(4))
@@ -105,8 +105,8 @@ describe('Closed Product', () => {
 
     expect((await product.accounts(user.address))._collateral).to.equal(userCollateralBefore)
     expect((await product.accounts(userB.address))._collateral).to.equal(userBCollateralBefore)
-    expect(await product.productFees()).to.equal(feesABefore)
-    expect(await product.productFees()).to.equal(feesBBefore)
+    expect((await product.fee())._protocol).to.equal(feesABefore)
+    expect((await product.fee())._product).to.equal(feesBBefore)
   })
 
   it('handles closing during liquidations', async () => {
@@ -134,8 +134,8 @@ describe('Closed Product', () => {
     expect(await product.liquidation(user.address)).to.be.false
     const userCollateralBefore = (await product.accounts(user.address))._collateral
     const userBCollateralBefore = (await product.accounts(userB.address))._collateral
-    const feesABefore = await product.protocolFees()
-    const feesBBefore = await product.productFees()
+    const feesABefore = (await product.fee())._protocol
+    const feesBBefore = (await product.fee())._product
 
     await chainlink.nextWithPriceModification(price => price.mul(4))
     await chainlink.nextWithPriceModification(price => price.mul(4))
@@ -144,7 +144,7 @@ describe('Closed Product', () => {
 
     expect((await product.accounts(user.address))._collateral).to.equal(userCollateralBefore)
     expect((await product.accounts(userB.address))._collateral).to.equal(userBCollateralBefore)
-    expect(await product.protocolFees()).to.equal(feesABefore)
-    expect(await product.productFees()).to.equal(feesBBefore)
+    expect((await product.fee())._protocol).to.equal(feesABefore)
+    expect((await product.fee())._product).to.equal(feesBBefore)
   })
 })

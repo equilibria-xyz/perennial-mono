@@ -120,11 +120,14 @@ export async function deployProtocol(): Promise<InstanceVars> {
   // Params - TODO: finalize before launch
   await controller.updatePauser(pauser.address)
   await controller.updateCoordinatorTreasury(0, treasuryA.address)
-  await controller.updateProtocolFee(utils.parseEther('0.50'))
-  await controller.updateMinFundingFee(utils.parseEther('0.10'))
+  await controller.updateParameter({
+    protocolFee: utils.parseEther('0.50'),
+    minFundingFee: utils.parseEther('0.10'),
+    minCollateral: utils.parseEther('500'),
+    paused: false,
+  })
   await controller.updateLiquidationFee(utils.parseEther('0.50'))
   await controller.updateIncentivizationFee(utils.parseEther('0.00'))
-  await controller.updateMinCollateral(utils.parseEther('500'))
   await controller.updateProgramsPerProduct(2)
 
   // Set state
