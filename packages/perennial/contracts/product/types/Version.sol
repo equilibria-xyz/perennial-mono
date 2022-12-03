@@ -75,6 +75,7 @@ library VersionLib {
         JumpRateUtilizationCurve memory utilizationCurve,
         UFixed18 minFundingFee,
         UFixed18 fundingFee,
+        Accumulator memory rewardRate,
         bool closed
     ) internal pure returns (UFixed18 newFeeAccumulator) {
         // unpack
@@ -97,7 +98,7 @@ library VersionLib {
         _accumulatePosition(valueAccumulator, latestPosition, period, closed);
 
         // accumulate share
-        _accumulateShare(shareAccumulator, latestPosition, period);
+        _accumulateShare(shareAccumulator, latestPosition, period, rewardRate); //TODO: auto-shutoff if not enough reward ERC20s in contract?
 
         // accumulate position fee
         feeAccumulator = _accumulatePositionFee(valueAccumulator, feeAccumulator, latestPosition, pre, positionFee);
@@ -240,15 +241,16 @@ library VersionLib {
     function _accumulateShare(
         Accumulator memory shareAccumulator,
         Position memory latestPosition,
-        Period memory period
+        Period memory period,
+        Accumulator memory rewardRate
     ) private pure {
-        UFixed18 elapsed = UFixed18Lib.from(period.toVersion.timestamp - period.fromVersion.timestamp);
+        UFixed18 elapsed = period.timestampDelta();
 
         shareAccumulator.maker = latestPosition.maker.isZero() ?
             shareAccumulator.maker :
-            shareAccumulator.maker.add(Fixed18Lib.from(elapsed.div(latestPosition.maker)));
+            shareAccumulator.maker.add(Fixed18Lib.from(elapsed).mul(rewardRate.taker).div(Fixed18Lib.from(latestPosition.maker)));
         shareAccumulator.taker = latestPosition.taker.isZero() ?
             shareAccumulator.taker :
-            shareAccumulator.taker.add(Fixed18Lib.from(elapsed.div(latestPosition.taker)));
+            shareAccumulator.taker.add(Fixed18Lib.from(elapsed).mul(rewardRate.taker).div(Fixed18Lib.from(latestPosition.taker)));
     }
 }

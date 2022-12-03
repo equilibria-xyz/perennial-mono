@@ -20,6 +20,7 @@ const DEFINITION = {
   name: 'Squeeth',
   symbol: 'SQTH',
   token: constants.AddressZero,
+  reward: constants.AddressZero,
   payoffDefinition: createPayoffDefinition(),
   oracle: '',
 }
@@ -47,8 +48,9 @@ describe('Reservoir Oracle Product', () => {
 
   beforeEach(async () => {
     instanceVars = await deployProtocol()
-    const { owner, dsu } = instanceVars
+    const { owner, dsu, incentiveToken } = instanceVars
     DEFINITION.token = dsu.address
+    DEFINITION.reward = incentiveToken.address
 
     // Reservoir has not deployed their feed adaptor to mainnet, so for now use Chainlink's DPI feed as a standin
     // TODO(arjun): Update this with Reservoir's mainnet deploy

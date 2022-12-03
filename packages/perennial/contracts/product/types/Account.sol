@@ -12,6 +12,8 @@ struct Account {
     int96 _position; // 9 decimals
 
     int64 _collateral; // 6 decimals
+
+    uint256 reward; // 18 decimals //TODO: pack more?
 }
 using AccountLib for Account global;
 
@@ -59,13 +61,17 @@ library AccountLib {
         Version memory toVersion
     ) internal pure {
         Fixed18 _position = position(account);
-        Fixed18 versionDelta = (_position.sign() == 1)
+        Fixed18 valueDelta = (_position.sign() == 1)
             ? toVersion.value().taker.sub(fromVersion.value().taker)
             : toVersion.value().maker.sub(fromVersion.value().maker);
+        Fixed18 shareDelta = (_position.sign() == 1)
+            ? toVersion.share().taker.sub(fromVersion.share().taker)
+            : toVersion.share().maker.sub(fromVersion.share().maker);
 
         account._position = int96(Fixed18.unwrap(next(account)) / 1e9);
         account._pre = 0;
-        account._collateral = int64(Fixed18.unwrap(collateral(account).add(_position.mul(versionDelta))) / 1e12);
+        account._collateral = int64(Fixed18.unwrap(collateral(account).add(_position.mul(valueDelta))) / 1e12);
+        account.reward = account.reward + UFixed18.unwrap(_position.mul(shareDelta).abs());
     }
 
     /**

@@ -14,7 +14,8 @@ describe.only('Happy Path', () => {
   })
 
   it('creates a product', async () => {
-    const { owner, user, controller, treasuryB, contractPayoffProvider, chainlinkOracle, dsu, lens } = instanceVars
+    const { owner, user, controller, treasuryB, contractPayoffProvider, chainlinkOracle, dsu, incentiveToken, lens } =
+      instanceVars
 
     await expect(controller.createCoordinator()).to.emit(controller, 'CoordinatorCreated').withArgs(1, owner.address)
     await expect(controller.updateCoordinatorTreasury(1, treasuryB.address))
@@ -25,6 +26,7 @@ describe.only('Happy Path', () => {
       name: 'Squeeth',
       symbol: 'SQTH',
       token: dsu.address,
+      reward: incentiveToken.address,
       payoffDefinition: createPayoffDefinition({ contractAddress: contractPayoffProvider.address }),
       oracle: chainlinkOracle.address,
     }
@@ -429,7 +431,6 @@ describe.only('Happy Path', () => {
     const { controller, pauser, user } = instanceVars
     const product = await createProduct(instanceVars)
 
-    const protocolParameter = await controller.parameter()
     await expect(controller.connect(pauser).updatePaused(true)).to.emit(controller, 'ParameterUpdated')
     await expect(product.update(0, utils.parseEther('1000'))).to.be.revertedWith('PausedError()')
     await expect(product.liquidate(user.address)).to.be.revertedWith('PausedError()')
@@ -477,8 +478,8 @@ describe.only('Happy Path', () => {
       taker: '-32892462923465729382860000',
     })
     expectPositionEq((await product.versions(INITIAL_VERSION + 2))._share, {
-      maker: '18300000000000000000000000',
-      taker: '18300000000000000000000000',
+      maker: 0,
+      taker: 0,
     })
   })
 })

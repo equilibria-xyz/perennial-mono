@@ -322,8 +322,8 @@ contract Controller is IController, UInitializable {
         return treasury(coordinatorFor[product]);
     }
 
-    function settlementParameters() external view returns (ProtocolParameter memory, IIncentivizer, address) {
-        return (parameter(), incentivizer(), treasury());
+    function settlementParameters() external view returns (ProtocolParameter memory, address) {
+        return (parameter(), treasury());
     }
 
     /// @dev Only allow owner of `coordinatorId` to call

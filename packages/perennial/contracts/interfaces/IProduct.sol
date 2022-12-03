@@ -19,6 +19,7 @@ interface IProduct is IPayoffProvider, IParamProvider {
         string name;
         string symbol;
         Token18 token;
+        Token18 reward;
         IOracleProvider oracle;
         PayoffDefinition payoffDefinition;
     }

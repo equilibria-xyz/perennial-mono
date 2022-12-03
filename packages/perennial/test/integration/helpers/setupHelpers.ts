@@ -178,7 +178,7 @@ export async function createProduct(
   payoffProvider?: TestnetContractPayoffProvider,
   oracle?: ChainlinkOracle | ReservoirFeedOracle,
 ): Promise<Product> {
-  const { owner, controller, treasuryB, chainlinkOracle, dsu } = instanceVars
+  const { owner, controller, treasuryB, chainlinkOracle, incentiveToken, dsu } = instanceVars
   if (!payoffProvider) {
     payoffProvider = instanceVars.contractPayoffProvider
   }
@@ -193,6 +193,7 @@ export async function createProduct(
     name: 'Squeeth',
     symbol: 'SQTH',
     token: dsu.address,
+    reward: incentiveToken.address,
     payoffDefinition: createPayoffDefinition({ contractAddress: payoffProvider.address }),
     oracle: oracle.address,
   }

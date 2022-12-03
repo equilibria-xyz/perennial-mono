@@ -22,13 +22,13 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         /* Global Parameters */
         ProtocolParameter protocolParameter;
 
-        IIncentivizer incentivizer;
-
         address protocolTreasury;
 
         /* Product Parameters */
 
         Parameter parameter;
+
+        Accumulator rewardRate;
 
         /* Current Global State */
         uint256 latestVersion;
@@ -63,6 +63,9 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     /// @dev ERC20 stablecoin for collateral
     Token18 public token;
 
+    /// @dev ERC20 stablecoin for reward
+    Token18 public reward;
+
     /// @dev Protocol and product fees collected, but not yet claimed
     Fee private _fee;
 
@@ -95,6 +98,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         name = definition_.name;
         symbol = definition_.symbol;
         token = definition_.token;
+        reward = definition_.reward;
     }
 
     //TODO: address 0?
@@ -123,6 +127,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     }
 
     //TODO: claim fee
+
+    //TODO: claim reward
 
     function accounts(address account) external view returns (Account memory) {
         return _accounts[account];
@@ -227,10 +233,11 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         _startGas(context, "_loadContext: %s");
 
         // Load protocol parameters
-        (context.protocolParameter, context.incentivizer, context.protocolTreasury) = controller().settlementParameters();
+        (context.protocolParameter, context.protocolTreasury) = controller().settlementParameters();
 
         // Load product parameters
         context.parameter = parameter();
+        context.rewardRate = rewardRate();
 
         // Load product state
         context.currentOracleVersion = _sync();
@@ -271,9 +278,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         Period memory period;
         Version memory fromVersion;
         Version memory toVersion;
-
-        // Sync incentivizer programs
-        context.incentivizer.sync(context.currentOracleVersion); //TODO: why isn't this called twice?
 
         // settle product a->b if necessary
         period.fromVersion = context.latestVersion == context.currentOracleVersion.version ? // TODO: make a lazy loader here
@@ -316,6 +320,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
                 context.parameter.utilizationCurve,
                 context.protocolParameter.minFundingFee,
                 context.parameter.fundingFee,
+                context.rewardRate,
                 context.parameter.closed
             );
             context.fee.update(feeAmount, context.protocolParameter.protocolFee);
@@ -332,8 +337,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         address account
     ) private {
         if (context.currentOracleVersion.version > context.latestAccountVersion) {
-            context.incentivizer.syncAccount(account, period.toVersion);
-
             context.account.accumulate(fromVersion, toVersion);
             context.latestAccountVersion = period.toVersion.version;
         }

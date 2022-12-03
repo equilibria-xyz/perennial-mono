@@ -25,6 +25,9 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
     ParameterStorage private constant _parameter = ParameterStorage.wrap(keccak256("equilibria.perennial.UParamProvider.parameter"));
     function parameter() public view returns (Parameter memory) { return _parameter.read(); }
 
+    PackedAccumulator private _rewardRate; //TODO: unstructured?
+    function rewardRate() public view returns (Accumulator memory) { return _rewardRate.unpack(); }
+
     function _updateParameter(Parameter memory newParameter) private {
         _parameter.store(newParameter);
         emit ParameterUpdated(newParameter);
@@ -32,5 +35,9 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
 
     function updateParameter(Parameter memory newParameter) external onlyProductOwner {
         _updateParameter(newParameter);
+    }
+
+    function updateRewardRate(Accumulator memory newRewardRate) external {
+        _rewardRate = newRewardRate.pack();
     }
 }
