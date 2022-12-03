@@ -2,14 +2,7 @@ import { expect } from 'chai'
 import HRE from 'hardhat'
 import { constants, utils } from 'ethers'
 import { Deployment } from 'hardhat-deploy/types'
-import {
-  Collateral__factory,
-  Controller,
-  Controller__factory,
-  IERC20Metadata__factory,
-  Product,
-  Product__factory,
-} from '../../../types/generated'
+import { Controller, Controller__factory, Product, Product__factory } from '../../../types/generated'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import opensPositions from '../shared/opensPosition.shared'
 
@@ -86,9 +79,6 @@ describe('Product - Milli-Squeeth - Mainnet Verification', () => {
   })
 
   it('opens positions', async () => {
-    const collateral = Collateral__factory.connect(deployments['Collateral_Proxy'].address, signer)
-    const dsu = IERC20Metadata__factory.connect(deployments['DSU'].address, signer)
-
-    await opensPositions(collateral, dsu, mSqueeth)
+    await opensPositions(mSqueeth, signer, deployments)
   })
 })
