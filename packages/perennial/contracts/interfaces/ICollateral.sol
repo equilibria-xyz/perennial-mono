@@ -20,6 +20,7 @@ interface ICollateral {
     error CollateralInsufficientCollateralError();
     error CollateralUnderLimitError();
     error CollateralZeroAddressError();
+    error CollateralAccountLiquidatingError(address account);
 
     function token() external view returns (Token18);
     function fees(address account) external view returns (UFixed18);

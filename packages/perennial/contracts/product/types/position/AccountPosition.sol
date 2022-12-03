@@ -46,7 +46,6 @@ library AccountPositionLib {
      * @return Current maintenance requirement for the account
      */
     function maintenance(AccountPosition storage self) internal view returns (UFixed18) {
-        if (self.liquidation) return UFixed18Lib.ZERO;
         return _maintenance(self.position);
     }
 
