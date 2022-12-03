@@ -155,6 +155,10 @@ describe('Collateral', () => {
       await product.mock.maintenance.withArgs(userB.address).returns(0)
       await product.mock.maintenanceNext.withArgs(userB.address).returns(0)
 
+      // Mock isLiquidating calls
+      await product.mock.isLiquidating.withArgs(user.address).returns(false)
+      await product.mock.isLiquidating.withArgs(userB.address).returns(false)
+
       //Pre-fill account
       await token.mock.transferFrom.withArgs(owner.address, collateral.address, 100).returns(true)
       await collateral.connect(owner).depositTo(user.address, product.address, 100)
@@ -230,6 +234,14 @@ describe('Collateral', () => {
             collateral,
             'CollateralInsufficientCollateralError',
           )
+        })
+
+        it('reverts if in liquidation', async () => {
+          await product.mock.isLiquidating.withArgs(user.address).returns(true)
+
+          await expect(fn(user.address, product.address, 80))
+            .to.be.revertedWithCustomError(collateral, 'CollateralAccountLiquidatingError')
+            .withArgs(user.address)
         })
 
         describe('multiple users per product', async () => {

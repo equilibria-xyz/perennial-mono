@@ -92,6 +92,8 @@ contract Collateral is ICollateral, UInitializable, UControllerProvider, UReentr
     collateralInvariant(account, product)
     maintenanceInvariant(account, product)
     {
+        if (product.isLiquidating(account)) revert CollateralAccountLiquidatingError(account);
+
         amount = amount.eq(UFixed18Lib.MAX) ? collateral(account, product) : amount;
         _products[product].debitAccount(account, amount);
         token.push(receiver, amount);

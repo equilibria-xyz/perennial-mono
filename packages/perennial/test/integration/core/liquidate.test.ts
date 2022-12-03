@@ -35,6 +35,9 @@ describe('Liquidate', () => {
       .withArgs(user.address, product.address, userB.address, utils.parseEther('1000'))
 
     expect(await product.isLiquidating(user.address)).to.be.true
+    await expect(collateral.connect(user).withdrawTo(user.address, product.address, constants.MaxUint256))
+      .to.be.revertedWithCustomError(collateral, 'CollateralAccountLiquidatingError')
+      .withArgs(user.address)
 
     expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(0)
     expect(await collateral['collateral(address)'](product.address)).to.equal(0)
@@ -44,6 +47,8 @@ describe('Liquidate', () => {
     await product.settleAccount(user.address)
 
     expect(await product.isLiquidating(user.address)).to.be.false
+    await expect(collateral.connect(user).withdrawTo(user.address, product.address, constants.MaxUint256)).to.not.be
+      .reverted
   })
 
   it('creates and resolves a shortfall', async () => {
