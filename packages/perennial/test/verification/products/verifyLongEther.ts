@@ -2,17 +2,27 @@ import { expect } from 'chai'
 import HRE from 'hardhat'
 import { constants, utils } from 'ethers'
 import { Deployment } from 'hardhat-deploy/types'
-import { Controller, Controller__factory, Product, Product__factory } from '../../../types/generated'
+import {
+  Collateral__factory,
+  Controller,
+  Controller__factory,
+  IERC20Metadata__factory,
+  Product,
+  Product__factory,
+} from '../../../types/generated'
+import opensPositions from '../shared/opensPosition.shared'
+import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 
 const { ethers } = HRE
 
 describe('Product - Long Ether - Mainnet Verification', () => {
+  let signer: SignerWithAddress
   let deployments: { [name: string]: Deployment }
   let controller: Controller
   let longEther: Product
 
   beforeEach(async () => {
-    const [signer] = await ethers.getSigners()
+    ;[signer] = await ethers.getSigners()
     deployments = await HRE.deployments.all()
     controller = Controller__factory.connect(deployments['Controller_Proxy'].address, signer)
     longEther = Product__factory.connect(deployments['Product_LongEther'].address, signer)
@@ -69,5 +79,12 @@ describe('Product - Long Ether - Mainnet Verification', () => {
     expect(utilizationCurve.maxRate).to.equal(utils.parseEther('1.25'))
     expect(utilizationCurve.targetRate).to.equal(utils.parseEther('0.25'))
     expect(utilizationCurve.targetUtilization).to.equal(utils.parseEther('0.8'))
+  })
+
+  it('opens positions', async () => {
+    const collateral = Collateral__factory.connect(deployments['Collateral_Proxy'].address, signer)
+    const dsu = IERC20Metadata__factory.connect(deployments['DSU'].address, signer)
+
+    await opensPositions(collateral, dsu, longEther)
   })
 })

@@ -23,10 +23,11 @@ const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || ''
 const MAINNET_NODE_URL = process.env.MAINNET_NODE_URL || ''
 const ROPSTEN_NODE_URL = process.env.ROPSTEN_NODE_URL || ''
 const KOVAN_NODE_URL = process.env.KOVAN_NODE_URL || ''
-const FORK_ENABLED = process.env.FORK_ENABLED === 'true' || false
 const GOERLI_NODE_URL = process.env.GOERLI_NODE_URL || ''
+const FORK_ENABLED = process.env.FORK_ENABLED === 'true' || false
 const FORK_NETWORK = process.env.FORK_NETWORK || 'mainnet'
 const FORK_BLOCK_NUMBER = process.env.FORK_BLOCK_NUMBER ? parseInt(process.env.FORK_BLOCK_NUMBER) : undefined
+const FORK_USE_REAL_DEPLOYS = process.env.FORK_USE_REAL_DEPLOYS === 'true' || false
 const NODE_INTERVAL_MINING = process.env.NODE_INTERVAL_MINING ? parseInt(process.env.NODE_INTERVAL_MINING) : undefined
 const MOCHA_PARALLEL = process.env.MOCHA_PARALLEL === 'true' || false
 const MOCHA_REPORTER = process.env.MOCHA_REPORTER || 'spec'
@@ -154,9 +155,14 @@ export default function defaultConfig({
         kovan: ['external/deployments/kovan', ...(externalDeployments?.kovan || [])],
         goerli: ['external/deployments/goerli', ...(externalDeployments?.goerli || [])],
         mainnet: ['external/deployments/mainnet', ...(externalDeployments?.mainnet || [])],
-        hardhat: [FORK_ENABLED ? `external/deployments/${FORK_NETWORK}` : '', ...(externalDeployments?.hardhat || [])],
+        hardhat: [
+          FORK_ENABLED ? `external/deployments/${FORK_NETWORK}` : '',
+          FORK_ENABLED && FORK_USE_REAL_DEPLOYS ? `deployments/${FORK_NETWORK}` : '',
+          ...(externalDeployments?.hardhat || []),
+        ],
         localhost: [
           FORK_ENABLED ? `external/deployments/${FORK_NETWORK}` : '',
+          FORK_ENABLED && FORK_USE_REAL_DEPLOYS ? `deployments/${FORK_NETWORK}` : '',
           ...(externalDeployments?.localhost || []),
         ],
       },

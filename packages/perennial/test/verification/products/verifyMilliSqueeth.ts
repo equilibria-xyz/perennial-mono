@@ -2,17 +2,27 @@ import { expect } from 'chai'
 import HRE from 'hardhat'
 import { constants, utils } from 'ethers'
 import { Deployment } from 'hardhat-deploy/types'
-import { Controller, Controller__factory, Product, Product__factory } from '../../../types/generated'
+import {
+  Collateral__factory,
+  Controller,
+  Controller__factory,
+  IERC20Metadata__factory,
+  Product,
+  Product__factory,
+} from '../../../types/generated'
+import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
+import opensPositions from '../shared/opensPosition.shared'
 
 const { ethers } = HRE
 
 describe('Product - Milli-Squeeth - Mainnet Verification', () => {
+  let signer: SignerWithAddress
   let deployments: { [name: string]: Deployment }
   let controller: Controller
   let mSqueeth: Product
 
   beforeEach(async () => {
-    const [signer] = await ethers.getSigners()
+    ;[signer] = await ethers.getSigners()
     deployments = await HRE.deployments.all()
     controller = Controller__factory.connect(deployments['Controller_Proxy'].address, signer)
     mSqueeth = Product__factory.connect(deployments['Product_MilliSqueeth'].address, signer)
@@ -73,5 +83,12 @@ describe('Product - Milli-Squeeth - Mainnet Verification', () => {
     expect(await controller['owner(address)'](mSqueeth.address)).to.equal(
       '0xA20ea565cD799e01A86548af5a2929EB7c767fC9' /* '0x609FFF64429e2A275a879e5C50e415cec842c629' */,
     )
+  })
+
+  it('opens positions', async () => {
+    const collateral = Collateral__factory.connect(deployments['Collateral_Proxy'].address, signer)
+    const dsu = IERC20Metadata__factory.connect(deployments['DSU'].address, signer)
+
+    await opensPositions(collateral, dsu, mSqueeth)
   })
 })
