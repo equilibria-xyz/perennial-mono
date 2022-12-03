@@ -112,7 +112,7 @@ describe('Reservoir Oracle Product', () => {
       _takerFee: 0,
     })
     expectPositionEq((await product.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
-    expectPositionEq((await product.versions(INITIAL_VERSION))._share, { maker: 0, taker: 0 })
+    expectPositionEq((await product.versions(INITIAL_VERSION))._reward, { maker: 0, taker: 0 })
 
     // Settle the product with a new oracle version
     await oracleFeed.next()
@@ -163,7 +163,7 @@ describe('Reservoir Oracle Product', () => {
       _takerFee: 0,
     })
     expectPositionEq((await product.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
-    expectPositionEq((await product.versions(INITIAL_VERSION))._share, { maker: 0, taker: 0 })
+    expectPositionEq((await product.versions(INITIAL_VERSION))._reward, { maker: 0, taker: 0 })
 
     // Settle the product with a new oracle version
     await oracleFeed.next()
@@ -216,7 +216,7 @@ describe('Reservoir Oracle Product', () => {
       _takerFee: 0,
     })
     expectPositionEq((await product.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
-    expectPositionEq((await product.versions(INITIAL_VERSION))._share, { maker: 0, taker: 0 })
+    expectPositionEq((await product.versions(INITIAL_VERSION))._reward, { maker: 0, taker: 0 })
   })
 
   it('closes multiple make positions', async () => {
@@ -250,7 +250,7 @@ describe('Reservoir Oracle Product', () => {
       _takerFee: 0,
     })
     expectPositionEq((await product.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
-    expectPositionEq((await product.versions(INITIAL_VERSION))._share, { maker: 0, taker: 0 })
+    expectPositionEq((await product.versions(INITIAL_VERSION))._reward, { maker: 0, taker: 0 })
   })
 
   it('opens a take position', async () => {
@@ -282,7 +282,7 @@ describe('Reservoir Oracle Product', () => {
       _takerFee: 0,
     })
     expectPositionEq((await product.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
-    expectPositionEq((await product.versions(INITIAL_VERSION))._share, { maker: 0, taker: 0 })
+    expectPositionEq((await product.versions(INITIAL_VERSION))._reward, { maker: 0, taker: 0 })
 
     // One round
     await oracleFeed.next()
@@ -340,7 +340,7 @@ describe('Reservoir Oracle Product', () => {
       _takerFee: 0,
     })
     expectPositionEq((await product.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
-    expectPositionEq((await product.versions(INITIAL_VERSION))._share, { maker: 0, taker: 0 })
+    expectPositionEq((await product.versions(INITIAL_VERSION))._reward, { maker: 0, taker: 0 })
 
     // One round
     await oracleFeed.next()
@@ -404,7 +404,7 @@ describe('Reservoir Oracle Product', () => {
       _takerFee: 0,
     })
     expectPositionEq((await product.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
-    expectPositionEq((await product.versions(INITIAL_VERSION))._share, { maker: 0, taker: 0 })
+    expectPositionEq((await product.versions(INITIAL_VERSION))._reward, { maker: 0, taker: 0 })
   })
 
   it('closes multiple take positions', async () => {
@@ -445,7 +445,7 @@ describe('Reservoir Oracle Product', () => {
       _takerFee: 0,
     })
     expectPositionEq((await product.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
-    expectPositionEq((await product.versions(INITIAL_VERSION))._share, { maker: 0, taker: 0 })
+    expectPositionEq((await product.versions(INITIAL_VERSION))._reward, { maker: 0, taker: 0 })
   })
 
   it('settle no op (gas test)', async () => {

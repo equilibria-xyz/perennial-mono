@@ -13,8 +13,8 @@ struct Version {
     /// @dev Accumulator value at each settled oracle version
     PackedAccumulator _value;
 
-    /// @dev Accumulator share at each settled oracle version
-    PackedAccumulator _share;
+    /// @dev Accumulator reward at each settled oracle version
+    PackedAccumulator _reward;
     
     /// @dev Global position at each version
     PackedPosition _position;
@@ -24,8 +24,8 @@ using VersionLib for Version global;
 /**
  * @title VersionLib
  * @notice Library that manages global versioned accumulator state.
- * @dev Manages two accumulators: value and share. The value accumulator measures the change in position value
- *      over time. The share accumulator measures the change in liquidity ownership over time (for tracking
+ * @dev Manages two accumulators: value and reward. The value accumulator measures the change in position value
+ *      over time. The reward accumulator measures the change in liquidity ownership over time (for tracking
  *      incentivization rewards).
  *
  *      Both accumulators are stamped for historical lookup anytime there is a global settlement, which services
@@ -43,12 +43,12 @@ library VersionLib {
     }
 
     /**
-     * @notice Returns the share accumulator
+     * @notice Returns the reward accumulator
      * @param self The struct to operate on
-     * @return The stamped share accumulator at the requested version
+     * @return The stamped reward accumulator at the requested version
      */
-    function share(Version memory self) internal pure returns (Accumulator memory) {
-        return self._share.unpack();
+    function reward(Version memory self) internal pure returns (Accumulator memory) {
+        return self._reward.unpack();
     }
 
     /**
@@ -79,8 +79,8 @@ library VersionLib {
         bool closed
     ) internal pure returns (UFixed18 newFeeAccumulator) {
         // unpack
-        (Accumulator memory valueAccumulator, Accumulator memory shareAccumulator, Position memory latestPosition) =
-            (versionAccumulator.value(), versionAccumulator.share(), versionAccumulator.position());
+        (Accumulator memory valueAccumulator, Accumulator memory rewardAccumulator, Position memory latestPosition) =
+            (versionAccumulator.value(), versionAccumulator.reward(), versionAccumulator.position());
 
         // accumulate funding
         feeAccumulator = _accumulateFunding(
@@ -97,15 +97,15 @@ library VersionLib {
         // accumulate position
         _accumulatePosition(valueAccumulator, latestPosition, period, closed);
 
-        // accumulate share
-        _accumulateShare(shareAccumulator, latestPosition, period, rewardRate); //TODO: auto-shutoff if not enough reward ERC20s in contract?
+        // accumulate reward
+        _accumulateReward(rewardAccumulator, latestPosition, period, rewardRate); //TODO: auto-shutoff if not enough reward ERC20s in contract?
 
         // accumulate position fee
         feeAccumulator = _accumulatePositionFee(valueAccumulator, feeAccumulator, latestPosition, pre, positionFee);
 
         // pack
         versionAccumulator._value = valueAccumulator.pack();
-        versionAccumulator._share = shareAccumulator.pack();
+        versionAccumulator._reward = rewardAccumulator.pack();
         versionAccumulator._position = latestPosition.next(pre).pack();
         pre.clear();
         newFeeAccumulator = feeAccumulator.add(newFeeAccumulator);
@@ -233,24 +233,24 @@ library VersionLib {
     }
 
     /**
-     * @notice Globally accumulates position's share of the total market since last oracle update
+     * @notice Globally accumulates position's reward since last oracle update
      * @dev This is used to compute incentivization rewards based on market participation
      * @param latestPosition The latest global position
      * @param period The oracle version period to settle for
      */
-    function _accumulateShare(
-        Accumulator memory shareAccumulator,
+    function _accumulateReward(
+        Accumulator memory rewardAccumulator,
         Position memory latestPosition,
         Period memory period,
         Accumulator memory rewardRate
     ) private pure {
         UFixed18 elapsed = period.timestampDelta();
 
-        shareAccumulator.maker = latestPosition.maker.isZero() ?
-            shareAccumulator.maker :
-            shareAccumulator.maker.add(Fixed18Lib.from(elapsed).mul(rewardRate.taker).div(Fixed18Lib.from(latestPosition.maker)));
-        shareAccumulator.taker = latestPosition.taker.isZero() ?
-            shareAccumulator.taker :
-            shareAccumulator.taker.add(Fixed18Lib.from(elapsed).mul(rewardRate.taker).div(Fixed18Lib.from(latestPosition.taker)));
+        rewardAccumulator.maker = latestPosition.maker.isZero() ?
+            rewardAccumulator.maker :
+            rewardAccumulator.maker.add(Fixed18Lib.from(elapsed).mul(rewardRate.taker).div(Fixed18Lib.from(latestPosition.maker)));
+        rewardAccumulator.taker = latestPosition.taker.isZero() ?
+            rewardAccumulator.taker :
+            rewardAccumulator.taker.add(Fixed18Lib.from(elapsed).mul(rewardRate.taker).div(Fixed18Lib.from(latestPosition.taker)));
     }
 }

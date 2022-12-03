@@ -82,7 +82,7 @@ describe.only('Happy Path', () => {
       _takerFee: 0,
     })
     expectPositionEq((await product.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
-    expectPositionEq((await product.versions(INITIAL_VERSION))._share, { maker: 0, taker: 0 })
+    expectPositionEq((await product.versions(INITIAL_VERSION))._reward, { maker: 0, taker: 0 })
 
     // Settle the product with a new oracle version
     await chainlink.next()
@@ -133,7 +133,7 @@ describe.only('Happy Path', () => {
       _takerFee: 0,
     })
     expectPositionEq((await product.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
-    expectPositionEq((await product.versions(INITIAL_VERSION))._share, { maker: 0, taker: 0 })
+    expectPositionEq((await product.versions(INITIAL_VERSION))._reward, { maker: 0, taker: 0 })
 
     // Settle the product with a new oracle version
     await chainlink.next()
@@ -186,7 +186,7 @@ describe.only('Happy Path', () => {
       _takerFee: 0,
     })
     expectPositionEq((await product.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
-    expectPositionEq((await product.versions(INITIAL_VERSION))._share, { maker: 0, taker: 0 })
+    expectPositionEq((await product.versions(INITIAL_VERSION))._reward, { maker: 0, taker: 0 })
   })
 
   it('closes multiple make positions', async () => {
@@ -220,7 +220,7 @@ describe.only('Happy Path', () => {
       _takerFee: 0,
     })
     expectPositionEq((await product.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
-    expectPositionEq((await product.versions(INITIAL_VERSION))._share, { maker: 0, taker: 0 })
+    expectPositionEq((await product.versions(INITIAL_VERSION))._reward, { maker: 0, taker: 0 })
   })
 
   it('opens a take position', async () => {
@@ -252,7 +252,7 @@ describe.only('Happy Path', () => {
       _takerFee: 0,
     })
     expectPositionEq((await product.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
-    expectPositionEq((await product.versions(INITIAL_VERSION))._share, { maker: 0, taker: 0 })
+    expectPositionEq((await product.versions(INITIAL_VERSION))._reward, { maker: 0, taker: 0 })
 
     // One round
     await chainlink.next()
@@ -310,7 +310,7 @@ describe.only('Happy Path', () => {
       _takerFee: 0,
     })
     expectPositionEq((await product.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
-    expectPositionEq((await product.versions(INITIAL_VERSION))._share, { maker: 0, taker: 0 })
+    expectPositionEq((await product.versions(INITIAL_VERSION))._reward, { maker: 0, taker: 0 })
 
     // One round
     await chainlink.next()
@@ -374,7 +374,7 @@ describe.only('Happy Path', () => {
       _takerFee: 0,
     })
     expectPositionEq((await product.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
-    expectPositionEq((await product.versions(INITIAL_VERSION))._share, { maker: 0, taker: 0 })
+    expectPositionEq((await product.versions(INITIAL_VERSION))._reward, { maker: 0, taker: 0 })
   })
 
   it('closes multiple take positions', async () => {
@@ -415,7 +415,7 @@ describe.only('Happy Path', () => {
       _takerFee: 0,
     })
     expectPositionEq((await product.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
-    expectPositionEq((await product.versions(INITIAL_VERSION))._share, { maker: 0, taker: 0 })
+    expectPositionEq((await product.versions(INITIAL_VERSION))._reward, { maker: 0, taker: 0 })
   })
 
   it('settle no op (gas test)', async () => {
@@ -477,7 +477,7 @@ describe.only('Happy Path', () => {
       maker: '-29840671308188362617140000',
       taker: '-32892462923465729382860000',
     })
-    expectPositionEq((await product.versions(INITIAL_VERSION + 2))._share, {
+    expectPositionEq((await product.versions(INITIAL_VERSION + 2))._reward, {
       maker: 0,
       taker: 0,
     })

@@ -64,14 +64,14 @@ library AccountLib {
         Fixed18 valueDelta = (_position.sign() == 1)
             ? toVersion.value().taker.sub(fromVersion.value().taker)
             : toVersion.value().maker.sub(fromVersion.value().maker);
-        Fixed18 shareDelta = (_position.sign() == 1)
-            ? toVersion.share().taker.sub(fromVersion.share().taker)
-            : toVersion.share().maker.sub(fromVersion.share().maker);
+        Fixed18 rewardDelta = (_position.sign() == 1)
+            ? toVersion.reward().taker.sub(fromVersion.reward().taker)
+            : toVersion.reward().maker.sub(fromVersion.reward().maker);
 
         account._position = int96(Fixed18.unwrap(next(account)) / 1e9);
         account._pre = 0;
         account._collateral = int64(Fixed18.unwrap(collateral(account).add(_position.mul(valueDelta))) / 1e12);
-        account.reward = account.reward + UFixed18.unwrap(_position.mul(shareDelta).abs());
+        account.reward = account.reward + UFixed18.unwrap(_position.mul(rewardDelta).abs());
     }
 
     /**
