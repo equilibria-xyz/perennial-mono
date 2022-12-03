@@ -14,7 +14,7 @@ describe.only('Happy Path', () => {
   })
 
   it('creates a product', async () => {
-    const { owner, user, controller, treasuryB, contractPayoffProvider, chainlinkOracle, dsu, incentiveToken, lens } =
+    const { owner, user, controller, treasuryB, contractPayoffProvider, chainlinkOracle, dsu, rewardToken, lens } =
       instanceVars
 
     await expect(controller.createCoordinator()).to.emit(controller, 'CoordinatorCreated').withArgs(1, owner.address)
@@ -26,7 +26,7 @@ describe.only('Happy Path', () => {
       name: 'Squeeth',
       symbol: 'SQTH',
       token: dsu.address,
-      reward: incentiveToken.address,
+      reward: rewardToken.address,
       payoffDefinition: createPayoffDefinition({ contractAddress: contractPayoffProvider.address }),
       oracle: chainlinkOracle.address,
     }

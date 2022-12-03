@@ -48,9 +48,9 @@ describe('Reservoir Oracle Product', () => {
 
   beforeEach(async () => {
     instanceVars = await deployProtocol()
-    const { owner, dsu, incentiveToken } = instanceVars
+    const { owner, dsu, rewardToken } = instanceVars
     DEFINITION.token = dsu.address
-    DEFINITION.reward = incentiveToken.address
+    DEFINITION.reward = rewardToken.address
 
     // Reservoir has not deployed their feed adaptor to mainnet, so for now use Chainlink's DPI feed as a standin
     // TODO(arjun): Update this with Reservoir's mainnet deploy

@@ -81,12 +81,4 @@ interface IPerennialLens {
         IProduct product,
         Fixed18 positionSize
     ) external returns (UFixed18);
-    function unclaimedIncentiveRewards(address account, IProduct product)
-        external
-        returns (Token18[] memory tokens, UFixed18[] memory amounts);
-    function unclaimedIncentiveRewards(
-        address account,
-        IProduct product,
-        uint256[] calldata programIds
-    ) external returns (Token18[] memory tokens, UFixed18[] memory amounts);
 }

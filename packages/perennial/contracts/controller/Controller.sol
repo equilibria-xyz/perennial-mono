@@ -4,8 +4,6 @@ pragma solidity 0.8.17;
 import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 import "../interfaces/IController.sol";
-import "../interfaces/IIncentivizer.sol";
-import "../interfaces/IProduct.sol";
 
 /**
  * @title Controller
@@ -15,10 +13,6 @@ contract Controller is IController, UInitializable {
     ProtocolParameterStorage private constant _parameter = ProtocolParameterStorage.wrap(keccak256("equilibria.perennial.UParamProvider.parameter"));
     function parameter() public view returns (ProtocolParameter memory) { return _parameter.read(); }
 
-    /// @dev Incentivizer contract address for the protocol
-    AddressStorage private constant _incentivizer = AddressStorage.wrap(keccak256("equilibria.perennial.Controller.incentivizer"));
-    function incentivizer() public view returns (IIncentivizer) { return IIncentivizer(_incentivizer.read()); }
-
     /// @dev Product implementation beacon address for the protocol
     AddressStorage private constant _productBeacon = AddressStorage.wrap(keccak256("equilibria.perennial.Controller.productBeacon"));
     function productBeacon() public view returns (IBeacon) { return IBeacon(_productBeacon.read()); }
@@ -26,14 +20,6 @@ contract Controller is IController, UInitializable {
     /// @dev Fee on maintenance for liquidation
     UFixed18Storage private constant _liquidationFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.Controller.liquidationFee"));
     function liquidationFee() public view returns (UFixed18) { return _liquidationFee.read(); }
-
-    /// @dev Fee on incentivization programs
-    UFixed18Storage private constant _incentivizationFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.Controller.incentivizationFee"));
-    function incentivizationFee() public view returns (UFixed18) { return _incentivizationFee.read(); }
-
-    /// @dev Maximum incentivization programs per product allowed
-    Uint256Storage private constant _programsPerProduct = Uint256Storage.wrap(keccak256("equilibria.perennial.Controller.programsPerProduct"));
-    function programsPerProduct() public view returns (uint256) { return _programsPerProduct.read(); }
 
     /// @dev Protocol pauser address. address(0) defaults to owner(0)
     AddressStorage private constant _pauser = AddressStorage.wrap(keccak256("equilibria.perennial.Controller.pauser"));
@@ -52,16 +38,11 @@ contract Controller is IController, UInitializable {
      * @notice Initializes the contract state
      * @dev Must be called atomically as part of the upgradeable proxy deployment to
      *      avoid front-running
-     * @param incentivizer_ Incentivizer contract address
      * @param productBeacon_ Product implementation beacon address
      */
-    function initialize(
-        IIncentivizer incentivizer_,
-        IBeacon productBeacon_
-    ) external initializer(1) {
+    function initialize(IBeacon productBeacon_) external initializer(1) {
         _createCoordinator();
 
-        updateIncentivizer(incentivizer_);
         updateProductBeacon(productBeacon_);
     }
 
@@ -156,16 +137,6 @@ contract Controller is IController, UInitializable {
     }
 
     /**
-     * @notice Updates the Incentivizer contract address
-     * @param newIncentivizer New Incentivizer contract address
-     */
-    function updateIncentivizer(IIncentivizer newIncentivizer) public onlyOwner(0) {
-        if (!Address.isContract(address(newIncentivizer))) revert ControllerNotContractAddressError();
-        _incentivizer.store(address(newIncentivizer));
-        emit IncentivizerUpdated(newIncentivizer);
-    }
-
-    /**
      * @notice Updates the Product implementation beacon address
      * @param newProductBeacon New Product implementation beacon address
      */
@@ -189,26 +160,6 @@ contract Controller is IController, UInitializable {
 
         _liquidationFee.store(newLiquidationFee);
         emit LiquidationFeeUpdated(newLiquidationFee);
-    }
-
-    /**
-     * @notice Updates the incentivization fee
-     * @param newIncentivizationFee New incentivization fee
-     */
-    function updateIncentivizationFee(UFixed18 newIncentivizationFee) public onlyOwner(0) {
-        if (newIncentivizationFee.gt(UFixed18Lib.ONE)) revert ControllerInvalidIncentivizationFeeError();
-
-        _incentivizationFee.store(newIncentivizationFee);
-        emit IncentivizationFeeUpdated(newIncentivizationFee);
-    }
-
-    /**
-     * @notice Updates the maximum incentivization programs per product allowed
-     * @param newProgramsPerProduct New maximum incentivization programs per product allowed
-     */
-    function updateProgramsPerProduct(uint256 newProgramsPerProduct) public onlyOwner(0) {
-        _programsPerProduct.store(newProgramsPerProduct);
-        emit ProgramsPerProductUpdated(newProgramsPerProduct);
     }
 
     /**

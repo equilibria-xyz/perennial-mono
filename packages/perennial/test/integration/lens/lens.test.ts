@@ -2,7 +2,7 @@ import { expect } from 'chai'
 import 'hardhat'
 import { constants, utils } from 'ethers'
 
-import { InstanceVars, deployProtocol, createProduct, depositTo, createIncentiveProgram } from '../helpers/setupHelpers'
+import { InstanceVars, deployProtocol, createProduct, depositTo } from '../helpers/setupHelpers'
 import { time } from '../../../../common/testutil'
 import { expectPositionEq, expectPrePositionEq } from '../../../../common/testutil/types'
 
@@ -18,7 +18,7 @@ describe('Lens', () => {
 
   it('returns correct lens values', async () => {
     const POSITION = utils.parseEther('0.0001')
-    const { user, userB, chainlink, lens, controller, incentiveToken } = instanceVars
+    const { user, userB, chainlink, lens, controller } = instanceVars
 
     expect(await lens.callStatic.controller()).to.equal(controller.address)
     // Setup fees
@@ -26,9 +26,6 @@ describe('Lens', () => {
     protocolParameter.protocolFee = utils.parseEther('0.25')
     controller.updateParameter(protocolParameter)
     const product = await createProduct(instanceVars)
-    await time.increase(-SECONDS_IN_YEAR)
-    await createIncentiveProgram(instanceVars, product)
-    await time.increase(SECONDS_IN_YEAR)
 
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
@@ -155,20 +152,6 @@ describe('Lens', () => {
     await chainlink.next()
 
     await product.connect(user).settle(user.address)
-    // Incentive Program Rewards are updated
-    let incentiveRewards = await lens.callStatic['unclaimedIncentiveRewards(address,address)'](
-      user.address,
-      product.address,
-    )
-    expect(incentiveRewards.tokens[0].toLowerCase()).to.equal(incentiveToken.address.toLowerCase())
-    expect(incentiveRewards.amounts[0]).to.equal('188786008230451956')
-    incentiveRewards = await lens.callStatic['unclaimedIncentiveRewards(address,address,uint256[])'](
-      user.address,
-      product.address,
-      [0],
-    )
-    expect(incentiveRewards.tokens[0].toLowerCase()).to.equal(incentiveToken.address.toLowerCase())
-    expect(incentiveRewards.amounts[0]).to.equal('188786008230451956')
     const prices = await lens.callStatic.atVersions(product.address, [2472, 2475])
     expect(prices[0].price).to.equal('11388297509860897871140900')
     expect(prices[1].price).to.equal('11628475351618010828602500')

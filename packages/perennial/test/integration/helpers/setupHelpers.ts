@@ -62,11 +62,10 @@ export interface InstanceVars {
   chainlinkOracle: ChainlinkOracle
   productBeacon: IBeacon
   productImpl: Product
-  incentivizer: Incentivizer
   lens: PerennialLens
   batcher: IBatcher
   forwarder: Forwarder
-  incentiveToken: ERC20PresetMinterPauser
+  rewardToken: ERC20PresetMinterPauser
 }
 
 export async function deployProtocol(): Promise<InstanceVars> {
@@ -94,28 +93,20 @@ export async function deployProtocol(): Promise<InstanceVars> {
   const proxyAdmin = await new ProxyAdmin__factory(owner).deploy()
 
   const controllerImpl = await new Controller__factory(owner).deploy()
-  const incentivizerImpl = await new Incentivizer__factory(owner).deploy()
 
   const controllerProxy = await new TransparentUpgradeableProxy__factory(owner).deploy(
     controllerImpl.address,
     proxyAdmin.address,
     [],
   )
-  const incentivizerProxy = await new TransparentUpgradeableProxy__factory(owner).deploy(
-    incentivizerImpl.address,
-    proxyAdmin.address,
-    [],
-  )
 
   const controller = await new Controller__factory(owner).attach(controllerProxy.address)
-  const incentivizer = await new Incentivizer__factory(owner).attach(incentivizerProxy.address)
 
   const productImpl = await new Product__factory(owner).deploy()
   const productBeacon = await new UpgradeableBeacon__factory(owner).deploy(productImpl.address)
 
   // Init
-  await incentivizer.initialize(controller.address)
-  await controller.initialize(incentivizer.address, productBeacon.address)
+  await controller.initialize(productBeacon.address)
 
   // Params - TODO: finalize before launch
   await controller.updatePauser(pauser.address)
@@ -127,8 +118,6 @@ export async function deployProtocol(): Promise<InstanceVars> {
     paused: false,
   })
   await controller.updateLiquidationFee(utils.parseEther('0.50'))
-  await controller.updateIncentivizationFee(utils.parseEther('0.00'))
-  await controller.updateProgramsPerProduct(2)
 
   // Set state
   const dsuHolder = await impersonate.impersonateWithBalance(DSU_HOLDER, utils.parseEther('10'))
@@ -143,7 +132,7 @@ export async function deployProtocol(): Promise<InstanceVars> {
 
   const forwarder = await new Forwarder__factory(owner).deploy(usdc.address, dsu.address, batcher.address)
 
-  const incentiveToken = await new ERC20PresetMinterPauser__factory(owner).deploy('Incentive Token', 'ITKN')
+  const rewardToken = await new ERC20PresetMinterPauser__factory(owner).deploy('Incentive Token', 'ITKN')
 
   return {
     owner,
@@ -165,11 +154,10 @@ export async function deployProtocol(): Promise<InstanceVars> {
     controller,
     productBeacon,
     productImpl,
-    incentivizer,
     lens,
     batcher,
     forwarder,
-    incentiveToken,
+    rewardToken,
   }
 }
 
@@ -178,7 +166,7 @@ export async function createProduct(
   payoffProvider?: TestnetContractPayoffProvider,
   oracle?: ChainlinkOracle | ReservoirFeedOracle,
 ): Promise<Product> {
-  const { owner, controller, treasuryB, chainlinkOracle, incentiveToken, dsu } = instanceVars
+  const { owner, controller, treasuryB, chainlinkOracle, rewardToken, dsu } = instanceVars
   if (!payoffProvider) {
     payoffProvider = instanceVars.contractPayoffProvider
   }
@@ -193,7 +181,7 @@ export async function createProduct(
     name: 'Squeeth',
     symbol: 'SQTH',
     token: dsu.address,
-    reward: incentiveToken.address,
+    reward: rewardToken.address,
     payoffDefinition: createPayoffDefinition({ contractAddress: payoffProvider.address }),
     oracle: oracle.address,
   }
@@ -216,37 +204,6 @@ export async function createProduct(
   await controller.createProduct(1, definition, parameter)
 
   return Product__factory.connect(productAddress, owner)
-}
-
-export async function createIncentiveProgram(
-  instanceVars: InstanceVars,
-  product: Product,
-  nonProtocol = false,
-  amount = { maker: utils.parseEther('8000'), taker: utils.parseEther('2000') },
-): Promise<BigNumber> {
-  const { controller, owner, userC, incentivizer, incentiveToken } = instanceVars
-  let programOwner = owner
-  let coordinatorId = 0
-  if (nonProtocol) {
-    programOwner = userC
-    coordinatorId = 1
-    await controller.updateCoordinatorPendingOwner(1, userC.address)
-    await controller.connect(userC).acceptCoordinatorOwner(1)
-  }
-  await incentiveToken.mint(programOwner.address, amount.maker.add(amount.taker))
-  await incentiveToken.connect(programOwner).approve(incentivizer.address, amount.maker.add(amount.taker))
-  const programInfo = {
-    coordinatorId,
-    token: incentiveToken.address,
-    amount,
-    start: (await time.currentBlockTimestamp()) + 60 * 60,
-    duration: 60 * 60 * 24 * 30 * 12 * 1.5,
-  }
-  const returnValue = await incentivizer.connect(programOwner).callStatic.create(product.address, programInfo)
-
-  await incentivizer.connect(programOwner).create(product.address, programInfo)
-  await time.increase(60 * 60 + 1)
-  return returnValue
 }
 
 export async function depositTo(

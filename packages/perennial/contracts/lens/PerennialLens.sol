@@ -393,53 +393,6 @@ contract PerennialLens is IPerennialLens {
     }
 
     /**
-     * @notice User's unclaimed rewards for all programs for product after settle
-     * @param account Account address
-     * @param product Product address
-     * @return tokens Token addresses of unclaimed incentive rewards for given product
-     * @return amounts Token amounts of unclaimed incentive rewards for given product
-     */
-    function unclaimedIncentiveRewards(address account, IProduct product)
-        public
-        settleAccount(account, product)
-        returns (Token18[] memory tokens, UFixed18[] memory amounts)
-    {
-        IIncentivizer incentivizer = controller.incentivizer();
-
-        uint256 programsLength = incentivizer.count(product);
-        tokens = new Token18[](programsLength);
-        amounts = new UFixed18[](programsLength);
-        for (uint256 i = 0; i < programsLength; i++) {
-            ProgramInfo memory programInfo = incentivizer.programInfos(product, i);
-            tokens[i] = programInfo.token;
-            amounts[i] = incentivizer.unclaimed(product, account, i);
-        }
-    }
-
-    /**
-     * @notice User's unclaimed rewards for provided programs for product after settle
-     * @param account Account address
-     * @param product Product address
-     * @param programIds Program IDs to query
-     * @return tokens Token addresses of unclaimed incentive rewards for given program IDs
-     * @return amounts Token amounts of unclaimed incentive rewards for given program IDs
-     */
-    function unclaimedIncentiveRewards(
-        address account,
-        IProduct product,
-        uint256[] calldata programIds
-    ) public settleAccount(account, product) returns (Token18[] memory tokens, UFixed18[] memory amounts) {
-        IIncentivizer incentivizer = controller.incentivizer();
-        tokens = new Token18[](programIds.length);
-        amounts = new UFixed18[](programIds.length);
-        for (uint256 i = 0; i < programIds.length; i++) {
-            ProgramInfo memory programInfo = incentivizer.programInfos(product, programIds[i]);
-            tokens[i] = programInfo.token;
-            amounts[i] = incentivizer.unclaimed(product, account, programIds[i]);
-        }
-    }
-
-    /**
      *  End UserProduct Individual Fields Functions
      */
 

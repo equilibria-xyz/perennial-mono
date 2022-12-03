@@ -3,7 +3,6 @@ pragma solidity ^0.8.13;
 
 import "@equilibria/root/number/types/UFixed18.sol";
 import "@openzeppelin/contracts/proxy/beacon/IBeacon.sol";
-import "./IIncentivizer.sol";
 import "./IProduct.sol";
 import "./types/PayoffDefinition.sol";
 import "../controller/types/ProtocolParameter.sol"; //TODO: not right package
@@ -21,12 +20,9 @@ interface IController {
         address treasury;
     }
 
-    event IncentivizerUpdated(IIncentivizer newIncentivizer);
     event ProductBeaconUpdated(IBeacon newProductBeacon);
     event ParameterUpdated(ProtocolParameter newParameter);
     event LiquidationFeeUpdated(UFixed18 newLiquidationFee);
-    event IncentivizationFeeUpdated(UFixed18 newIncentivizationFee);
-    event ProgramsPerProductUpdated(uint256 newProgramsPerProduct);
     event PauserUpdated(address newPauser);
     event CoordinatorPendingOwnerUpdated(uint256 indexed coordinatorId, address newPendingOwner);
     event CoordinatorOwnerUpdated(uint256 indexed coordinatorId, address newOwner);
@@ -38,22 +34,16 @@ interface IController {
     error ControllerNotPauserError();
     error ControllerNotOwnerError(uint256 controllerId);
     error ControllerNotPendingOwnerError(uint256 controllerId);
-    error ControllerInvalidProtocolFeeError();
-    error ControllerInvalidMinFundingFeeError();
     error ControllerInvalidLiquidationFeeError();
-    error ControllerInvalidIncentivizationFeeError();
     error ControllerNotContractAddressError();
 
-    function incentivizer() external view returns (IIncentivizer);
     function productBeacon() external view returns (IBeacon);
     function coordinators(uint256 collateralId) external view returns (Coordinator memory);
     function coordinatorFor(IProduct product) external view returns (uint256);
     function parameter() external view returns (ProtocolParameter memory);
     function liquidationFee() external view returns (UFixed18);
-    function incentivizationFee() external view returns (UFixed18);
-    function programsPerProduct() external view returns (uint256);
     function pauser() external view returns (address);
-    function initialize(IIncentivizer incentivizer_, IBeacon productBeacon_) external;
+    function initialize(IBeacon productBeacon_) external;
     function createCoordinator() external returns (uint256);
     function updateCoordinatorPendingOwner(uint256 coordinatorId, address newPendingOwner) external;
     function acceptCoordinatorOwner(uint256 coordinatorId) external;
@@ -63,12 +53,9 @@ interface IController {
         IProduct.ProductDefinition calldata definition,
         Parameter calldata parameter
     ) external returns (IProduct);
-    function updateIncentivizer(IIncentivizer newIncentivizer) external;
     function updateProductBeacon(IBeacon newProductBeacon) external;
     function updateParameter(ProtocolParameter memory newParameter) external;
     function updateLiquidationFee(UFixed18 newLiquidationFee) external;
-    function updateIncentivizationFee(UFixed18 newIncentivizationFee) external;
-    function updateProgramsPerProduct(uint256 newProductsPerProduct) external;
     function updatePauser(address newPauser) external;
     function updatePaused(bool newPaused) external;
     function isProduct(IProduct product) external view returns (bool);
