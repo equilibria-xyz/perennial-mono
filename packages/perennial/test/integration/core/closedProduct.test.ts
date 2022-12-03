@@ -93,8 +93,8 @@ describe('Closed Product', () => {
     await product.settle(user.address)
     await product.settle(userB.address)
 
-    const userCollateralBefore = (await product.accounts(user.address)).collateral
-    const userBCollateralBefore = (await product.accounts(userB.address)).collateral
+    const userCollateralBefore = (await product.accounts(user.address))._collateral
+    const userBCollateralBefore = (await product.accounts(userB.address))._collateral
     const feesABefore = await product.protocolFees()
     const feesBBefore = await product.productFees()
 
@@ -103,8 +103,8 @@ describe('Closed Product', () => {
     await product.settle(user.address)
     await product.settle(userB.address)
 
-    expect((await product.accounts(user.address)).collateral).to.equal(userCollateralBefore)
-    expect((await product.accounts(userB.address)).collateral).to.equal(userBCollateralBefore)
+    expect((await product.accounts(user.address))._collateral).to.equal(userCollateralBefore)
+    expect((await product.accounts(userB.address))._collateral).to.equal(userBCollateralBefore)
     expect(await product.productFees()).to.equal(feesABefore)
     expect(await product.productFees()).to.equal(feesBBefore)
   })
@@ -132,8 +132,8 @@ describe('Closed Product', () => {
     await product.settle(userB.address)
 
     expect(await product.liquidation(user.address)).to.be.false
-    const userCollateralBefore = (await product.accounts(user.address)).collateral
-    const userBCollateralBefore = (await product.accounts(userB.address)).collateral
+    const userCollateralBefore = (await product.accounts(user.address))._collateral
+    const userBCollateralBefore = (await product.accounts(userB.address))._collateral
     const feesABefore = await product.protocolFees()
     const feesBBefore = await product.productFees()
 
@@ -142,8 +142,8 @@ describe('Closed Product', () => {
     await product.settle(user.address)
     await product.settle(userB.address)
 
-    expect((await product.accounts(user.address)).collateral).to.equal(userCollateralBefore)
-    expect((await product.accounts(userB.address)).collateral).to.equal(userBCollateralBefore)
+    expect((await product.accounts(user.address))._collateral).to.equal(userCollateralBefore)
+    expect((await product.accounts(userB.address))._collateral).to.equal(userBCollateralBefore)
     expect(await product.protocolFees()).to.equal(feesABefore)
     expect(await product.productFees()).to.equal(feesBBefore)
   })

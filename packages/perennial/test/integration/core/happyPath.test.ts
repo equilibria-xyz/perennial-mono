@@ -50,7 +50,7 @@ describe.only('Happy Path', () => {
     await dsu.connect(user).approve(productAddress, utils.parseEther('1000'))
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
 
-    expect((await product.accounts(user.address)).collateral).to.equal(utils.parseEther('1000'))
+    expect((await product.accounts(user.address))._collateral).to.equal(utils.parseEther('1000').div(1e12))
     expect(await lens.callStatic['collateral(address)'](product.address)).to.equal(utils.parseEther('1000'))
   })
 
@@ -67,7 +67,7 @@ describe.only('Happy Path', () => {
 
     // Check user is in the correct state
     expect((await product.accounts(user.address))._position).to.equal(0)
-    expect((await product.accounts(user.address))._pre).to.equal(POSITION.mul(-1))
+    expect((await product.accounts(user.address))._pre).to.equal(POSITION.mul(-1).div(1e9))
     expect(await product.latestVersions(user.address)).to.equal(INITIAL_VERSION)
 
     // Check global state
@@ -98,7 +98,7 @@ describe.only('Happy Path', () => {
 
     // Settle user and check state
     await product.settle(user.address)
-    expect((await product.accounts(user.address))._position).to.equal(POSITION.mul(-1))
+    expect((await product.accounts(user.address))._position).to.equal(POSITION.mul(-1).div(1e9))
     expect((await product.accounts(user.address))._pre).to.equal(0)
     expect(await product.latestVersions(user.address)).to.equal(INITIAL_VERSION + 1)
   })
@@ -118,7 +118,7 @@ describe.only('Happy Path', () => {
 
     // Check user is in the correct state
     expect((await product.accounts(user.address))._position).to.equal(0)
-    expect((await product.accounts(user.address))._pre).to.equal(POSITION.mul(-1))
+    expect((await product.accounts(user.address))._pre).to.equal(POSITION.mul(-1).div(1e9))
     expect(await product.latestVersions(user.address)).to.equal(INITIAL_VERSION)
 
     // Check global state
@@ -149,7 +149,7 @@ describe.only('Happy Path', () => {
 
     // Settle user and check state
     await product.settle(user.address)
-    expect((await product.accounts(user.address))._position).to.equal(POSITION.mul(-1))
+    expect((await product.accounts(user.address))._position).to.equal(POSITION.mul(-1).div(1e9))
     expect((await product.accounts(user.address))._pre).to.equal(0)
     expect(await product.latestVersions(user.address)).to.equal(INITIAL_VERSION + 1)
   })
@@ -237,7 +237,7 @@ describe.only('Happy Path', () => {
 
     // User State
     expect((await product.accounts(userB.address))._position).to.equal(0)
-    expect((await product.accounts(userB.address))._pre).to.equal(TAKE_POSITION)
+    expect((await product.accounts(userB.address))._pre).to.equal(TAKE_POSITION.div(1e9))
     expect(await product.latestVersions(userB.address)).to.equal(INITIAL_VERSION)
 
     // Global State
@@ -272,7 +272,7 @@ describe.only('Happy Path', () => {
       _takerFee: 0,
     })
     await product.settle(userB.address)
-    expect((await product.accounts(userB.address))._position).to.equal(TAKE_POSITION)
+    expect((await product.accounts(userB.address))._position).to.equal(TAKE_POSITION.div(1e9))
     expect((await product.accounts(userB.address))._pre).to.equal(0)
     expect(await product.latestVersions(userB.address)).to.equal(INITIAL_VERSION + 2)
   })
@@ -295,7 +295,7 @@ describe.only('Happy Path', () => {
 
     // User State
     expect((await product.accounts(userB.address))._position).to.equal(0)
-    expect((await product.accounts(userB.address))._pre).to.equal(TAKE_POSITION)
+    expect((await product.accounts(userB.address))._pre).to.equal(TAKE_POSITION.div(1e9))
     expect(await product.latestVersions(userB.address)).to.equal(INITIAL_VERSION)
 
     // Global State
@@ -330,7 +330,7 @@ describe.only('Happy Path', () => {
       _takerFee: 0,
     })
     await product.settle(userB.address)
-    expect((await product.accounts(userB.address))._position).to.equal(TAKE_POSITION)
+    expect((await product.accounts(userB.address))._position).to.equal(TAKE_POSITION.div(1e9))
     expect((await product.accounts(userB.address))._pre).to.equal(0)
     expect(await product.latestVersions(userB.address)).to.equal(INITIAL_VERSION + 2)
   })
@@ -455,8 +455,8 @@ describe.only('Happy Path', () => {
       .withArgs(user.address, INITIAL_VERSION + 2, POSITION.div(2).mul(-1))
 
     // Check user is in the correct state
-    expect((await product.accounts(user.address))._position).to.equal(POSITION.div(2).mul(-1))
-    expect((await product.accounts(user.address))._pre).to.equal(POSITION.div(2).mul(-1))
+    expect((await product.accounts(user.address))._position).to.equal(POSITION.div(2).mul(-1).div(1e9))
+    expect((await product.accounts(user.address))._pre).to.equal(POSITION.div(2).mul(-1).div(1e9))
     expect(await product.latestVersions(user.address)).to.equal(INITIAL_VERSION + 2)
 
     // Check global state

@@ -108,53 +108,29 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         token = definition_.token;
     }
 
-    /**
-     * @notice Surfaces global settlement externally
-     */
     //TODO: address 0?
     function settle(address account) external nonReentrant {
         CurrentContext memory context = _loadContext(account);
         _settle(context, account);
         _saveContext(context, account);
-
-        if (context.paused) revert PausedError();
     }
 
     //TODO support depositTo and withdrawTo
     function update(Fixed18 positionAmount, Fixed18 collateralAmount) external nonReentrant {
-        _update(msg.sender, positionAmount, collateralAmount, false);
+        CurrentContext memory context = _loadContext(msg.sender);
+        _settle(context, msg.sender);
+        _update(context, msg.sender, positionAmount, collateralAmount, false);
+        _saveContext(context, msg.sender);
     }
 
-    /**
-     * @notice Liquidates `account`'s `product` collateral account
-     * @dev Account must be under-collateralized, fee returned immediately to `msg.sender`
-     * @param account Account to liquidate
-     */
     function liquidate(address account)
     external
     nonReentrant
     {
-        // close open position
-        Fixed18 closeAmount = _accounts[account].position().mul(Fixed18Lib.NEG_ONE);
-        CurrentContext memory context = _update(account, closeAmount, Fixed18Lib.ZERO, true); //TODO: don't think this works
-
-        // check can liquidate
-        if (!_liquidatable(context)) revert ProductCantLiquidate();
-
-        // Dispurse fee
-        // TODO: cleanup
-        UFixed18 liquidationFee = controller().liquidationFee();
-        UFixed18 accountMaintenance = context.account.maintenance(context.currentOracleVersion, context.parameter.maintenance);
-        UFixed18 fee = UFixed18Lib.min(context.account.collateral.max(Fixed18Lib.ZERO).abs(), accountMaintenance.mul(liquidationFee));
-        context.account.collateral = context.account.collateral.sub(Fixed18Lib.from(-1, fee)); // no shortfall
-
-        // save state
-        _accounts[account] = context.account;
-        liquidation[account] = true;
-
-        token.push(msg.sender, fee);
-
-        emit Liquidation(account, msg.sender, fee);
+        CurrentContext memory context = _loadContext(account);
+        _settle(context, account);
+        _liquidate(context, account);
+        _saveContext(context, account);
     }
 
     //TODO: claim fee
@@ -171,11 +147,44 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         return _pre;
     }
 
-    function _update(address account, Fixed18 positionAmount, Fixed18 collateralAmount, bool force) private returns (CurrentContext memory context) {
-        // load
-        context = _loadContext(account);
-        _settle(context, account);
+    function _liquidate(
+        CurrentContext memory context,
+        address account
+    ) private {
+        // before
+        if (!_liquidatable(context)) revert ProductCantLiquidate();
 
+        // close all positions
+        _update(context, account, context.account.position().mul(Fixed18Lib.NEG_ONE), Fixed18Lib.ZERO, true);
+
+        // handle liquidation fee
+        UFixed18 liquidationFee = controller().liquidationFee(); // TODO: external call
+        UFixed18 liquidationReward = UFixed18Lib.min(
+            context.account.collateral().max(Fixed18Lib.ZERO).abs(),
+            context.account.maintenance(context.currentOracleVersion, context.parameter.maintenance).mul(liquidationFee)
+        );
+        context.account.update(
+            Fixed18Lib.ZERO, //TODO: all the position stuff is not needed here so might be a gas efficiency check here
+            Fixed18Lib.from(-1, liquidationReward),
+            context.currentOracleVersion,
+            context.parameter.makerFee,
+            context.parameter.takerFee
+        );
+        context.liquidation = true;
+
+        // remit liquidation reward
+        token.push(msg.sender, liquidationReward);
+
+        emit Liquidation(account, msg.sender, liquidationReward);
+    }
+
+    function _update(
+        CurrentContext memory context,
+        address account,
+        Fixed18 positionAmount,
+        Fixed18 collateralAmount,
+        bool force
+    ) private {
         _startGas(context, "_update before-update-after: %s");
 
         // before
@@ -200,16 +209,13 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         );
 
         // after
-        if (context.account.collateral.sign() == -1 && collateralAmount.sign() == -1) revert ProductInDebtError();
+        if (context.account.collateral().sign() == -1 && collateralAmount.sign() == -1) revert ProductInDebtError();
         if (_liquidatable(context) || _liquidatableNext(context)) revert ProductInsufficientCollateralError();
         if (!force && _socializationNext(context).lt(UFixed18Lib.ONE)) revert ProductInsufficientLiquidityError();
         if (context.version.position().next(context.pre).maker.gt(context.parameter.makerLimit)) revert ProductMakerOverLimitError();
-        if (!context.account.collateral.isZero() && context.account.collateral.lt(Fixed18Lib.from(context.minCollateral))) revert ProductCollateralUnderLimitError();
+        if (!context.account.collateral().isZero() && context.account.collateral().lt(Fixed18Lib.from(context.minCollateral))) revert ProductCollateralUnderLimitError();
 
         _endGas(context);
-
-        // save
-        _saveContext(context, account);
 
         _startGas(context, "_update fund-events: %s");
 
@@ -247,6 +253,9 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         context.account = _accounts[account];
         context.liquidation = liquidation[account];
 
+        // after
+        if (context.paused) revert PausedError();
+
         _endGas(context);
     }
 
@@ -256,6 +265,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         latestVersion = context.latestVersion;
         latestVersions[account] = context.latestAccountVersion;
         _accounts[account] = context.account;
+        liquidation[account] = context.liquidation;
         _pre = context.pre;
         productFees = context.productFees;
         protocolFees = context.protocolFees;
@@ -358,12 +368,12 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      */
     function _liquidatableNext(CurrentContext memory context) private pure returns (bool) {
         UFixed18 maintenanceAmount = context.account.maintenanceNext(context.currentOracleVersion, context.parameter.maintenance);
-        return Fixed18Lib.from(maintenanceAmount).gt(context.account.collateral);
+        return Fixed18Lib.from(maintenanceAmount).gt(context.account.collateral());
     }
 
     function _liquidatable(CurrentContext memory context) private pure returns (bool) {
         UFixed18 maintenanceAmount = context.account.maintenance(context.currentOracleVersion, context.parameter.maintenance);
-        return Fixed18Lib.from(maintenanceAmount).gt(context.account.collateral);
+        return Fixed18Lib.from(maintenanceAmount).gt(context.account.collateral());
     }
 
     function _socializationNext(CurrentContext memory context) private pure returns (UFixed18) {

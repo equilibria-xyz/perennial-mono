@@ -257,7 +257,7 @@ contract PerennialLens is IPerennialLens {
      */
     function collateral(address account, IProduct product) public settleAccount(account, product) returns (Fixed18) {
         Account memory productAccount = product.accounts(account);
-        return productAccount.collateral;
+        return productAccount.collateral();
     }
 
     /**
@@ -285,7 +285,7 @@ contract PerennialLens is IPerennialLens {
     function liquidatable(address account, IProduct product) public settleAccount(account, product) returns (bool) {
         Account memory productAccount = product.accounts(account);
         UFixed18 maintenanceAmount = _maintenance(product, productAccount.position());
-        return Fixed18Lib.from(maintenanceAmount).gt(productAccount.collateral);
+        return Fixed18Lib.from(maintenanceAmount).gt(productAccount.collateral());
     }
 
     /**

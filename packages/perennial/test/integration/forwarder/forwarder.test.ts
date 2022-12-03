@@ -26,7 +26,7 @@ describe('Forwarder', () => {
 
     expect(await usdc.balanceOf(user.address)).to.equal(BigNumber.from(10e12).sub(1000e6))
 
-    expect((await product.accounts(userB.address)).collateral).to.equal(utils.parseEther('1000'))
+    expect((await product.accounts(userB.address))._collateral).to.equal(utils.parseEther('1000').div(1e12))
     expect(await lens.callStatic['collateral(address)'](product.address)).to.equal(utils.parseEther('1000'))
 
     expect(await usdc.balanceOf(forwarder.address)).to.equal(0)

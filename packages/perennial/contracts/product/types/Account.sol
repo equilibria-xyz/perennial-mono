@@ -7,13 +7,11 @@ import "./Version.sol";
 
 /// @dev Account type
 struct Account {
+    int96 _pre; // 9 decimals
 
-    PackedFixed18 _pre;
+    int96 _position; // 9 decimals
 
-    /// @dev The current settled position of the account
-    PackedFixed18 _position;
-
-    Fixed18 collateral;
+    int64 _collateral; // 6 decimals
 }
 using AccountLib for Account global;
 
@@ -47,8 +45,8 @@ library AccountLib {
             .sub(Fixed18Lib.from(takerAmount.mul(currentOracleVersion.price).abs().mul(takerFee)));
 
         // update position
-        account._pre = account._pre.unpack().add(positionAmount).pack();
-        account.collateral = account.collateral.add(collateralAmount);
+        account._pre = int96(Fixed18.unwrap(pre(account).add(positionAmount)) / 1e9);
+        account._collateral = int64(Fixed18.unwrap(collateral(account).add(collateralAmount)) / 1e12);
     }
 
     /**
@@ -65,9 +63,9 @@ library AccountLib {
             ? toVersion.value().taker.sub(fromVersion.value().taker)
             : toVersion.value().maker.sub(fromVersion.value().maker);
 
-        account._position = next(account).pack();
-        account._pre = Fixed18Lib.ZERO.pack();
-        account.collateral = account.collateral.add(_position.mul(versionDelta));
+        account._position = int96(Fixed18.unwrap(next(account)) / 1e9);
+        account._pre = 0;
+        account._collateral = int64(Fixed18.unwrap(collateral(account).add(_position.mul(versionDelta))) / 1e12);
     }
 
     /**
@@ -113,15 +111,20 @@ library AccountLib {
         return notionalMax.mul(maintenanceRatio);
     }
 
+
     function pre(Account memory self) internal pure returns (Fixed18) {
-        return self._pre.unpack();
+        return Fixed18.wrap(int256(self._pre) * 1e9);
     }
 
     function position(Account memory self) internal pure returns (Fixed18) {
-        return self._position.unpack();
+        return Fixed18.wrap(int256(self._position) * 1e9);
+    }
+
+    function collateral(Account memory self) internal pure returns (Fixed18) {
+        return Fixed18.wrap(int256(self._collateral) * 1e12);
     }
 
     function next(Account memory self) internal pure returns (Fixed18) {
-        return self._position.unpack().add(self._pre.unpack());
+        return position(self).add(pre(self));
     }
 }
