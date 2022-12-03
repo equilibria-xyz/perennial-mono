@@ -6,8 +6,8 @@ import "@equilibria/root/control/unstructured/UReentrancyGuard.sol";
 import "../controller/UControllerProvider.sol";
 import "./UPayoffProvider.sol";
 import "./UParamProvider.sol";
-import "./types/Account.sol";
 import "hardhat/console.sol";
+
 
 // TODO: position needs less settle on the second period for both global and account
 // TODO: lots of params can be passed in from global settle to account settle
@@ -45,9 +45,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
         PrePosition pre;
 
-        UFixed18 productFees;
-
-        UFixed18 protocolFees;
+        Fee fee;
 
         /* Current Account State */
         uint256 latestAccountVersion;
@@ -72,10 +70,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     Token18 public token;
 
     /// @dev Protocol and product fees collected, but not yet claimed
-    UFixed18 public productFees;
-
-    /// @dev Protocol and protocol fees collected, but not yet claimed
-    UFixed18 public protocolFees;
+    Fee private _fee;
 
     /// @dev The individual state for each account
     mapping(address => Account) private _accounts;
@@ -145,6 +140,10 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
     function pre() external view returns (PrePosition memory) {
         return _pre;
+    }
+
+    function fee() external view returns (Fee memory) {
+        return _fee;
     }
 
     function _liquidate(
@@ -245,8 +244,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         context.latestVersion = latestVersion;
         context.version = _versions[context.latestVersion];
         context.pre = _pre;
-        context.productFees = productFees; //TODO: pack these
-        context.protocolFees = protocolFees;
+        context.fee = _fee;
 
         // Load account state
         context.latestAccountVersion = latestVersions[account];
@@ -267,8 +265,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         _accounts[account] = context.account;
         liquidation[account] = context.liquidation;
         _pre = context.pre;
-        productFees = context.productFees;
-        protocolFees = context.protocolFees;
+        _fee = context.fee;
 
         _endGas(context);
     }
@@ -313,22 +310,12 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         toVersion = context.version;
         _settlePeriodAccount(context, period, fromVersion, toVersion, account);
 
-        // save accumulator data
-        //TODO: move to accumulator
-        UFixed18 protocolFeeAmount = feeAccumulator.mul(context.protocolFee);
-        UFixed18 productFeeAmount = feeAccumulator.sub(protocolFeeAmount);
-        context.protocolFees = context.protocolFees.add(productFeeAmount);
-        context.productFees = context.productFees.add(productFeeAmount);
-
         _endGas(context);
     }
 
-    function _settlePeriod(UFixed18 feeAccumulator, CurrentContext memory context, Period memory period)
-    private
-    returns (UFixed18 newFeeAccumulator)
-    {
+    function _settlePeriod(UFixed18 feeAccumulator, CurrentContext memory context, Period memory period) private {
         if (context.currentOracleVersion.version > context.latestVersion) {
-            (newFeeAccumulator) = context.version.accumulate(
+            UFixed18 feeAmount = context.version.accumulate(
                 feeAccumulator,
                 context.pre,
                 period,
@@ -338,6 +325,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
                 context.parameter.fundingFee,
                 context.parameter.closed
             );
+            context.fee.update(feeAmount, context.protocolFee);
             context.latestVersion = period.toVersion.version;
             _versions[period.toVersion.version] = context.version;
         }
@@ -349,9 +337,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         Version memory fromVersion,
         Version memory toVersion,
         address account
-    )
-    private
-    {
+    ) private {
         if (context.currentOracleVersion.version > context.latestAccountVersion) {
             context.incentivizer.syncAccount(account, period.toVersion);
 

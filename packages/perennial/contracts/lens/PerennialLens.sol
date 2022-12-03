@@ -50,7 +50,7 @@ contract PerennialLens is IPerennialLens {
         _snapshot.collateral = collateral(product);
         _snapshot.pre = pre(product);
         _snapshot.position = position(product);
-        (_snapshot.productFee, _snapshot.protocolFee) = fees(product);
+        _snapshot.fee = fees(product);
         _snapshot.openInterest = openInterest(product);
     }
 
@@ -140,9 +140,10 @@ contract PerennialLens is IPerennialLens {
      * @return Total collateral for product
      */
     function collateral(IProduct product) public settle(product) returns (Fixed18) {
+        Fee memory fee = product.fee();
         return Fixed18Lib.from(product.token().balanceOf(address(product)))
-            .sub(Fixed18Lib.from(product.protocolFees()))
-            .sub(Fixed18Lib.from(product.productFees()));
+            .sub(Fixed18Lib.from(fee.protocol()))
+            .sub(Fixed18Lib.from(fee.product()));
     }
 
     /**
@@ -224,12 +225,10 @@ contract PerennialLens is IPerennialLens {
     /**
      * @notice Fees accumulated by product and protocol treasuries after settle
      * @param product Product address
-     * @return protocolFees fees accrued by the protocol
-     * @return productFees fees accrued by the product owner
+     * @return fees accrued by the protocol
      */
-    function fees(IProduct product) public settle(product) returns (UFixed18 protocolFees, UFixed18 productFees) {
-        protocolFees = product.protocolFees();
-        productFees = product.productFees();
+    function fees(IProduct product) public settle(product) returns (Fee memory) {
+        return product.fee();
     }
 
     /**

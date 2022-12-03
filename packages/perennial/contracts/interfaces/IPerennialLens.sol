@@ -21,8 +21,7 @@ interface IPerennialLens {
         Fixed18 collateral;
         PrePosition pre;
         Position position;
-        UFixed18 productFee;
-        UFixed18 protocolFee;
+        Fee fee;
         Position openInterest;
     }
 
@@ -57,7 +56,7 @@ interface IPerennialLens {
     function parameter(IProduct product) external view returns (Parameter memory);
     function collateral(IProduct product) external returns (Fixed18);
     function pre(IProduct product) external returns (PrePosition memory);
-    function fees(IProduct product) external returns (UFixed18 protocolFees, UFixed18 productFees);
+    function fees(IProduct product) external returns (Fee memory);
     function position(IProduct product) external returns (Position memory);
     function globalPosition(IProduct product) external returns (PrePosition memory, Position memory);
     function latestVersion(IProduct product) external returns (IOracleProvider.OracleVersion memory);

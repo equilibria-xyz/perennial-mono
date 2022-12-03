@@ -12,6 +12,7 @@ import "./types/PrePosition.sol";
 import "./types/Accumulator.sol";
 import "../product/types/Version.sol"; //TODO: these have to be in interface
 import "../product/types/Account.sol";
+import "../product/types/Fee.sol";
 
 interface IProduct is IPayoffProvider, IParamProvider {
     struct ProductDefinition {
@@ -46,15 +47,14 @@ interface IProduct is IPayoffProvider, IParamProvider {
     function name() external view returns (string memory);
     function symbol() external view returns (string memory);
     function token() external view returns (Token18);
-    function productFees() external view returns (UFixed18);
-    function protocolFees() external view returns (UFixed18);
-    function settle(address account) external;
-    function update(Fixed18 positionAmount, Fixed18 collateralAmount) external;
-    function liquidate(address account) external;
     function liquidation(address account) external view returns (bool);
     function latestVersion() external view returns (uint256);
+    function latestVersions(address account) external view returns (uint256);
     function accounts(address account) external view returns (Account memory);
     function versions(uint256 oracleVersion) external view returns (Version memory);
     function pre() external view returns (PrePosition memory);
-    function latestVersions(address account) external view returns (uint256);
+    function fee() external view returns (Fee memory);
+    function settle(address account) external;
+    function update(Fixed18 positionAmount, Fixed18 collateralAmount) external;
+    function liquidate(address account) external;
 }
