@@ -73,7 +73,7 @@ describe('Reservoir Oracle Product', () => {
       .to.emit(controller, 'CoordinatorCreated')
       .withArgs(1, owner.address)
     await expect(controller.updateCoordinatorTreasury(1, treasuryB.address))
-      .to.emit(controller, 'CoordinatorTreasuryPositionUpdated')
+      .to.emit(controller, 'CoordinatorTreasuryUpdated')
       .withArgs(1, treasuryB.address)
 
     const productAddress = await controller.callStatic.createProduct(1, DEFINITION, PARAMETER)
@@ -94,8 +94,8 @@ describe('Reservoir Oracle Product', () => {
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
 
     await expect(product.connect(user).update(POSITION.mul(-1), 0))
-      .to.emit(product, 'PositionUpdated')
-      .withArgs(user.address, INITIAL_VERSION, POSITION)
+      .to.emit(product, 'Updated')
+      .withArgs(user.address, INITIAL_VERSION, POSITION, 0)
 
     // Check user is in the correct state
     expect((await product.accounts(user.address))._position).to.equal(0)
@@ -145,8 +145,8 @@ describe('Reservoir Oracle Product', () => {
     await product.connect(user).update(POSITION.div(2).mul(-1), 0)
 
     await expect(product.connect(user).update(POSITION.div(2).mul(-1), 0))
-      .to.emit(product, 'PositionUpdated')
-      .withArgs(user.address, INITIAL_VERSION, POSITION.div(2))
+      .to.emit(product, 'Updated')
+      .withArgs(user.address, INITIAL_VERSION, POSITION.div(2), 0)
 
     // Check user is in the correct state
     expect((await product.accounts(user.address))._position).to.equal(0)
@@ -196,8 +196,8 @@ describe('Reservoir Oracle Product', () => {
     await product.connect(user).update(OPEN_POSITION.mul(-1), 0)
 
     await expect(product.connect(user).update(CLOSE_POSITION, 0))
-      .to.emit(product, 'PositionUpdated')
-      .withArgs(user.address, INITIAL_VERSION, CLOSE_POSITION)
+      .to.emit(product, 'Updated')
+      .withArgs(user.address, INITIAL_VERSION, CLOSE_POSITION, 0)
 
     // User state
     expect(await lens.callStatic.maintenance(user.address, product.address)).to.equal(0)
@@ -230,8 +230,8 @@ describe('Reservoir Oracle Product', () => {
     await product.connect(user).update(CLOSE_POSITION.div(2), 0)
 
     await expect(product.connect(user).update(CLOSE_POSITION.div(2), 0))
-      .to.emit(product, 'PositionUpdated')
-      .withArgs(user.address, INITIAL_VERSION, CLOSE_POSITION.div(2))
+      .to.emit(product, 'Updated')
+      .withArgs(user.address, INITIAL_VERSION, CLOSE_POSITION.div(2), 0)
 
     // User state
     expect(await lens.callStatic.maintenance(user.address, product.address)).to.equal(0)
@@ -264,7 +264,7 @@ describe('Reservoir Oracle Product', () => {
 
     await product.connect(user).update(MAKE_POSITION.mul(-1), 0)
     await expect(product.connect(userB).update(TAKE_POSITION, 0))
-      .to.emit(product, 'PositionUpdated')
+      .to.emit(product, 'Updated')
       .withArgs(userB.address, INITIAL_VERSION, TAKE_POSITION)
 
     // User State
@@ -322,8 +322,8 @@ describe('Reservoir Oracle Product', () => {
     await product.connect(userB).update(TAKE_POSITION.div(2), 0)
 
     await expect(product.connect(userB).update(TAKE_POSITION.div(2), 0))
-      .to.emit(product, 'PositionUpdated')
-      .withArgs(userB.address, INITIAL_VERSION, TAKE_POSITION.div(2))
+      .to.emit(product, 'Updated')
+      .withArgs(userB.address, INITIAL_VERSION, TAKE_POSITION.div(2), 0)
 
     // User State
     expect((await product.accounts(user.address))._position).to.equal(0)
@@ -384,8 +384,8 @@ describe('Reservoir Oracle Product', () => {
     await product.connect(userB).update(OPEN_TAKE_POSITION, 0)
 
     await expect(product.connect(userB).update(CLOSE_TAKE_POSITION.mul(-1), 0))
-      .to.emit(product, 'PositionUpdated')
-      .withArgs(userB.address, INITIAL_VERSION, CLOSE_TAKE_POSITION)
+      .to.emit(product, 'Updated')
+      .withArgs(userB.address, INITIAL_VERSION, CLOSE_TAKE_POSITION, 0)
 
     // User State
     expect(await lens.callStatic.maintenance(userB.address, product.address)).to.equal(0)
@@ -425,8 +425,8 @@ describe('Reservoir Oracle Product', () => {
     await product.connect(userB).update(CLOSE_TAKE_POSITION.div(2).mul(-1), 0)
 
     await expect(product.connect(userB).update(CLOSE_TAKE_POSITION.div(2).mul(-1), 0))
-      .to.emit(product, 'PositionUpdated')
-      .withArgs(userB.address, INITIAL_VERSION, CLOSE_TAKE_POSITION.div(2))
+      .to.emit(product, 'Updated')
+      .withArgs(userB.address, INITIAL_VERSION, CLOSE_TAKE_POSITION.div(2), 0)
 
     // User State
     expect(await lens.callStatic.maintenance(userB.address, product.address)).to.equal(0)

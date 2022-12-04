@@ -26,8 +26,7 @@ interface IProduct is IPayoffProvider, IParamProvider {
 
     event Settle(uint256 preVersion, uint256 toVersion);
     event AccountSettle(address indexed account, uint256 preVersion, uint256 toVersion);
-    event PositionUpdated(address indexed account, uint256 version, Fixed18 amount);
-    event CollateralUpdated(address indexed account, Fixed18 amount);
+    event Updated(address indexed account, uint256 version, Fixed18 positionAmount, Fixed18 collateralAmount);
     event Liquidation(address indexed account, address liquidator, UFixed18 fee);
     event FeeSettled(UFixed18 protocolFeeAmount, UFixed18 productFeeAmount);
     event CollateralSettled(address indexed account, Fixed18 amount, UFixed18 newShortfall);

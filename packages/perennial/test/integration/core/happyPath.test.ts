@@ -64,8 +64,8 @@ describe.only('Happy Path', () => {
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
 
     await expect(product.connect(user).update(POSITION.mul(-1), 0))
-      .to.emit(product, 'PositionUpdated')
-      .withArgs(user.address, INITIAL_VERSION, POSITION.mul(-1))
+      .to.emit(product, 'Updated')
+      .withArgs(user.address, INITIAL_VERSION, POSITION.mul(-1), 0)
 
     // Check user is in the correct state
     expect((await product.accounts(user.address))._position).to.equal(0)
@@ -115,8 +115,8 @@ describe.only('Happy Path', () => {
     await product.connect(user).update(POSITION.div(2).mul(-1), 0)
 
     await expect(product.connect(user).update(POSITION.div(2).mul(-1), 0))
-      .to.emit(product, 'PositionUpdated')
-      .withArgs(user.address, INITIAL_VERSION, POSITION.div(2).mul(-1))
+      .to.emit(product, 'Updated')
+      .withArgs(user.address, INITIAL_VERSION, POSITION.div(2).mul(-1), 0)
 
     // Check user is in the correct state
     expect((await product.accounts(user.address))._position).to.equal(0)
@@ -166,8 +166,8 @@ describe.only('Happy Path', () => {
     await product.connect(user).update(OPEN_POSITION.mul(-1), 0)
     await product.connect(user).update(CLOSE_POSITION, 0)
     // await expect(product.connect(user).update(CLOSE_POSITION))
-    //   .to.emit(product, 'PositionUpdated')
-    //   .withArgs(user.address, INITIAL_VERSION, CLOSE_POSITION)
+    //   .to.emit(product, 'Updated')
+    //   .withArgs(user.address, INITIAL_VERSION, CLOSE_POSITION, 0)
 
     // User state
     expect(await lens.callStatic.maintenance(user.address, product.address)).to.equal(0)
@@ -200,8 +200,8 @@ describe.only('Happy Path', () => {
     await product.connect(user).update(CLOSE_POSITION.div(2), 0)
 
     await expect(product.connect(user).update(CLOSE_POSITION.div(2), 0))
-      .to.emit(product, 'PositionUpdated')
-      .withArgs(user.address, INITIAL_VERSION, CLOSE_POSITION.div(2))
+      .to.emit(product, 'Updated')
+      .withArgs(user.address, INITIAL_VERSION, CLOSE_POSITION.div(2), 0)
 
     // User state
     expect(await lens.callStatic.maintenance(user.address, product.address)).to.equal(0)
@@ -234,8 +234,8 @@ describe.only('Happy Path', () => {
 
     await product.connect(user).update(MAKE_POSITION.mul(-1), 0)
     await expect(product.connect(userB).update(TAKE_POSITION, 0))
-      .to.emit(product, 'PositionUpdated')
-      .withArgs(userB.address, INITIAL_VERSION, TAKE_POSITION)
+      .to.emit(product, 'Updated')
+      .withArgs(userB.address, INITIAL_VERSION, TAKE_POSITION, 0)
 
     // User State
     expect((await product.accounts(userB.address))._position).to.equal(0)
@@ -292,8 +292,8 @@ describe.only('Happy Path', () => {
     await product.connect(userB).update(TAKE_POSITION.div(2), 0)
 
     await expect(product.connect(userB).update(TAKE_POSITION.div(2), 0))
-      .to.emit(product, 'PositionUpdated')
-      .withArgs(userB.address, INITIAL_VERSION, TAKE_POSITION.div(2))
+      .to.emit(product, 'Updated')
+      .withArgs(userB.address, INITIAL_VERSION, TAKE_POSITION.div(2), 0)
 
     // User State
     expect((await product.accounts(userB.address))._position).to.equal(0)
@@ -354,8 +354,8 @@ describe.only('Happy Path', () => {
     await product.connect(userB).update(OPEN_TAKE_POSITION, 0)
 
     await expect(product.connect(userB).update(CLOSE_TAKE_POSITION.mul(-1), 0))
-      .to.emit(product, 'PositionUpdated')
-      .withArgs(userB.address, INITIAL_VERSION, CLOSE_TAKE_POSITION.mul(-1))
+      .to.emit(product, 'Updated')
+      .withArgs(userB.address, INITIAL_VERSION, CLOSE_TAKE_POSITION.mul(-1), 0)
 
     // User State
     expect(await lens.callStatic.maintenance(userB.address, product.address)).to.equal(0)
@@ -395,8 +395,8 @@ describe.only('Happy Path', () => {
     await product.connect(userB).update(CLOSE_TAKE_POSITION.div(2).mul(-1), 0)
 
     await expect(product.connect(userB).update(CLOSE_TAKE_POSITION.div(2).mul(-1), 0))
-      .to.emit(product, 'PositionUpdated')
-      .withArgs(userB.address, INITIAL_VERSION, CLOSE_TAKE_POSITION.div(2).mul(-1))
+      .to.emit(product, 'Updated')
+      .withArgs(userB.address, INITIAL_VERSION, CLOSE_TAKE_POSITION.div(2).mul(-1), 0)
 
     // User State
     expect(await lens.callStatic.maintenance(userB.address, product.address)).to.equal(0)
@@ -448,13 +448,16 @@ describe.only('Happy Path', () => {
     await product.connect(user).update(POSITION.div(2).mul(-1), utils.parseEther('1000'))
     await product.connect(userB).update(POSITION.div(2), utils.parseEther('1000'))
 
+    // Test with rewards on
+    // await product.updateRewardRate({maker: utils.parseEther('0.01'), taker: utils.parseEther('0.001')})
+
     // Ensure a->b->c
     await chainlink.next()
     await chainlink.next()
 
     await expect(product.connect(user).update(POSITION.div(2).mul(-1), utils.parseEther('-1')))
-      .to.emit(product, 'PositionUpdated')
-      .withArgs(user.address, INITIAL_VERSION + 2, POSITION.div(2).mul(-1))
+      .to.emit(product, 'Updated')
+      .withArgs(user.address, INITIAL_VERSION + 2, POSITION.div(2).mul(-1), utils.parseEther('-1'))
 
     // Check user is in the correct state
     expect((await product.accounts(user.address))._position).to.equal(POSITION.div(2).mul(-1).div(1e9))

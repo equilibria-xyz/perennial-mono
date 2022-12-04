@@ -32,10 +32,8 @@ describe('Closed Product', () => {
     parameters.closed = true
     await product.updateParameter(parameters)
     // await expect(product.updateClosed(true))
-    //   .to.emit(product, 'PositionUpdated')
+    //   .to.emit(product, 'Updated')
     //   .withArgs(true, 2474)
-    //   .to.emit(product, 'Settle')
-    //   .withArgs(2474, 2474)
 
     // expect(await product.closed()).to.be.true
   })

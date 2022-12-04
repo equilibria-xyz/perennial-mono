@@ -151,7 +151,8 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         address account
     ) private {
         // before
-        if (!_liquidatable(context)) revert ProductCantLiquidate();
+        UFixed18 maintenance = context.account.maintenance(context.currentOracleVersion, context.parameter.maintenance);
+        if (context.account.collateral().gte(Fixed18Lib.from(maintenance))) revert ProductCantLiquidate();
 
         // close all positions
         _update(context, account, context.account.position().mul(Fixed18Lib.NEG_ONE), Fixed18Lib.ZERO, true);
@@ -160,7 +161,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         UFixed18 liquidationFee = controller().liquidationFee(); // TODO: external call
         UFixed18 liquidationReward = UFixed18Lib.min(
             context.account.collateral().max(Fixed18Lib.ZERO).abs(),
-            context.account.maintenance(context.currentOracleVersion, context.parameter.maintenance).mul(liquidationFee)
+            maintenance.mul(liquidationFee)
         );
         context.account.update(
             Fixed18Lib.ZERO, //TODO: all the position stuff is not needed here so might be a gas efficiency check here
@@ -207,11 +208,9 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         );
 
         // after
-        if (context.account.collateral().sign() == -1 && collateralAmount.sign() == -1) revert ProductInDebtError();
-        if (_liquidatable(context) || _liquidatableNext(context)) revert ProductInsufficientCollateralError();
         if (!force && _socializationNext(context).lt(UFixed18Lib.ONE)) revert ProductInsufficientLiquidityError();
         if (context.version.position().next(context.pre).maker.gt(context.parameter.makerLimit)) revert ProductMakerOverLimitError();
-        if (!context.account.collateral().isZero() && context.account.collateral().lt(Fixed18Lib.from(context.protocolParameter.minCollateral))) revert ProductCollateralUnderLimitError();
+        if (!force) _checkCollateral(context);
 
         _endGas(context);
 
@@ -222,9 +221,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         if (collateralAmount.sign() == -1) token.push(account, collateralAmount.abs());
 
         // events
-        //TODO: cleanup
-        emit PositionUpdated(account, context.currentOracleVersion.version, positionAmount);
-        emit CollateralUpdated(account, collateralAmount);
+        emit Updated(account, context.currentOracleVersion.version, positionAmount, collateralAmount);
 
         _endGas(context);
     }
@@ -342,22 +339,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         }
     }
 
-    /**
-     * @notice Returns whether `account`'s `product` collateral account can be liquidated
-     *         after the next oracle version settlement
-     * @dev Takes into account the current pre-position on the account
-     * @return Whether the account can be liquidated
-     */
-    function _liquidatableNext(CurrentContext memory context) private pure returns (bool) {
-        UFixed18 maintenanceAmount = context.account.maintenanceNext(context.currentOracleVersion, context.parameter.maintenance);
-        return Fixed18Lib.from(maintenanceAmount).gt(context.account.collateral());
-    }
-
-    function _liquidatable(CurrentContext memory context) private pure returns (bool) {
-        UFixed18 maintenanceAmount = context.account.maintenance(context.currentOracleVersion, context.parameter.maintenance);
-        return Fixed18Lib.from(maintenanceAmount).gt(context.account.collateral());
-    }
-
     function _socializationNext(CurrentContext memory context) private pure returns (UFixed18) {
         if (context.parameter.closed) return UFixed18Lib.ONE;
         return context.version.position().next(context.pre).socializationFactor();
@@ -369,6 +350,22 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         if (context.account.position().sign() == amount.sign()) return false;
         if (nextAccountPosition.sign() != context.account.position().sign()) return false;
         return true;
+    }
+
+    function _checkCollateral(CurrentContext memory context) private pure {
+        if (context.account.collateral().sign() == -1) revert ProductInDebtError();
+
+        if (
+            !context.account.collateral().isZero() &&
+            UFixed18Lib.from(context.account.collateral()).lt(context.protocolParameter.minCollateral)
+        ) revert ProductCollateralUnderLimitError();
+
+        (UFixed18 maintenanceAmount, UFixed18 maintenanceNextAmount) = (
+            context.account.maintenance(context.currentOracleVersion, context.parameter.maintenance),
+            context.account.maintenanceNext(context.currentOracleVersion, context.parameter.maintenance)
+        );
+        if (Fixed18Lib.from(maintenanceAmount.max(maintenanceNextAmount)).gt(context.account.collateral()))
+            revert ProductInsufficientCollateralError();
     }
 
     // Debug
