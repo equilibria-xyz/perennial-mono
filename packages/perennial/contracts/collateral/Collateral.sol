@@ -112,6 +112,8 @@ contract Collateral is ICollateral, UInitializable, UControllerProvider, UReentr
     isProduct(product)
     settleForAccount(account, product)
     {
+        if (product.isLiquidating(account)) revert CollateralAccountLiquidatingError(account);
+
         UFixed18 totalMaintenance = product.maintenance(account);
         UFixed18 totalCollateral = collateral(account, product);
 
@@ -205,6 +207,8 @@ contract Collateral is ICollateral, UInitializable, UControllerProvider, UReentr
      * @return Whether the account can be liquidated
      */
     function liquidatable(address account, IProduct product) external view returns (bool) {
+        if (product.isLiquidating(account)) return false;
+
         return product.maintenance(account).gt(collateral(account, product));
     }
 
