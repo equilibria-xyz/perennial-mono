@@ -164,14 +164,17 @@ describe('Core - Mainnet Verification', () => {
       const timelockProposerRole = await timelock.PROPOSER_ROLE()
       const timelockExecutorRole = await timelock.EXECUTOR_ROLE()
       const eqMultisigAddress = '0x589CDCf60aea6B961720214e80b713eB66B89A4d'
+      const pnlLabsMultisigAddress = '0xA20ea565cD799e01A86548af5a2929EB7c767fC9'
       const deployerSigAddress = '0x66a7fDB96C583c59597de16d8b2B989231415339'
 
       expect(await timelock.hasRole(timelockAdminRole, timelock.address)).to.be.true
       expect(await timelock.hasRole(timelockAdminRole, getMultisigAddress('mainnet'))).to.be.true /* false */
+      expect(await timelock.hasRole(timelockAdminRole, pnlLabsMultisigAddress)).to.be.false
       expect(await timelock.hasRole(timelockAdminRole, eqMultisigAddress)).to.be.false
       expect(await timelock.hasRole(timelockAdminRole, deployerSigAddress)).to.be.false
 
       expect(await timelock.hasRole(timelockProposerRole, getMultisigAddress('mainnet'))).to.be.true
+      expect(await timelock.hasRole(timelockProposerRole, pnlLabsMultisigAddress)).to.be.true /* false */
       expect(await timelock.hasRole(timelockProposerRole, eqMultisigAddress)).to.be.false
       expect(await timelock.hasRole(timelockProposerRole, deployerSigAddress)).to.be.false
 
