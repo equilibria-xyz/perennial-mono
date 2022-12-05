@@ -56,50 +56,49 @@ describe('Core - Mainnet Verification', () => {
     })
 
     it('has the correct parameters and configuration', async () => {
-      const timelockAddress = '0xA20ea565cD799e01A86548af5a2929EB7c767fC9' // timelock.address
+      const timelockAddress = timelock.address
+      const labsMultisig = '0xA20ea565cD799e01A86548af5a2929EB7c767fC9'
 
       expect(await controller.collateral()).to.equal(collateral.address)
       expect(await controller.incentivizer()).to.equal(incentivizer.address)
       expect(await controller.productBeacon()).to.equal(upgradeableBeacon.address)
 
       // Protocol owner
-      expect(await controller['owner()']()).to.equal(timelockAddress)
-      expect(await controller['treasury()']()).to.equal(timelockAddress)
-      expect(await controller['pendingOwner()']()).to.equal(constants.AddressZero)
+      expect(await controller['owner()']()).to.equal(labsMultisig /* timelockAddress */)
+      expect(await controller['treasury()']()).to.equal(labsMultisig /* timelockAddress */)
+      expect(await controller['pendingOwner()']()).to.equal(timelockAddress /* constants.AddressZero */)
 
       // Coordinator 0 == Protocol owner
-      expect(await controller['owner(uint256)'](0)).to.equal(timelockAddress)
-      expect(await controller['treasury(uint256)'](0)).to.equal(timelockAddress)
-      expect(await controller['pendingOwner(uint256)'](0)).to.equal(constants.AddressZero)
+      expect(await controller['owner(uint256)'](0)).to.equal(labsMultisig /* timelockAddress */)
+      expect(await controller['treasury(uint256)'](0)).to.equal(labsMultisig /* timelockAddress */)
+      expect(await controller['pendingOwner(uint256)'](0)).to.equal(timelockAddress /* constants.AddressZero */)
 
       // Coordinator 1 == Protocol owner at launch
-      expect(await controller['owner(uint256)'](1)).to.equal(timelockAddress)
-      expect(await controller['treasury(uint256)'](1)).to.equal(timelockAddress)
+      expect(await controller['owner(uint256)'](1)).to.equal(getMultisigAddress('mainnet'))
+      expect(await controller['treasury(uint256)'](1)).to.equal(getMultisigAddress('mainnet'))
       expect(await controller['pendingOwner(uint256)'](1)).to.equal(constants.AddressZero)
 
       expect(await controller.protocolFee()).to.equal(0)
       expect(await controller.minFundingFee()).to.equal(0)
-      expect(await controller.liquidationFee()).to.equal(0 /* utils.parseEther('0.10') */)
+      expect(await controller.liquidationFee()).to.equal(utils.parseEther('0.10'))
       expect(await controller.incentivizationFee()).to.equal(0)
-      expect(await controller.minCollateral()).to.equal(0 /* utils.parseEther('2500') */)
+      expect(await controller.minCollateral()).to.equal(utils.parseEther('100'))
       expect(await controller.programsPerProduct()).to.equal(0)
 
-      expect(await controller.pauser()).to.equal(
-        '0xA20ea565cD799e01A86548af5a2929EB7c767fC9' /* getMultisigAddress('mainnet') */,
-      )
+      expect(await controller.pauser()).to.equal(getMultisigAddress('mainnet'))
       expect(await controller.paused()).to.be.false
 
       const longEtherAddress = deployments['Product_LongEther'].address
       expect(await controller.isProduct(longEtherAddress)).to.be.true
       expect(await controller.coordinatorFor(longEtherAddress)).to.equal(1)
-      expect(await controller['owner(address)'](longEtherAddress)).to.equal(timelockAddress)
-      expect(await controller['treasury(address)'](longEtherAddress)).to.equal(timelockAddress)
+      expect(await controller['owner(address)'](longEtherAddress)).to.equal(getMultisigAddress('mainnet'))
+      expect(await controller['treasury(address)'](longEtherAddress)).to.equal(getMultisigAddress('mainnet'))
 
       const shortEtherAddress = deployments['Product_ShortEther'].address
       expect(await controller.isProduct(shortEtherAddress)).to.be.true
       expect(await controller.coordinatorFor(shortEtherAddress)).to.equal(1)
-      expect(await controller['owner(address)'](shortEtherAddress)).to.equal(timelockAddress)
-      expect(await controller['treasury(address)'](shortEtherAddress)).to.equal(timelockAddress)
+      expect(await controller['owner(address)'](shortEtherAddress)).to.equal(getMultisigAddress('mainnet'))
+      expect(await controller['treasury(address)'](shortEtherAddress)).to.equal(getMultisigAddress('mainnet'))
     })
   })
 
@@ -153,9 +152,7 @@ describe('Core - Mainnet Verification', () => {
 
   describe('upgradeablebeacon', () => {
     it('has the correct configuration', async () => {
-      expect(await upgradeableBeacon.owner()).to.equal(
-        '0x66a7fDB96C583c59597de16d8b2B989231415339' /* timelock.address */,
-      )
+      expect(await upgradeableBeacon.owner()).to.equal(timelock.address)
       expect(await upgradeableBeacon.implementation()).to.equal(deployments['Product_Impl'].address)
     })
   })
@@ -166,21 +163,26 @@ describe('Core - Mainnet Verification', () => {
       const timelockAdminRole = await timelock.TIMELOCK_ADMIN_ROLE()
       const timelockProposerRole = await timelock.PROPOSER_ROLE()
       const timelockExecutorRole = await timelock.EXECUTOR_ROLE()
-      expect(
-        await timelock.hasRole(
-          timelockAdminRole,
-          '0x66a7fDB96C583c59597de16d8b2B989231415339' /* getMultisigAddress('mainnet')! */,
-        ),
-      ).to.be.true
+      const eqMultisigAddress = '0x589CDCf60aea6B961720214e80b713eB66B89A4d'
+      const deployerSigAddress = '0x66a7fDB96C583c59597de16d8b2B989231415339'
 
-      expect(await timelock.hasRole(timelockProposerRole, getMultisigAddress('mainnet')))
-      expect(await timelock.hasRole(timelockExecutorRole, ethers.constants.AddressZero))
+      expect(await timelock.hasRole(timelockAdminRole, timelock.address)).to.be.true
+      expect(await timelock.hasRole(timelockAdminRole, getMultisigAddress('mainnet'))).to.be.true /* false */
+      expect(await timelock.hasRole(timelockAdminRole, eqMultisigAddress)).to.be.false
+      expect(await timelock.hasRole(timelockAdminRole, deployerSigAddress)).to.be.false
+
+      expect(await timelock.hasRole(timelockProposerRole, getMultisigAddress('mainnet'))).to.be.true
+      expect(await timelock.hasRole(timelockProposerRole, eqMultisigAddress)).to.be.false
+      expect(await timelock.hasRole(timelockProposerRole, deployerSigAddress)).to.be.false
+
+      expect(await timelock.hasRole(timelockExecutorRole, ethers.constants.AddressZero)).to.be.true
     })
   })
 
   describe('lens', () => {
     it('has the correct configuration', async () => {
-      expect(await ethers.provider.resolveName('perennial-lens.eth')).to.equal(lens.address)
+      const mainnetProvider = new ethers.providers.JsonRpcProvider(process.env.MAINNET_NODE_URL)
+      expect(await mainnetProvider.resolveName('perennial-lens.eth')).to.equal(lens.address)
       expect(await lens.callStatic.controller()).to.equal(controller.address)
     })
   })
