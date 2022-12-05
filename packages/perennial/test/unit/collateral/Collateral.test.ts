@@ -392,6 +392,9 @@ describe('Collateral', () => {
 
       // Mock settle calls
       await product.mock.settleAccount.withArgs(user.address).returns()
+
+      // Mock isLiquidating calls
+      await product.mock.isLiquidating.withArgs(user.address).returns(false)
     })
 
     context('user not liquidatable', async () => {
@@ -450,6 +453,41 @@ describe('Collateral', () => {
           .to.be.revertedWithCustomError(collateral, `NotProductError`)
           .withArgs(notProduct.address)
       })
+
+      it('reverts if already liquidating', async () => {
+        await product.mock.isLiquidating.withArgs(user.address).returns(true)
+
+        await expect(collateral.liquidate(user.address, product.address))
+          .to.be.revertedWithCustomError(collateral, 'CollateralAccountLiquidatingError')
+          .withArgs(user.address)
+      })
+    })
+  })
+
+  describe('#liquidatable', async () => {
+    beforeEach(async () => {
+      await token.mock.transferFrom.withArgs(owner.address, collateral.address, 100).returns(true)
+      await collateral.depositTo(user.address, product.address, 100)
+    })
+
+    it('returns true if below maintenance', async () => {
+      await product.mock.isLiquidating.withArgs(user.address).returns(false)
+      await product.mock.maintenance.withArgs(user.address).returns(101)
+
+      expect(await collateral.liquidatable(user.address, product.address)).to.equal(true)
+    })
+
+    it('returns false if above maintenance', async () => {
+      await product.mock.isLiquidating.withArgs(user.address).returns(false)
+      await product.mock.maintenance.withArgs(user.address).returns(99)
+
+      expect(await collateral.liquidatable(user.address, product.address)).to.equal(false)
+    })
+
+    it('returns false if already liquidating', async () => {
+      await product.mock.isLiquidating.withArgs(user.address).returns(true)
+
+      expect(await collateral.liquidatable(user.address, product.address)).to.equal(false)
     })
   })
 
