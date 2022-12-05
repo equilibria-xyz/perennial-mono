@@ -19,5 +19,5 @@
 
 ## 🔐 Security
 
-- The perennial protocol is audited and insured by Sherlock.
-- Un-discovered bugs may be reported to our bug bounty program through Immunifi.
+- The perennial protocol is audited and insured by Sherlock. Audit reports are available in [packages/perennial/audits](packages/perennial/audits)
+- Un-discovered bugs may be reported to our [bug bounty program through Immunefi](https://immunefi.com/bounty/perennial/).
