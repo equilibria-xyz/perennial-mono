@@ -57,21 +57,20 @@ describe('Core - Mainnet Verification', () => {
 
     it('has the correct parameters and configuration', async () => {
       const timelockAddress = timelock.address
-      const labsMultisig = '0xA20ea565cD799e01A86548af5a2929EB7c767fC9'
 
       expect(await controller.collateral()).to.equal(collateral.address)
       expect(await controller.incentivizer()).to.equal(incentivizer.address)
       expect(await controller.productBeacon()).to.equal(upgradeableBeacon.address)
 
       // Protocol owner
-      expect(await controller['owner()']()).to.equal(labsMultisig /* timelockAddress */)
-      expect(await controller['treasury()']()).to.equal(labsMultisig /* timelockAddress */)
-      expect(await controller['pendingOwner()']()).to.equal(timelockAddress /* constants.AddressZero */)
+      expect(await controller['owner()']()).to.equal(timelockAddress)
+      expect(await controller['treasury()']()).to.equal(timelockAddress)
+      expect(await controller['pendingOwner()']()).to.equal(constants.AddressZero)
 
       // Coordinator 0 == Protocol owner
-      expect(await controller['owner(uint256)'](0)).to.equal(labsMultisig /* timelockAddress */)
-      expect(await controller['treasury(uint256)'](0)).to.equal(labsMultisig /* timelockAddress */)
-      expect(await controller['pendingOwner(uint256)'](0)).to.equal(timelockAddress /* constants.AddressZero */)
+      expect(await controller['owner(uint256)'](0)).to.equal(timelockAddress)
+      expect(await controller['treasury(uint256)'](0)).to.equal(timelockAddress)
+      expect(await controller['pendingOwner(uint256)'](0)).to.equal(constants.AddressZero)
 
       // Coordinator 1 == Protocol owner at launch
       expect(await controller['owner(uint256)'](1)).to.equal(getMultisigAddress('mainnet'))
