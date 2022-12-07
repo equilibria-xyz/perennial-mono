@@ -64,7 +64,7 @@ describe('Product - Long Ether - Mainnet Verification', () => {
     expect(await longEther.fundingFee()).to.equal(0)
     expect(await longEther.makerFee()).to.equal(0)
     expect(await longEther.takerFee()).to.equal(0)
-    expect(await longEther.makerLimit()).to.equal(utils.parseEther('2000'))
+    expect(await longEther.makerLimit()).to.equal(utils.parseEther('1200'))
     expect(await longEther.oracle()).to.equal(deployments['ChainlinkOracle_ETH'].address)
 
     const utilizationCurve = await longEther.utilizationCurve()

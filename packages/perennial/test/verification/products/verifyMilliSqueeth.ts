@@ -64,7 +64,7 @@ describe('Product - Milli-Squeeth - Mainnet Verification', () => {
     expect(await mSqueeth.fundingFee()).to.equal(0)
     expect(await mSqueeth.makerFee()).to.equal(0)
     expect(await mSqueeth.takerFee()).to.equal(0)
-    expect(await mSqueeth.makerLimit()).to.equal(utils.parseEther('750'))
+    expect(await mSqueeth.makerLimit()).to.equal(utils.parseEther('450'))
     expect(await mSqueeth.oracle()).to.equal(deployments['ChainlinkOracle_ETH'].address)
 
     const utilizationCurve = await mSqueeth.utilizationCurve()

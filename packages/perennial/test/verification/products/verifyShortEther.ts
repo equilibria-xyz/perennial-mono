@@ -65,7 +65,7 @@ describe('Product - Short Ether - Mainnet Verification', () => {
       expect(await shortEther.fundingFee()).to.equal(0)
       expect(await shortEther.makerFee()).to.equal(0)
       expect(await shortEther.takerFee()).to.equal(0)
-      expect(await shortEther.makerLimit()).to.equal(utils.parseEther('2000'))
+      expect(await shortEther.makerLimit()).to.equal(utils.parseEther('1200'))
       expect(await shortEther.oracle()).to.equal(deployments['ChainlinkOracle_ETH'].address)
 
       const utilizationCurve = await shortEther.utilizationCurve()
