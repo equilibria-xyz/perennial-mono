@@ -5,7 +5,6 @@ import "@equilibria/root/number/types/UFixed18.sol";
 import "@equilibria/root/token/types/Token18.sol";
 import "@equilibria/root/curve/types/JumpRateUtilizationCurve.sol";
 import "./IPayoffProvider.sol";
-import "./IParamProvider.sol";
 import "./types/PayoffDefinition.sol";
 import "./types/Position.sol";
 import "./types/PrePosition.sol";
@@ -14,7 +13,7 @@ import "../product/types/Version.sol"; //TODO: these have to be in interface
 import "../product/types/Account.sol";
 import "../product/types/Fee.sol";
 
-interface IProduct is IPayoffProvider, IParamProvider {
+interface IProduct is IPayoffProvider {
     struct ProductDefinition {
         string name;
         string symbol;
@@ -32,6 +31,7 @@ interface IProduct is IPayoffProvider, IParamProvider {
     event CollateralSettled(address indexed account, Fixed18 amount, UFixed18 newShortfall);
     event TreasuryUpdated(address newTreasury);
     event FeeClaimed(address indexed treasury, UFixed18 feeAmount);
+    event ParameterUpdated(Parameter newParameter);
 
     error ProductInsufficientLiquidityError();
     error ProductInsufficientCollateralError();
@@ -40,6 +40,7 @@ interface IProduct is IPayoffProvider, IParamProvider {
     error ProductMakerOverLimitError();
     error ProductOracleBootstrappingError();
     error ProductInvalidOracle();
+    error ProductPausedError();
     error ProductClosedError();
     error ProductCollateralUnderLimitError();
     error ProductCantLiquidate();
@@ -61,4 +62,6 @@ interface IProduct is IPayoffProvider, IParamProvider {
     function update(Fixed18 positionAmount, Fixed18 collateralAmount) external;
     function liquidate(address account) external;
     function updateTreasury(address newTreasury) external;
+    function parameter() external view returns (Parameter memory);
+    function updateParameter(Parameter memory newParameter) external;
 }

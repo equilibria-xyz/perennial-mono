@@ -16,6 +16,7 @@ interface IController {
     event ProductCreated(IProduct indexed product, IProduct.ProductDefinition definition, Parameter parameter);
 
     error ControllerNotPauserError();
+    error ControllerPausedError();
     error ControllerInvalidLiquidationFeeError();
     error ControllerNotContractAddressError();
 

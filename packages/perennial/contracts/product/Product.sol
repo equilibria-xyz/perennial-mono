@@ -4,9 +4,9 @@ pragma solidity 0.8.17;
 import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@equilibria/root/control/unstructured/UOwnable.sol";
 import "@equilibria/root/control/unstructured/UReentrancyGuard.sol";
-import "../controller/UControllerProvider.sol";
+import "../interfaces/IProduct.sol";
+import "../interfaces/IController.sol";
 import "./UPayoffProvider.sol";
-import "./UParamProvider.sol";
 import "hardhat/console.sol";
 
 
@@ -18,7 +18,7 @@ import "hardhat/console.sol";
  * @notice Manages logic and state for a single product market.
  * @dev Cloned by the Controller contract to launch new product markets.
  */
-contract Product is IProduct, UInitializable, UOwnable, UParamProvider, UPayoffProvider, UControllerProvider, UReentrancyGuard {
+contract Product is IProduct, UInitializable, UOwnable, UPayoffProvider, UReentrancyGuard {
     struct CurrentContext {
         /* Global Parameters */
         ProtocolParameter protocolParameter;
@@ -50,6 +50,9 @@ contract Product is IProduct, UInitializable, UOwnable, UParamProvider, UPayoffP
 
         string gasCounterMessage;
     }
+
+    /// @dev The protocol controller
+    IController public controller;
 
     /// @dev The name of the product
     string public name;
@@ -83,6 +86,9 @@ contract Product is IProduct, UInitializable, UOwnable, UParamProvider, UPayoffP
     /// @dev Treasury of the product, collects fees
     address public treasury;
 
+    ParameterStorage private constant _parameter = ParameterStorage.wrap(keccak256("equilibria.perennial.UParamProvider.parameter"));
+    function parameter() public view returns (Parameter memory) { return _parameter.read(); }
+
     /**
      * @notice Initializes the contract state
      */
@@ -91,15 +97,15 @@ contract Product is IProduct, UInitializable, UOwnable, UParamProvider, UPayoffP
         Parameter calldata parameter_
     ) external initializer(1) {
         __UOwnable__initialize();
-        __UControllerProvider__initialize(IController(msg.sender));
         __UPayoffProvider__initialize(definition_.oracle, definition_.payoffDefinition);
         __UReentrancyGuard__initialize();
-        __UParamProvider__initialize(parameter_);
 
+        controller = IController(msg.sender);
         name = definition_.name;
         symbol = definition_.symbol;
         token = definition_.token;
         reward = definition_.reward;
+        updateParameter(parameter_);
     }
 
     //TODO: address 0?
@@ -132,6 +138,11 @@ contract Product is IProduct, UInitializable, UOwnable, UParamProvider, UPayoffP
         emit TreasuryUpdated(newTreasury);
     }
 
+    function updateParameter(Parameter memory newParameter) public onlyOwner {
+        _parameter.store(newParameter);
+        emit ParameterUpdated(newParameter);
+    }
+
     function claimFee() external {
         Fee memory newFee = _fee;
 
@@ -142,7 +153,7 @@ contract Product is IProduct, UInitializable, UOwnable, UParamProvider, UPayoffP
             emit FeeClaimed(msg.sender, feeAmount);
         }
 
-        if (msg.sender == controller().treasury()) {
+        if (msg.sender == controller.treasury()) {
             UFixed18 feeAmount = newFee.protocol();
             newFee._protocol = 0;
             token.push(msg.sender, feeAmount);
@@ -179,7 +190,7 @@ contract Product is IProduct, UInitializable, UOwnable, UParamProvider, UPayoffP
         _update(context, account, context.account.position().mul(Fixed18Lib.NEG_ONE), Fixed18Lib.ZERO, true);
 
         // handle liquidation fee
-        UFixed18 liquidationFee = controller().liquidationFee(); // TODO: external call
+        UFixed18 liquidationFee = controller.liquidationFee(); // TODO: external call
         UFixed18 liquidationReward = UFixed18Lib.min(
             context.account.collateral().max(Fixed18Lib.ZERO).abs(),
             maintenance.mul(liquidationFee)
@@ -247,7 +258,7 @@ contract Product is IProduct, UInitializable, UOwnable, UParamProvider, UPayoffP
         _startGas(context, "_loadContext: %s");
 
         // Load protocol parameters
-        context.protocolParameter = controller().parameter();
+        context.protocolParameter = controller.parameter();
 
         // Load product parameters
         context.parameter = parameter();
@@ -265,7 +276,7 @@ contract Product is IProduct, UInitializable, UOwnable, UParamProvider, UPayoffP
         context.liquidation = liquidation[account]; //TODO: packing into account will save gas on liquidation
 
         // after
-        if (context.protocolParameter.paused) revert PausedError();
+        if (context.protocolParameter.paused) revert ProductPausedError();
 
         _endGas(context);
     }
