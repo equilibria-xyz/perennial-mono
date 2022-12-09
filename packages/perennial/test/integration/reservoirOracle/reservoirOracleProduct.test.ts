@@ -38,6 +38,10 @@ const PARAMETER = {
     targetRate: utils.parseEther('0.80'),
     targetUtilization: utils.parseEther('0.80'),
   },
+  rewardRate: {
+    maker: 0,
+    taker: 0,
+  },
 }
 
 describe('Reservoir Oracle Product', () => {

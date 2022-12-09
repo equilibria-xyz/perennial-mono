@@ -17,11 +17,6 @@ describe.only('Happy Path', () => {
     const { owner, user, controller, treasuryB, contractPayoffProvider, chainlinkOracle, dsu, rewardToken, lens } =
       instanceVars
 
-    await expect(controller.createCoordinator()).to.emit(controller, 'CoordinatorCreated').withArgs(1, owner.address)
-    await expect(controller.updateCoordinatorTreasury(1, treasuryB.address))
-      .to.emit(controller, 'CoordinatorTreasuryUpdated')
-      .withArgs(1, treasuryB.address)
-
     const definition = {
       name: 'Squeeth',
       symbol: 'SQTH',
@@ -44,10 +39,16 @@ describe.only('Happy Path', () => {
         targetRate: utils.parseEther('0.80'),
         targetUtilization: utils.parseEther('0.80'),
       },
+      rewardRate: {
+        maker: 0,
+        taker: 0,
+      },
     }
-    const productAddress = await controller.callStatic.createProduct(1, definition, parameter)
-    await expect(controller.createProduct(1, definition, parameter)).to.emit(controller, 'ProductCreated')
+    const productAddress = await controller.callStatic.createProduct(definition, parameter)
+    await expect(controller.createProduct(definition, parameter)).to.emit(controller, 'ProductCreated')
     const product = Product__factory.connect(productAddress, owner)
+    await product.connect(owner).acceptOwner()
+    await product.connect(owner).updateTreasury(treasuryB.address)
 
     await dsu.connect(user).approve(productAddress, utils.parseEther('1000'))
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))

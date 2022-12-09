@@ -108,7 +108,7 @@ export async function deployProtocol(): Promise<InstanceVars> {
 
   // Params - TODO: finalize before launch
   await controller.updatePauser(pauser.address)
-  await controller.updateCoordinatorTreasury(0, treasuryA.address)
+  await controller.updateTreasury(treasuryA.address)
   await controller.updateParameter({
     protocolFee: utils.parseEther('0.50'),
     minFundingFee: utils.parseEther('0.10'),
@@ -172,9 +172,6 @@ export async function createProduct(
     oracle = chainlinkOracle
   }
 
-  await controller.createCoordinator()
-  await controller.updateCoordinatorTreasury(1, treasuryB.address)
-
   const definition = {
     name: 'Squeeth',
     symbol: 'SQTH',
@@ -197,11 +194,19 @@ export async function createProduct(
       targetRate: utils.parseEther('0.80'),
       targetUtilization: utils.parseEther('0.80'),
     },
+    rewardRate: {
+      maker: 0,
+      taker: 0,
+    },
   }
-  const productAddress = await controller.callStatic.createProduct(1, definition, parameter)
-  await controller.createProduct(1, definition, parameter)
+  const productAddress = await controller.callStatic.createProduct(definition, parameter)
+  await controller.createProduct(definition, parameter)
 
-  return Product__factory.connect(productAddress, owner)
+  const product = Product__factory.connect(productAddress, owner)
+  await product.acceptOwner()
+  await product.updateTreasury(treasuryB.address)
+
+  return product
 }
 
 export async function depositTo(

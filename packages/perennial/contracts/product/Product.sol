@@ -2,6 +2,7 @@
 pragma solidity 0.8.17;
 
 import "@equilibria/root/control/unstructured/UInitializable.sol";
+import "@equilibria/root/control/unstructured/UOwnable.sol";
 import "@equilibria/root/control/unstructured/UReentrancyGuard.sol";
 import "../controller/UControllerProvider.sol";
 import "./UPayoffProvider.sol";
@@ -17,18 +18,14 @@ import "hardhat/console.sol";
  * @notice Manages logic and state for a single product market.
  * @dev Cloned by the Controller contract to launch new product markets.
  */
-contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, UReentrancyGuard {
+contract Product is IProduct, UInitializable, UOwnable, UParamProvider, UPayoffProvider, UControllerProvider, UReentrancyGuard {
     struct CurrentContext {
         /* Global Parameters */
         ProtocolParameter protocolParameter;
 
-        address protocolTreasury;
-
         /* Product Parameters */
 
         Parameter parameter;
-
-        Accumulator rewardRate;
 
         /* Current Global State */
         uint256 latestVersion;
@@ -83,6 +80,9 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     /// @dev Whether the account is currently locked for liquidation
     mapping(address => bool) public liquidation;
 
+    /// @dev Treasury of the product, collects fees
+    address public treasury;
+
     /**
      * @notice Initializes the contract state
      */
@@ -90,6 +90,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         IProduct.ProductDefinition calldata definition_,
         Parameter calldata parameter_
     ) external initializer(1) {
+        __UOwnable__initialize();
         __UControllerProvider__initialize(IController(msg.sender));
         __UPayoffProvider__initialize(definition_.oracle, definition_.payoffDefinition);
         __UReentrancyGuard__initialize();
@@ -104,14 +105,14 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     //TODO: address 0?
     function settle(address account) external nonReentrant {
         CurrentContext memory context = _loadContext(account);
-        _settle(context, account);
+        _settle(context);
         _saveContext(context, account);
     }
 
     //TODO support depositTo and withdrawTo
     function update(Fixed18 positionAmount, Fixed18 collateralAmount) external nonReentrant {
         CurrentContext memory context = _loadContext(msg.sender);
-        _settle(context, msg.sender);
+        _settle(context);
         _update(context, msg.sender, positionAmount, collateralAmount, false);
         _saveContext(context, msg.sender);
     }
@@ -121,12 +122,35 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
     nonReentrant
     {
         CurrentContext memory context = _loadContext(account);
-        _settle(context, account);
+        _settle(context);
         _liquidate(context, account);
         _saveContext(context, account);
     }
 
-    //TODO: claim fee
+    function updateTreasury(address newTreasury) external onlyOwner {
+        treasury = newTreasury;
+        emit TreasuryUpdated(newTreasury);
+    }
+
+    function claimFee() external {
+        Fee memory newFee = _fee;
+
+        if (msg.sender == treasury) {
+            UFixed18 feeAmount = newFee.product();
+            newFee._product = 0;
+            token.push(msg.sender, feeAmount);
+            emit FeeClaimed(msg.sender, feeAmount);
+        }
+
+        if (msg.sender == controller().treasury()) {
+            UFixed18 feeAmount = newFee.protocol();
+            newFee._protocol = 0;
+            token.push(msg.sender, feeAmount);
+            emit FeeClaimed(msg.sender, feeAmount);
+        }
+
+        _fee = newFee;
+    }
 
     //TODO: claim reward
 
@@ -146,10 +170,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         return _fee;
     }
 
-    function _liquidate(
-        CurrentContext memory context,
-        address account
-    ) private {
+    function _liquidate(CurrentContext memory context, address account) private {
         // before
         UFixed18 maintenance = context.account.maintenance(context.currentOracleVersion, context.parameter.maintenance);
         if (context.account.collateral().gte(Fixed18Lib.from(maintenance))) revert ProductCantLiquidate();
@@ -167,8 +188,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
             Fixed18Lib.ZERO, //TODO: all the position stuff is not needed here so might be a gas efficiency check here
             Fixed18Lib.from(-1, liquidationReward),
             context.currentOracleVersion,
-            context.parameter.makerFee,
-            context.parameter.takerFee
+            context.parameter
         );
         context.liquidation = true;
 
@@ -180,7 +200,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
     function _update(
         CurrentContext memory context,
-        address account,
+        address account, //TODO: use for onbehalf of?
         Fixed18 positionAmount,
         Fixed18 collateralAmount,
         bool force
@@ -196,20 +216,17 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
             positionAmount,
             collateralAmount,
             context.currentOracleVersion,
-            context.parameter.makerFee,
-            context.parameter.takerFee
+            context.parameter
         );
         context.pre.update(
             makerAmount,
             takerAmount,
             context.currentOracleVersion,
-            context.parameter.makerFee,
-            context.parameter.takerFee
+            context.parameter
         );
 
         // after
-        if (!force && _socializationNext(context).lt(UFixed18Lib.ONE)) revert ProductInsufficientLiquidityError();
-        if (context.version.position().next(context.pre).maker.gt(context.parameter.makerLimit)) revert ProductMakerOverLimitError();
+        if (!force) _checkPosition(context);
         if (!force) _checkCollateral(context);
 
         _endGas(context);
@@ -230,11 +247,10 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         _startGas(context, "_loadContext: %s");
 
         // Load protocol parameters
-        (context.protocolParameter, context.protocolTreasury) = controller().settlementParameters();
+        context.protocolParameter = controller().parameter();
 
         // Load product parameters
         context.parameter = parameter();
-        context.rewardRate = rewardRate();
 
         // Load product state
         context.currentOracleVersion = _sync();
@@ -246,7 +262,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         // Load account state
         context.latestAccountVersion = latestVersions[account];
         context.account = _accounts[account];
-        context.liquidation = liquidation[account];
+        context.liquidation = liquidation[account]; //TODO: packing into account will save gas on liquidation
 
         // after
         if (context.protocolParameter.paused) revert PausedError();
@@ -267,11 +283,10 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         _endGas(context);
     }
 
-    function _settle(CurrentContext memory context, address account) private { //TODO: should be pure
+    function _settle(CurrentContext memory context) private { //TODO: should be pure
         _startGas(context, "_settle: %s");
 
         // Initialize memory
-        UFixed18 feeAccumulator; //TODO: whys this still here?
         Period memory period;
         Version memory fromVersion;
         Version memory toVersion;
@@ -283,44 +298,39 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         period.toVersion = context.latestVersion + 1 == context.currentOracleVersion.version ?
             context.currentOracleVersion :
             atVersion(context.latestVersion + 1);
-        _settlePeriod(feeAccumulator, context, period);
+        _settlePeriod(context, period);
 
         // settle product b->c if necessary
         period.fromVersion = period.toVersion;
         period.toVersion = context.currentOracleVersion;
-        _settlePeriod(feeAccumulator, context, period);
+        _settlePeriod(context, period);
 
         // settle account a->b if necessary
         period.toVersion = context.latestAccountVersion + 1 == context.currentOracleVersion.version ?
-            context.currentOracleVersion : // if b == c, don't re-call provider for oracle version
+            context.currentOracleVersion :
             atVersion(context.latestAccountVersion + 1);
-        fromVersion = _versions[context.latestAccountVersion]; //TODO: can we lazy load version too?
+        fromVersion = _versions[context.latestAccountVersion];
         toVersion = _versions[context.latestAccountVersion + 1];
-        _settlePeriodAccount(context, period, fromVersion, toVersion, account);
+        _settlePeriodAccount(context, period, fromVersion, toVersion);
 
         // settle account b->c if necessary
         period.toVersion = context.currentOracleVersion;
         fromVersion = toVersion;
         toVersion = context.version;
-        _settlePeriodAccount(context, period, fromVersion, toVersion, account);
+        _settlePeriodAccount(context, period, fromVersion, toVersion);
 
         _endGas(context);
     }
 
-    function _settlePeriod(UFixed18 feeAccumulator, CurrentContext memory context, Period memory period) private {
+    function _settlePeriod(CurrentContext memory context, Period memory period) private {
         if (context.currentOracleVersion.version > context.latestVersion) {
-            UFixed18 feeAmount = context.version.accumulate(
-                feeAccumulator,
+            context.version.accumulate(
                 context.pre,
+                context.fee,
                 period,
-                context.parameter.positionFee,
-                context.parameter.utilizationCurve,
-                context.protocolParameter.minFundingFee,
-                context.parameter.fundingFee,
-                context.rewardRate,
-                context.parameter.closed
+                context.protocolParameter,
+                context.parameter
             );
-            context.fee.update(feeAmount, context.protocolParameter.protocolFee);
             context.latestVersion = period.toVersion.version;
             _versions[period.toVersion.version] = context.version;
         }
@@ -330,18 +340,12 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         CurrentContext memory context,
         Period memory period,
         Version memory fromVersion,
-        Version memory toVersion,
-        address account
-    ) private {
+        Version memory toVersion
+    ) private pure {
         if (context.currentOracleVersion.version > context.latestAccountVersion) {
             context.account.accumulate(fromVersion, toVersion);
             context.latestAccountVersion = period.toVersion.version;
         }
-    }
-
-    function _socializationNext(CurrentContext memory context) private pure returns (UFixed18) {
-        if (context.parameter.closed) return UFixed18Lib.ONE;
-        return context.version.position().next(context.pre).socializationFactor();
     }
 
     function _closingNext(CurrentContext memory context, Fixed18 amount) private pure returns (bool) {
@@ -352,19 +356,29 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         return true;
     }
 
+    function _checkPosition(CurrentContext memory context) private pure {
+        Position memory nextPosition = context.version.position().next(context.pre);
+
+        if (!context.parameter.closed && nextPosition.socializationFactor().lt(UFixed18Lib.ONE))
+            revert ProductInsufficientLiquidityError();
+
+        if (nextPosition.maker.gt(context.parameter.makerLimit))
+            revert ProductMakerOverLimitError();
+    }
+
     function _checkCollateral(CurrentContext memory context) private pure {
         if (context.account.collateral().sign() == -1) revert ProductInDebtError();
 
-        if (
-            !context.account.collateral().isZero() &&
-            UFixed18Lib.from(context.account.collateral()).lt(context.protocolParameter.minCollateral)
-        ) revert ProductCollateralUnderLimitError();
+        UFixed18 boundedCollateral = UFixed18Lib.from(context.account.collateral());
+
+        if (!context.account.collateral().isZero() && boundedCollateral.lt(context.protocolParameter.minCollateral))
+            revert ProductCollateralUnderLimitError();
 
         (UFixed18 maintenanceAmount, UFixed18 maintenanceNextAmount) = (
             context.account.maintenance(context.currentOracleVersion, context.parameter.maintenance),
             context.account.maintenanceNext(context.currentOracleVersion, context.parameter.maintenance)
         );
-        if (Fixed18Lib.from(maintenanceAmount.max(maintenanceNextAmount)).gt(context.account.collateral()))
+        if (maintenanceAmount.max(maintenanceNextAmount).gt(boundedCollateral))
             revert ProductInsufficientCollateralError();
     }
 

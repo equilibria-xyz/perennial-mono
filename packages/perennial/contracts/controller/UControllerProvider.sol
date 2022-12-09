@@ -32,32 +32,4 @@ abstract contract UControllerProvider is UInitializable {
         if (!Address.isContract(address(controller_))) revert InvalidControllerError();
         _controller.store(address(controller_));
     }
-
-    /// @dev Only allow a valid product contract to call
-    modifier onlyProduct {
-        if (!controller().isProduct(IProduct(msg.sender))) revert NotProductError(IProduct(msg.sender));
-
-        _;
-    }
-
-    /// @dev Verify that `product` is a valid product contract
-    modifier isProduct(IProduct product) {
-        if (!controller().isProduct(product)) revert NotProductError(product);
-
-        _;
-    }
-
-    /// @dev Only allow the coordinator owner to call
-    modifier onlyOwner(uint256 coordinatorId) {
-        if (msg.sender != controller().owner(coordinatorId)) revert NotOwnerError(coordinatorId);
-
-        _;
-    }
-
-    /// @dev Only allow if the protocol is currently unpaused
-    modifier notPaused() {
-        if (controller().parameter().paused) revert PausedError();
-
-        _;
-    }
 }

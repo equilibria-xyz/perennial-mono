@@ -3,6 +3,7 @@ pragma solidity ^0.8.13;
 
 import "@equilibria/root/number/types/UFixed18.sol";
 import "@equilibria/perennial-oracle/contracts/interfaces/IOracleProvider.sol";
+import "../../product/types/Parameter.sol";
 import "./Position.sol";
 import "../IProduct.sol";
 
@@ -62,18 +63,17 @@ library PrePositionLib {
         Fixed18 makerAmount,
         Fixed18 takerAmount,
         IOracleProvider.OracleVersion memory currentOracleVersion,
-        UFixed18 makerFee,
-        UFixed18 takerFee
+        Parameter memory parameter
     ) internal pure {
         self._maker = self.maker().add(makerAmount).pack();
         self._taker = self.taker().add(takerAmount).pack();
         self._makerFee = self._makerFee //TODO: double computing
             .unpack()
-            .add(makerAmount.mul(currentOracleVersion.price).abs().mul(makerFee))
+            .add(makerAmount.mul(currentOracleVersion.price).abs().mul(parameter.makerFee))
             .pack();
         self._takerFee = self._takerFee
             .unpack()
-            .add(takerAmount.mul(currentOracleVersion.price).abs().mul(takerFee))
+            .add(takerAmount.mul(currentOracleVersion.price).abs().mul(parameter.takerFee))
             .pack();
     }
 }

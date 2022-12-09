@@ -27,8 +27,7 @@ library AccountLib {
         Fixed18 positionAmount,
         Fixed18 collateralAmount,
         IOracleProvider.OracleVersion memory currentOracleVersion,
-        UFixed18 makerFee,
-        UFixed18 takerFee
+        Parameter memory parameter
     ) internal pure returns (Fixed18 makerAmount, Fixed18 takerAmount) {
         // compute position update
         Fixed18 currentNext = next(account);
@@ -43,8 +42,8 @@ library AccountLib {
 
         // compute collateral update
         collateralAmount = collateralAmount
-            .sub(Fixed18Lib.from(makerAmount.mul(currentOracleVersion.price).abs().mul(makerFee)))
-            .sub(Fixed18Lib.from(takerAmount.mul(currentOracleVersion.price).abs().mul(takerFee)));
+            .sub(Fixed18Lib.from(makerAmount.mul(currentOracleVersion.price).abs().mul(parameter.makerFee)))
+            .sub(Fixed18Lib.from(takerAmount.mul(currentOracleVersion.price).abs().mul(parameter.takerFee)));
 
         // update position
         account._pre = int96(Fixed18.unwrap(pre(account).add(positionAmount)) / 1e9);

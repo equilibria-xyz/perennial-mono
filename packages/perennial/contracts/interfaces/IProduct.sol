@@ -30,6 +30,8 @@ interface IProduct is IPayoffProvider, IParamProvider {
     event Liquidation(address indexed account, address liquidator, UFixed18 fee);
     event FeeSettled(UFixed18 protocolFeeAmount, UFixed18 productFeeAmount);
     event CollateralSettled(address indexed account, Fixed18 amount, UFixed18 newShortfall);
+    event TreasuryUpdated(address newTreasury);
+    event FeeClaimed(address indexed treasury, UFixed18 feeAmount);
 
     error ProductInsufficientLiquidityError();
     error ProductInsufficientCollateralError();
@@ -37,16 +39,17 @@ interface IProduct is IPayoffProvider, IParamProvider {
     error ProductInDebtError();
     error ProductMakerOverLimitError();
     error ProductOracleBootstrappingError();
-    error ProductNotOwnerError();
     error ProductInvalidOracle();
     error ProductClosedError();
     error ProductCollateralUnderLimitError();
     error ProductCantLiquidate();
+    error ProductNotTreasuryError();
 
     function initialize(ProductDefinition calldata definition_, Parameter calldata parameter_) external;
     function name() external view returns (string memory);
     function symbol() external view returns (string memory);
     function token() external view returns (Token18);
+    function treasury() external view returns (address);
     function liquidation(address account) external view returns (bool);
     function latestVersion() external view returns (uint256);
     function latestVersions(address account) external view returns (uint256);
@@ -57,4 +60,5 @@ interface IProduct is IPayoffProvider, IParamProvider {
     function settle(address account) external;
     function update(Fixed18 positionAmount, Fixed18 collateralAmount) external;
     function liquidate(address account) external;
+    function updateTreasury(address newTreasury) external;
 }

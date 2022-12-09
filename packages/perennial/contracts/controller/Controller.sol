@@ -2,6 +2,7 @@
 pragma solidity 0.8.17;
 
 import "@equilibria/root/control/unstructured/UInitializable.sol";
+import "@equilibria/root/control/unstructured/UOwnable.sol";
 import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 import "../interfaces/IController.sol";
 
@@ -9,7 +10,7 @@ import "../interfaces/IController.sol";
  * @title Controller
  * @notice Manages creating new products and global protocol parameters.
  */
-contract Controller is IController, UInitializable {
+contract Controller is IController, UInitializable, UOwnable {
     ProtocolParameterStorage private constant _parameter = ProtocolParameterStorage.wrap(keccak256("equilibria.perennial.UParamProvider.parameter"));
     function parameter() public view returns (ProtocolParameter memory) { return _parameter.read(); }
 
@@ -22,17 +23,18 @@ contract Controller is IController, UInitializable {
     function liquidationFee() public view returns (UFixed18) { return _liquidationFee.read(); }
 
     /// @dev Protocol pauser address. address(0) defaults to owner(0)
+    AddressStorage private constant _treasury = AddressStorage.wrap(keccak256("equilibria.perennial.Controller.treasury"));
+    function treasury() public view returns (address) {
+        address treasury_ = _treasury.read();
+        return treasury_ == address(0) ? owner() : treasury_;
+    }
+
+    /// @dev Protocol pauser address. address(0) defaults to owner(0)
     AddressStorage private constant _pauser = AddressStorage.wrap(keccak256("equilibria.perennial.Controller.pauser"));
     function pauser() public view returns (address) {
         address pauser_ = _pauser.read();
         return pauser_ == address(0) ? owner() : pauser_;
     }
-
-    /// @dev List of product coordinators
-    Coordinator[] private _coordinators;
-
-    /// @dev Mapping of the coordinator for each  product
-    mapping(IProduct => uint256) public coordinatorFor;
 
     /**
      * @notice Initializes the contract state
@@ -41,96 +43,48 @@ contract Controller is IController, UInitializable {
      * @param productBeacon_ Product implementation beacon address
      */
     function initialize(IBeacon productBeacon_) external initializer(1) {
-        _createCoordinator();
-
+        __UOwnable__initialize();
         updateProductBeacon(productBeacon_);
     }
 
     /**
-     * @notice Creates a new coordinator with `msg.sender` as the owner
-     * @dev Can only be called by the protocol owner
-     * @return New coordinator ID
-     */
-    function createCoordinator() external returns (uint256) {
-        return _createCoordinator();
-    }
-
-    /**
-     * @notice Creates a new coordinator with `msg.sender` as the owner
-     * @dev `treasury` and `pauser` initialize as the 0-address, defaulting to the `owner`
-     * @return New coordinator ID
-     */
-    function _createCoordinator() private returns (uint256) {
-        uint256 coordinatorId = _coordinators.length;
-
-        _coordinators.push(Coordinator({
-            pendingOwner: address(0),
-            owner: msg.sender,
-            treasury: address(0)
-        }));
-
-        emit CoordinatorCreated(coordinatorId, msg.sender);
-
-        return coordinatorId;
-    }
-
-    /**
-     * @notice Updates the pending owner of an existing coordinator
-     * @dev Must be called by the coordinator's current owner
-     * @param coordinatorId Coordinator to update
-     * @param newPendingOwner New pending owner address
-     */
-    function updateCoordinatorPendingOwner(uint256 coordinatorId, address newPendingOwner) external onlyOwner(coordinatorId) {
-        _coordinators[coordinatorId].pendingOwner = newPendingOwner;
-        emit CoordinatorPendingOwnerUpdated(coordinatorId, newPendingOwner);
-    }
-
-    /**
-     * @notice Accepts ownership over an existing coordinator
-     * @dev Must be called by the coordinator's pending owner
-     * @param coordinatorId Coordinator to update
-     */
-    function acceptCoordinatorOwner(uint256 coordinatorId) external {
-        Coordinator storage coordinator = _coordinators[coordinatorId];
-        address newPendingOwner = coordinator.pendingOwner;
-
-        if (msg.sender != newPendingOwner) revert ControllerNotPendingOwnerError(coordinatorId);
-
-        coordinator.pendingOwner = address(0);
-        coordinator.owner = newPendingOwner;
-        emit CoordinatorOwnerUpdated(coordinatorId, newPendingOwner);
-    }
-
-    /**
      * @notice Updates the treasury of an existing coordinator
-     * @dev Must be called by the coordinator's current owner. Defaults to the coordinator `owner` if set to address(0)
-     * @param coordinatorId Coordinator to update
+     * @dev Must be called by the current owner. Defaults to the coordinator `owner` if set to address(0)
      * @param newTreasury New treasury address
      */
-    function updateCoordinatorTreasury(uint256 coordinatorId, address newTreasury) external onlyOwner(coordinatorId) {
-        _coordinators[coordinatorId].treasury = newTreasury;
-        emit CoordinatorTreasuryUpdated(coordinatorId, newTreasury);
+    function updateTreasury(address newTreasury) external onlyOwner {
+        _treasury.store(newTreasury);
+        emit TreasuryUpdated(newTreasury);
+    }
+
+    /**
+     * @notice Updates the protocol pauser address. Zero address defaults to owner(0)
+     * @param newPauser New protocol pauser address
+     */
+    function updatePauser(address newPauser) public onlyOwner {
+        _pauser.store(newPauser);
+        emit PauserUpdated(newPauser);
     }
 
     /**
      * @notice Creates a new product market with `provider`
      * @dev Can only be called by the coordinator owner
-     * @param coordinatorId Coordinator that will own the product
      * @return New product contract address
      */
-    function createProduct(
-        uint256 coordinatorId,
-        IProduct.ProductDefinition calldata definition,
-        Parameter calldata productParameter
-    ) external onlyOwner(coordinatorId) returns (IProduct) {
-        if (coordinatorId == 0) revert ControllerNoZeroCoordinatorError();
-
+    function createProduct(IProduct.ProductDefinition calldata definition, Parameter calldata productParameter)
+        external
+        returns (IProduct)
+    {
         BeaconProxy newProductProxy = new BeaconProxy(
             address(productBeacon()),
             abi.encodeCall(IProduct.initialize, (definition, productParameter))
         );
         IProduct newProduct = IProduct(address(newProductProxy));
-        coordinatorFor[newProduct] = coordinatorId;
+
+        UOwnable(address(newProduct)).updatePendingOwner(msg.sender); //TODO: IOwnable in root
+
+        //TODO: create2 or registration?
+
         emit ProductCreated(newProduct, definition, productParameter);
 
         return newProduct;
@@ -140,13 +94,13 @@ contract Controller is IController, UInitializable {
      * @notice Updates the Product implementation beacon address
      * @param newProductBeacon New Product implementation beacon address
      */
-    function updateProductBeacon(IBeacon newProductBeacon) public onlyOwner(0) {
+    function updateProductBeacon(IBeacon newProductBeacon) public onlyOwner {
         if (!Address.isContract(address(newProductBeacon))) revert ControllerNotContractAddressError();
         _productBeacon.store(address(newProductBeacon));
         emit ProductBeaconUpdated(newProductBeacon);
     }
 
-    function updateParameter(ProtocolParameter memory newParameter) public onlyOwner(0) {
+    function updateParameter(ProtocolParameter memory newParameter) public onlyOwner {
         _parameter.store(newParameter);
         emit ParameterUpdated(newParameter);
     }
@@ -155,7 +109,7 @@ contract Controller is IController, UInitializable {
      * @notice Updates the liquidation fee
      * @param newLiquidationFee New liquidation fee
      */
-    function updateLiquidationFee(UFixed18 newLiquidationFee) public onlyOwner(0) {
+    function updateLiquidationFee(UFixed18 newLiquidationFee) public onlyOwner {
         if (newLiquidationFee.gt(UFixed18Lib.ONE)) revert ControllerInvalidLiquidationFeeError();
 
         _liquidationFee.store(newLiquidationFee);
@@ -163,131 +117,14 @@ contract Controller is IController, UInitializable {
     }
 
     /**
-     * @notice Updates the protocol pauser address. Zero address defaults to owner(0)
-     * @param newPauser New protocol pauser address
-     */
-    function updatePauser(address newPauser) public onlyOwner(0) {
-        _pauser.store(newPauser);
-        emit PauserUpdated(newPauser);
-    }
-
-    /**
      * @notice Updates the protocol paused state
      * @param newPaused New protocol paused state
      */
-    function updatePaused(bool newPaused) public onlyPauser {
+    function updatePaused(bool newPaused) public {
+        if (msg.sender != pauser()) revert ControllerNotPauserError();
         ProtocolParameter memory newParameter = parameter();
         newParameter.paused = newPaused;
         _parameter.store(newParameter);
         emit ParameterUpdated(newParameter);
-    }
-
-    /**
-     * @notice Returns whether a contract is a product
-     * @param product Contract address to check
-     * @return Whether a contract is a product
-     */
-    function isProduct(IProduct product) public view returns (bool) {
-        return coordinatorFor[product] != 0;
-    }
-
-    /**
-     * @notice Returns coordinator state for coordinator `coordinatorId`
-     * @param coordinatorId Coordinator to return for
-     * @return Coordinator state
-     */
-    function coordinators(uint256 coordinatorId) external view returns (Coordinator memory) {
-        return _coordinators[coordinatorId];
-    }
-
-    /**
-     * @notice Returns the pending owner of the protocol
-     * @return Owner of the protocol
-     */
-    function pendingOwner() public view returns (address) {
-        return pendingOwner(0);
-    }
-
-    /**
-     * @notice Returns the pending owner of the coordinator `coordinatorId`
-     * @param coordinatorId Coordinator to return for
-     * @return Pending owner of the coordinator
-     */
-    function pendingOwner(uint256 coordinatorId) public view returns (address) {
-        return _coordinators[coordinatorId].pendingOwner;
-    }
-
-    /**
-     * @notice Returns the owner of the protocol
-     * @return Owner of the protocol
-     */
-    function owner() public view returns (address) {
-        return owner(0);
-    }
-
-    /**
-     * @notice Returns the owner of the coordinator `coordinatorId`
-     * @param coordinatorId Coordinator to return for
-     * @return Owner of the coordinator
-     */
-    function owner(uint256 coordinatorId) public view returns (address) {
-        return _coordinators[coordinatorId].owner;
-    }
-
-    /**
-     * @notice Returns the owner of the product `product`
-     * @param product Product to return for
-     * @return Owner of the product
-     */
-    function owner(IProduct product) external view returns (address) {
-        return owner(coordinatorFor[product]);
-    }
-
-    /**
-     * @notice Returns the treasury of the protocol
-     * @dev Defaults to the `owner` when `treasury` is unset
-     * @return Treasury of the protocol
-     */
-    function treasury() public view returns (address) {
-        return treasury(0);
-    }
-
-    /**
-     * @notice Returns the treasury of the coordinator `coordinatorId`
-     * @dev Defaults to the `owner` when `treasury` is unset
-     * @param coordinatorId Coordinator to return for
-     * @return Treasury of the coordinator
-     */
-    function treasury(uint256 coordinatorId) public view returns (address) {
-        address _treasury = _coordinators[coordinatorId].treasury;
-        return _treasury == address(0) ? owner(coordinatorId) : _treasury;
-    }
-
-    /**
-     * @notice Returns the treasury of the product `product`
-     * @dev Defaults to the `owner` when `treasury` is unset
-     * @param product Product to return for
-     * @return Treasury of the product
-     */
-    function treasury(IProduct product) public view returns (address) {
-        return treasury(coordinatorFor[product]);
-    }
-
-    function settlementParameters() external view returns (ProtocolParameter memory, address) {
-        return (parameter(), treasury());
-    }
-
-    /// @dev Only allow owner of `coordinatorId` to call
-    modifier onlyOwner(uint256 coordinatorId) {
-        if (msg.sender != owner(coordinatorId)) revert ControllerNotOwnerError(coordinatorId);
-
-        _;
-    }
-
-    /// @dev Only allow the pauser to call
-    modifier onlyPauser {
-        if (msg.sender != pauser()) revert ControllerNotPauserError();
-
-        _;
     }
 }

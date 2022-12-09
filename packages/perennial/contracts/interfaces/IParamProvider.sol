@@ -11,6 +11,4 @@ interface IParamProvider {
     
     function parameter() external view returns (Parameter memory);
     function updateParameter(Parameter memory newParameter) external;
-    function rewardRate() external view returns (Accumulator memory);
-    function updateRewardRate(Accumulator memory newRewardRate) external;
 }

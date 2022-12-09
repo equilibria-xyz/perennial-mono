@@ -7,6 +7,8 @@ import "../../interfaces/types/PackedAccumulator.sol";
 import "../../interfaces/types/PackedPosition.sol";
 import "../../interfaces/types/PrePosition.sol";
 import "./Period.sol";
+import "../../controller/types/ProtocolParameter.sol";
+import "./Fee.sol";
 
 /// @dev Version type
 struct Version {
@@ -64,21 +66,17 @@ library VersionLib {
      * @notice Accumulates the global state for the period from `period.fromVersion` to `period.toVersion`
      * @param versionAccumulator The struct to operate on
      * @param period The oracle version period to settle for
-     * @return newFeeAccumulator The fee accrued from opening or closing a new position
      */
     function accumulate(
         Version memory versionAccumulator,
-        UFixed18 feeAccumulator,
         PrePosition memory pre,
+        Fee memory fee,
         Period memory period,
-        UFixed18 positionFee,
-        JumpRateUtilizationCurve memory utilizationCurve,
-        UFixed18 minFundingFee,
-        UFixed18 fundingFee,
-        Accumulator memory rewardRate,
-        bool closed
-    ) internal pure returns (UFixed18 newFeeAccumulator) {
+        ProtocolParameter memory protocolParameter,
+        Parameter memory parameter
+    ) internal pure {
         // unpack
+        UFixed18 feeAccumulator;
         (Accumulator memory valueAccumulator, Accumulator memory rewardAccumulator, Position memory latestPosition) =
             (versionAccumulator.value(), versionAccumulator.reward(), versionAccumulator.position());
 
@@ -88,27 +86,27 @@ library VersionLib {
             feeAccumulator,
             latestPosition,
             period,
-            utilizationCurve,
-            minFundingFee,
-            fundingFee,
-            closed
+            protocolParameter,
+            parameter
         );
 
         // accumulate position
-        _accumulatePosition(valueAccumulator, latestPosition, period, closed);
+        _accumulatePosition(valueAccumulator, latestPosition, period, parameter);
 
         // accumulate reward
-        _accumulateReward(rewardAccumulator, latestPosition, period, rewardRate); //TODO: auto-shutoff if not enough reward ERC20s in contract?
+        _accumulateReward(rewardAccumulator, latestPosition, period, parameter); //TODO: auto-shutoff if not enough reward ERC20s in contract?
 
         // accumulate position fee
-        feeAccumulator = _accumulatePositionFee(valueAccumulator, feeAccumulator, latestPosition, pre, positionFee);
+        feeAccumulator = _accumulatePositionFee(valueAccumulator, feeAccumulator, latestPosition, pre, parameter);
 
-        // pack
+        // update
         versionAccumulator._value = valueAccumulator.pack();
         versionAccumulator._reward = rewardAccumulator.pack();
         versionAccumulator._position = latestPosition.next(pre).pack();
+
+        // external
         pre.clear();
-        newFeeAccumulator = feeAccumulator.add(newFeeAccumulator);
+        fee.update(feeAccumulator, protocolParameter.protocolFee);
     }
 
     /**
@@ -126,12 +124,12 @@ library VersionLib {
         UFixed18 feeAccumulator,
         Position memory latestPosition,
         PrePosition memory pre,
-        UFixed18 positionFee //TODO: move this to update also?
+        Parameter memory parameter
     ) private pure returns (UFixed18 newFeeAccumulator) {
         if (pre.isEmpty()) return feeAccumulator;
 
         Position memory positionFeeAmount = pre.fees();
-        Position memory protocolFeeAmount = positionFeeAmount.mul(positionFee);
+        Position memory protocolFeeAmount = positionFeeAmount.mul(parameter.positionFee);  //TODO: move this to update also?
         positionFeeAmount = positionFeeAmount.sub(protocolFeeAmount);
         newFeeAccumulator = protocolFeeAmount.sum();
 
@@ -168,23 +166,21 @@ library VersionLib {
         UFixed18 feeAccumulator,
         Position memory latestPosition,
         Period memory period,
-        JumpRateUtilizationCurve memory utilizationCurve,
-        UFixed18 minFundingFee,
-        UFixed18 fundingFee,
-        bool closed
+        ProtocolParameter memory protocolParameter,
+        Parameter memory parameter
     ) private pure returns (UFixed18 newFeeAccumulator) {
-        if (closed) return feeAccumulator;
+        if (parameter.closed) return feeAccumulator;
         if (latestPosition.taker.isZero()) return feeAccumulator;
         if (latestPosition.maker.isZero()) return feeAccumulator;
 
         UFixed18 takerNotional = Fixed18Lib.from(latestPosition.taker).mul(period.fromVersion.price).abs();
         UFixed18 socializedNotional = takerNotional.mul(latestPosition.socializationFactor());
 
-        Fixed18 fundingAccumulated = utilizationCurve.compute(latestPosition.utilization())     // yearly funding rate
-            .mul(Fixed18Lib.from(period.timestampDelta()))                                      // multiply by seconds in period
-            .div(Fixed18Lib.from(365 days))                                                     // divide by seconds in year (funding rate for period)
-            .mul(Fixed18Lib.from(socializedNotional));                                          // multiply by socialized notion (funding for period)
-        UFixed18 boundedFundingFee = UFixed18Lib.max(fundingFee, minFundingFee);
+        Fixed18 fundingAccumulated = parameter.utilizationCurve.compute(latestPosition.utilization())     // yearly funding rate
+            .mul(Fixed18Lib.from(period.timestampDelta()))                                                // multiply by seconds in period
+            .div(Fixed18Lib.from(365 days))                                                               // divide by seconds in year (funding rate for period)
+            .mul(Fixed18Lib.from(socializedNotional));                                                    // multiply by socialized notion (funding for period)
+        UFixed18 boundedFundingFee = UFixed18Lib.max(parameter.fundingFee, protocolParameter.minFundingFee);
         newFeeAccumulator = fundingAccumulated.abs().mul(boundedFundingFee);
 
         Fixed18 fundingAccumulatedWithoutFee = Fixed18Lib.from(
@@ -208,15 +204,14 @@ library VersionLib {
      * @notice Globally accumulates position PNL since last oracle update
      * @param latestPosition The latest global position
      * @param period The oracle version period to settle for
-     * @param closed Whether the product is closed
      */
     function _accumulatePosition(
         Accumulator memory valueAccumulator,
         Position memory latestPosition,
         Period memory period,
-        bool closed
+        Parameter memory parameter
     ) private pure {
-        if (closed) return;
+        if (parameter.closed) return;
         if (latestPosition.taker.isZero()) return;
         if (latestPosition.maker.isZero()) return;
 
@@ -242,15 +237,23 @@ library VersionLib {
         Accumulator memory rewardAccumulator,
         Position memory latestPosition,
         Period memory period,
-        Accumulator memory rewardRate
+        Parameter memory parameter
     ) private pure {
         UFixed18 elapsed = period.timestampDelta();
 
         rewardAccumulator.maker = latestPosition.maker.isZero() ?
             rewardAccumulator.maker :
-            rewardAccumulator.maker.add(Fixed18Lib.from(elapsed).mul(rewardRate.taker).div(Fixed18Lib.from(latestPosition.maker)));
+            rewardAccumulator.maker.add(
+                Fixed18Lib.from(elapsed)
+                    .mul(parameter.rewardRate.taker)
+                    .div(Fixed18Lib.from(latestPosition.maker))
+            );
         rewardAccumulator.taker = latestPosition.taker.isZero() ?
             rewardAccumulator.taker :
-            rewardAccumulator.taker.add(Fixed18Lib.from(elapsed).mul(rewardRate.taker).div(Fixed18Lib.from(latestPosition.taker)));
+            rewardAccumulator.taker.add(
+                Fixed18Lib.from(elapsed)
+                    .mul(parameter.rewardRate.taker)
+                    .div(Fixed18Lib.from(latestPosition.taker))
+            );
     }
 }
