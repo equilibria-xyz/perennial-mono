@@ -3,7 +3,7 @@ pragma solidity ^0.8.13;
 
 import "@equilibria/root/number/types/UFixed18.sol";
 import "@equilibria/root/curve/types/JumpRateUtilizationCurve.sol";
-import "../../interfaces/types/PackedAccumulator.sol";
+import "./PackedAccumulator.sol";
 
 /// @dev Parameter type
 struct Parameter {

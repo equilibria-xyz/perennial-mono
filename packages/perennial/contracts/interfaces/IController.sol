@@ -5,7 +5,7 @@ import "@equilibria/root/number/types/UFixed18.sol";
 import "@openzeppelin/contracts/proxy/beacon/IBeacon.sol";
 import "./IProduct.sol";
 import "./types/PayoffDefinition.sol";
-import "../controller/types/ProtocolParameter.sol"; //TODO: not right package
+import "./types/ProtocolParameter.sol";
 
 interface IController {
     event ProductBeaconUpdated(IBeacon newProductBeacon);

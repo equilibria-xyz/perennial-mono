@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.17;
 
-import "../../interfaces/IProduct.sol";
-import "../../interfaces/types/PrePosition.sol";
+import "../IProduct.sol";
+import "./PrePosition.sol";
 import "./Version.sol";
 
 //TODO: add interface fee?

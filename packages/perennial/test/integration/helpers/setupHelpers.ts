@@ -17,10 +17,8 @@ import {
   ChainlinkOracle__factory,
   Product__factory,
   UpgradeableBeacon__factory,
-  PerennialLens,
-  PerennialLens__factory,
-  Forwarder,
-  Forwarder__factory,
+  Lens,
+  Lens__factory,
   IBatcher,
   IBatcher__factory,
   ERC20PresetMinterPauser,
@@ -60,9 +58,8 @@ export interface InstanceVars {
   chainlinkOracle: ChainlinkOracle
   productBeacon: IBeacon
   productImpl: Product
-  lens: PerennialLens
+  lens: Lens
   batcher: IBatcher
-  forwarder: Forwarder
   rewardToken: ERC20PresetMinterPauser
 }
 
@@ -126,9 +123,7 @@ export async function deployProtocol(): Promise<InstanceVars> {
   const usdcHolder = await impersonate.impersonateWithBalance(USDC_HOLDER, utils.parseEther('10'))
   await chainlinkOracle.sync()
 
-  const lens = await new PerennialLens__factory(owner).deploy(controller.address)
-
-  const forwarder = await new Forwarder__factory(owner).deploy(usdc.address, dsu.address, batcher.address)
+  const lens = await new Lens__factory(owner).deploy(controller.address)
 
   const rewardToken = await new ERC20PresetMinterPauser__factory(owner).deploy('Incentive Token', 'ITKN')
 
@@ -154,7 +149,6 @@ export async function deployProtocol(): Promise<InstanceVars> {
     productImpl,
     lens,
     batcher,
-    forwarder,
     rewardToken,
   }
 }

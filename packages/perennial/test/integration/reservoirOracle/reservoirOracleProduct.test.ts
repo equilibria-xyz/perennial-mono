@@ -73,16 +73,11 @@ describe('Reservoir Oracle Product', () => {
   it('creates a product', async () => {
     const { owner, user, controller, treasuryB, dsu, lens } = instanceVars
 
-    await expect(controller.connect(owner).createCoordinator())
-      .to.emit(controller, 'CoordinatorCreated')
-      .withArgs(1, owner.address)
-    await expect(controller.updateCoordinatorTreasury(1, treasuryB.address))
-      .to.emit(controller, 'CoordinatorTreasuryUpdated')
-      .withArgs(1, treasuryB.address)
-
-    const productAddress = await controller.callStatic.createProduct(1, DEFINITION, PARAMETER)
+    const productAddress = await controller.callStatic.createProduct(DEFINITION, PARAMETER)
     const product = Product__factory.connect(productAddress, owner)
-    await expect(controller.createProduct(1, DEFINITION, PARAMETER)).to.emit(controller, 'ProductCreated')
+    await expect(controller.createProduct(DEFINITION, PARAMETER)).to.emit(controller, 'ProductCreated')
+    await product.connect(owner).acceptOwner()
+    await product.connect(owner).updateTreasury(treasuryB.address)
 
     await dsu.connect(user).approve(product.address, utils.parseEther('1000'))
     await product.connect(user).update(0, utils.parseEther('1000'))

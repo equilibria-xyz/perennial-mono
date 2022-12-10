@@ -2,12 +2,12 @@
 pragma solidity 0.8.17;
 
 import "@equilibria/root/curve/types/JumpRateUtilizationCurve.sol";
-import "../../interfaces/types/Accumulator.sol";
-import "../../interfaces/types/PackedAccumulator.sol";
-import "../../interfaces/types/PackedPosition.sol";
-import "../../interfaces/types/PrePosition.sol";
+import "./Accumulator.sol";
+import "./PackedAccumulator.sol";
+import "./PackedPosition.sol";
+import "./PrePosition.sol";
+import "./ProtocolParameter.sol";
 import "./Period.sol";
-import "../../controller/types/ProtocolParameter.sol";
 import "./Fee.sol";
 
 /// @dev Version type

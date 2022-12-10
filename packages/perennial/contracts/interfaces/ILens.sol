@@ -9,7 +9,7 @@ import "./IController.sol";
  * @title Lens contract to conveniently pull protocol, product, and userproduct data
  * @notice All functions should be called using `callStatic`
  */
-interface IPerennialLens {
+interface ILens {
     /// @dev Snapshot of Product information
     struct ProductSnapshot {
         IProduct.ProductDefinition definition;

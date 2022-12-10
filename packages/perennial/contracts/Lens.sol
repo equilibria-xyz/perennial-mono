@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.17;
 
-import "../interfaces/IPerennialLens.sol";
+import "./interfaces/ILens.sol";
 
 /**
  * @title Lens contract to conveniently pull protocol data
  * @notice All functions should be called using `callStatic`
  */
-contract PerennialLens is IPerennialLens {
+contract Lens is ILens {
     /**
      * @notice Protocol controller
      * @return Protocol controller

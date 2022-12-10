@@ -3,7 +3,7 @@ pragma solidity ^0.8.13;
 
 import "@equilibria/root/number/types/UFixed18.sol";
 import "@equilibria/perennial-oracle/contracts/interfaces/IOracleProvider.sol";
-import "../../product/types/Parameter.sol";
+import "./Parameter.sol";
 import "./Position.sol";
 import "../IProduct.sol";
 

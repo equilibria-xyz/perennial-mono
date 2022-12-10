@@ -9,9 +9,9 @@ import "./types/PayoffDefinition.sol";
 import "./types/Position.sol";
 import "./types/PrePosition.sol";
 import "./types/Accumulator.sol";
-import "../product/types/Version.sol"; //TODO: these have to be in interface
-import "../product/types/Account.sol";
-import "../product/types/Fee.sol";
+import "./types/Version.sol";
+import "./types/Account.sol";
+import "./types/Fee.sol";
 
 interface IProduct is IPayoffProvider {
     struct ProductDefinition {
