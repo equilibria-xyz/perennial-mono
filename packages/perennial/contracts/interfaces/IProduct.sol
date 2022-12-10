@@ -4,7 +4,6 @@ pragma solidity ^0.8.13;
 import "@equilibria/root/number/types/UFixed18.sol";
 import "@equilibria/root/token/types/Token18.sol";
 import "@equilibria/root/curve/types/JumpRateUtilizationCurve.sol";
-import "./IPayoffProvider.sol";
 import "./types/PayoffDefinition.sol";
 import "./types/Position.sol";
 import "./types/PrePosition.sol";
@@ -13,7 +12,7 @@ import "./types/Version.sol";
 import "./types/Account.sol";
 import "./types/Fee.sol";
 
-interface IProduct is IPayoffProvider {
+interface IProduct {
     struct ProductDefinition {
         string name;
         string symbol;
@@ -45,12 +44,18 @@ interface IProduct is IPayoffProvider {
     error ProductCollateralUnderLimitError();
     error ProductCantLiquidate();
     error ProductNotTreasuryError();
+    error PayoffProviderInvalidOracle();
+    error PayoffProviderInvalidPayoffDefinitionError();
 
     function initialize(ProductDefinition calldata definition_, Parameter calldata parameter_) external;
     function name() external view returns (string memory);
     function symbol() external view returns (string memory);
     function token() external view returns (Token18);
     function treasury() external view returns (address);
+    function oracle() external view returns (IOracleProvider);
+    function payoffDefinition() external view returns (PayoffDefinition memory);
+    function currentVersion() external view returns (IOracleProvider.OracleVersion memory);
+    function atVersion(uint256 oracleVersion) external view returns (IOracleProvider.OracleVersion memory);
     function liquidation(address account) external view returns (bool);
     function latestVersion() external view returns (uint256);
     function latestVersions(address account) external view returns (uint256);

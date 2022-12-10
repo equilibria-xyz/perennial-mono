@@ -4,9 +4,8 @@ pragma solidity 0.8.17;
 import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@equilibria/root/control/unstructured/UOwnable.sol";
 import "@equilibria/root/control/unstructured/UReentrancyGuard.sol";
-import "../interfaces/IProduct.sol";
-import "../interfaces/IController.sol";
-import "./UPayoffProvider.sol";
+import "./interfaces/IProduct.sol";
+import "./interfaces/IController.sol";
 import "hardhat/console.sol";
 
 
@@ -18,7 +17,7 @@ import "hardhat/console.sol";
  * @notice Manages logic and state for a single product market.
  * @dev Cloned by the Controller contract to launch new product markets.
  */
-contract Product is IProduct, UInitializable, UOwnable, UPayoffProvider, UReentrancyGuard {
+contract Product is IProduct, UInitializable, UOwnable, UReentrancyGuard {
     struct CurrentContext {
         /* Global Parameters */
         ProtocolParameter protocolParameter;
@@ -89,6 +88,12 @@ contract Product is IProduct, UInitializable, UOwnable, UPayoffProvider, UReentr
     ParameterStorage private constant _parameter = ParameterStorage.wrap(keccak256("equilibria.perennial.UParamProvider.parameter"));
     function parameter() public view returns (Parameter memory) { return _parameter.read(); }
 
+    /// @dev The oracle contract address
+    IOracleProvider public oracle;
+
+    /// @dev Payoff definition struct
+    PayoffDefinition private _payoffDefinition;
+
     /**
      * @notice Initializes the contract state
      */
@@ -97,7 +102,6 @@ contract Product is IProduct, UInitializable, UOwnable, UPayoffProvider, UReentr
         Parameter calldata parameter_
     ) external initializer(1) {
         __UOwnable__initialize();
-        __UPayoffProvider__initialize(definition_.oracle, definition_.payoffDefinition);
         __UReentrancyGuard__initialize();
 
         controller = IController(msg.sender);
@@ -105,6 +109,8 @@ contract Product is IProduct, UInitializable, UOwnable, UPayoffProvider, UReentr
         symbol = definition_.symbol;
         token = definition_.token;
         reward = definition_.reward;
+        oracle = definition_.oracle;
+        _payoffDefinition = definition_.payoffDefinition;
         updateParameter(parameter_);
     }
 
@@ -165,6 +171,23 @@ contract Product is IProduct, UInitializable, UOwnable, UPayoffProvider, UReentr
 
     //TODO: claim reward
 
+    /**
+     * @notice Returns the current oracle version transformed by the payoff definition
+     * @return Current oracle version transformed by the payoff definition
+     */
+    function currentVersion() public view returns (IOracleProvider.OracleVersion memory) {
+        return _transform(oracle.currentVersion());
+    }
+
+    /**
+     * @notice Returns the oracle version at `oracleVersion` transformed by the payoff definition
+     * @param oracleVersion Oracle version to return for
+     * @return Oracle version at `oracleVersion` with price transformed by payoff function
+     */
+    function atVersion(uint256 oracleVersion) public view returns (IOracleProvider.OracleVersion memory) {
+        return _transform(oracle.atVersion(oracleVersion));
+    }
+
     function accounts(address account) external view returns (Account memory) {
         return _accounts[account];
     }
@@ -179,6 +202,10 @@ contract Product is IProduct, UInitializable, UOwnable, UPayoffProvider, UReentr
 
     function fee() external view returns (Fee memory) {
         return _fee;
+    }
+
+    function payoffDefinition() external view returns (PayoffDefinition memory) {
+        return _payoffDefinition;
     }
 
     function _liquidate(CurrentContext memory context, address account) private {
@@ -264,7 +291,7 @@ contract Product is IProduct, UInitializable, UOwnable, UPayoffProvider, UReentr
         context.parameter = parameter();
 
         // Load product state
-        context.currentOracleVersion = _sync();
+        context.currentOracleVersion = _transform(oracle.sync());
         context.latestVersion = latestVersion;
         context.version = _versions[context.latestVersion];
         context.pre = _pre;
@@ -391,6 +418,20 @@ contract Product is IProduct, UInitializable, UOwnable, UPayoffProvider, UReentr
         );
         if (maintenanceAmount.max(maintenanceNextAmount).gt(boundedCollateral))
             revert ProductInsufficientCollateralError();
+    }
+
+    /**
+     * @notice Returns the transformed oracle version
+     * @param oracleVersion Oracle version to transform
+     * @return Transformed oracle version
+     */
+    function _transform(IOracleProvider.OracleVersion memory oracleVersion)
+        internal
+        view
+        returns (IOracleProvider.OracleVersion memory)
+    {
+        oracleVersion.price = _payoffDefinition.transform(oracleVersion.price);
+        return oracleVersion;
     }
 
     // Debug
