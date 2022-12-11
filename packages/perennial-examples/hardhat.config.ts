@@ -12,7 +12,7 @@ const config = defaultConfig({
     hardhat: [`${eqPerennialDir}/deployments/mainnet`, `${eqPerennialOracleDir}/deployments/mainnet`],
     localhost: [`${eqPerennialDir}/deployments/localhost`, `${eqPerennialOracleDir}/deployments/localhost`],
   },
-  dependencyPaths: ['@equilibria/perennial/contracts/interfaces/IController.sol'],
+  dependencyPaths: ['@equilibria/perennial/contracts/interfaces/IFactory.sol'],
 })
 
 export default config

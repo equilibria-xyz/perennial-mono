@@ -7,7 +7,7 @@ import "./IProduct.sol";
 import "./types/PayoffDefinition.sol";
 import "./types/ProtocolParameter.sol";
 
-interface IController {
+interface IFactory {
     event ProductBeaconUpdated(IBeacon newProductBeacon);
     event ParameterUpdated(ProtocolParameter newParameter);
     event LiquidationFeeUpdated(UFixed18 newLiquidationFee);
@@ -15,10 +15,10 @@ interface IController {
     event PauserUpdated(address newPauser);
     event ProductCreated(IProduct indexed product, IProduct.ProductDefinition definition, Parameter parameter);
 
-    error ControllerNotPauserError();
-    error ControllerPausedError();
-    error ControllerInvalidLiquidationFeeError();
-    error ControllerNotContractAddressError();
+    error FactoryNotPauserError();
+    error FactoryPausedError();
+    error FactoryInvalidLiquidationFeeError();
+    error FactoryNotContractAddressError();
 
     function productBeacon() external view returns (IBeacon);
     function parameter() external view returns (ProtocolParameter memory);

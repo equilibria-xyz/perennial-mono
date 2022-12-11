@@ -3,7 +3,6 @@ import 'hardhat'
 import { constants, utils } from 'ethers'
 
 import { InstanceVars, deployProtocol, createProduct, depositTo } from '../helpers/setupHelpers'
-import { time } from '../../../../common/testutil'
 import { expectPositionEq, expectPrePositionEq } from '../../../../common/testutil/types'
 
 const SECONDS_IN_YEAR = 60 * 60 * 24 * 365
@@ -20,7 +19,7 @@ describe('Lens', () => {
     const POSITION = utils.parseEther('0.0001')
     const { user, userB, chainlink, lens, controller } = instanceVars
 
-    expect(await lens.callStatic.controller()).to.equal(controller.address)
+    expect(await lens.callStatic.factory()).to.equal(controller.address)
     // Setup fees
     const protocolParameter = await controller.parameter()
     protocolParameter.protocolFee = utils.parseEther('0.25')

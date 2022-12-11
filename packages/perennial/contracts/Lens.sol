@@ -9,14 +9,14 @@ import "./interfaces/ILens.sol";
  */
 contract Lens is ILens {
     /**
-     * @notice Protocol controller
-     * @return Protocol controller
+     * @notice Protocol factory
+     * @return Protocol factory
      */
-    IController public immutable controller;
+    IFactory public immutable factory;
 
-    /// @param _controller Protocol controller address
-    constructor(IController _controller) {
-        controller = _controller;
+    /// @param _factory Protocol factory address
+    constructor(IFactory _factory) {
+        factory = _factory;
     }
 
     /**

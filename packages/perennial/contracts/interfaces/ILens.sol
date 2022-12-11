@@ -3,7 +3,7 @@ pragma solidity 0.8.17;
 
 import "@equilibria/perennial-oracle/contracts/interfaces/IOracleProvider.sol";
 import "./IProduct.sol";
-import "./IController.sol";
+import "./IFactory.sol";
 
 /**
  * @title Lens contract to conveniently pull protocol, product, and userproduct data
@@ -40,7 +40,7 @@ interface ILens {
     }
 
     // Protocol Values
-    function controller() external view returns (IController);
+    function factory() external view returns (IFactory);
 
     // Snapshot Functions for batch values
     function snapshots(IProduct[] calldata productAddresses) external returns (ProductSnapshot[] memory);

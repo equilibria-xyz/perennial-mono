@@ -5,14 +5,14 @@ import { CHAINLINK_CUSTOM_CURRENCIES, buildChainlinkRoundId } from '@equilibria/
 
 import { time, impersonate } from '../../../../common/testutil'
 import {
-  Controller,
+  Factory,
   TestnetContractPayoffProvider,
   IERC20Metadata,
   ChainlinkOracle,
   Product,
   IBeacon,
   IERC20Metadata__factory,
-  Controller__factory,
+  Factory__factory,
   TestnetContractPayoffProvider__factory,
   ChainlinkOracle__factory,
   Product__factory,
@@ -48,7 +48,7 @@ export interface InstanceVars {
   treasuryA: SignerWithAddress
   treasuryB: SignerWithAddress
   proxyAdmin: ProxyAdmin
-  controller: Controller
+  controller: Factory
   contractPayoffProvider: TestnetContractPayoffProvider
   dsu: IERC20Metadata
   usdc: IERC20Metadata
@@ -87,7 +87,7 @@ export async function deployProtocol(): Promise<InstanceVars> {
   // Deploy protocol contracts
   const proxyAdmin = await new ProxyAdmin__factory(owner).deploy()
 
-  const controllerImpl = await new Controller__factory(owner).deploy()
+  const controllerImpl = await new Factory__factory(owner).deploy()
 
   const controllerProxy = await new TransparentUpgradeableProxy__factory(owner).deploy(
     controllerImpl.address,
@@ -95,7 +95,7 @@ export async function deployProtocol(): Promise<InstanceVars> {
     [],
   )
 
-  const controller = await new Controller__factory(owner).attach(controllerProxy.address)
+  const controller = await new Factory__factory(owner).attach(controllerProxy.address)
 
   const productImpl = await new Product__factory(owner).deploy()
   const productBeacon = await new UpgradeableBeacon__factory(owner).deploy(productImpl.address)

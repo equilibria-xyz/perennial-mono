@@ -5,7 +5,7 @@ import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@equilibria/root/control/unstructured/UOwnable.sol";
 import "@equilibria/root/control/unstructured/UReentrancyGuard.sol";
 import "./interfaces/IProduct.sol";
-import "./interfaces/IController.sol";
+import "./interfaces/IFactory.sol";
 import "hardhat/console.sol";
 
 
@@ -15,7 +15,7 @@ import "hardhat/console.sol";
 /**
  * @title Product
  * @notice Manages logic and state for a single product market.
- * @dev Cloned by the Controller contract to launch new product markets.
+ * @dev Cloned by the Factory contract to launch new product markets.
  */
 contract Product is IProduct, UInitializable, UOwnable, UReentrancyGuard {
     struct CurrentContext {
@@ -50,8 +50,8 @@ contract Product is IProduct, UInitializable, UOwnable, UReentrancyGuard {
         string gasCounterMessage;
     }
 
-    /// @dev The protocol controller
-    IController public controller;
+    /// @dev The protocol factory
+    IFactory public factory;
 
     /// @dev The name of the product
     string public name;
@@ -104,7 +104,7 @@ contract Product is IProduct, UInitializable, UOwnable, UReentrancyGuard {
         __UOwnable__initialize();
         __UReentrancyGuard__initialize();
 
-        controller = IController(msg.sender);
+        factory = IFactory(msg.sender);
         name = definition_.name;
         symbol = definition_.symbol;
         token = definition_.token;
@@ -159,7 +159,7 @@ contract Product is IProduct, UInitializable, UOwnable, UReentrancyGuard {
             emit FeeClaimed(msg.sender, feeAmount);
         }
 
-        if (msg.sender == controller.treasury()) {
+        if (msg.sender == factory.treasury()) {
             UFixed18 feeAmount = newFee.protocol();
             newFee._protocol = 0;
             token.push(msg.sender, feeAmount);
@@ -217,7 +217,7 @@ contract Product is IProduct, UInitializable, UOwnable, UReentrancyGuard {
         _update(context, account, context.account.position().mul(Fixed18Lib.NEG_ONE), Fixed18Lib.ZERO, true);
 
         // handle liquidation fee
-        UFixed18 liquidationFee = controller.liquidationFee(); // TODO: external call
+        UFixed18 liquidationFee = factory.liquidationFee(); // TODO: external call
         UFixed18 liquidationReward = UFixed18Lib.min(
             context.account.collateral().max(Fixed18Lib.ZERO).abs(),
             maintenance.mul(liquidationFee)
@@ -285,7 +285,7 @@ contract Product is IProduct, UInitializable, UOwnable, UReentrancyGuard {
         _startGas(context, "_loadContext: %s");
 
         // Load protocol parameters
-        context.protocolParameter = controller.parameter();
+        context.protocolParameter = factory.parameter();
 
         // Load product parameters
         context.parameter = parameter();
