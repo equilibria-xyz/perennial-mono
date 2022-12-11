@@ -12,8 +12,8 @@ import "./types/Version.sol";
 import "./types/Account.sol";
 import "./types/Fee.sol";
 
-interface IProduct {
-    struct ProductDefinition {
+interface IMarket {
+    struct MarketDefinition {
         string name;
         string symbol;
         Token18 token;
@@ -26,28 +26,28 @@ interface IProduct {
     event AccountSettle(address indexed account, uint256 preVersion, uint256 toVersion);
     event Updated(address indexed account, uint256 version, Fixed18 positionAmount, Fixed18 collateralAmount);
     event Liquidation(address indexed account, address liquidator, UFixed18 fee);
-    event FeeSettled(UFixed18 protocolFeeAmount, UFixed18 productFeeAmount);
+    event FeeSettled(UFixed18 protocolFeeAmount, UFixed18 marketFeeAmount);
     event CollateralSettled(address indexed account, Fixed18 amount, UFixed18 newShortfall);
     event TreasuryUpdated(address newTreasury);
     event FeeClaimed(address indexed treasury, UFixed18 feeAmount);
     event ParameterUpdated(Parameter newParameter);
 
-    error ProductInsufficientLiquidityError();
-    error ProductInsufficientCollateralError();
-    error ProductInLiquidationError();
-    error ProductInDebtError();
-    error ProductMakerOverLimitError();
-    error ProductOracleBootstrappingError();
-    error ProductInvalidOracle();
-    error ProductPausedError();
-    error ProductClosedError();
-    error ProductCollateralUnderLimitError();
-    error ProductCantLiquidate();
-    error ProductNotTreasuryError();
+    error MarketInsufficientLiquidityError();
+    error MarketInsufficientCollateralError();
+    error MarketInLiquidationError();
+    error MarketInDebtError();
+    error MarketMakerOverLimitError();
+    error MarketOracleBootstrappingError();
+    error MarketInvalidOracle();
+    error MarketPausedError();
+    error MarketClosedError();
+    error MarketCollateralUnderLimitError();
+    error MarketCantLiquidate();
+    error MarketNotTreasuryError();
     error PayoffProviderInvalidOracle();
     error PayoffProviderInvalidPayoffDefinitionError();
 
-    function initialize(ProductDefinition calldata definition_, Parameter calldata parameter_) external;
+    function initialize(MarketDefinition calldata definition_, Parameter calldata parameter_) external;
     function name() external view returns (string memory);
     function symbol() external view returns (string memory);
     function token() external view returns (Token18);

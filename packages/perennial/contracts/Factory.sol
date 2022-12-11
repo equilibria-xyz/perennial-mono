@@ -8,15 +8,15 @@ import "./interfaces/IFactory.sol";
 
 /**
  * @title Factory
- * @notice Manages creating new products and global protocol parameters.
+ * @notice Manages creating new markets and global protocol parameters.
  */
 contract Factory is IFactory, UInitializable, UOwnable {
     ProtocolParameterStorage private constant _parameter = ProtocolParameterStorage.wrap(keccak256("equilibria.perennial.UParamProvider.parameter"));
     function parameter() public view returns (ProtocolParameter memory) { return _parameter.read(); }
 
-    /// @dev Product implementation beacon address for the protocol
-    AddressStorage private constant _productBeacon = AddressStorage.wrap(keccak256("equilibria.perennial.Factory.productBeacon"));
-    function productBeacon() public view returns (IBeacon) { return IBeacon(_productBeacon.read()); }
+    /// @dev Market implementation beacon address for the protocol
+    AddressStorage private constant _marketBeacon = AddressStorage.wrap(keccak256("equilibria.perennial.Factory.marketBeacon"));
+    function marketBeacon() public view returns (IBeacon) { return IBeacon(_marketBeacon.read()); }
 
     /// @dev Fee on maintenance for liquidation
     UFixed18Storage private constant _liquidationFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.Factory.liquidationFee"));
@@ -40,11 +40,11 @@ contract Factory is IFactory, UInitializable, UOwnable {
      * @notice Initializes the contract state
      * @dev Must be called atomically as part of the upgradeable proxy deployment to
      *      avoid front-running
-     * @param productBeacon_ Product implementation beacon address
+     * @param marketBeacon_ Market implementation beacon address
      */
-    function initialize(IBeacon productBeacon_) external initializer(1) {
+    function initialize(IBeacon marketBeacon_) external initializer(1) {
         __UOwnable__initialize();
-        updateProductBeacon(productBeacon_);
+        updateMarketBeacon(marketBeacon_);
     }
 
     /**
@@ -67,37 +67,37 @@ contract Factory is IFactory, UInitializable, UOwnable {
     }
 
     /**
-     * @notice Creates a new product market with `provider`
+     * @notice Creates a new market market with `provider`
      * @dev Can only be called by the coordinator owner
-     * @return New product contract address
+     * @return New market contract address
      */
-    function createProduct(IProduct.ProductDefinition calldata definition, Parameter calldata productParameter)
+    function createMarket(IMarket.MarketDefinition calldata definition, Parameter calldata marketParameter)
         external
-        returns (IProduct)
+        returns (IMarket)
     {
-        BeaconProxy newProductProxy = new BeaconProxy(
-            address(productBeacon()),
-            abi.encodeCall(IProduct.initialize, (definition, productParameter))
+        BeaconProxy newMarketProxy = new BeaconProxy(
+            address(marketBeacon()),
+            abi.encodeCall(IMarket.initialize, (definition, marketParameter))
         );
-        IProduct newProduct = IProduct(address(newProductProxy));
+        IMarket newMarket = IMarket(address(newMarketProxy));
 
-        UOwnable(address(newProduct)).updatePendingOwner(msg.sender); //TODO: IOwnable in root
+        UOwnable(address(newMarket)).updatePendingOwner(msg.sender); //TODO: IOwnable in root
 
         //TODO: create2 or registration?
 
-        emit ProductCreated(newProduct, definition, productParameter);
+        emit MarketCreated(newMarket, definition, marketParameter);
 
-        return newProduct;
+        return newMarket;
     }
 
     /**
-     * @notice Updates the Product implementation beacon address
-     * @param newProductBeacon New Product implementation beacon address
+     * @notice Updates the Market implementation beacon address
+     * @param newMarketBeacon New Market implementation beacon address
      */
-    function updateProductBeacon(IBeacon newProductBeacon) public onlyOwner {
-        if (!Address.isContract(address(newProductBeacon))) revert FactoryNotContractAddressError();
-        _productBeacon.store(address(newProductBeacon));
-        emit ProductBeaconUpdated(newProductBeacon);
+    function updateMarketBeacon(IBeacon newMarketBeacon) public onlyOwner {
+        if (!Address.isContract(address(newMarketBeacon))) revert FactoryNotContractAddressError();
+        _marketBeacon.store(address(newMarketBeacon));
+        emit MarketBeaconUpdated(newMarketBeacon);
     }
 
     function updateParameter(ProtocolParameter memory newParameter) public onlyOwner {

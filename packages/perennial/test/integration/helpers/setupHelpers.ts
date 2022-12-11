@@ -9,13 +9,13 @@ import {
   TestnetContractPayoffProvider,
   IERC20Metadata,
   ChainlinkOracle,
-  Product,
+  Market,
   IBeacon,
   IERC20Metadata__factory,
   Factory__factory,
   TestnetContractPayoffProvider__factory,
   ChainlinkOracle__factory,
-  Product__factory,
+  Market__factory,
   UpgradeableBeacon__factory,
   Lens,
   Lens__factory,
@@ -56,8 +56,8 @@ export interface InstanceVars {
   usdcHolder: SignerWithAddress
   chainlink: ChainlinkContext
   chainlinkOracle: ChainlinkOracle
-  productBeacon: IBeacon
-  productImpl: Product
+  marketBeacon: IBeacon
+  marketImpl: Market
   lens: Lens
   batcher: IBatcher
   rewardToken: ERC20PresetMinterPauser
@@ -97,11 +97,11 @@ export async function deployProtocol(): Promise<InstanceVars> {
 
   const controller = await new Factory__factory(owner).attach(controllerProxy.address)
 
-  const productImpl = await new Product__factory(owner).deploy()
-  const productBeacon = await new UpgradeableBeacon__factory(owner).deploy(productImpl.address)
+  const marketImpl = await new Market__factory(owner).deploy()
+  const marketBeacon = await new UpgradeableBeacon__factory(owner).deploy(marketImpl.address)
 
   // Init
-  await controller.initialize(productBeacon.address)
+  await controller.initialize(marketBeacon.address)
 
   // Params - TODO: finalize before launch
   await controller.updatePauser(pauser.address)
@@ -145,19 +145,19 @@ export async function deployProtocol(): Promise<InstanceVars> {
     usdcHolder,
     proxyAdmin,
     controller,
-    productBeacon,
-    productImpl,
+    marketBeacon,
+    marketImpl,
     lens,
     batcher,
     rewardToken,
   }
 }
 
-export async function createProduct(
+export async function createMarket(
   instanceVars: InstanceVars,
   payoffProvider?: TestnetContractPayoffProvider,
   oracle?: ChainlinkOracle | ReservoirFeedOracle,
-): Promise<Product> {
+): Promise<Market> {
   const { owner, controller, treasuryB, chainlinkOracle, rewardToken, dsu } = instanceVars
   if (!payoffProvider) {
     payoffProvider = instanceVars.contractPayoffProvider
@@ -193,23 +193,23 @@ export async function createProduct(
       taker: 0,
     },
   }
-  const productAddress = await controller.callStatic.createProduct(definition, parameter)
-  await controller.createProduct(definition, parameter)
+  const marketAddress = await controller.callStatic.createMarket(definition, parameter)
+  await controller.createMarket(definition, parameter)
 
-  const product = Product__factory.connect(productAddress, owner)
-  await product.acceptOwner()
-  await product.updateTreasury(treasuryB.address)
+  const market = Market__factory.connect(marketAddress, owner)
+  await market.acceptOwner()
+  await market.updateTreasury(treasuryB.address)
 
-  return product
+  return market
 }
 
 export async function depositTo(
   instanceVars: InstanceVars,
   user: SignerWithAddress,
-  product: Product,
+  market: Market,
   position: BigNumber,
 ): Promise<void> {
   const { dsu } = instanceVars
-  await dsu.connect(user).approve(product.address, position)
-  await product.connect(user).update(0, position)
+  await dsu.connect(user).approve(market.address, position)
+  await market.connect(user).update(0, position)
 }

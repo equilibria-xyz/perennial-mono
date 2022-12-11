@@ -2,9 +2,9 @@ import { expect } from 'chai'
 import 'hardhat'
 import { constants, utils } from 'ethers'
 
-import { InstanceVars, deployProtocol, createProduct, depositTo, INITIAL_VERSION } from '../helpers/setupHelpers'
+import { InstanceVars, deployProtocol, createMarket, depositTo, INITIAL_VERSION } from '../helpers/setupHelpers'
 import { createPayoffDefinition, expectPositionEq, expectPrePositionEq } from '../../../../common/testutil/types'
-import { Product__factory } from '../../../types/generated'
+import { Market__factory } from '../../../types/generated'
 
 describe.only('Happy Path', () => {
   let instanceVars: InstanceVars
@@ -13,7 +13,7 @@ describe.only('Happy Path', () => {
     instanceVars = await deployProtocol()
   })
 
-  it('creates a product', async () => {
+  it('creates a market', async () => {
     const { owner, user, controller, treasuryB, contractPayoffProvider, chainlinkOracle, dsu, rewardToken, lens } =
       instanceVars
 
@@ -44,55 +44,55 @@ describe.only('Happy Path', () => {
         taker: 0,
       },
     }
-    const productAddress = await controller.callStatic.createProduct(definition, parameter)
-    await expect(controller.createProduct(definition, parameter)).to.emit(controller, 'ProductCreated')
-    const product = Product__factory.connect(productAddress, owner)
-    await product.connect(owner).acceptOwner()
-    await product.connect(owner).updateTreasury(treasuryB.address)
+    const marketAddress = await controller.callStatic.createMarket(definition, parameter)
+    await expect(controller.createMarket(definition, parameter)).to.emit(controller, 'MarketCreated')
+    const market = Market__factory.connect(marketAddress, owner)
+    await market.connect(owner).acceptOwner()
+    await market.connect(owner).updateTreasury(treasuryB.address)
 
-    await dsu.connect(user).approve(productAddress, utils.parseEther('1000'))
-    await depositTo(instanceVars, user, product, utils.parseEther('1000'))
+    await dsu.connect(user).approve(marketAddress, utils.parseEther('1000'))
+    await depositTo(instanceVars, user, market, utils.parseEther('1000'))
 
-    expect((await product.accounts(user.address))._collateral).to.equal(utils.parseEther('1000').div(1e12))
-    expect(await lens.callStatic['collateral(address)'](product.address)).to.equal(utils.parseEther('1000'))
+    expect((await market.accounts(user.address))._collateral).to.equal(utils.parseEther('1000').div(1e12))
+    expect(await lens.callStatic['collateral(address)'](market.address)).to.equal(utils.parseEther('1000'))
   })
 
   it('opens a make position', async () => {
     const POSITION = utils.parseEther('0.0001')
     const { user, chainlink } = instanceVars
 
-    const product = await createProduct(instanceVars)
-    await depositTo(instanceVars, user, product, utils.parseEther('1000'))
+    const market = await createMarket(instanceVars)
+    await depositTo(instanceVars, user, market, utils.parseEther('1000'))
 
-    await expect(product.connect(user).update(POSITION.mul(-1), 0))
-      .to.emit(product, 'Updated')
+    await expect(market.connect(user).update(POSITION.mul(-1), 0))
+      .to.emit(market, 'Updated')
       .withArgs(user.address, INITIAL_VERSION, POSITION.mul(-1), 0)
 
     // Check user is in the correct state
-    expect((await product.accounts(user.address))._position).to.equal(0)
-    expect((await product.accounts(user.address))._pre).to.equal(POSITION.mul(-1).div(1e9))
-    expect(await product.latestVersions(user.address)).to.equal(INITIAL_VERSION)
+    expect((await market.accounts(user.address))._position).to.equal(0)
+    expect((await market.accounts(user.address))._pre).to.equal(POSITION.mul(-1).div(1e9))
+    expect(await market.latestVersions(user.address)).to.equal(INITIAL_VERSION)
 
     // Check global state
-    expect(await product.latestVersion()).to.equal(INITIAL_VERSION)
-    expectPositionEq((await product.versions(INITIAL_VERSION))._position, { maker: 0, taker: 0 })
-    expectPrePositionEq(await product.pre(), {
+    expect(await market.latestVersion()).to.equal(INITIAL_VERSION)
+    expectPositionEq((await market.versions(INITIAL_VERSION))._position, { maker: 0, taker: 0 })
+    expectPrePositionEq(await market.pre(), {
       _maker: POSITION,
       _taker: 0,
       _makerFee: 0,
       _takerFee: 0,
     })
-    expectPositionEq((await product.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
-    expectPositionEq((await product.versions(INITIAL_VERSION))._reward, { maker: 0, taker: 0 })
+    expectPositionEq((await market.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
+    expectPositionEq((await market.versions(INITIAL_VERSION))._reward, { maker: 0, taker: 0 })
 
-    // Settle the product with a new oracle version
+    // Settle the market with a new oracle version
     await chainlink.next()
-    await product.settle(constants.AddressZero)
+    await market.settle(constants.AddressZero)
 
     // Check global post-settlement state
-    expect(await product.latestVersion()).to.equal(INITIAL_VERSION + 1)
-    expectPositionEq((await product.versions(INITIAL_VERSION + 1))._position, { maker: POSITION, taker: 0 })
-    expectPrePositionEq(await product.pre(), {
+    expect(await market.latestVersion()).to.equal(INITIAL_VERSION + 1)
+    expectPositionEq((await market.versions(INITIAL_VERSION + 1))._position, { maker: POSITION, taker: 0 })
+    expectPrePositionEq(await market.pre(), {
       _maker: 0,
       _taker: 0,
       _makerFee: 0,
@@ -100,50 +100,50 @@ describe.only('Happy Path', () => {
     })
 
     // Settle user and check state
-    await product.settle(user.address)
-    expect((await product.accounts(user.address))._position).to.equal(POSITION.mul(-1).div(1e9))
-    expect((await product.accounts(user.address))._pre).to.equal(0)
-    expect(await product.latestVersions(user.address)).to.equal(INITIAL_VERSION + 1)
+    await market.settle(user.address)
+    expect((await market.accounts(user.address))._position).to.equal(POSITION.mul(-1).div(1e9))
+    expect((await market.accounts(user.address))._pre).to.equal(0)
+    expect(await market.latestVersions(user.address)).to.equal(INITIAL_VERSION + 1)
   })
 
   it('opens multiple make positions', async () => {
     const POSITION = utils.parseEther('0.0001')
     const { user, chainlink } = instanceVars
 
-    const product = await createProduct(instanceVars)
-    await depositTo(instanceVars, user, product, utils.parseEther('1000'))
+    const market = await createMarket(instanceVars)
+    await depositTo(instanceVars, user, market, utils.parseEther('1000'))
 
-    await product.connect(user).update(POSITION.div(2).mul(-1), 0)
+    await market.connect(user).update(POSITION.div(2).mul(-1), 0)
 
-    await expect(product.connect(user).update(POSITION.div(2).mul(-1), 0))
-      .to.emit(product, 'Updated')
+    await expect(market.connect(user).update(POSITION.div(2).mul(-1), 0))
+      .to.emit(market, 'Updated')
       .withArgs(user.address, INITIAL_VERSION, POSITION.div(2).mul(-1), 0)
 
     // Check user is in the correct state
-    expect((await product.accounts(user.address))._position).to.equal(0)
-    expect((await product.accounts(user.address))._pre).to.equal(POSITION.mul(-1).div(1e9))
-    expect(await product.latestVersions(user.address)).to.equal(INITIAL_VERSION)
+    expect((await market.accounts(user.address))._position).to.equal(0)
+    expect((await market.accounts(user.address))._pre).to.equal(POSITION.mul(-1).div(1e9))
+    expect(await market.latestVersions(user.address)).to.equal(INITIAL_VERSION)
 
     // Check global state
-    expect(await product.latestVersion()).to.equal(INITIAL_VERSION)
-    expectPositionEq((await product.versions(INITIAL_VERSION))._position, { maker: 0, taker: 0 })
-    expectPrePositionEq(await product.pre(), {
+    expect(await market.latestVersion()).to.equal(INITIAL_VERSION)
+    expectPositionEq((await market.versions(INITIAL_VERSION))._position, { maker: 0, taker: 0 })
+    expectPrePositionEq(await market.pre(), {
       _maker: POSITION,
       _taker: 0,
       _makerFee: 0,
       _takerFee: 0,
     })
-    expectPositionEq((await product.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
-    expectPositionEq((await product.versions(INITIAL_VERSION))._reward, { maker: 0, taker: 0 })
+    expectPositionEq((await market.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
+    expectPositionEq((await market.versions(INITIAL_VERSION))._reward, { maker: 0, taker: 0 })
 
-    // Settle the product with a new oracle version
+    // Settle the market with a new oracle version
     await chainlink.next()
-    await product.settle(constants.AddressZero)
+    await market.settle(constants.AddressZero)
 
     // Check global post-settlement state
-    expect(await product.latestVersion()).to.equal(INITIAL_VERSION + 1)
-    expectPositionEq((await product.versions(INITIAL_VERSION + 1))._position, { maker: POSITION, taker: 0 })
-    expectPrePositionEq(await product.pre(), {
+    expect(await market.latestVersion()).to.equal(INITIAL_VERSION + 1)
+    expectPositionEq((await market.versions(INITIAL_VERSION + 1))._position, { maker: POSITION, taker: 0 })
+    expectPrePositionEq(await market.pre(), {
       _maker: 0,
       _taker: 0,
       _makerFee: 0,
@@ -151,10 +151,10 @@ describe.only('Happy Path', () => {
     })
 
     // Settle user and check state
-    await product.settle(user.address)
-    expect((await product.accounts(user.address))._position).to.equal(POSITION.mul(-1).div(1e9))
-    expect((await product.accounts(user.address))._pre).to.equal(0)
-    expect(await product.latestVersions(user.address)).to.equal(INITIAL_VERSION + 1)
+    await market.settle(user.address)
+    expect((await market.accounts(user.address))._position).to.equal(POSITION.mul(-1).div(1e9))
+    expect((await market.accounts(user.address))._pre).to.equal(0)
+    expect(await market.latestVersions(user.address)).to.equal(INITIAL_VERSION + 1)
   })
 
   it('closes a make position', async () => {
@@ -162,32 +162,32 @@ describe.only('Happy Path', () => {
     const CLOSE_POSITION = utils.parseEther('0.0001')
     const { user, lens } = instanceVars
 
-    const product = await createProduct(instanceVars)
-    await depositTo(instanceVars, user, product, utils.parseEther('1000'))
-    await product.connect(user).update(OPEN_POSITION.mul(-1), 0)
-    await product.connect(user).update(CLOSE_POSITION, 0)
-    // await expect(product.connect(user).update(CLOSE_POSITION))
-    //   .to.emit(product, 'Updated')
+    const market = await createMarket(instanceVars)
+    await depositTo(instanceVars, user, market, utils.parseEther('1000'))
+    await market.connect(user).update(OPEN_POSITION.mul(-1), 0)
+    await market.connect(user).update(CLOSE_POSITION, 0)
+    // await expect(market.connect(user).update(CLOSE_POSITION))
+    //   .to.emit(market, 'Updated')
     //   .withArgs(user.address, INITIAL_VERSION, CLOSE_POSITION, 0)
 
     // User state
-    expect(await lens.callStatic.maintenance(user.address, product.address)).to.equal(0)
-    expect(await lens.callStatic.maintenanceNext(user.address, product.address)).to.equal(0)
-    expect((await product.accounts(user.address))._position).to.equal(0)
-    expect((await product.accounts(user.address))._pre).to.equal(0)
-    expect(await product.latestVersions(user.address)).to.equal(INITIAL_VERSION)
+    expect(await lens.callStatic.maintenance(user.address, market.address)).to.equal(0)
+    expect(await lens.callStatic.maintenanceNext(user.address, market.address)).to.equal(0)
+    expect((await market.accounts(user.address))._position).to.equal(0)
+    expect((await market.accounts(user.address))._pre).to.equal(0)
+    expect(await market.latestVersions(user.address)).to.equal(INITIAL_VERSION)
 
     // Global State
-    expect(await product.latestVersion()).to.equal(INITIAL_VERSION)
-    expectPositionEq((await product.versions(INITIAL_VERSION))._position, { maker: 0, taker: 0 })
-    expectPrePositionEq(await product.pre(), {
+    expect(await market.latestVersion()).to.equal(INITIAL_VERSION)
+    expectPositionEq((await market.versions(INITIAL_VERSION))._position, { maker: 0, taker: 0 })
+    expectPrePositionEq(await market.pre(), {
       _maker: 0,
       _taker: 0,
       _makerFee: 0,
       _takerFee: 0,
     })
-    expectPositionEq((await product.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
-    expectPositionEq((await product.versions(INITIAL_VERSION))._reward, { maker: 0, taker: 0 })
+    expectPositionEq((await market.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
+    expectPositionEq((await market.versions(INITIAL_VERSION))._reward, { maker: 0, taker: 0 })
   })
 
   it('closes multiple make positions', async () => {
@@ -195,33 +195,33 @@ describe.only('Happy Path', () => {
     const CLOSE_POSITION = utils.parseEther('0.0001')
     const { user, lens } = instanceVars
 
-    const product = await createProduct(instanceVars)
-    await depositTo(instanceVars, user, product, utils.parseEther('1000'))
-    await product.connect(user).update(OPEN_POSITION.mul(-1), 0)
-    await product.connect(user).update(CLOSE_POSITION.div(2), 0)
+    const market = await createMarket(instanceVars)
+    await depositTo(instanceVars, user, market, utils.parseEther('1000'))
+    await market.connect(user).update(OPEN_POSITION.mul(-1), 0)
+    await market.connect(user).update(CLOSE_POSITION.div(2), 0)
 
-    await expect(product.connect(user).update(CLOSE_POSITION.div(2), 0))
-      .to.emit(product, 'Updated')
+    await expect(market.connect(user).update(CLOSE_POSITION.div(2), 0))
+      .to.emit(market, 'Updated')
       .withArgs(user.address, INITIAL_VERSION, CLOSE_POSITION.div(2), 0)
 
     // User state
-    expect(await lens.callStatic.maintenance(user.address, product.address)).to.equal(0)
-    expect(await lens.callStatic.maintenanceNext(user.address, product.address)).to.equal(0)
-    expect((await product.accounts(user.address))._position).to.equal(0)
-    expect((await product.accounts(user.address))._pre).to.equal(0)
-    expect(await product.latestVersions(user.address)).to.equal(INITIAL_VERSION)
+    expect(await lens.callStatic.maintenance(user.address, market.address)).to.equal(0)
+    expect(await lens.callStatic.maintenanceNext(user.address, market.address)).to.equal(0)
+    expect((await market.accounts(user.address))._position).to.equal(0)
+    expect((await market.accounts(user.address))._pre).to.equal(0)
+    expect(await market.latestVersions(user.address)).to.equal(INITIAL_VERSION)
 
     // Global State
-    expect(await product.latestVersion()).to.equal(INITIAL_VERSION)
-    expectPositionEq((await product.versions(INITIAL_VERSION))._position, { maker: 0, taker: 0 })
-    expectPrePositionEq(await product.pre(), {
+    expect(await market.latestVersion()).to.equal(INITIAL_VERSION)
+    expectPositionEq((await market.versions(INITIAL_VERSION))._position, { maker: 0, taker: 0 })
+    expectPrePositionEq(await market.pre(), {
       _maker: 0,
       _taker: 0,
       _makerFee: 0,
       _takerFee: 0,
     })
-    expectPositionEq((await product.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
-    expectPositionEq((await product.versions(INITIAL_VERSION))._reward, { maker: 0, taker: 0 })
+    expectPositionEq((await market.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
+    expectPositionEq((await market.versions(INITIAL_VERSION))._reward, { maker: 0, taker: 0 })
   })
 
   it('opens a take position', async () => {
@@ -229,31 +229,31 @@ describe.only('Happy Path', () => {
     const TAKE_POSITION = utils.parseEther('0.00001')
     const { user, userB, chainlink, chainlinkOracle } = instanceVars
 
-    const product = await createProduct(instanceVars)
-    await depositTo(instanceVars, user, product, utils.parseEther('1000'))
-    await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
+    const market = await createMarket(instanceVars)
+    await depositTo(instanceVars, user, market, utils.parseEther('1000'))
+    await depositTo(instanceVars, userB, market, utils.parseEther('1000'))
 
-    await product.connect(user).update(MAKE_POSITION.mul(-1), 0)
-    await expect(product.connect(userB).update(TAKE_POSITION, 0))
-      .to.emit(product, 'Updated')
+    await market.connect(user).update(MAKE_POSITION.mul(-1), 0)
+    await expect(market.connect(userB).update(TAKE_POSITION, 0))
+      .to.emit(market, 'Updated')
       .withArgs(userB.address, INITIAL_VERSION, TAKE_POSITION, 0)
 
     // User State
-    expect((await product.accounts(userB.address))._position).to.equal(0)
-    expect((await product.accounts(userB.address))._pre).to.equal(TAKE_POSITION.div(1e9))
-    expect(await product.latestVersions(userB.address)).to.equal(INITIAL_VERSION)
+    expect((await market.accounts(userB.address))._position).to.equal(0)
+    expect((await market.accounts(userB.address))._pre).to.equal(TAKE_POSITION.div(1e9))
+    expect(await market.latestVersions(userB.address)).to.equal(INITIAL_VERSION)
 
     // Global State
-    expect(await product.latestVersion()).to.equal(INITIAL_VERSION)
-    expectPositionEq((await product.versions(INITIAL_VERSION))._position, { maker: 0, taker: 0 })
-    expectPrePositionEq(await product.pre(), {
+    expect(await market.latestVersion()).to.equal(INITIAL_VERSION)
+    expectPositionEq((await market.versions(INITIAL_VERSION))._position, { maker: 0, taker: 0 })
+    expectPrePositionEq(await market.pre(), {
       _maker: MAKE_POSITION,
       _taker: TAKE_POSITION,
       _makerFee: 0,
       _takerFee: 0,
     })
-    expectPositionEq((await product.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
-    expectPositionEq((await product.versions(INITIAL_VERSION))._reward, { maker: 0, taker: 0 })
+    expectPositionEq((await market.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
+    expectPositionEq((await market.versions(INITIAL_VERSION))._reward, { maker: 0, taker: 0 })
 
     // One round
     await chainlink.next()
@@ -261,23 +261,23 @@ describe.only('Happy Path', () => {
 
     // Another round
     await chainlink.next()
-    await product.settle(constants.AddressZero)
+    await market.settle(constants.AddressZero)
 
-    expect(await product.latestVersion()).to.equal(INITIAL_VERSION + 2)
-    expectPositionEq((await product.versions(INITIAL_VERSION + 2))._position, {
+    expect(await market.latestVersion()).to.equal(INITIAL_VERSION + 2)
+    expectPositionEq((await market.versions(INITIAL_VERSION + 2))._position, {
       maker: MAKE_POSITION,
       taker: TAKE_POSITION,
     })
-    expectPrePositionEq(await product.pre(), {
+    expectPrePositionEq(await market.pre(), {
       _maker: 0,
       _taker: 0,
       _makerFee: 0,
       _takerFee: 0,
     })
-    await product.settle(userB.address)
-    expect((await product.accounts(userB.address))._position).to.equal(TAKE_POSITION.div(1e9))
-    expect((await product.accounts(userB.address))._pre).to.equal(0)
-    expect(await product.latestVersions(userB.address)).to.equal(INITIAL_VERSION + 2)
+    await market.settle(userB.address)
+    expect((await market.accounts(userB.address))._position).to.equal(TAKE_POSITION.div(1e9))
+    expect((await market.accounts(userB.address))._pre).to.equal(0)
+    expect(await market.latestVersions(userB.address)).to.equal(INITIAL_VERSION + 2)
   })
 
   it('opens multiple take positions', async () => {
@@ -285,33 +285,33 @@ describe.only('Happy Path', () => {
     const TAKE_POSITION = utils.parseEther('0.00001')
     const { user, userB, chainlink, chainlinkOracle } = instanceVars
 
-    const product = await createProduct(instanceVars)
-    await depositTo(instanceVars, user, product, utils.parseEther('1000'))
-    await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
+    const market = await createMarket(instanceVars)
+    await depositTo(instanceVars, user, market, utils.parseEther('1000'))
+    await depositTo(instanceVars, userB, market, utils.parseEther('1000'))
 
-    await product.connect(user).update(MAKE_POSITION.mul(-1), 0)
-    await product.connect(userB).update(TAKE_POSITION.div(2), 0)
+    await market.connect(user).update(MAKE_POSITION.mul(-1), 0)
+    await market.connect(userB).update(TAKE_POSITION.div(2), 0)
 
-    await expect(product.connect(userB).update(TAKE_POSITION.div(2), 0))
-      .to.emit(product, 'Updated')
+    await expect(market.connect(userB).update(TAKE_POSITION.div(2), 0))
+      .to.emit(market, 'Updated')
       .withArgs(userB.address, INITIAL_VERSION, TAKE_POSITION.div(2), 0)
 
     // User State
-    expect((await product.accounts(userB.address))._position).to.equal(0)
-    expect((await product.accounts(userB.address))._pre).to.equal(TAKE_POSITION.div(1e9))
-    expect(await product.latestVersions(userB.address)).to.equal(INITIAL_VERSION)
+    expect((await market.accounts(userB.address))._position).to.equal(0)
+    expect((await market.accounts(userB.address))._pre).to.equal(TAKE_POSITION.div(1e9))
+    expect(await market.latestVersions(userB.address)).to.equal(INITIAL_VERSION)
 
     // Global State
-    expect(await product.latestVersion()).to.equal(INITIAL_VERSION)
-    expectPositionEq((await product.versions(INITIAL_VERSION))._position, { maker: 0, taker: 0 })
-    expectPrePositionEq(await product.pre(), {
+    expect(await market.latestVersion()).to.equal(INITIAL_VERSION)
+    expectPositionEq((await market.versions(INITIAL_VERSION))._position, { maker: 0, taker: 0 })
+    expectPrePositionEq(await market.pre(), {
       _maker: MAKE_POSITION,
       _taker: TAKE_POSITION,
       _makerFee: 0,
       _takerFee: 0,
     })
-    expectPositionEq((await product.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
-    expectPositionEq((await product.versions(INITIAL_VERSION))._reward, { maker: 0, taker: 0 })
+    expectPositionEq((await market.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
+    expectPositionEq((await market.versions(INITIAL_VERSION))._reward, { maker: 0, taker: 0 })
 
     // One round
     await chainlink.next()
@@ -319,23 +319,23 @@ describe.only('Happy Path', () => {
 
     // Another round
     await chainlink.next()
-    await product.settle(constants.AddressZero)
+    await market.settle(constants.AddressZero)
 
-    expect(await product.latestVersion()).to.equal(INITIAL_VERSION + 2)
-    expectPositionEq((await product.versions(INITIAL_VERSION + 2))._position, {
+    expect(await market.latestVersion()).to.equal(INITIAL_VERSION + 2)
+    expectPositionEq((await market.versions(INITIAL_VERSION + 2))._position, {
       maker: MAKE_POSITION,
       taker: TAKE_POSITION,
     })
-    expectPrePositionEq(await product.pre(), {
+    expectPrePositionEq(await market.pre(), {
       _maker: 0,
       _taker: 0,
       _makerFee: 0,
       _takerFee: 0,
     })
-    await product.settle(userB.address)
-    expect((await product.accounts(userB.address))._position).to.equal(TAKE_POSITION.div(1e9))
-    expect((await product.accounts(userB.address))._pre).to.equal(0)
-    expect(await product.latestVersions(userB.address)).to.equal(INITIAL_VERSION + 2)
+    await market.settle(userB.address)
+    expect((await market.accounts(userB.address))._position).to.equal(TAKE_POSITION.div(1e9))
+    expect((await market.accounts(userB.address))._pre).to.equal(0)
+    expect(await market.latestVersions(userB.address)).to.equal(INITIAL_VERSION + 2)
   })
 
   it('closes a take position', async () => {
@@ -344,38 +344,38 @@ describe.only('Happy Path', () => {
     const CLOSE_TAKE_POSITION = utils.parseEther('0.00001')
     const { user, userB, lens } = instanceVars
 
-    const product = await createProduct(instanceVars)
-    await depositTo(instanceVars, user, product, utils.parseEther('1000'))
-    await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
+    const market = await createMarket(instanceVars)
+    await depositTo(instanceVars, user, market, utils.parseEther('1000'))
+    await depositTo(instanceVars, userB, market, utils.parseEther('1000'))
 
-    await expect(product.connect(userB).update(OPEN_TAKE_POSITION, 0)).to.be.revertedWith(
-      'ProductInsufficientLiquidityError()',
+    await expect(market.connect(userB).update(OPEN_TAKE_POSITION, 0)).to.be.revertedWith(
+      'MarketInsufficientLiquidityError()',
     )
-    await product.connect(user).update(OPEN_MAKE_POSITION.mul(-1), 0)
-    await product.connect(userB).update(OPEN_TAKE_POSITION, 0)
+    await market.connect(user).update(OPEN_MAKE_POSITION.mul(-1), 0)
+    await market.connect(userB).update(OPEN_TAKE_POSITION, 0)
 
-    await expect(product.connect(userB).update(CLOSE_TAKE_POSITION.mul(-1), 0))
-      .to.emit(product, 'Updated')
+    await expect(market.connect(userB).update(CLOSE_TAKE_POSITION.mul(-1), 0))
+      .to.emit(market, 'Updated')
       .withArgs(userB.address, INITIAL_VERSION, CLOSE_TAKE_POSITION.mul(-1), 0)
 
     // User State
-    expect(await lens.callStatic.maintenance(userB.address, product.address)).to.equal(0)
-    expect(await lens.callStatic.maintenanceNext(userB.address, product.address)).to.equal(0)
-    expect((await product.accounts(userB.address))._position).to.equal(0)
-    expect((await product.accounts(userB.address))._pre).to.equal(0)
-    expect(await product.latestVersions(user.address)).to.equal(INITIAL_VERSION)
+    expect(await lens.callStatic.maintenance(userB.address, market.address)).to.equal(0)
+    expect(await lens.callStatic.maintenanceNext(userB.address, market.address)).to.equal(0)
+    expect((await market.accounts(userB.address))._position).to.equal(0)
+    expect((await market.accounts(userB.address))._pre).to.equal(0)
+    expect(await market.latestVersions(user.address)).to.equal(INITIAL_VERSION)
 
     // Global State
-    expect(await product.latestVersion()).to.equal(INITIAL_VERSION)
-    expectPositionEq((await product.versions(INITIAL_VERSION))._position, { maker: 0, taker: 0 })
-    expectPrePositionEq(await product.pre(), {
+    expect(await market.latestVersion()).to.equal(INITIAL_VERSION)
+    expectPositionEq((await market.versions(INITIAL_VERSION))._position, { maker: 0, taker: 0 })
+    expectPrePositionEq(await market.pre(), {
       _maker: OPEN_MAKE_POSITION,
       _taker: 0,
       _makerFee: 0,
       _takerFee: 0,
     })
-    expectPositionEq((await product.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
-    expectPositionEq((await product.versions(INITIAL_VERSION))._reward, { maker: 0, taker: 0 })
+    expectPositionEq((await market.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
+    expectPositionEq((await market.versions(INITIAL_VERSION))._reward, { maker: 0, taker: 0 })
   })
 
   it('closes multiple take positions', async () => {
@@ -384,104 +384,104 @@ describe.only('Happy Path', () => {
     const CLOSE_TAKE_POSITION = utils.parseEther('0.00001')
     const { user, userB, lens } = instanceVars
 
-    const product = await createProduct(instanceVars)
-    await depositTo(instanceVars, user, product, utils.parseEther('1000'))
-    await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
+    const market = await createMarket(instanceVars)
+    await depositTo(instanceVars, user, market, utils.parseEther('1000'))
+    await depositTo(instanceVars, userB, market, utils.parseEther('1000'))
 
-    await expect(product.connect(userB).update(OPEN_TAKE_POSITION, 0)).to.be.revertedWith(
-      'ProductInsufficientLiquidityError()',
+    await expect(market.connect(userB).update(OPEN_TAKE_POSITION, 0)).to.be.revertedWith(
+      'MarketInsufficientLiquidityError()',
     )
-    await product.connect(user).update(OPEN_MAKE_POSITION.mul(-1), 0)
-    await product.connect(userB).update(OPEN_TAKE_POSITION, 0)
-    await product.connect(userB).update(CLOSE_TAKE_POSITION.div(2).mul(-1), 0)
+    await market.connect(user).update(OPEN_MAKE_POSITION.mul(-1), 0)
+    await market.connect(userB).update(OPEN_TAKE_POSITION, 0)
+    await market.connect(userB).update(CLOSE_TAKE_POSITION.div(2).mul(-1), 0)
 
-    await expect(product.connect(userB).update(CLOSE_TAKE_POSITION.div(2).mul(-1), 0))
-      .to.emit(product, 'Updated')
+    await expect(market.connect(userB).update(CLOSE_TAKE_POSITION.div(2).mul(-1), 0))
+      .to.emit(market, 'Updated')
       .withArgs(userB.address, INITIAL_VERSION, CLOSE_TAKE_POSITION.div(2).mul(-1), 0)
 
     // User State
-    expect(await lens.callStatic.maintenance(userB.address, product.address)).to.equal(0)
-    expect(await lens.callStatic.maintenanceNext(userB.address, product.address)).to.equal(0)
-    expect((await product.accounts(userB.address))._position).to.equal(0)
-    expect((await product.accounts(userB.address))._pre).to.equal(0)
-    expect(await product.latestVersions(user.address)).to.equal(INITIAL_VERSION)
+    expect(await lens.callStatic.maintenance(userB.address, market.address)).to.equal(0)
+    expect(await lens.callStatic.maintenanceNext(userB.address, market.address)).to.equal(0)
+    expect((await market.accounts(userB.address))._position).to.equal(0)
+    expect((await market.accounts(userB.address))._pre).to.equal(0)
+    expect(await market.latestVersions(user.address)).to.equal(INITIAL_VERSION)
 
     // Global State
-    expect(await product.latestVersion()).to.equal(INITIAL_VERSION)
-    expectPositionEq((await product.versions(INITIAL_VERSION))._position, { maker: 0, taker: 0 })
-    expectPrePositionEq(await product.pre(), {
+    expect(await market.latestVersion()).to.equal(INITIAL_VERSION)
+    expectPositionEq((await market.versions(INITIAL_VERSION))._position, { maker: 0, taker: 0 })
+    expectPrePositionEq(await market.pre(), {
       _maker: OPEN_MAKE_POSITION,
       _taker: 0,
       _makerFee: 0,
       _takerFee: 0,
     })
-    expectPositionEq((await product.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
-    expectPositionEq((await product.versions(INITIAL_VERSION))._reward, { maker: 0, taker: 0 })
+    expectPositionEq((await market.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
+    expectPositionEq((await market.versions(INITIAL_VERSION))._reward, { maker: 0, taker: 0 })
   })
 
   it('settle no op (gas test)', async () => {
     const { user } = instanceVars
 
-    const product = await createProduct(instanceVars)
+    const market = await createMarket(instanceVars)
 
-    await product.settle(user.address)
-    await product.settle(user.address)
+    await market.settle(user.address)
+    await market.settle(user.address)
   })
 
   it('disables actions when paused', async () => {
     const { controller, pauser, user } = instanceVars
-    const product = await createProduct(instanceVars)
+    const market = await createMarket(instanceVars)
 
     await expect(controller.connect(pauser).updatePaused(true)).to.emit(controller, 'ParameterUpdated')
-    await expect(product.update(0, utils.parseEther('1000'))).to.be.revertedWith('PausedError()')
-    await expect(product.liquidate(user.address)).to.be.revertedWith('PausedError()')
-    await expect(product.update(utils.parseEther('0.001'), 0)).to.be.revertedWith('PausedError()')
-    await expect(product.settle(user.address)).to.be.revertedWith('PausedError()')
+    await expect(market.update(0, utils.parseEther('1000'))).to.be.revertedWith('PausedError()')
+    await expect(market.liquidate(user.address)).to.be.revertedWith('PausedError()')
+    await expect(market.update(utils.parseEther('0.001'), 0)).to.be.revertedWith('PausedError()')
+    await expect(market.settle(user.address)).to.be.revertedWith('PausedError()')
   })
 
   it('delayed update w/ collateral (gas)', async () => {
     const POSITION = utils.parseEther('0.0001')
     const { user, userB, dsu, chainlink } = instanceVars
 
-    const product = await createProduct(instanceVars)
-    await dsu.connect(user).approve(product.address, utils.parseEther('1000'))
-    await dsu.connect(userB).approve(product.address, utils.parseEther('1000'))
-    await product.connect(user).update(POSITION.div(2).mul(-1), utils.parseEther('1000'))
-    await product.connect(userB).update(POSITION.div(2), utils.parseEther('1000'))
+    const market = await createMarket(instanceVars)
+    await dsu.connect(user).approve(market.address, utils.parseEther('1000'))
+    await dsu.connect(userB).approve(market.address, utils.parseEther('1000'))
+    await market.connect(user).update(POSITION.div(2).mul(-1), utils.parseEther('1000'))
+    await market.connect(userB).update(POSITION.div(2), utils.parseEther('1000'))
 
     // Test with rewards on
-    // await product.updateRewardRate({maker: utils.parseEther('0.01'), taker: utils.parseEther('0.001')})
+    // await market.updateRewardRate({maker: utils.parseEther('0.01'), taker: utils.parseEther('0.001')})
 
     // Ensure a->b->c
     await chainlink.next()
     await chainlink.next()
 
-    await expect(product.connect(user).update(POSITION.div(2).mul(-1), utils.parseEther('-1')))
-      .to.emit(product, 'Updated')
+    await expect(market.connect(user).update(POSITION.div(2).mul(-1), utils.parseEther('-1')))
+      .to.emit(market, 'Updated')
       .withArgs(user.address, INITIAL_VERSION + 2, POSITION.div(2).mul(-1), utils.parseEther('-1'))
 
     // Check user is in the correct state
-    expect((await product.accounts(user.address))._position).to.equal(POSITION.div(2).mul(-1).div(1e9))
-    expect((await product.accounts(user.address))._pre).to.equal(POSITION.div(2).mul(-1).div(1e9))
-    expect(await product.latestVersions(user.address)).to.equal(INITIAL_VERSION + 2)
+    expect((await market.accounts(user.address))._position).to.equal(POSITION.div(2).mul(-1).div(1e9))
+    expect((await market.accounts(user.address))._pre).to.equal(POSITION.div(2).mul(-1).div(1e9))
+    expect(await market.latestVersions(user.address)).to.equal(INITIAL_VERSION + 2)
 
     // Check global state
-    expect(await product.latestVersion()).to.equal(INITIAL_VERSION + 2)
-    expectPositionEq((await product.versions(INITIAL_VERSION + 2))._position, {
+    expect(await market.latestVersion()).to.equal(INITIAL_VERSION + 2)
+    expectPositionEq((await market.versions(INITIAL_VERSION + 2))._position, {
       maker: POSITION.div(2),
       taker: POSITION.div(2),
     })
-    expectPrePositionEq(await product.pre(), {
+    expectPrePositionEq(await market.pre(), {
       _maker: POSITION.div(2),
       _taker: 0,
       _makerFee: 0,
       _takerFee: 0,
     })
-    expectPositionEq((await product.versions(INITIAL_VERSION + 2))._value, {
+    expectPositionEq((await market.versions(INITIAL_VERSION + 2))._value, {
       maker: '-29840671308188362617140000',
       taker: '-32892462923465729382860000',
     })
-    expectPositionEq((await product.versions(INITIAL_VERSION + 2))._reward, {
+    expectPositionEq((await market.versions(INITIAL_VERSION + 2))._reward, {
       maker: 0,
       taker: 0,
     })

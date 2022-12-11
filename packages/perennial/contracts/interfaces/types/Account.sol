@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.17;
 
-import "../IProduct.sol";
+import "../IMarket.sol";
 import "./PrePosition.sol";
 import "./Version.sol";
 

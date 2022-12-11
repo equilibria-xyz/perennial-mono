@@ -3,7 +3,7 @@ pragma solidity ^0.8.13;
 
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@equilibria/root/number/types/UFixed18.sol";
-import "../IProduct.sol";
+import "../IMarket.sol";
 import "./Accumulator.sol";
 import "./PrePosition.sol";
 import "./PackedPosition.sol";

@@ -2,7 +2,7 @@ import { expect } from 'chai'
 import 'hardhat'
 import { BigNumber, constants, utils } from 'ethers'
 
-import { InstanceVars, deployProtocol, createProduct, depositTo } from '../helpers/setupHelpers'
+import { InstanceVars, deployProtocol, createMarket, depositTo } from '../helpers/setupHelpers'
 
 describe('Liquidate', () => {
   let instanceVars: InstanceVars
@@ -15,112 +15,112 @@ describe('Liquidate', () => {
     const POSITION = utils.parseEther('0.0001')
     const { user, userB, dsu, chainlink, lens } = instanceVars
 
-    const product = await createProduct(instanceVars)
-    await depositTo(instanceVars, user, product, utils.parseEther('1000'))
-    await product.connect(user).update(POSITION.mul(-1), 0)
+    const market = await createMarket(instanceVars)
+    await depositTo(instanceVars, user, market, utils.parseEther('1000'))
+    await market.connect(user).update(POSITION.mul(-1), 0)
 
-    expect(await lens.callStatic.liquidatable(user.address, product.address)).to.be.false
+    expect(await lens.callStatic.liquidatable(user.address, market.address)).to.be.false
 
-    // Settle the product with a new oracle version
+    // Settle the market with a new oracle version
     await chainlink.nextWithPriceModification(price => price.mul(10))
-    await product.settle(user.address)
+    await market.settle(user.address)
 
-    expect(await lens.callStatic.liquidatable(user.address, product.address)).to.be.true
+    expect(await lens.callStatic.liquidatable(user.address, market.address)).to.be.true
 
-    await expect(product.connect(userB).liquidate(user.address))
-      .to.emit(product, 'Liquidation')
-      .withArgs(user.address, product.address, userB.address, utils.parseEther('1000'))
+    await expect(market.connect(userB).liquidate(user.address))
+      .to.emit(market, 'Liquidation')
+      .withArgs(user.address, market.address, userB.address, utils.parseEther('1000'))
 
-    expect(await product.liquidation(user.address)).to.be.true
+    expect(await market.liquidation(user.address)).to.be.true
 
-    expect((await product.accounts(user.address))._collateral).to.equal(0)
-    expect(await lens.callStatic['collateral(address)'](product.address)).to.equal(0)
+    expect((await market.accounts(user.address))._collateral).to.equal(0)
+    expect(await lens.callStatic['collateral(address)'](market.address)).to.equal(0)
     expect(await dsu.balanceOf(userB.address)).to.equal(utils.parseEther('21000')) // Original 20000 + fee
 
     await chainlink.next()
-    await product.settle(user.address)
+    await market.settle(user.address)
 
-    expect(await product.liquidation(user.address)).to.be.false
+    expect(await market.liquidation(user.address)).to.be.false
   })
 
   it('creates and resolves a shortfall', async () => {
     const POSITION = utils.parseEther('0.0001')
     const { user, userB, dsu, chainlink } = instanceVars
 
-    const product = await createProduct(instanceVars)
-    await depositTo(instanceVars, user, product, utils.parseEther('1000'))
-    await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
-    await product.connect(user).update(POSITION.mul(-1), 0)
-    await product.connect(userB).update(POSITION, 0)
+    const market = await createMarket(instanceVars)
+    await depositTo(instanceVars, user, market, utils.parseEther('1000'))
+    await depositTo(instanceVars, userB, market, utils.parseEther('1000'))
+    await market.connect(user).update(POSITION.mul(-1), 0)
+    await market.connect(userB).update(POSITION, 0)
 
-    // Settle the product with a new oracle version
+    // Settle the market with a new oracle version
     await chainlink.next()
-    await product.settle(constants.AddressZero)
+    await market.settle(constants.AddressZero)
 
     await chainlink.nextWithPriceModification(price => price.mul(2))
-    await product.settle(user.address)
-    await product.settle(userB.address)
+    await market.settle(user.address)
+    await market.settle(userB.address)
 
-    expect((await product.accounts(user.address))._collateral).to.equal(
+    expect((await market.accounts(user.address))._collateral).to.equal(
       BigNumber.from('-2463736825720737646856').div(1e12),
     )
 
-    const userBCollateral = (await product.accounts(userB.address))._collateral
-    await expect(product.connect(userB).update(0, userBCollateral.mul(-1))).to.be.revertedWith('0x11') // underflow
+    const userBCollateral = (await market.accounts(userB.address))._collateral
+    await expect(market.connect(userB).update(0, userBCollateral.mul(-1))).to.be.revertedWith('0x11') // underflow
 
-    await dsu.connect(userB).approve(product.address, constants.MaxUint256)
-    await product.connect(user).update(0, '2463736825720737646856') //TODO: from userB?
+    await dsu.connect(userB).approve(market.address, constants.MaxUint256)
+    await market.connect(user).update(0, '2463736825720737646856') //TODO: from userB?
 
-    expect((await product.accounts(user.address))._collateral).to.equal(0)
+    expect((await market.accounts(user.address))._collateral).to.equal(0)
   })
 
   it('uses a socialization factor', async () => {
     const POSITION = utils.parseEther('0.0001')
     const { user, userB, userC, userD, chainlink, lens } = instanceVars
 
-    const product = await createProduct(instanceVars)
-    await depositTo(instanceVars, user, product, utils.parseEther('1000'))
-    await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
-    await depositTo(instanceVars, userC, product, utils.parseEther('10000'))
-    await depositTo(instanceVars, userD, product, utils.parseEther('10000'))
-    await product.connect(user).update(POSITION.mul(-1), 0)
-    await product.connect(userB).update(POSITION.mul(-1), 0)
-    await product.connect(userC).update(POSITION, 0)
-    await product.connect(userD).update(POSITION, 0)
+    const market = await createMarket(instanceVars)
+    await depositTo(instanceVars, user, market, utils.parseEther('1000'))
+    await depositTo(instanceVars, userB, market, utils.parseEther('1000'))
+    await depositTo(instanceVars, userC, market, utils.parseEther('10000'))
+    await depositTo(instanceVars, userD, market, utils.parseEther('10000'))
+    await market.connect(user).update(POSITION.mul(-1), 0)
+    await market.connect(userB).update(POSITION.mul(-1), 0)
+    await market.connect(userC).update(POSITION, 0)
+    await market.connect(userD).update(POSITION, 0)
 
-    expect(await lens.callStatic.liquidatable(user.address, product.address)).to.be.false
+    expect(await lens.callStatic.liquidatable(user.address, market.address)).to.be.false
 
-    // Settle the product with a new oracle version
+    // Settle the market with a new oracle version
     await chainlink.nextWithPriceModification(price => price.mul(2))
 
     // Liquidate `user` which results in taker > maker
     const expectedLiquidationFee = BigNumber.from('682778989173237912428')
-    await expect(product.connect(userB).liquidate(user.address))
-      .to.emit(product, 'Liquidation')
-      .withArgs(user.address, product.address, userB.address, expectedLiquidationFee)
+    await expect(market.connect(userB).liquidate(user.address))
+      .to.emit(market, 'Liquidation')
+      .withArgs(user.address, market.address, userB.address, expectedLiquidationFee)
 
     await chainlink.next()
-    await product.settle(user.address)
-    await product.settle(userB.address)
-    await product.settle(userC.address)
-    await product.settle(userD.address)
+    await market.settle(user.address)
+    await market.settle(userB.address)
+    await market.settle(userC.address)
+    await market.settle(userD.address)
 
-    const currA = (await product.accounts(user.address))._collateral
-    const currB = (await product.accounts(userB.address))._collateral
-    const currC = (await product.accounts(userC.address))._collateral
-    const currD = (await product.accounts(userD.address))._collateral
+    const currA = (await market.accounts(user.address))._collateral
+    const currB = (await market.accounts(userB.address))._collateral
+    const currC = (await market.accounts(userC.address))._collateral
+    const currD = (await market.accounts(userD.address))._collateral
     const totalCurr = currA.add(currB).add(currC).add(currD)
-    const feesCurr = (await product.fee())._protocol.add((await product.fee())._product)
+    const feesCurr = (await market.fee())._protocol.add((await market.fee())._market)
 
     await chainlink.next()
-    await product.settle(userB.address)
-    await product.settle(userC.address)
-    await product.settle(userD.address)
+    await market.settle(userB.address)
+    await market.settle(userC.address)
+    await market.settle(userD.address)
 
-    const newA = (await product.accounts(user.address))._collateral
-    const newB = (await product.accounts(userB.address))._collateral
-    const newC = (await product.accounts(userC.address))._collateral
-    const newD = (await product.accounts(userD.address))._collateral
+    const newA = (await market.accounts(user.address))._collateral
+    const newB = (await market.accounts(userB.address))._collateral
+    const newC = (await market.accounts(userC.address))._collateral
+    const newD = (await market.accounts(userD.address))._collateral
     const totalNew = newA.add(newB).add(newC).add(newD)
 
     // Expect the loss from B to be socialized equally to C and D
@@ -129,7 +129,7 @@ describe('Liquidate', () => {
     expect(currC.lt(newC)).to.equal(true)
     expect(currD.lt(newD)).to.equal(true)
 
-    const feesNew = (await product.fee())._protocol.add((await product.fee())._product)
+    const feesNew = (await market.fee())._protocol.add((await market.fee())._market)
 
     expect(totalCurr.add(feesCurr)).to.be.gte(totalNew.add(feesNew))
     expect(totalCurr.add(feesCurr)).to.be.closeTo(totalNew.add(feesNew), 1)

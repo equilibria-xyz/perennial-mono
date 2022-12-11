@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.17;
 
-import "../IProduct.sol";
+import "../IMarket.sol";
 import "./PrePosition.sol";
 import "./Version.sol";
 
@@ -11,7 +11,7 @@ import "./Version.sol";
 struct Fee {
     uint128 _protocol; // 18 decimals
 
-    uint128 _product; // 18 decimals
+    uint128 _market; // 18 decimals
 }
 using FeeLib for Fee global;
 
@@ -22,16 +22,16 @@ using FeeLib for Fee global;
 library FeeLib {
     function update(Fee memory self, UFixed18 amount, UFixed18 protocolFee) internal pure {
         UFixed18 protocolAmount = amount.mul(protocolFee);
-        UFixed18 productAmount = amount.sub(protocolAmount);
+        UFixed18 marketAmount = amount.sub(protocolAmount);
         self._protocol = uint128(UFixed18.unwrap(protocol(self).add(protocolAmount)));
-        self._product = uint128(UFixed18.unwrap(product(self).add(productAmount)));
+        self._market = uint128(UFixed18.unwrap(market(self).add(marketAmount)));
     }
 
     function protocol(Fee memory self) internal pure returns (UFixed18) {
         return UFixed18.wrap(uint256(self._protocol));
     }
 
-    function product(Fee memory self) internal pure returns (UFixed18) {
-        return UFixed18.wrap(uint256(self._product));
+    function market(Fee memory self) internal pure returns (UFixed18) {
+        return UFixed18.wrap(uint256(self._market));
     }
 }

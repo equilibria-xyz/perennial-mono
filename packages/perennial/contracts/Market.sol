@@ -4,7 +4,7 @@ pragma solidity 0.8.17;
 import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@equilibria/root/control/unstructured/UOwnable.sol";
 import "@equilibria/root/control/unstructured/UReentrancyGuard.sol";
-import "./interfaces/IProduct.sol";
+import "./interfaces/IMarket.sol";
 import "./interfaces/IFactory.sol";
 import "hardhat/console.sol";
 
@@ -13,16 +13,16 @@ import "hardhat/console.sol";
 // TODO: lots of params can be passed in from global settle to account settle
 
 /**
- * @title Product
- * @notice Manages logic and state for a single product market.
- * @dev Cloned by the Factory contract to launch new product markets.
+ * @title Market
+ * @notice Manages logic and state for a single market market.
+ * @dev Cloned by the Factory contract to launch new market markets.
  */
-contract Product is IProduct, UInitializable, UOwnable, UReentrancyGuard {
+contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
     struct CurrentContext {
         /* Global Parameters */
         ProtocolParameter protocolParameter;
 
-        /* Product Parameters */
+        /* Market Parameters */
 
         Parameter parameter;
 
@@ -53,10 +53,10 @@ contract Product is IProduct, UInitializable, UOwnable, UReentrancyGuard {
     /// @dev The protocol factory
     IFactory public factory;
 
-    /// @dev The name of the product
+    /// @dev The name of the market
     string public name;
 
-    /// @dev The symbol of the product
+    /// @dev The symbol of the market
     string public symbol;
 
     /// @dev ERC20 stablecoin for collateral
@@ -65,7 +65,7 @@ contract Product is IProduct, UInitializable, UOwnable, UReentrancyGuard {
     /// @dev ERC20 stablecoin for reward
     Token18 public reward;
 
-    /// @dev Protocol and product fees collected, but not yet claimed
+    /// @dev Protocol and market fees collected, but not yet claimed
     Fee private _fee;
 
     /// @dev The individual state for each account
@@ -82,7 +82,7 @@ contract Product is IProduct, UInitializable, UOwnable, UReentrancyGuard {
     /// @dev Whether the account is currently locked for liquidation
     mapping(address => bool) public liquidation;
 
-    /// @dev Treasury of the product, collects fees
+    /// @dev Treasury of the market, collects fees
     address public treasury;
 
     ParameterStorage private constant _parameter = ParameterStorage.wrap(keccak256("equilibria.perennial.UParamProvider.parameter"));
@@ -98,7 +98,7 @@ contract Product is IProduct, UInitializable, UOwnable, UReentrancyGuard {
      * @notice Initializes the contract state
      */
     function initialize(
-        IProduct.ProductDefinition calldata definition_,
+        IMarket.MarketDefinition calldata definition_,
         Parameter calldata parameter_
     ) external initializer(1) {
         __UOwnable__initialize();
@@ -153,8 +153,8 @@ contract Product is IProduct, UInitializable, UOwnable, UReentrancyGuard {
         Fee memory newFee = _fee;
 
         if (msg.sender == treasury) {
-            UFixed18 feeAmount = newFee.product();
-            newFee._product = 0;
+            UFixed18 feeAmount = newFee.market();
+            newFee._market = 0;
             token.push(msg.sender, feeAmount);
             emit FeeClaimed(msg.sender, feeAmount);
         }
@@ -211,7 +211,7 @@ contract Product is IProduct, UInitializable, UOwnable, UReentrancyGuard {
     function _liquidate(CurrentContext memory context, address account) private {
         // before
         UFixed18 maintenance = context.account.maintenance(context.currentOracleVersion, context.parameter.maintenance);
-        if (context.account.collateral().gte(Fixed18Lib.from(maintenance))) revert ProductCantLiquidate();
+        if (context.account.collateral().gte(Fixed18Lib.from(maintenance))) revert MarketCantLiquidate();
 
         // close all positions
         _update(context, account, context.account.position().mul(Fixed18Lib.NEG_ONE), Fixed18Lib.ZERO, true);
@@ -246,8 +246,8 @@ contract Product is IProduct, UInitializable, UOwnable, UReentrancyGuard {
         _startGas(context, "_update before-update-after: %s");
 
         // before
-        if (context.liquidation) revert ProductInLiquidationError();
-        if (context.parameter.closed && !_closingNext(context, positionAmount)) revert ProductClosedError();
+        if (context.liquidation) revert MarketInLiquidationError();
+        if (context.parameter.closed && !_closingNext(context, positionAmount)) revert MarketClosedError();
 
         // update
         (Fixed18 makerAmount, Fixed18 takerAmount) = context.account.update(
@@ -287,10 +287,10 @@ contract Product is IProduct, UInitializable, UOwnable, UReentrancyGuard {
         // Load protocol parameters
         context.protocolParameter = factory.parameter();
 
-        // Load product parameters
+        // Load market parameters
         context.parameter = parameter();
 
-        // Load product state
+        // Load market state
         context.currentOracleVersion = _transform(oracle.sync());
         context.latestVersion = latestVersion;
         context.version = _versions[context.latestVersion];
@@ -303,7 +303,7 @@ contract Product is IProduct, UInitializable, UOwnable, UReentrancyGuard {
         context.liquidation = liquidation[account]; //TODO: packing into account will save gas on liquidation
 
         // after
-        if (context.protocolParameter.paused) revert ProductPausedError();
+        if (context.protocolParameter.paused) revert MarketPausedError();
 
         _endGas(context);
     }
@@ -329,7 +329,7 @@ contract Product is IProduct, UInitializable, UOwnable, UReentrancyGuard {
         Version memory fromVersion;
         Version memory toVersion;
 
-        // settle product a->b if necessary
+        // settle market a->b if necessary
         period.fromVersion = context.latestVersion == context.currentOracleVersion.version ? // TODO: make a lazy loader here
             context.currentOracleVersion :
             atVersion(context.latestVersion);
@@ -338,7 +338,7 @@ contract Product is IProduct, UInitializable, UOwnable, UReentrancyGuard {
             atVersion(context.latestVersion + 1);
         _settlePeriod(context, period);
 
-        // settle product b->c if necessary
+        // settle market b->c if necessary
         period.fromVersion = period.toVersion;
         period.toVersion = context.currentOracleVersion;
         _settlePeriod(context, period);
@@ -398,26 +398,26 @@ contract Product is IProduct, UInitializable, UOwnable, UReentrancyGuard {
         Position memory nextPosition = context.version.position().next(context.pre);
 
         if (!context.parameter.closed && nextPosition.socializationFactor().lt(UFixed18Lib.ONE))
-            revert ProductInsufficientLiquidityError();
+            revert MarketInsufficientLiquidityError();
 
         if (nextPosition.maker.gt(context.parameter.makerLimit))
-            revert ProductMakerOverLimitError();
+            revert MarketMakerOverLimitError();
     }
 
     function _checkCollateral(CurrentContext memory context) private pure {
-        if (context.account.collateral().sign() == -1) revert ProductInDebtError();
+        if (context.account.collateral().sign() == -1) revert MarketInDebtError();
 
         UFixed18 boundedCollateral = UFixed18Lib.from(context.account.collateral());
 
         if (!context.account.collateral().isZero() && boundedCollateral.lt(context.protocolParameter.minCollateral))
-            revert ProductCollateralUnderLimitError();
+            revert MarketCollateralUnderLimitError();
 
         (UFixed18 maintenanceAmount, UFixed18 maintenanceNextAmount) = (
             context.account.maintenance(context.currentOracleVersion, context.parameter.maintenance),
             context.account.maintenanceNext(context.currentOracleVersion, context.parameter.maintenance)
         );
         if (maintenanceAmount.max(maintenanceNextAmount).gt(boundedCollateral))
-            revert ProductInsufficientCollateralError();
+            revert MarketInsufficientCollateralError();
     }
 
     /**

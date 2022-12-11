@@ -24,72 +24,72 @@ contract Lens is ILens {
      */
 
     /**
-     * @notice Returns the snapshots of the provided `productAddresses`
-     * @param productAddresses Product addresses
-     * @return _snapshots a snapshot for each product after settle
+     * @notice Returns the snapshots of the provided `marketAddresses`
+     * @param marketAddresses Market addresses
+     * @return _snapshots a snapshot for each market after settle
      */
-    function snapshots(IProduct[] calldata productAddresses) public returns (ProductSnapshot[] memory _snapshots) {
-        _snapshots = new ProductSnapshot[](productAddresses.length);
-        for (uint256 i = 0; i < productAddresses.length; i++) {
-            _snapshots[i] = snapshot(productAddresses[i]);
+    function snapshots(IMarket[] calldata marketAddresses) public returns (MarketSnapshot[] memory _snapshots) {
+        _snapshots = new MarketSnapshot[](marketAddresses.length);
+        for (uint256 i = 0; i < marketAddresses.length; i++) {
+            _snapshots[i] = snapshot(marketAddresses[i]);
         }
     }
 
     /**
-     * @notice Returns the snapshot of the provided `product`
-     * @param product Product address
-     * @return _snapshot for the product after settle
+     * @notice Returns the snapshot of the provided `market`
+     * @param market Market address
+     * @return _snapshot for the market after settle
      */
-    function snapshot(IProduct product) public settle(product) returns (ProductSnapshot memory _snapshot) {
-        _snapshot.definition = definition(product);
-        _snapshot.parameter = parameter(product);
-        _snapshot.productAddress = address(product);
-        _snapshot.rate = rate(product);
-        _snapshot.dailyRate = dailyRate(product);
-        _snapshot.latestVersion = latestVersion(product);
-        _snapshot.collateral = collateral(product);
-        _snapshot.pre = pre(product);
-        _snapshot.position = position(product);
-        _snapshot.fee = fees(product);
-        _snapshot.openInterest = openInterest(product);
+    function snapshot(IMarket market) public settle(market) returns (MarketSnapshot memory _snapshot) {
+        _snapshot.definition = definition(market);
+        _snapshot.parameter = parameter(market);
+        _snapshot.marketAddress = address(market);
+        _snapshot.rate = rate(market);
+        _snapshot.dailyRate = dailyRate(market);
+        _snapshot.latestVersion = latestVersion(market);
+        _snapshot.collateral = collateral(market);
+        _snapshot.pre = pre(market);
+        _snapshot.position = position(market);
+        _snapshot.fee = fees(market);
+        _snapshot.openInterest = openInterest(market);
     }
 
     /**
-     * @notice Returns the user snapshots for the provided `productAddresses`
+     * @notice Returns the user snapshots for the provided `marketAddresses`
      * @param account User addresses
-     * @param productAddresses Product addresses
-     * @return _snapshots UserSnapshot for each product after settle
+     * @param marketAddresses Market addresses
+     * @return _snapshots UserSnapshot for each market after settle
      */
-    function snapshots(address account, IProduct[] memory productAddresses)
-        public returns (UserProductSnapshot[] memory _snapshots)
+    function snapshots(address account, IMarket[] memory marketAddresses)
+        public returns (UserMarketSnapshot[] memory _snapshots)
     {
-        _snapshots = new UserProductSnapshot[](productAddresses.length);
-        for (uint256 i = 0; i < productAddresses.length; i++) {
-            _snapshots[i] = snapshot(account, productAddresses[i]);
+        _snapshots = new UserMarketSnapshot[](marketAddresses.length);
+        for (uint256 i = 0; i < marketAddresses.length; i++) {
+            _snapshots[i] = snapshot(account, marketAddresses[i]);
         }
     }
 
     /**
-     * @notice Returns the user snapshot for the provided `product`
+     * @notice Returns the user snapshot for the provided `market`
      * @param account User addresses
-     * @param product Product address
-     * @return _snapshot UserSnapshot for the product after settle
+     * @param market Market address
+     * @return _snapshot UserSnapshot for the market after settle
      */
-    function snapshot(address account, IProduct product)
+    function snapshot(address account, IMarket market)
         public
-        settleAccount(account, product)
-        returns (UserProductSnapshot memory _snapshot)
+        settleAccount(account, market)
+        returns (UserMarketSnapshot memory _snapshot)
     {
-        _snapshot.productAddress = address(product);
+        _snapshot.marketAddress = address(market);
         _snapshot.userAddress = account;
-        _snapshot.collateral = collateral(account, product);
-        _snapshot.maintenance = maintenance(account, product);
-        _snapshot.pre = pre(account, product);
-        _snapshot.position = position(account, product);
-        _snapshot.liquidatable = liquidatable(account, product);
-        _snapshot.liquidating = liquidating(account, product);
-        _snapshot.openInterest = openInterest(account, product);
-        _snapshot.exposure = exposure(account, product);
+        _snapshot.collateral = collateral(account, market);
+        _snapshot.maintenance = maintenance(account, market);
+        _snapshot.pre = pre(account, market);
+        _snapshot.position = position(account, market);
+        _snapshot.liquidatable = liquidatable(account, market);
+        _snapshot.liquidating = liquidating(account, market);
+        _snapshot.openInterest = openInterest(account, market);
+        _snapshot.exposure = exposure(account, market);
     }
 
     /**
@@ -97,278 +97,278 @@ contract Lens is ILens {
      */
 
     /**
-     *  Product Individual Fields Functions
+     *  Market Individual Fields Functions
      */
 
     /**
-     * @notice Returns the name of the provided `product`
-     * @param product Product address
-     * @return Name of the product
+     * @notice Returns the name of the provided `market`
+     * @param market Market address
+     * @return Name of the market
      */
-    function name(IProduct product) public view returns (string memory) {
-        return product.name();
+    function name(IMarket market) public view returns (string memory) {
+        return market.name();
     }
 
     /**
-     * @notice Returns the symbol of the provided `product`
-     * @param product Product address
-     * @return Symbol of the product
+     * @notice Returns the symbol of the provided `market`
+     * @param market Market address
+     * @return Symbol of the market
      */
-    function symbol(IProduct product) public view returns (string memory) {
-        return product.symbol();
+    function symbol(IMarket market) public view returns (string memory) {
+        return market.symbol();
     }
 
-    function token(IProduct product) public view returns (Token18) {
-        return product.token();
+    function token(IMarket market) public view returns (Token18) {
+        return market.token();
     }
 
-    function definition(IProduct product) public view returns (IProduct.ProductDefinition memory _definition) {
-        _definition.name = name(product);
-        _definition.symbol = symbol(product);
-        _definition.token = token(product);
-        _definition.payoffDefinition = product.payoffDefinition();
-        _definition.oracle = product.oracle();
+    function definition(IMarket market) public view returns (IMarket.MarketDefinition memory _definition) {
+        _definition.name = name(market);
+        _definition.symbol = symbol(market);
+        _definition.token = token(market);
+        _definition.payoffDefinition = market.payoffDefinition();
+        _definition.oracle = market.oracle();
     }
 
-    function parameter(IProduct product) public view returns (Parameter memory) {
-        return product.parameter();
+    function parameter(IMarket market) public view returns (Parameter memory) {
+        return market.parameter();
     }
 
     /**
-     * @notice Product total collateral amount after settle
-     * @param product Product address
-     * @return Total collateral for product
+     * @notice Market total collateral amount after settle
+     * @param market Market address
+     * @return Total collateral for market
      */
-    function collateral(IProduct product) public settle(product) returns (Fixed18) {
-        Fee memory fee = product.fee();
-        return Fixed18Lib.from(product.token().balanceOf(address(product)))
+    function collateral(IMarket market) public settle(market) returns (Fixed18) {
+        Fee memory fee = market.fee();
+        return Fixed18Lib.from(market.token().balanceOf(address(market)))
             .sub(Fixed18Lib.from(fee.protocol()))
-            .sub(Fixed18Lib.from(fee.product()));
+            .sub(Fixed18Lib.from(fee.market()));
     }
 
     /**
-     * @notice Product pre position after settle
-     * @param product Product address
-     * @return Product pre-position
+     * @notice Market pre position after settle
+     * @param market Market address
+     * @return Market pre-position
      */
-    function pre(IProduct product) public settle(product) returns (PrePosition memory) {
-        return product.pre();
+    function pre(IMarket market) public settle(market) returns (PrePosition memory) {
+        return market.pre();
     }
 
     /**
-     * @notice Product position after settle
-     * @param product Product address
-     * @return product position
+     * @notice Market position after settle
+     * @param market Market address
+     * @return market position
      */
-    function position(IProduct product) public settle(product) returns (Position memory) {
-        return _latestPosition(product);
+    function position(IMarket market) public settle(market) returns (Position memory) {
+        return _latestPosition(market);
     }
 
     /**
-     * @notice Product pre-position and position after settle
-     * @param product Product address
-     * @return Product pre-position
-     * @return Product position
+     * @notice Market pre-position and position after settle
+     * @param market Market address
+     * @return Market pre-position
+     * @return Market position
      */
-    function globalPosition(IProduct product) public settle(product) returns (PrePosition memory, Position memory) {
-        return (product.pre(), _latestPosition(product));
+    function globalPosition(IMarket market) public settle(market) returns (PrePosition memory, Position memory) {
+        return (market.pre(), _latestPosition(market));
     }
 
     /**
-     * @notice Current price of product after settle
-     * @param product Product address
-     * @return Product latest price
+     * @notice Current price of market after settle
+     * @param market Market address
+     * @return Market latest price
      */
-    function latestVersion(IProduct product) public settle(product) returns (IOracleProvider.OracleVersion memory) {
-        return _latestVersion(product);
+    function latestVersion(IMarket market) public settle(market) returns (IOracleProvider.OracleVersion memory) {
+        return _latestVersion(market);
     }
 
     /**
-     * @notice Prices of product at specified versions after settle
-     * @param product Product address
+     * @notice Prices of market at specified versions after settle
+     * @param market Market address
      * @param versions Oracle versions to query
-     * @return prices Product prices at specified versions
+     * @return prices Market prices at specified versions
      */
-    function atVersions(IProduct product, uint256[] memory versions)
+    function atVersions(IMarket market, uint256[] memory versions)
         public
-        settle(product)
+        settle(market)
         returns (IOracleProvider.OracleVersion[] memory prices)
     {
         prices = new IOracleProvider.OracleVersion[](versions.length);
         for (uint256 i = 0; i < versions.length; i++) {
-            prices[i] = product.atVersion(versions[i]);
+            prices[i] = market.atVersion(versions[i]);
         }
     }
 
     /**
-     * @notice Product funding rate after settle
-     * @param product Product address
-     * @return Product current funding rate
+     * @notice Market funding rate after settle
+     * @param market Market address
+     * @return Market current funding rate
      */
-    function rate(IProduct product) public settle(product) returns (Fixed18) {
-        Position memory position_ = _latestPosition(product);
-        JumpRateUtilizationCurve memory utilizationCurve_ = product.parameter().utilizationCurve;
+    function rate(IMarket market) public settle(market) returns (Fixed18) {
+        Position memory position_ = _latestPosition(market);
+        JumpRateUtilizationCurve memory utilizationCurve_ = market.parameter().utilizationCurve;
         return utilizationCurve_.compute(position_.utilization()).div(Fixed18Lib.from(365 days));
     }
 
     /**
-     * @notice Product funding extrapolated to a daily rate after settle
-     * @param product Product address
-     * @return Product current funding extrapolated to a daily rate
+     * @notice Market funding extrapolated to a daily rate after settle
+     * @param market Market address
+     * @return Market current funding extrapolated to a daily rate
      */
-    function dailyRate(IProduct product) public settle(product) returns (Fixed18) {
-        Position memory position_ = _latestPosition(product);
-        JumpRateUtilizationCurve memory utilizationCurve_ = product.parameter().utilizationCurve;
+    function dailyRate(IMarket market) public settle(market) returns (Fixed18) {
+        Position memory position_ = _latestPosition(market);
+        JumpRateUtilizationCurve memory utilizationCurve_ = market.parameter().utilizationCurve;
         return utilizationCurve_.compute(position_.utilization()).div(Fixed18Lib.from(365));
     }
 
     /**
-     * @notice Fees accumulated by product and protocol treasuries after settle
-     * @param product Product address
+     * @notice Fees accumulated by market and protocol treasuries after settle
+     * @param market Market address
      * @return fees accrued by the protocol
      */
-    function fees(IProduct product) public settle(product) returns (Fee memory) {
-        return product.fee();
+    function fees(IMarket market) public settle(market) returns (Fee memory) {
+        return market.fee();
     }
 
     /**
-     * @notice Product total open interest after settle
-     * @param product Product address
-     * @return Product maker and taker position multiplied by latest price after settle
+     * @notice Market total open interest after settle
+     * @param market Market address
+     * @return Market maker and taker position multiplied by latest price after settle
      */
-    function openInterest(IProduct product) public settle(product) returns (Position memory) {
-        return _latestPosition(product).mul(_latestVersion(product).price.abs());
+    function openInterest(IMarket market) public settle(market) returns (Position memory) {
+        return _latestPosition(market).mul(_latestVersion(market).price.abs());
     }
 
     /**
-     *  End Product Individual Fields Functions
+     *  End Market Individual Fields Functions
      */
 
     /**
-     *  UserProduct Individual Fields Functions
+     *  UserMarket Individual Fields Functions
      */
 
     /**
-     * @notice User collateral amount for product after settle
+     * @notice User collateral amount for market after settle
      * @param account Account address
-     * @param product Product address
-     * @return User deposited collateral for product
+     * @param market Market address
+     * @return User deposited collateral for market
      */
-    function collateral(address account, IProduct product) public settleAccount(account, product) returns (Fixed18) {
-        Account memory productAccount = product.accounts(account);
-        return productAccount.collateral();
+    function collateral(address account, IMarket market) public settleAccount(account, market) returns (Fixed18) {
+        Account memory marketAccount = market.accounts(account);
+        return marketAccount.collateral();
     }
 
     /**
-     * @notice User maintenance amount for product after settle
+     * @notice User maintenance amount for market after settle
      * @param account Account address
-     * @param product Product address
+     * @param market Market address
      * @return Maximum of user maintenance, and maintenanceNext
      */
-    function maintenance(address account, IProduct product) public settleAccount(account, product) returns (UFixed18) {
-        Account memory productAccount = product.accounts(account);
-        return _maintenance(product, productAccount.position());
+    function maintenance(address account, IMarket market) public settleAccount(account, market) returns (UFixed18) {
+        Account memory marketAccount = market.accounts(account);
+        return _maintenance(market, marketAccount.position());
     }
 
-    function maintenanceNext(address account, IProduct product) public settleAccount(account, product) returns (UFixed18) {
-        Account memory productAccount = product.accounts(account);
-        return _maintenance(product, productAccount.position().add(productAccount.pre()));
+    function maintenanceNext(address account, IMarket market) public settleAccount(account, market) returns (UFixed18) {
+        Account memory marketAccount = market.accounts(account);
+        return _maintenance(market, marketAccount.position().add(marketAccount.pre()));
     }
 
     /**
-     * @notice User liquidatble status for product after settle
+     * @notice User liquidatble status for market after settle
      * @param account Account address
-     * @param product Product address
+     * @param market Market address
      * @return Whether or not the user's position eligible to be liquidated
      */
-    function liquidatable(address account, IProduct product) public settleAccount(account, product) returns (bool) {
-        Account memory productAccount = product.accounts(account);
-        UFixed18 maintenanceAmount = _maintenance(product, productAccount.position());
-        return Fixed18Lib.from(maintenanceAmount).gt(productAccount.collateral());
+    function liquidatable(address account, IMarket market) public settleAccount(account, market) returns (bool) {
+        Account memory marketAccount = market.accounts(account);
+        UFixed18 maintenanceAmount = _maintenance(market, marketAccount.position());
+        return Fixed18Lib.from(maintenanceAmount).gt(marketAccount.collateral());
     }
 
     /**
-     * @notice User liquidating status for product after settle
+     * @notice User liquidating status for market after settle
      * @param account Account address
-     * @param product Product address
+     * @param market Market address
      * @return Whether or not the user's position is being liquidated
      */
-    function liquidating(address account, IProduct product) public settleAccount(account, product) returns (bool) {
-        return product.liquidation(account);
+    function liquidating(address account, IMarket market) public settleAccount(account, market) returns (bool) {
+        return market.liquidation(account);
     }
 
     /**
-     * @notice User pre position for product after settle
+     * @notice User pre position for market after settle
      * @param account Account address
-     * @param product Product address
+     * @param market Market address
      * @return User pre-position
      */
-    function pre(address account, IProduct product)
+    function pre(address account, IMarket market)
         public
-        settleAccount(account, product)
+        settleAccount(account, market)
         returns (Fixed18)
     {
-        Account memory productAccount = product.accounts(account);
-        return productAccount.pre();
+        Account memory marketAccount = market.accounts(account);
+        return marketAccount.pre();
     }
 
     /**
-     * @notice User position for product after settle
+     * @notice User position for market after settle
      * @param account Account address
-     * @param product Product address
+     * @param market Market address
      * @return User position
      */
-    function position(address account, IProduct product)
+    function position(address account, IMarket market)
         public
-        settleAccount(account, product)
+        settleAccount(account, market)
         returns (Fixed18)
     {
-        Account memory productAccount = product.accounts(account);
-        return productAccount.position();
+        Account memory marketAccount = market.accounts(account);
+        return marketAccount.position();
     }
 
     /**
-     * @notice User pre-position and position for product after settle
+     * @notice User pre-position and position for market after settle
      * @param account Account address
-     * @param product Product address
+     * @param market Market address
      * @return User pre-position
      * @return User position
      */
-    function userPosition(address account, IProduct product)
+    function userPosition(address account, IMarket market)
         public
-        settleAccount(account, product)
+        settleAccount(account, market)
         returns (Fixed18, Fixed18)
     {
-        Account memory productAccount = product.accounts(account);
-        return (productAccount.pre(), productAccount.position());
+        Account memory marketAccount = market.accounts(account);
+        return (marketAccount.pre(), marketAccount.position());
     }
 
     /**
-     * @notice User's open interest in product after settle
+     * @notice User's open interest in market after settle
      * @param account Account address
-     * @param product Product address
+     * @param market Market address
      * @return User's maker or taker position multiplied by latest price after settle
      */
-    function openInterest(address account, IProduct product)
+    function openInterest(address account, IMarket market)
         public
-        settleAccount(account, product)
+        settleAccount(account, market)
         returns (Fixed18)
     {
-        Account memory productAccount = product.accounts(account);
-        return productAccount.position().mul(_latestVersion(product).price);
+        Account memory marketAccount = market.accounts(account);
+        return marketAccount.position().mul(_latestVersion(market).price);
     }
 
     /**
-     * @notice User's exposure in product after settle
+     * @notice User's exposure in market after settle
      * @param account Account address
-     * @param product Product address
+     * @param market Market address
      * @return User's exposure (openInterest * utilization) after settle
      */
-    function exposure(address account, IProduct product) public settleAccount(account, product) returns (Fixed18) {
-        (, Position memory _pos) = globalPosition(product);
+    function exposure(address account, IMarket market) public settleAccount(account, market) returns (Fixed18) {
+        (, Position memory _pos) = globalPosition(market);
         if (_pos.maker.isZero()) { return Fixed18Lib.ZERO; }
 
-        Fixed18 _openInterest = openInterest(account, product);
+        Fixed18 _openInterest = openInterest(account, market);
         if (_openInterest.sign() == 1) {
             return _openInterest; // Taker exposure is always 100% of openInterest
         }
@@ -378,27 +378,27 @@ contract Lens is ILens {
     }
 
     /**
-     * @notice User's maintenance required for position size in product after settle
+     * @notice User's maintenance required for position size in market after settle
      * @param account Account address
-     * @param product Product address
+     * @param market Market address
      * @param positionSize size of position for maintenance calculation
-     * @return Maintenance required for position in product
+     * @return Maintenance required for position in market
      */
-    function maintenanceRequired(address account, IProduct product, Fixed18 positionSize)
+    function maintenanceRequired(address account, IMarket market, Fixed18 positionSize)
         public
-        settleAccount(account, product)
+        settleAccount(account, market)
         returns (UFixed18)
     {
-        return _maintenance(product, positionSize);
+        return _maintenance(market, positionSize);
     }
 
     /**
-     *  End UserProduct Individual Fields Functions
+     *  End UserMarket Individual Fields Functions
      */
 
-    function _maintenance(IProduct product, Fixed18 positionSize) private view returns (UFixed18) {
-        UFixed18 maintenance_ = product.parameter().maintenance;
-        UFixed18 notional = positionSize.mul(_latestVersion(product).price).abs();
+    function _maintenance(IMarket market, Fixed18 positionSize) private view returns (UFixed18) {
+        UFixed18 maintenance_ = market.parameter().maintenance;
+        UFixed18 notional = positionSize.mul(_latestVersion(market).price).abs();
         return notional.mul(maintenance_);
     }
 
@@ -407,23 +407,23 @@ contract Lens is ILens {
      */
 
     /**
-     * @notice Returns the Product's latest position
+     * @notice Returns the Market's latest position
      * @dev Private function, does not call settle itself
-     * @param product Product address
-     * @return Latest position for the product
+     * @param market Market address
+     * @return Latest position for the market
      */
-    function _latestPosition(IProduct product) private view returns (Position memory) {
-        return product.versions(product.latestVersion()).position();
+    function _latestPosition(IMarket market) private view returns (Position memory) {
+        return market.versions(market.latestVersion()).position();
     }
 
     /**
-     * @notice Returns the Product's latest version
+     * @notice Returns the Market's latest version
      * @dev Private function, does not call settle itself
-     * @param product Product address
-     * @return Latest version for the product
+     * @param market Market address
+     * @return Latest version for the market
      */
-    function _latestVersion(IProduct product) private view returns (IOracleProvider.OracleVersion memory) {
-        return product.atVersion(product.latestVersion());
+    function _latestVersion(IMarket market) private view returns (IOracleProvider.OracleVersion memory) {
+        return market.atVersion(market.latestVersion());
     }
 
     /**
@@ -434,15 +434,15 @@ contract Lens is ILens {
      *  Modifier Functions
      */
 
-    /// @dev Settles the product
-    modifier settle(IProduct product) {
-        product.settle(address(0));
+    /// @dev Settles the market
+    modifier settle(IMarket market) {
+        market.settle(address(0));
         _;
     }
 
-    /// @dev Settles the product. product.settleAccount also settles the product
-    modifier settleAccount(address account, IProduct product) {
-        product.settle(account);
+    /// @dev Settles the market. market.settleAccount also settles the market
+    modifier settleAccount(address account, IMarket market) {
+        market.settle(account);
         _;
     }
 
