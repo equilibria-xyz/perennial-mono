@@ -3,8 +3,8 @@ pragma solidity 0.8.17;
 
 import "@chainlink/contracts/src/v0.8/interfaces/FeedRegistryInterface.sol";
 import "@openzeppelin/contracts/utils/math/SafeCast.sol";
-import "@equilibria/perennial/contracts/interfaces/IOracleProvider.sol";
 import "./types/ChainlinkRegistry.sol";
+import "../interfaces/IOracleProvider.sol";
 
 /**
  * @title ChainlinkOracle

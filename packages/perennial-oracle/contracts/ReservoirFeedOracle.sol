@@ -3,8 +3,7 @@ pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
-import "./interfaces/IOracleProvider.sol";
-
+import "@equilibria/perennial/contracts/interfaces/IOracleProvider.sol";
 /**
  * @title ReservoirFeedOracle
  * @notice Reservoir implementation of the IOracle interface, using Reservoir's AggregatorV3Interface adaptors

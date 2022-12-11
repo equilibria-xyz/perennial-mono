@@ -24,12 +24,12 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
 
         /* Market Parameters */
 
-        Parameter parameter;
+        MarketParameter marketParameter;
 
         /* Current Global State */
         uint256 latestVersion;
 
-        IOracleProvider.OracleVersion currentOracleVersion;
+        OracleVersion currentOracleVersion;
 
         Version version;
 
@@ -85,8 +85,8 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
     /// @dev Treasury of the market, collects fees
     address public treasury;
 
-    ParameterStorage private constant _parameter = ParameterStorage.wrap(keccak256("equilibria.perennial.UParamProvider.parameter"));
-    function parameter() public view returns (Parameter memory) { return _parameter.read(); }
+    MarketParameterStorage private constant _parameter = MarketParameterStorage.wrap(keccak256("equilibria.perennial.Market.parameter"));
+    function parameter() public view returns (MarketParameter memory) { return _parameter.read(); }
 
     /// @dev The oracle contract address
     IOracleProvider public oracle;
@@ -99,7 +99,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
      */
     function initialize(
         IMarket.MarketDefinition calldata definition_,
-        Parameter calldata parameter_
+        MarketParameter calldata parameter_
     ) external initializer(1) {
         __UOwnable__initialize();
         __UReentrancyGuard__initialize();
@@ -144,7 +144,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         emit TreasuryUpdated(newTreasury);
     }
 
-    function updateParameter(Parameter memory newParameter) public onlyOwner {
+    function updateParameter(MarketParameter memory newParameter) public onlyOwner {
         _parameter.store(newParameter);
         emit ParameterUpdated(newParameter);
     }
@@ -175,7 +175,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
      * @notice Returns the current oracle version transformed by the payoff definition
      * @return Current oracle version transformed by the payoff definition
      */
-    function currentVersion() public view returns (IOracleProvider.OracleVersion memory) {
+    function currentVersion() public view returns (OracleVersion memory) {
         return _transform(oracle.currentVersion());
     }
 
@@ -184,7 +184,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
      * @param oracleVersion Oracle version to return for
      * @return Oracle version at `oracleVersion` with price transformed by payoff function
      */
-    function atVersion(uint256 oracleVersion) public view returns (IOracleProvider.OracleVersion memory) {
+    function atVersion(uint256 oracleVersion) public view returns (OracleVersion memory) {
         return _transform(oracle.atVersion(oracleVersion));
     }
 
@@ -210,7 +210,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
 
     function _liquidate(CurrentContext memory context, address account) private {
         // before
-        UFixed18 maintenance = context.account.maintenance(context.currentOracleVersion, context.parameter.maintenance);
+        UFixed18 maintenance = context.account.maintenance(context.currentOracleVersion, context.marketParameter.maintenance);
         if (context.account.collateral().gte(Fixed18Lib.from(maintenance))) revert MarketCantLiquidate();
 
         // close all positions
@@ -226,7 +226,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
             Fixed18Lib.ZERO, //TODO: all the position stuff is not needed here so might be a gas efficiency check here
             Fixed18Lib.from(-1, liquidationReward),
             context.currentOracleVersion,
-            context.parameter
+            context.marketParameter
         );
         context.liquidation = true;
 
@@ -247,20 +247,20 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
 
         // before
         if (context.liquidation) revert MarketInLiquidationError();
-        if (context.parameter.closed && !_closingNext(context, positionAmount)) revert MarketClosedError();
+        if (context.marketParameter.closed && !_closingNext(context, positionAmount)) revert MarketClosedError();
 
         // update
         (Fixed18 makerAmount, Fixed18 takerAmount) = context.account.update(
             positionAmount,
             collateralAmount,
             context.currentOracleVersion,
-            context.parameter
+            context.marketParameter
         );
         context.pre.update(
             makerAmount,
             takerAmount,
             context.currentOracleVersion,
-            context.parameter
+            context.marketParameter
         );
 
         // after
@@ -288,7 +288,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         context.protocolParameter = factory.parameter();
 
         // Load market parameters
-        context.parameter = parameter();
+        context.marketParameter = parameter();
 
         // Load market state
         context.currentOracleVersion = _transform(oracle.sync());
@@ -367,7 +367,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
                 context.fee,
                 period,
                 context.protocolParameter,
-                context.parameter
+                context.marketParameter
             );
             context.latestVersion = period.toVersion.version;
             _versions[period.toVersion.version] = context.version;
@@ -397,10 +397,10 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
     function _checkPosition(CurrentContext memory context) private pure {
         Position memory nextPosition = context.version.position().next(context.pre);
 
-        if (!context.parameter.closed && nextPosition.socializationFactor().lt(UFixed18Lib.ONE))
+        if (!context.marketParameter.closed && nextPosition.socializationFactor().lt(UFixed18Lib.ONE))
             revert MarketInsufficientLiquidityError();
 
-        if (nextPosition.maker.gt(context.parameter.makerLimit))
+        if (nextPosition.maker.gt(context.marketParameter.makerLimit))
             revert MarketMakerOverLimitError();
     }
 
@@ -413,8 +413,8 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
             revert MarketCollateralUnderLimitError();
 
         (UFixed18 maintenanceAmount, UFixed18 maintenanceNextAmount) = (
-            context.account.maintenance(context.currentOracleVersion, context.parameter.maintenance),
-            context.account.maintenanceNext(context.currentOracleVersion, context.parameter.maintenance)
+            context.account.maintenance(context.currentOracleVersion, context.marketParameter.maintenance),
+            context.account.maintenanceNext(context.currentOracleVersion, context.marketParameter.maintenance)
         );
         if (maintenanceAmount.max(maintenanceNextAmount).gt(boundedCollateral))
             revert MarketInsufficientCollateralError();
@@ -425,10 +425,10 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
      * @param oracleVersion Oracle version to transform
      * @return Transformed oracle version
      */
-    function _transform(IOracleProvider.OracleVersion memory oracleVersion)
+    function _transform(OracleVersion memory oracleVersion)
         internal
         view
-        returns (IOracleProvider.OracleVersion memory)
+        returns (OracleVersion memory)
     {
         oracleVersion.price = _payoffDefinition.transform(oracleVersion.price);
         return oracleVersion;

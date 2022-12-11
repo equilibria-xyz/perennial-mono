@@ -130,7 +130,7 @@ contract Lens is ILens {
         _definition.oracle = market.oracle();
     }
 
-    function parameter(IMarket market) public view returns (Parameter memory) {
+    function parameter(IMarket market) public view returns (MarketParameter memory) {
         return market.parameter();
     }
 
@@ -179,7 +179,7 @@ contract Lens is ILens {
      * @param market Market address
      * @return Market latest price
      */
-    function latestVersion(IMarket market) public settle(market) returns (IOracleProvider.OracleVersion memory) {
+    function latestVersion(IMarket market) public settle(market) returns (OracleVersion memory) {
         return _latestVersion(market);
     }
 
@@ -192,9 +192,9 @@ contract Lens is ILens {
     function atVersions(IMarket market, uint256[] memory versions)
         public
         settle(market)
-        returns (IOracleProvider.OracleVersion[] memory prices)
+        returns (OracleVersion[] memory prices)
     {
-        prices = new IOracleProvider.OracleVersion[](versions.length);
+        prices = new OracleVersion[](versions.length);
         for (uint256 i = 0; i < versions.length; i++) {
             prices[i] = market.atVersion(versions[i]);
         }
@@ -422,7 +422,7 @@ contract Lens is ILens {
      * @param market Market address
      * @return Latest version for the market
      */
-    function _latestVersion(IMarket market) private view returns (IOracleProvider.OracleVersion memory) {
+    function _latestVersion(IMarket market) private view returns (OracleVersion memory) {
         return market.atVersion(market.latestVersion());
     }
 

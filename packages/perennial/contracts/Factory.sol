@@ -71,7 +71,7 @@ contract Factory is IFactory, UInitializable, UOwnable {
      * @dev Can only be called by the coordinator owner
      * @return New market contract address
      */
-    function createMarket(IMarket.MarketDefinition calldata definition, Parameter calldata marketParameter)
+    function createMarket(IMarket.MarketDefinition calldata definition, MarketParameter calldata marketParameter)
         external
         returns (IMarket)
     {

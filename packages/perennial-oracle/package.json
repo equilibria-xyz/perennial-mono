@@ -13,6 +13,7 @@
   "scripts": {
     "build": "yarn compile && tsc -p tsconfig.build.json",
     "compile": "hardhat compile",
+    "compile:optimizer": "OPTIMIZER_ENABLED=true hardhat compile",
     "deploy": "OPTIMIZER_ENABLED=true hardhat deploy",
     "verify": "hardhat etherscan-verify --sleep --solc-input",
     "gasReport": "REPORT_GAS=true yarn test:integration",
@@ -33,6 +34,7 @@
   "license": "APACHE-2.0",
   "dependencies": {
     "@equilibria/root": "0.1.6",
+    "@equilibria/perennial": "0.2.1",
     "@openzeppelin/contracts": "4.6.0",
     "@ethersproject/bignumber": "^5.5.1"
   },

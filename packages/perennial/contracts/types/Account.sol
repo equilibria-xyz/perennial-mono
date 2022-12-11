@@ -25,8 +25,8 @@ library AccountLib {
         Account memory account,
         Fixed18 positionAmount,
         Fixed18 collateralAmount,
-        IOracleProvider.OracleVersion memory currentOracleVersion,
-        Parameter memory parameter
+        OracleVersion memory currentOracleVersion,
+        MarketParameter memory marketParameter
     ) internal pure returns (Fixed18 makerAmount, Fixed18 takerAmount) {
         // compute position update
         Fixed18 currentNext = next(account);
@@ -41,8 +41,8 @@ library AccountLib {
 
         // compute collateral update
         collateralAmount = collateralAmount
-            .sub(Fixed18Lib.from(makerAmount.mul(currentOracleVersion.price).abs().mul(parameter.makerFee)))
-            .sub(Fixed18Lib.from(takerAmount.mul(currentOracleVersion.price).abs().mul(parameter.takerFee)));
+            .sub(Fixed18Lib.from(makerAmount.mul(currentOracleVersion.price).abs().mul(marketParameter.makerFee)))
+            .sub(Fixed18Lib.from(takerAmount.mul(currentOracleVersion.price).abs().mul(marketParameter.takerFee)));
 
         // update position
         account._pre = int96(Fixed18.unwrap(pre(account).add(positionAmount)) / 1e9);
@@ -80,7 +80,7 @@ library AccountLib {
      */
     function maintenance(
         Account memory self,
-        IOracleProvider.OracleVersion memory currentOracleVersion,
+        OracleVersion memory currentOracleVersion,
         UFixed18 maintenanceRatio
     ) internal pure returns (UFixed18) {
         return _maintenance(position(self), currentOracleVersion, maintenanceRatio);
@@ -94,7 +94,7 @@ library AccountLib {
      */
     function maintenanceNext(
         Account memory self,
-        IOracleProvider.OracleVersion memory currentOracleVersion,
+        OracleVersion memory currentOracleVersion,
         UFixed18 maintenanceRatio
     ) internal pure returns (UFixed18) {
         return _maintenance(next(self), currentOracleVersion, maintenanceRatio);
@@ -108,7 +108,7 @@ library AccountLib {
      */
     function _maintenance(
         Fixed18 _position,
-        IOracleProvider.OracleVersion memory currentOracleVersion,
+        OracleVersion memory currentOracleVersion,
         UFixed18 maintenanceRatio
     ) private pure returns (UFixed18) {
         UFixed18 notionalMax = _position.mul(currentOracleVersion.price).abs();

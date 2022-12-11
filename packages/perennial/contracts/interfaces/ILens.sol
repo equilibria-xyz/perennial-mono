@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.17;
 
-import "@equilibria/perennial-oracle/contracts/interfaces/IOracleProvider.sol";
+import "./IOracleProvider.sol";
 import "./IMarket.sol";
 import "./IFactory.sol";
 
@@ -13,11 +13,11 @@ interface ILens {
     /// @dev Snapshot of Market information
     struct MarketSnapshot {
         IMarket.MarketDefinition definition;
-        Parameter parameter;
+        MarketParameter parameter;
         address marketAddress;
         Fixed18 rate;
         Fixed18 dailyRate;
-        IOracleProvider.OracleVersion latestVersion;
+        OracleVersion latestVersion;
         Fixed18 collateral;
         PrePosition pre;
         Position position;
@@ -53,14 +53,14 @@ interface ILens {
     function symbol(IMarket market) external view returns (string memory);
     function token(IMarket market) external view returns (Token18);
     function definition(IMarket market) external view returns (IMarket.MarketDefinition memory);
-    function parameter(IMarket market) external view returns (Parameter memory);
+    function parameter(IMarket market) external view returns (MarketParameter memory);
     function collateral(IMarket market) external returns (Fixed18);
     function pre(IMarket market) external returns (PrePosition memory);
     function fees(IMarket market) external returns (Fee memory);
     function position(IMarket market) external returns (Position memory);
     function globalPosition(IMarket market) external returns (PrePosition memory, Position memory);
-    function latestVersion(IMarket market) external returns (IOracleProvider.OracleVersion memory);
-    function atVersions(IMarket market, uint[] memory versions) external returns (IOracleProvider.OracleVersion[] memory);
+    function latestVersion(IMarket market) external returns (OracleVersion memory);
+    function atVersions(IMarket market, uint[] memory versions) external returns (OracleVersion[] memory);
     function rate(IMarket market) external returns (Fixed18);
     function openInterest(IMarket market) external returns (Position memory);
     function dailyRate(IMarket market) external returns (Fixed18);

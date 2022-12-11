@@ -33,7 +33,6 @@
   "dependencies": {
     "@chainlink/contracts": "0.3.1",
     "@equilibria/emptyset-batcher": "0.0.4",
-    "@equilibria/perennial-oracle": "0.1.0",
     "@equilibria/root": "0.1.6",
     "@openzeppelin/contracts": "4.7.3"
   },

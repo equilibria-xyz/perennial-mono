@@ -5,8 +5,8 @@ import "@equilibria/root/number/types/UFixed18.sol";
 import "@equilibria/root/curve/types/JumpRateUtilizationCurve.sol";
 import "./PackedAccumulator.sol";
 
-/// @dev Parameter type
-struct Parameter {
+/// @dev MarketParameter type
+struct MarketParameter {
     UFixed18 maintenance; // <= 429%
     UFixed18 fundingFee;  // <= 429%
     UFixed18 makerFee;    // <= 429%
@@ -17,7 +17,7 @@ struct Parameter {
     JumpRateUtilizationCurve utilizationCurve;
     Accumulator rewardRate;
 }
-struct PackedParameter {
+struct PackedMarketParameter {
     uint32 maintenance; // <= 429%
     uint32 fundingFee;  // <= 429%
     uint32 makerFee;    // <= 429%
@@ -31,21 +31,21 @@ struct PackedParameter {
     JumpRateUtilizationCurve utilizationCurve;
     PackedAccumulator rewardRate;
 }
-type ParameterStorage is bytes32;
-using ParameterStorageLib for ParameterStorage global;
+type MarketParameterStorage is bytes32;
+using MarketParameterStorageLib for MarketParameterStorage global;
 
-library ParameterStorageLib {
-    struct ParameterStoragePointer {
-        PackedParameter value;
+library MarketParameterStorageLib {
+    struct MarketParameterStoragePointer {
+        PackedMarketParameter value;
     }
 
     uint256 private constant OFFSET = 10 ** 9;
 
-    error ParameterStorageOverflowError();
+    error MarketParameterStorageOverflowError();
 
-    function read(ParameterStorage self) internal view returns (Parameter memory) {
-        PackedParameter memory value = _pointer(self).value;
-        return Parameter(
+    function read(MarketParameterStorage self) internal view returns (MarketParameter memory) {
+        PackedMarketParameter memory value = _pointer(self).value;
+        return MarketParameter(
             UFixed18.wrap(uint256(value.maintenance) * OFFSET),
             UFixed18.wrap(uint256(value.fundingFee) * OFFSET),
             UFixed18.wrap(uint256(value.makerFee) * OFFSET),
@@ -58,30 +58,30 @@ library ParameterStorageLib {
         );
     }
 
-    function store(ParameterStorage self, Parameter memory parameter) internal {
+    function store(MarketParameterStorage self, MarketParameter memory parameter) internal {
         //TODO: check mod for precision
-        if (parameter.maintenance.gt(UFixed18Lib.ONE)) revert ParameterStorageOverflowError();
-        if (parameter.fundingFee.gt(UFixed18Lib.ONE)) revert ParameterStorageOverflowError();
-        if (parameter.makerFee.gt(UFixed18Lib.ONE)) revert ParameterStorageOverflowError();
-        if (parameter.takerFee.gt(UFixed18Lib.ONE)) revert ParameterStorageOverflowError();
-        if (parameter.positionFee.gt(UFixed18Lib.ONE)) revert ParameterStorageOverflowError();
-        if (parameter.makerLimit.gt(UFixed18Lib.from(18_446_744_073))) revert ParameterStorageOverflowError();
+        if (parameter.maintenance.gt(UFixed18Lib.ONE)) revert MarketParameterStorageOverflowError();
+        if (parameter.fundingFee.gt(UFixed18Lib.ONE)) revert MarketParameterStorageOverflowError();
+        if (parameter.makerFee.gt(UFixed18Lib.ONE)) revert MarketParameterStorageOverflowError();
+        if (parameter.takerFee.gt(UFixed18Lib.ONE)) revert MarketParameterStorageOverflowError();
+        if (parameter.positionFee.gt(UFixed18Lib.ONE)) revert MarketParameterStorageOverflowError();
+        if (parameter.makerLimit.gt(UFixed18Lib.from(18_446_744_073))) revert MarketParameterStorageOverflowError();
 
-        _pointer(self).value = PackedParameter(
+        _pointer(self).value = PackedMarketParameter(
             uint32(UFixed18.unwrap(parameter.maintenance) / OFFSET),
             uint32(UFixed18.unwrap(parameter.fundingFee) / OFFSET),
             uint32(UFixed18.unwrap(parameter.makerFee) / OFFSET),
             uint32(UFixed18.unwrap(parameter.takerFee) / OFFSET),
             uint32(UFixed18.unwrap(parameter.positionFee) / OFFSET),
             uint64(UFixed18.unwrap(parameter.makerLimit) / OFFSET),
-            parameter.closed,
+                parameter.closed,
             bytes3(0x000000),
-            parameter.utilizationCurve,
-            parameter.rewardRate.pack()
+                parameter.utilizationCurve,
+                parameter.rewardRate.pack()
         );
     }
 
-    function _pointer(ParameterStorage self) private pure returns (ParameterStoragePointer storage pointer) {
+    function _pointer(MarketParameterStorage self) private pure returns (MarketParameterStoragePointer storage pointer) {
         assembly ("memory-safe") { pointer.slot := self }
     }
 }

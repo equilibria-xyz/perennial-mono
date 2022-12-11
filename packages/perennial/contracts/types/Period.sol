@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.17;
 
-import "@equilibria/perennial-oracle/contracts/interfaces/IOracleProvider.sol";
+import "./OracleVersion.sol";
 
 /// @dev Period type
 struct Period {
-    IOracleProvider.OracleVersion fromVersion;
-    IOracleProvider.OracleVersion toVersion;
+    OracleVersion fromVersion;
+    OracleVersion toVersion;
 }
 using PeriodLib for Period global;
 

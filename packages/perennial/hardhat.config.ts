@@ -1,7 +1,4 @@
-import { dirname } from 'path'
-
 import defaultConfig, { OPTIMIZER_ENABLED, SOLIDITY_VERSION } from '../common/hardhat.default.config'
-const eqPerennialOracleDir = dirname(require.resolve('@equilibria/perennial-oracle/package.json'))
 
 const config = defaultConfig({
   solidityOverrides: {
@@ -16,24 +13,12 @@ const config = defaultConfig({
       },
     },
   },
-  externalDeployments: {
-    kovan: [`${eqPerennialOracleDir}/deployments/kovan`],
-    goerli: [`${eqPerennialOracleDir}/deployments/goerli`],
-    mainnet: [`${eqPerennialOracleDir}/deployments/mainnet`],
-    hardhat: [`${eqPerennialOracleDir}/deployments/mainnet`],
-    localhost: [`${eqPerennialOracleDir}/deployments/localhost`],
-  },
   dependencyPaths: [
     '@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol',
     '@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol',
     '@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol',
     '@openzeppelin/contracts/governance/TimelockController.sol',
     '@openzeppelin/contracts/token/ERC20/presets/ERC20PresetMinterPauser.sol',
-    '@equilibria/perennial-oracle/contracts/ChainlinkOracle.sol',
-    '@equilibria/perennial-oracle/contracts/ReservoirFeedOracle.sol',
-    '@equilibria/perennial-oracle/contracts/test/TestnetChainlinkFeedRegistry.sol',
-    '@equilibria/perennial-oracle/contracts/test/PassthroughDataFeed.sol',
-    '@equilibria/perennial-oracle/contracts/test/PassthroughChainlinkFeed.sol',
     '@equilibria/emptyset-batcher/batcher/Batcher.sol',
   ],
 })

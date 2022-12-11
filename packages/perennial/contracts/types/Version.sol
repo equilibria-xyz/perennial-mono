@@ -73,7 +73,7 @@ library VersionLib {
         Fee memory fee,
         Period memory period,
         ProtocolParameter memory protocolParameter,
-        Parameter memory parameter
+        MarketParameter memory marketParameter
     ) internal pure {
         // unpack
         UFixed18 feeAccumulator;
@@ -87,17 +87,17 @@ library VersionLib {
             latestPosition,
             period,
             protocolParameter,
-            parameter
+            marketParameter
         );
 
         // accumulate position
-        _accumulatePosition(valueAccumulator, latestPosition, period, parameter);
+        _accumulatePosition(valueAccumulator, latestPosition, period, marketParameter);
 
         // accumulate reward
-        _accumulateReward(rewardAccumulator, latestPosition, period, parameter); //TODO: auto-shutoff if not enough reward ERC20s in contract?
+        _accumulateReward(rewardAccumulator, latestPosition, period, marketParameter); //TODO: auto-shutoff if not enough reward ERC20s in contract?
 
         // accumulate position fee
-        feeAccumulator = _accumulatePositionFee(valueAccumulator, feeAccumulator, latestPosition, pre, parameter);
+        feeAccumulator = _accumulatePositionFee(valueAccumulator, feeAccumulator, latestPosition, pre, marketParameter);
 
         // update
         versionAccumulator._value = valueAccumulator.pack();
@@ -124,12 +124,12 @@ library VersionLib {
         UFixed18 feeAccumulator,
         Position memory latestPosition,
         PrePosition memory pre,
-        Parameter memory parameter
+        MarketParameter memory marketParameter
     ) private pure returns (UFixed18 newFeeAccumulator) {
         if (pre.isEmpty()) return feeAccumulator;
 
         Position memory positionFeeAmount = pre.fees();
-        Position memory protocolFeeAmount = positionFeeAmount.mul(parameter.positionFee);  //TODO: move this to update also?
+        Position memory protocolFeeAmount = positionFeeAmount.mul(marketParameter.positionFee);  //TODO: move this to update also?
         positionFeeAmount = positionFeeAmount.sub(protocolFeeAmount);
         newFeeAccumulator = protocolFeeAmount.sum();
 
@@ -167,20 +167,20 @@ library VersionLib {
         Position memory latestPosition,
         Period memory period,
         ProtocolParameter memory protocolParameter,
-        Parameter memory parameter
+        MarketParameter memory marketParameter
     ) private pure returns (UFixed18 newFeeAccumulator) {
-        if (parameter.closed) return feeAccumulator;
+        if (marketParameter.closed) return feeAccumulator;
         if (latestPosition.taker.isZero()) return feeAccumulator;
         if (latestPosition.maker.isZero()) return feeAccumulator;
 
         UFixed18 takerNotional = Fixed18Lib.from(latestPosition.taker).mul(period.fromVersion.price).abs();
         UFixed18 socializedNotional = takerNotional.mul(latestPosition.socializationFactor());
 
-        Fixed18 fundingAccumulated = parameter.utilizationCurve.compute(latestPosition.utilization())     // yearly funding rate
+        Fixed18 fundingAccumulated = marketParameter.utilizationCurve.compute(latestPosition.utilization())     // yearly funding rate
             .mul(Fixed18Lib.from(period.timestampDelta()))                                                // multiply by seconds in period
             .div(Fixed18Lib.from(365 days))                                                               // divide by seconds in year (funding rate for period)
             .mul(Fixed18Lib.from(socializedNotional));                                                    // multiply by socialized notion (funding for period)
-        UFixed18 boundedFundingFee = UFixed18Lib.max(parameter.fundingFee, protocolParameter.minFundingFee);
+        UFixed18 boundedFundingFee = UFixed18Lib.max(marketParameter.fundingFee, protocolParameter.minFundingFee);
         newFeeAccumulator = fundingAccumulated.abs().mul(boundedFundingFee);
 
         Fixed18 fundingAccumulatedWithoutFee = Fixed18Lib.from(
@@ -209,9 +209,9 @@ library VersionLib {
         Accumulator memory valueAccumulator,
         Position memory latestPosition,
         Period memory period,
-        Parameter memory parameter
+        MarketParameter memory marketParameter
     ) private pure {
-        if (parameter.closed) return;
+        if (marketParameter.closed) return;
         if (latestPosition.taker.isZero()) return;
         if (latestPosition.maker.isZero()) return;
 
@@ -237,7 +237,7 @@ library VersionLib {
         Accumulator memory rewardAccumulator,
         Position memory latestPosition,
         Period memory period,
-        Parameter memory parameter
+        MarketParameter memory marketParameter
     ) private pure {
         UFixed18 elapsed = period.timestampDelta();
 
@@ -245,14 +245,14 @@ library VersionLib {
             rewardAccumulator.maker :
             rewardAccumulator.maker.add(
                 Fixed18Lib.from(elapsed)
-                    .mul(parameter.rewardRate.taker)
+                    .mul(marketParameter.rewardRate.taker)
                     .div(Fixed18Lib.from(latestPosition.maker))
             );
         rewardAccumulator.taker = latestPosition.taker.isZero() ?
             rewardAccumulator.taker :
             rewardAccumulator.taker.add(
                 Fixed18Lib.from(elapsed)
-                    .mul(parameter.rewardRate.taker)
+                    .mul(marketParameter.rewardRate.taker)
                     .div(Fixed18Lib.from(latestPosition.taker))
             );
     }

@@ -13,7 +13,7 @@ interface IFactory {
     event LiquidationFeeUpdated(UFixed18 newLiquidationFee);
     event TreasuryUpdated(address newTreasury);
     event PauserUpdated(address newPauser);
-    event MarketCreated(IMarket indexed market, IMarket.MarketDefinition definition, Parameter parameter);
+    event MarketCreated(IMarket indexed market, IMarket.MarketDefinition definition, MarketParameter marketParameter);
 
     error FactoryNotPauserError();
     error FactoryPausedError();
@@ -27,7 +27,7 @@ interface IFactory {
     function pauser() external view returns (address);
     function initialize(IBeacon marketBeacon_) external;
     function updateTreasury(address newTreasury) external;
-    function createMarket(IMarket.MarketDefinition calldata definition, Parameter calldata parameter) external returns (IMarket);
+    function createMarket(IMarket.MarketDefinition calldata definition, MarketParameter calldata marketParameter) external returns (IMarket);
     function updateMarketBeacon(IBeacon newMarketBeacon) external;
     function updateParameter(ProtocolParameter memory newParameter) external;
     function updateLiquidationFee(UFixed18 newLiquidationFee) external;

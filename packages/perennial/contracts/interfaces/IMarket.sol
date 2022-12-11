@@ -4,6 +4,7 @@ pragma solidity ^0.8.13;
 import "@equilibria/root/number/types/UFixed18.sol";
 import "@equilibria/root/token/types/Token18.sol";
 import "@equilibria/root/curve/types/JumpRateUtilizationCurve.sol";
+import "./IOracleProvider.sol";
 import "../types/PayoffDefinition.sol";
 import "../types/Position.sol";
 import "../types/PrePosition.sol";
@@ -11,6 +12,7 @@ import "../types/Accumulator.sol";
 import "../types/Version.sol";
 import "../types/Account.sol";
 import "../types/Fee.sol";
+import "../types/OracleVersion.sol";
 
 interface IMarket {
     struct MarketDefinition {
@@ -30,7 +32,7 @@ interface IMarket {
     event CollateralSettled(address indexed account, Fixed18 amount, UFixed18 newShortfall);
     event TreasuryUpdated(address newTreasury);
     event FeeClaimed(address indexed treasury, UFixed18 feeAmount);
-    event ParameterUpdated(Parameter newParameter);
+    event ParameterUpdated(MarketParameter newParameter);
 
     error MarketInsufficientLiquidityError();
     error MarketInsufficientCollateralError();
@@ -47,15 +49,15 @@ interface IMarket {
     error PayoffProviderInvalidOracle();
     error PayoffProviderInvalidPayoffDefinitionError();
 
-    function initialize(MarketDefinition calldata definition_, Parameter calldata parameter_) external;
+    function initialize(MarketDefinition calldata definition_, MarketParameter calldata parameter_) external;
     function name() external view returns (string memory);
     function symbol() external view returns (string memory);
     function token() external view returns (Token18);
     function treasury() external view returns (address);
     function oracle() external view returns (IOracleProvider);
     function payoffDefinition() external view returns (PayoffDefinition memory);
-    function currentVersion() external view returns (IOracleProvider.OracleVersion memory);
-    function atVersion(uint256 oracleVersion) external view returns (IOracleProvider.OracleVersion memory);
+    function currentVersion() external view returns (OracleVersion memory);
+    function atVersion(uint256 oracleVersion) external view returns (OracleVersion memory);
     function liquidation(address account) external view returns (bool);
     function latestVersion() external view returns (uint256);
     function latestVersions(address account) external view returns (uint256);
@@ -67,6 +69,6 @@ interface IMarket {
     function update(Fixed18 positionAmount, Fixed18 collateralAmount) external;
     function liquidate(address account) external;
     function updateTreasury(address newTreasury) external;
-    function parameter() external view returns (Parameter memory);
-    function updateParameter(Parameter memory newParameter) external;
+    function parameter() external view returns (MarketParameter memory);
+    function updateParameter(MarketParameter memory newParameter) external;
 }
