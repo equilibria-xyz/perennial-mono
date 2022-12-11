@@ -4,8 +4,8 @@ pragma solidity ^0.8.13;
 import "@equilibria/root/number/types/UFixed18.sol";
 import "@openzeppelin/contracts/proxy/beacon/IBeacon.sol";
 import "./IMarket.sol";
-import "./types/PayoffDefinition.sol";
-import "./types/ProtocolParameter.sol";
+import "../types/PayoffDefinition.sol";
+import "../types/ProtocolParameter.sol";
 
 interface IFactory {
     event MarketBeaconUpdated(IBeacon newMarketBeacon);

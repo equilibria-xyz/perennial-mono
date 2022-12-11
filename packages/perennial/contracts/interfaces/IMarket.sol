@@ -4,13 +4,13 @@ pragma solidity ^0.8.13;
 import "@equilibria/root/number/types/UFixed18.sol";
 import "@equilibria/root/token/types/Token18.sol";
 import "@equilibria/root/curve/types/JumpRateUtilizationCurve.sol";
-import "./types/PayoffDefinition.sol";
-import "./types/Position.sol";
-import "./types/PrePosition.sol";
-import "./types/Accumulator.sol";
-import "./types/Version.sol";
-import "./types/Account.sol";
-import "./types/Fee.sol";
+import "../types/PayoffDefinition.sol";
+import "../types/Position.sol";
+import "../types/PrePosition.sol";
+import "../types/Accumulator.sol";
+import "../types/Version.sol";
+import "../types/Account.sol";
+import "../types/Fee.sol";
 
 interface IMarket {
     struct MarketDefinition {

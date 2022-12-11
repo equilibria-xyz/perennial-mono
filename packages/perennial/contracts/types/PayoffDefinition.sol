@@ -2,7 +2,7 @@
 pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/utils/Address.sol";
-import "../../interfaces/IContractPayoffProvider.sol";
+import "../interfaces/IContractPayoffProvider.sol";
 
 /// @dev PayoffDefinition tyoe
 struct PayoffDefinition {

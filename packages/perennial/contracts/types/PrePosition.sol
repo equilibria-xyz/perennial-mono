@@ -5,7 +5,6 @@ import "@equilibria/root/number/types/UFixed18.sol";
 import "@equilibria/perennial-oracle/contracts/interfaces/IOracleProvider.sol";
 import "./Parameter.sol";
 import "./Position.sol";
-import "../IMarket.sol";
 
 /// @dev PrePosition type
 struct PrePosition {
