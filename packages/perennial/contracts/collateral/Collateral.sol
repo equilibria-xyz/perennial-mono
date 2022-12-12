@@ -124,7 +124,9 @@ contract Collateral is ICollateral, UInitializable, UControllerProvider, UReentr
 
         // claim fee
         UFixed18 liquidationFee = controller().liquidationFee();
-        UFixed18 fee = UFixed18Lib.min(totalCollateral, totalMaintenance.mul(liquidationFee));
+        // If maintenance is less than minCollateral, use minCollateral for fee amount
+        UFixed18 collateralForFee = UFixed18Lib.max(totalMaintenance, controller().minCollateral());
+        UFixed18 fee = UFixed18Lib.min(totalCollateral, collateralForFee.mul(liquidationFee));
 
         _products[product].debitAccount(account, fee);
         token.push(msg.sender, fee);

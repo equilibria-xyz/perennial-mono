@@ -425,6 +425,22 @@ describe('Collateral', () => {
         expect(await collateral['collateral(address)'](product.address)).to.equal(50)
       })
 
+      it('calculates fee on minCollateral if maintenance < minCollateral', async () => {
+        await controller.mock.minCollateral.returns(120)
+        await product.mock.maintenance.withArgs(user.address).returns(101)
+        await product.mock.closeAll.withArgs(user.address).returns()
+        await token.mock.transfer.withArgs(owner.address, 60).returns(true)
+
+        expect(await collateral.liquidatable(user.address, product.address)).to.equal(true)
+
+        await expect(collateral.liquidate(user.address, product.address))
+          .to.emit(collateral, 'Liquidation')
+          .withArgs(user.address, product.address, owner.address, 60)
+
+        expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(40)
+        expect(await collateral['collateral(address)'](product.address)).to.equal(40)
+      })
+
       it('limits fee to total collateral', async () => {
         await product.mock.maintenance.withArgs(user.address).returns(210)
         await product.mock.closeAll.withArgs(user.address).returns()
