@@ -13,7 +13,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
     Token18 public immutable DSU; // solhint-disable-line var-name-mixedcase
 
     /// @dev Batcher address
-    Batcher public immutable batcher;
+    IBatcher public immutable batcher;
 
     /// @dev Controller address
     IController public immutable controller;
@@ -31,7 +31,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
      * @param batcher_ Protocol Batcher address
      * @param controller_ Protocol Controller address
      */
-    constructor(Token6 usdc_, Batcher batcher_, IController controller_) {
+    constructor(Token6 usdc_, IBatcher batcher_, IController controller_) {
         USDC = usdc_;
         batcher = batcher_;
         controller = controller_;
@@ -45,8 +45,9 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
      * @dev Must be called atomically as part of the upgradeable proxy deployment to
      *      avoid front-running
      */
-    function initialize() external initializer(1) {
+    function initialize() external initializer(2) {
         DSU.approve(address(collateral));
+        DSU.approve(address(batcher));
         DSU.approve(address(reserve));
         USDC.approve(address(batcher));
         USDC.approve(address(reserve));
@@ -208,11 +209,13 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
      * @param amount Amount of DSU to unwrap
      */
     function _unwrap(address receiver, UFixed18 amount) private {
-        // Unwrap the DSU into USDC and return to the receiver
-        // The current batcher does not have UNWRAP functionality yet, so just go directly to the reserve
-        reserve.redeem(amount);
-
-        // Push the amount to the receiver
-        USDC.push(receiver, amount);
+        // If the batcher doesn't have enough for this unwrap, go directly to the reserve
+        if (amount.gt(USDC.balanceOf(address(batcher)))) {
+            reserve.redeem(amount);
+            if (receiver != address(this)) USDC.push(receiver, amount);
+        } else {
+            // Unwrap the DSU into USDC and return to the receiver
+            batcher.unwrap(amount, receiver);
+        }
     }
 }
