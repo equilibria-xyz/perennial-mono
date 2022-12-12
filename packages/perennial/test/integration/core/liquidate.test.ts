@@ -11,7 +11,46 @@ describe('Liquidate', () => {
     instanceVars = await deployProtocol()
   })
 
-  it('liquidates a user', async () => {
+  it('liquidates a user maintenance', async () => {
+    const POSITION = utils.parseEther('0.0001')
+    const { user, userB, collateral, dsu, chainlink } = instanceVars
+
+    const product = await createProduct(instanceVars)
+    await depositTo(instanceVars, user, product, utils.parseEther('500'))
+    await product.connect(user).openMake(POSITION)
+
+    expect(await collateral.liquidatable(user.address, product.address)).to.be.false
+
+    // Settle the product with a new oracle version
+    await chainlink.nextWithPriceModification(price => price.add(1000e8))
+    await product.settle()
+
+    await product.settleAccount(user.address)
+
+    expect(await collateral.liquidatableNext(user.address, product.address)).to.be.true
+    expect(await collateral.liquidatable(user.address, product.address)).to.be.true
+
+    await expect(collateral.connect(userB).liquidate(user.address, product.address))
+      .to.emit(collateral, 'Liquidation')
+      .withArgs(user.address, product.address, userB.address, '286895956958009478107')
+
+    expect(await product.isLiquidating(user.address)).to.be.true
+
+    expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(
+      '213104043041990521893',
+    )
+    expect(await collateral['collateral(address)'](product.address)).to.equal('213104043041990521893')
+    expect(await dsu.balanceOf(userB.address)).to.equal(
+      utils.parseEther('20000').add(BigNumber.from('286895956958009478107')),
+    ) // Original 20000 + fee
+
+    await chainlink.next()
+    await product.settleAccount(user.address)
+
+    expect(await product.isLiquidating(user.address)).to.be.false
+  })
+
+  it('liquidates a user total collateral', async () => {
     const POSITION = utils.parseEther('0.0001')
     const { user, userB, collateral, dsu, chainlink } = instanceVars
 
@@ -38,7 +77,43 @@ describe('Liquidate', () => {
 
     expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(0)
     expect(await collateral['collateral(address)'](product.address)).to.equal(0)
-    expect(await dsu.balanceOf(userB.address)).to.equal(utils.parseEther('21000')) // Original 20000 + fee
+    expect(await dsu.balanceOf(userB.address)).to.equal(utils.parseEther('2100')) // Original 20000 + fee
+
+    await chainlink.next()
+    await product.settleAccount(user.address)
+
+    expect(await product.isLiquidating(user.address)).to.be.false
+  })
+
+  it('liquidates a user with minCollateral', async () => {
+    const POSITION = utils.parseEther('0.0001')
+    const { user, userB, collateral, controller, dsu, chainlink } = instanceVars
+
+    const product = await createProduct(instanceVars)
+    await depositTo(instanceVars, user, product, utils.parseEther('500'))
+    await product.connect(user).openMake(POSITION)
+
+    expect(await collateral.liquidatable(user.address, product.address)).to.be.false
+
+    // Settle the product with a new oracle version
+    await controller.updateMinCollateral(utils.parseEther('1000'))
+    await chainlink.nextWithPriceModification(price => price.add(1000e8))
+    await product.settle()
+
+    await product.settleAccount(user.address)
+
+    expect(await collateral.liquidatableNext(user.address, product.address)).to.be.true
+    expect(await collateral.liquidatable(user.address, product.address)).to.be.true
+
+    await expect(collateral.connect(userB).liquidate(user.address, product.address))
+      .to.emit(collateral, 'Liquidation')
+      .withArgs(user.address, product.address, userB.address, utils.parseEther('500'))
+
+    expect(await product.isLiquidating(user.address)).to.be.true
+
+    expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(0)
+    expect(await collateral['collateral(address)'](product.address)).to.equal(0)
+    expect(await dsu.balanceOf(userB.address)).to.equal(utils.parseEther('20500')) // Original 20000 + fee
 
     await chainlink.next()
     await product.settleAccount(user.address)
