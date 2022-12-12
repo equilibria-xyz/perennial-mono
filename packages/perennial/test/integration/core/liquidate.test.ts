@@ -77,7 +77,7 @@ describe('Liquidate', () => {
 
     expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(0)
     expect(await collateral['collateral(address)'](product.address)).to.equal(0)
-    expect(await dsu.balanceOf(userB.address)).to.equal(utils.parseEther('2100')) // Original 20000 + fee
+    expect(await dsu.balanceOf(userB.address)).to.equal(utils.parseEther('21000')) // Original 20000 + fee
 
     await chainlink.next()
     await product.settleAccount(user.address)
