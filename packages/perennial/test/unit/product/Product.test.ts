@@ -2218,7 +2218,7 @@ describe('Product', () => {
           closePosition: { maker: POSITION.mul(2), taker: 0 },
         })
         expect(await product.isLiquidating(user.address)).to.equal(true)
-        expect(await product['maintenance(address)'](user.address)).to.equal(0)
+        expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('615'))
       })
 
       it('closes taker side', async () => {
@@ -2251,7 +2251,7 @@ describe('Product', () => {
           closePosition: { maker: 0, taker: POSITION.mul(2) },
         })
         expect(await product.isLiquidating(user.address)).to.equal(true)
-        expect(await product['maintenance(address)'](user.address)).to.equal(0)
+        expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('615'))
       })
 
       it('reverts if already initialized', async () => {
@@ -5272,7 +5272,7 @@ describe('Product', () => {
           closePosition: { maker: POSITION.mul(2), taker: 0 },
         })
         expect(await product.isLiquidating(user.address)).to.equal(true)
-        expect(await product['maintenance(address)'](user.address)).to.equal(0)
+        expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('615'))
       })
 
       it('closes taker side', async () => {
@@ -5305,7 +5305,7 @@ describe('Product', () => {
           closePosition: { maker: 0, taker: POSITION.mul(2) },
         })
         expect(await product.isLiquidating(user.address)).to.equal(true)
-        expect(await product['maintenance(address)'](user.address)).to.equal(0)
+        expect(await product['maintenance(address)'](user.address)).to.equal(utils.parseEther('615'))
       })
 
       it('reverts if already initialized', async () => {
