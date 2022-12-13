@@ -1,0 +1,421 @@
+{
+  "address": "0xbdA59A4405AD32cF81887B54ef5e6D5cB2177d52",
+  "abi": [
+    {
+      "anonymous": false,
+      "inputs": [
+        { "indexed": true, "internalType": "address", "name": "account", "type": "address" },
+        { "indexed": false, "internalType": "uint256", "name": "borrowAmount", "type": "uint256" }
+      ],
+      "name": "Borrow",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [{ "indexed": false, "internalType": "uint256", "name": "burnAmount", "type": "uint256" }],
+      "name": "BurnStake",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        { "indexed": true, "internalType": "address", "name": "account", "type": "address" },
+        { "indexed": false, "internalType": "uint256", "name": "mintAmount", "type": "uint256" },
+        { "indexed": false, "internalType": "uint256", "name": "costAmount", "type": "uint256" }
+      ],
+      "name": "Mint",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        { "indexed": false, "internalType": "address", "name": "account", "type": "address" },
+        { "indexed": false, "internalType": "uint256", "name": "mintAmount", "type": "uint256" }
+      ],
+      "name": "MintStake",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        { "indexed": true, "internalType": "address", "name": "makerToken", "type": "address" },
+        { "indexed": true, "internalType": "address", "name": "takerToken", "type": "address" },
+        { "indexed": false, "internalType": "uint256", "name": "price", "type": "uint256" },
+        { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" }
+      ],
+      "name": "OrderRegistered",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [{ "indexed": false, "internalType": "address", "name": "newOwner", "type": "address" }],
+      "name": "OwnerUpdate",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [{ "indexed": false, "internalType": "bool", "name": "newPaused", "type": "bool" }],
+      "name": "PausedUpdate",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [{ "indexed": false, "internalType": "address", "name": "newPauser", "type": "address" }],
+      "name": "PauserUpdate",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        { "indexed": true, "internalType": "address", "name": "account", "type": "address" },
+        { "indexed": false, "internalType": "uint256", "name": "costAmount", "type": "uint256" },
+        { "indexed": false, "internalType": "uint256", "name": "redeemAmount", "type": "uint256" }
+      ],
+      "name": "Redeem",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [{ "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" }],
+      "name": "RedeemVault",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [{ "indexed": false, "internalType": "address", "name": "newRegistry", "type": "address" }],
+      "name": "RegistryUpdate",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        { "indexed": true, "internalType": "address", "name": "account", "type": "address" },
+        { "indexed": false, "internalType": "uint256", "name": "repayAmount", "type": "uint256" }
+      ],
+      "name": "Repay",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [{ "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" }],
+      "name": "SupplyVault",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        { "indexed": true, "internalType": "address", "name": "makerToken", "type": "address" },
+        { "indexed": true, "internalType": "address", "name": "takerToken", "type": "address" },
+        { "indexed": false, "internalType": "uint256", "name": "takerAmount", "type": "uint256" },
+        { "indexed": false, "internalType": "uint256", "name": "makerAmount", "type": "uint256" }
+      ],
+      "name": "Swap",
+      "type": "event"
+    },
+    {
+      "constant": true,
+      "inputs": [],
+      "name": "admin",
+      "outputs": [{ "internalType": "address", "name": "adm", "type": "address" }],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [
+        { "internalType": "address", "name": "account", "type": "address" },
+        { "internalType": "uint256", "name": "amount", "type": "uint256" }
+      ],
+      "name": "borrow",
+      "outputs": [],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [],
+      "name": "burnStake",
+      "outputs": [],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [],
+      "name": "claimVault",
+      "outputs": [],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "constant": true,
+      "inputs": [{ "internalType": "address", "name": "borrower", "type": "address" }],
+      "name": "debt",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [
+        { "internalType": "address", "name": "token", "type": "address" },
+        { "internalType": "address", "name": "delegatee", "type": "address" }
+      ],
+      "name": "delegateVault",
+      "outputs": [],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "constant": true,
+      "inputs": [],
+      "name": "implementation",
+      "outputs": [{ "internalType": "address", "name": "impl", "type": "address" }],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [{ "internalType": "uint256", "name": "amount", "type": "uint256" }],
+      "name": "mint",
+      "outputs": [],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [
+        { "internalType": "address", "name": "account", "type": "address" },
+        { "internalType": "uint256", "name": "amount", "type": "uint256" }
+      ],
+      "name": "mintStake",
+      "outputs": [],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "constant": true,
+      "inputs": [
+        { "internalType": "address", "name": "makerToken", "type": "address" },
+        { "internalType": "address", "name": "takerToken", "type": "address" }
+      ],
+      "name": "order",
+      "outputs": [
+        {
+          "components": [
+            {
+              "components": [{ "internalType": "uint256", "name": "value", "type": "uint256" }],
+              "internalType": "struct Decimal.D256",
+              "name": "price",
+              "type": "tuple"
+            },
+            { "internalType": "uint256", "name": "amount", "type": "uint256" }
+          ],
+          "internalType": "struct ReserveTypes.Order",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "constant": true,
+      "inputs": [],
+      "name": "owner",
+      "outputs": [{ "internalType": "address", "name": "o", "type": "address" }],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "constant": true,
+      "inputs": [],
+      "name": "paused",
+      "outputs": [{ "internalType": "bool", "name": "p", "type": "bool" }],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "constant": true,
+      "inputs": [],
+      "name": "pauser",
+      "outputs": [{ "internalType": "address", "name": "p", "type": "address" }],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [{ "internalType": "uint256", "name": "amount", "type": "uint256" }],
+      "name": "redeem",
+      "outputs": [],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "constant": true,
+      "inputs": [],
+      "name": "redeemPrice",
+      "outputs": [
+        {
+          "components": [{ "internalType": "uint256", "name": "value", "type": "uint256" }],
+          "internalType": "struct Decimal.D256",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [
+        { "internalType": "address", "name": "makerToken", "type": "address" },
+        { "internalType": "address", "name": "takerToken", "type": "address" },
+        { "internalType": "uint256", "name": "price", "type": "uint256" },
+        { "internalType": "uint256", "name": "amount", "type": "uint256" }
+      ],
+      "name": "registerOrder",
+      "outputs": [],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "constant": true,
+      "inputs": [],
+      "name": "registry",
+      "outputs": [{ "internalType": "contract IRegistry", "name": "reg", "type": "address" }],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [
+        { "internalType": "address", "name": "account", "type": "address" },
+        { "internalType": "uint256", "name": "amount", "type": "uint256" }
+      ],
+      "name": "repay",
+      "outputs": [],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "constant": true,
+      "inputs": [],
+      "name": "reserveBalance",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "constant": true,
+      "inputs": [],
+      "name": "reserveRatio",
+      "outputs": [
+        {
+          "components": [{ "internalType": "uint256", "name": "value", "type": "uint256" }],
+          "internalType": "struct Decimal.D256",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [{ "internalType": "address", "name": "newOwner", "type": "address" }],
+      "name": "setOwner",
+      "outputs": [],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [{ "internalType": "bool", "name": "newPaused", "type": "bool" }],
+      "name": "setPaused",
+      "outputs": [],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [{ "internalType": "address", "name": "newPauser", "type": "address" }],
+      "name": "setPauser",
+      "outputs": [],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [{ "internalType": "address", "name": "newRegistry", "type": "address" }],
+      "name": "setRegistry",
+      "outputs": [],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [],
+      "name": "setup",
+      "outputs": [],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [
+        { "internalType": "address", "name": "makerToken", "type": "address" },
+        { "internalType": "address", "name": "takerToken", "type": "address" },
+        { "internalType": "uint256", "name": "takerAmount", "type": "uint256" }
+      ],
+      "name": "swap",
+      "outputs": [],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [],
+      "name": "takeOwnership",
+      "outputs": [],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "constant": true,
+      "inputs": [],
+      "name": "totalDebt",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ]
+}

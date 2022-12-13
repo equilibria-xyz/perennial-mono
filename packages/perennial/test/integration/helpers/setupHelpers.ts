@@ -136,9 +136,11 @@ export async function deployProtocol(): Promise<InstanceVars> {
   await collateral.initialize(controller.address)
 
   // Setup MultiInvoker
+  const reserve = IEmptySetReserve__factory.connect(await batcher.RESERVE(), owner)
   const multiInvokerImpl = await new MultiInvoker__factory(owner).deploy(
     usdc.address,
     batcher.address,
+    reserve.address,
     controllerProxy.address,
   )
   const multiInvokerProxy = await new TransparentUpgradeableProxy__factory(owner).deploy(
@@ -179,7 +181,6 @@ export async function deployProtocol(): Promise<InstanceVars> {
   )
 
   const incentiveToken = await new ERC20PresetMinterPauser__factory(owner).deploy('Incentive Token', 'ITKN')
-  const reserve = IEmptySetReserve__factory.connect(await batcher.RESERVE(), owner)
 
   return {
     owner,

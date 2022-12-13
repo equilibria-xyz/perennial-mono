@@ -1,7 +1,7 @@
 import { expect } from 'chai'
 import { BigNumber, constants, utils } from 'ethers'
 import { time } from '../../../../common/testutil'
-import { Product } from '../../../types/generated'
+import { MultiInvoker__factory, Product } from '../../../types/generated'
 import { IMultiInvoker } from '../../../types/generated/contracts/interfaces/IMultiInvoker'
 import { buildInvokerActions, InvokerAction } from '../../util'
 import { YEAR } from '../core/incentivizer.test'
@@ -312,6 +312,58 @@ describe('MultiInvoker', () => {
         .withArgs(reserve.address, multiInvoker.address, 10000e6)
         .to.emit(usdc, 'Transfer')
         .withArgs(multiInvoker.address, user.address, 10000e6)
+    })
+
+    context('0 address batcher', () => {
+      beforeEach(async () => {
+        const { usdc, reserve, controller, multiInvoker, owner, proxyAdmin } = instanceVars
+        const multiInvokerImpl = await new MultiInvoker__factory(owner).deploy(
+          usdc.address,
+          constants.AddressZero,
+          reserve.address,
+          controller.address,
+        )
+
+        await proxyAdmin.upgrade(multiInvoker.address, multiInvokerImpl.address)
+      })
+
+      it('calls the reserve directly on WRAP', async () => {
+        const { user, dsu, usdc, usdcHolder, multiInvoker, reserve } = instanceVars
+
+        await usdc.connect(usdcHolder).transfer(user.address, 1_000_000e6)
+
+        const amount = utils.parseEther('2000000')
+        const WRAP = {
+          action: 8,
+          args: utils.defaultAbiCoder.encode(['address', 'uint'], [user.address, amount]),
+        }
+        await expect(multiInvoker.connect(user).invoke([WRAP]))
+          .to.emit(usdc, 'Transfer')
+          .withArgs(user.address, multiInvoker.address, 2_000_000e6)
+          .to.emit(reserve, 'Mint')
+          .withArgs(multiInvoker.address, amount, 2_000_000e6)
+          .to.emit(dsu, 'Transfer')
+          .withArgs(reserve.address, multiInvoker.address, amount)
+          .to.emit(dsu, 'Transfer')
+          .withArgs(multiInvoker.address, user.address, amount)
+      })
+
+      it('calls the reserve directly on UNWRAP', async () => {
+        const { user, multiInvoker, batcher, usdc, reserve } = instanceVars
+
+        // Load the Reserve with some USDC
+        await usdc.connect(user).approve(batcher.address, constants.MaxUint256)
+        await batcher.connect(user).wrap(amount, user.address)
+        await batcher.rebalance()
+
+        await expect(multiInvoker.connect(user).invoke([actions.UNWRAP]))
+          .to.emit(reserve, 'Redeem')
+          .withArgs(multiInvoker.address, amount, 10000e6)
+          .to.emit(usdc, 'Transfer')
+          .withArgs(reserve.address, multiInvoker.address, 10000e6)
+          .to.emit(usdc, 'Transfer')
+          .withArgs(multiInvoker.address, user.address, 10000e6)
+      })
     })
   })
 })
