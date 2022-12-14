@@ -56,7 +56,8 @@ contract ChainlinkOracle is IOracleProvider {
         // Update phase annotation when new phase detected
         while (round.phaseId() > _latestPhaseId()) {
             uint256 roundCount = registry.getRoundCount(base, quote, _latestPhaseId());
-            _startingVersionForPhaseId.push(roundCount);
+            _startingVersionForPhaseId.push(
+                roundCount + _startingVersionForPhaseId[_startingVersionForPhaseId.length - 1]);
         }
 
         // Return packaged oracle version
@@ -106,7 +107,7 @@ contract ChainlinkOracle is IOracleProvider {
 
     /**
      * @notice Computes the chainlink round ID from a version
-     * @notice version Version to compute from
+     * @param version Version to compute from
      * @return Chainlink round ID
      */
     function _versionToRoundId(uint256 version) private view returns (uint80) {
