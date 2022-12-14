@@ -100,7 +100,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
      * @param newFundingFee new funding fee value
      */
     function _updateFundingFee(UFixed18 newFundingFee) private {
-        if (newFundingFee.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidFeeValue();
+        if (newFundingFee.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidParamValue();
         _fundingFee.store(newFundingFee);
         emit FundingFeeUpdated(newFundingFee, _productVersion());
     }
@@ -119,7 +119,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
      * @param newMakerFee new maker fee value
      */
     function _updateMakerFee(UFixed18 newMakerFee) private {
-        if (newMakerFee.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidFeeValue();
+        if (newMakerFee.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidParamValue();
         _makerFee.store(newMakerFee);
         emit MakerFeeUpdated(newMakerFee, _productVersion());
     }
@@ -129,7 +129,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
      * @param newMakerFee new maker fee value
      */
     function _updatePendingMakerFee(UFixed18 newMakerFee) private {
-        if (newMakerFee.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidFeeValue();
+        if (newMakerFee.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidParamValue();
         PendingFeeUpdates memory pendingFees_ = pendingFeeUpdates();
         pendingFees_.updateMakerFee(newMakerFee);
         _pendingFeeUpdates.store(pendingFees_);
@@ -154,7 +154,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
      * @param newTakerFee new taker fee value
      */
     function _updateTakerFee(UFixed18 newTakerFee) private {
-        if (newTakerFee.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidFeeValue();
+        if (newTakerFee.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidParamValue();
         _takerFee.store(newTakerFee);
         emit TakerFeeUpdated(newTakerFee, _productVersion());
     }
@@ -164,7 +164,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
      * @param newTakerFee new taker fee value
      */
     function _updatePendingTakerFee(UFixed18 newTakerFee) private {
-        if (newTakerFee.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidFeeValue();
+        if (newTakerFee.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidParamValue();
         PendingFeeUpdates memory pendingFees_ = pendingFeeUpdates();
         pendingFees_.updateTakerFee(newTakerFee);
         _pendingFeeUpdates.store(pendingFees_);
@@ -189,7 +189,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
      * @param newPositionFee new position fee value
      */
     function _updatePositionFee(UFixed18 newPositionFee) private {
-        if (newPositionFee.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidFeeValue();
+        if (newPositionFee.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidParamValue();
         _positionFee.store(newPositionFee);
         emit PositionFeeUpdated(newPositionFee, _productVersion());
     }
@@ -199,7 +199,7 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
      * @param newPositionFee new position fee value
      */
     function _updatePendingPositionFee(UFixed18 newPositionFee) private {
-        if (newPositionFee.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidFeeValue();
+        if (newPositionFee.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidParamValue();
         PendingFeeUpdates memory pendingFees_ = pendingFeeUpdates();
         pendingFees_.updatePositionFee(newPositionFee);
         _pendingFeeUpdates.store(pendingFees_);
