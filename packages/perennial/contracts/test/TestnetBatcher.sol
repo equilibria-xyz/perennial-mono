@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.15;
+pragma solidity ^0.8.15;
 
 import "@openzeppelin/contracts/token/ERC20/presets/ERC20PresetMinterPauser.sol";
 import "@equilibria/emptyset-batcher/interfaces/IBatcher.sol";
