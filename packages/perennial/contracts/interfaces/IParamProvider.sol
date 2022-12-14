@@ -20,10 +20,7 @@ interface IParamProvider {
         uint256 version
     );
 
-    error ParamProviderInvalidMakerFee();
-    error ParamProviderInvalidTakerFee();
-    error ParamProviderInvalidPositionFee();
-    error ParamProviderInvalidFundingFee();
+    error ParamProviderInvalidFeeValue();
 
     function maintenance() external view returns (UFixed18);
     function updateMaintenance(UFixed18 newMaintenance) external;
