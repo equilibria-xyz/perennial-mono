@@ -62,8 +62,6 @@ interface IProduct is IPayoffProvider, IParamProvider {
     error ProductInLiquidationError();
     error ProductMakerOverLimitError();
     error ProductOracleBootstrappingError();
-    error ProductNotOwnerError();
-    error ProductInvalidOracle();
     error ProductClosedError();
 
     function name() external view returns (string memory);
