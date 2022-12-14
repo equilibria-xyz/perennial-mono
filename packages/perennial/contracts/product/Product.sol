@@ -503,6 +503,15 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         emit ClosedUpdated(newClosed, oracleVersion.version);
     }
 
+    /**
+     * @notice Updates underlying product oracle
+     * @dev only callable by product owner
+     * @param newOracle new oracle address
+     */
+    function updateOracle(IOracleProvider newOracle) external onlyProductOwner {
+        _updateOracle(address(newOracle));
+    }
+
     /// @dev Limit total maker for guarded rollouts
     modifier makerInvariant() {
         _;

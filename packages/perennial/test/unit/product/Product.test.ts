@@ -185,6 +185,11 @@ describe('Product', () => {
         .to.emit(product, 'JumpRateUtilizationCurveUpdated')
         .withArgs(newCurve, 0)
 
+      const newOracle = await deployMockContract(owner, IOracleProvider__factory.abi)
+      await expect(product.updateOracle(newOracle.address))
+        .to.emit(product, 'OracleUpdated')
+        .withArgs(newOracle.address)
+
       expect(product.settle).to.have.callCount(7)
 
       expect(await product['maintenance()']()).to.equal(utils.parseEther('0.1'))
@@ -199,6 +204,8 @@ describe('Product', () => {
       expect(curve.maxRate).to.equal(utils.parseEther('0.20'))
       expect(curve.targetRate).to.equal(utils.parseEther('0.30'))
       expect(curve.targetUtilization).to.equal(utils.parseEther('0.4'))
+
+      expect(await product.oracle()).to.equal(newOracle.address)
     })
 
     describe('pending fee updates', () => {
@@ -322,6 +329,9 @@ describe('Product', () => {
         .withArgs(1)
       await expect(product.connect(user).updateMakerLimit(utils.parseEther('0.5')))
         .to.be.be.revertedWithCustomError(product, 'NotOwnerError')
+        .withArgs(1)
+      await expect(product.connect(user).updateOracle(user.address))
+        .to.be.revertedWithCustomError(product, 'NotOwnerError')
         .withArgs(1)
     })
 

@@ -95,4 +95,5 @@ interface IProduct is IPayoffProvider, IParamProvider {
     function rate(Position memory position) external view returns (Fixed18);
     function closed() external view returns (bool);
     function updateClosed(bool newClosed) external;
+    function updateOracle(IOracleProvider newOracle) external;
 }
