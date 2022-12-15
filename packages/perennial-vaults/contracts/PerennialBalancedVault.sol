@@ -34,6 +34,7 @@ contract PerennialBalancedVault is ERC4626, UOwnable {
         maxLeverageMultiplier = maxLeverageMultiplier_;
         require(maxLeverageMultiplier.gt(UFixed18Lib.ONE), "leverage must be > 1");
         collateral = controller.collateral();
+        dsu_.approve(address(collateral), type(uint256).max);
     }
 
     function totalAssets() public view override returns (uint256) {
