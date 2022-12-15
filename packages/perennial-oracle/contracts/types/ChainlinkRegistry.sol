@@ -45,9 +45,9 @@ library ChainlinkRegistryLib {
      * @param roundId The specific round to fetch data for
      * @return Specific round's data
      */
-    function getRound(ChainlinkRegistry self, address base, address quote, uint80 roundId) internal view returns (ChainlinkRound memory) {
+    function getRound(ChainlinkRegistry self, address base, address quote, uint256 roundId) internal view returns (ChainlinkRound memory) {
         (, int256 answer, , uint256 updatedAt, ) =
-            FeedRegistryInterface(ChainlinkRegistry.unwrap(self)).getRoundData(base, quote, roundId);
+            FeedRegistryInterface(ChainlinkRegistry.unwrap(self)).getRoundData(base, quote, uint80(roundId));
         return ChainlinkRound({roundId: roundId, timestamp: updatedAt, answer: answer});
     }
 
@@ -74,10 +74,10 @@ library ChainlinkRegistryLib {
      * @param phaseId The specific phase to fetch data for
      * @return The quantity of rounds for the phase
      */
-    function getRoundCount(ChainlinkRegistry self, address base, address quote, uint16 phaseId)
-    internal view returns (uint80) {
+    function getRoundCount(ChainlinkRegistry self, address base, address quote, uint256 phaseId)
+    internal view returns (uint256) {
         (uint80 startingRoundId, uint80 endingRoundId) =
-            FeedRegistryInterface(ChainlinkRegistry.unwrap(self)).getPhaseRange(base, quote, phaseId);
-        return endingRoundId - startingRoundId + 1;
+            FeedRegistryInterface(ChainlinkRegistry.unwrap(self)).getPhaseRange(base, quote, uint16(phaseId));
+        return uint256(endingRoundId - startingRoundId + 1);
     }
 }

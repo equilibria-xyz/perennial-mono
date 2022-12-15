@@ -27,7 +27,12 @@ contract ChainlinkOracle is IOracleProvider {
     int256 private immutable _decimalOffset;
 
     /// @dev Mapping of the first oracle version for each underlying phase ID
-    uint256[] private _startingVersionForPhaseId;
+    Phase[] private _phases;
+
+    struct Phase {
+        uint128 startingVersion;
+        uint128 startingRoundId;
+    }
 
     /**
      * @notice Initializes the contract state
@@ -40,8 +45,11 @@ contract ChainlinkOracle is IOracleProvider {
         base = base_;
         quote = quote_;
 
-        _startingVersionForPhaseId.push(0); // phaseId is 1-indexed, skip index 0
-        _startingVersionForPhaseId.push(0); // phaseId is 1-indexed, first phase starts as version 0
+        // phaseId is 1-indexed, skip index 0
+        _phases.push(Phase(uint128(0), uint128(0)));
+        // phaseId is 1-indexed, first phase starts as version 0
+        _phases.push(Phase(uint128(0), uint128(registry_.getStartingRoundId(base_, quote_, 1))));
+
         _decimalOffset = SafeCast.toInt256(10 ** registry_.decimals(base, quote));
     }
 
@@ -55,9 +63,13 @@ contract ChainlinkOracle is IOracleProvider {
 
         // Update phase annotation when new phase detected
         while (round.phaseId() > _latestPhaseId()) {
-            uint256 roundCount = registry.getRoundCount(base, quote, _latestPhaseId());
-            _startingVersionForPhaseId.push(
-                roundCount + _startingVersionForPhaseId[_startingVersionForPhaseId.length - 1]);
+            _phases.push(
+                Phase(
+                    uint128(registry.getRoundCount(base, quote, _latestPhaseId())) +
+                        _phases[_phases.length - 1].startingVersion,
+                    uint128(registry.getStartingRoundId(base, quote, _latestPhaseId()))
+                )
+            );
         }
 
         // Return packaged oracle version
@@ -88,8 +100,8 @@ contract ChainlinkOracle is IOracleProvider {
      * @return Built oracle version
      */
     function _buildOracleVersion(ChainlinkRound memory round) private view returns (OracleVersion memory) {
-        uint256 version = _startingVersionForPhaseId[round.phaseId()] +
-            uint256(round.roundId - registry.getStartingRoundId(base, quote, round.phaseId()));
+        Phase memory phase = _phases[round.phaseId()];
+        uint256 version = uint256(phase.startingVersion) + round.roundId - uint256(phase.startingRoundId);
         return _buildOracleVersion(round, version);
     }
 
@@ -107,24 +119,25 @@ contract ChainlinkOracle is IOracleProvider {
 
     /**
      * @notice Computes the chainlink round ID from a version
-     * @param version Version to compute from
+     * @notice version Version to compute from
      * @return Chainlink round ID
      */
-    function _versionToRoundId(uint256 version) private view returns (uint80) {
-        uint16 phaseId = _versionToPhaseId(version);
-        return registry.getStartingRoundId(base, quote, phaseId) +
-            uint80(version - _startingVersionForPhaseId[phaseId]);
+    function _versionToRoundId(uint256 version) private view returns (uint256) {
+        Phase memory phase = _versionToPhase(version);
+        return uint256(phase.startingRoundId) + version - uint256(phase.startingVersion);
     }
 
     /**
      * @notice Computes the chainlink phase ID from a version
      * @param version Version to compute from
-     * @return phaseId Chainlink phase ID
+     * @return phase Chainlink phase
      */
-    function _versionToPhaseId(uint256 version) private view returns (uint16 phaseId) {
-        phaseId = _latestPhaseId();
-        while (_startingVersionForPhaseId[phaseId] > version) {
+    function _versionToPhase(uint256 version) private view returns (Phase memory phase) {
+        uint256 phaseId = _latestPhaseId();
+        phase = _phases[phaseId];
+        while (uint256(phase.startingVersion) > version) {
             phaseId--;
+            phase = _phases[phaseId];
         }
     }
 
@@ -133,6 +146,6 @@ contract ChainlinkOracle is IOracleProvider {
      * @return Latest seen phase ID
      */
     function _latestPhaseId() private view returns (uint16) {
-        return uint16(_startingVersionForPhaseId.length - 1);
+        return uint16(_phases.length - 1);
     }
 }
