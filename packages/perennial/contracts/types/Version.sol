@@ -84,23 +84,25 @@ library VersionLib {
     ) private pure returns (UFixed18 newFeeAccumulator) {
         if (pre.isEmpty()) return feeAccumulator;
 
-        Position memory positionFeeAmount = pre.fees();
-        Position memory protocolFeeAmount = positionFeeAmount.mul(marketParameter.positionFee);  //TODO: move this to update also?
-        positionFeeAmount = positionFeeAmount.sub(protocolFeeAmount);
-        newFeeAccumulator = protocolFeeAmount.sum();
+        (UFixed18 makerPositionFee, UFixed18 takerPositionFee) = (pre.makerFee(), pre.takerFee());
+        (UFixed18 makerProtocolFee, UFixed18 takerProtocolFee) =
+            (marketParameter.positionFee.mul(makerPositionFee), marketParameter.positionFee.mul(takerPositionFee));
+        (makerPositionFee, takerPositionFee) =
+            (makerPositionFee.sub(makerProtocolFee), takerPositionFee.sub(takerProtocolFee));
+        newFeeAccumulator = makerProtocolFee.add(takerProtocolFee);
 
         // If there are makers to distribute the taker's position fee to, distribute. Otherwise give it to the protocol
         if (!versionAccumulator.position.maker().isZero()) {
-            versionAccumulator.value.incrementMaker(Fixed18Lib.from(positionFeeAmount.taker()), versionAccumulator.position.maker());
+            versionAccumulator.value.incrementMaker(Fixed18Lib.from(takerPositionFee), versionAccumulator.position.maker());
         } else {
-            newFeeAccumulator = newFeeAccumulator.add(positionFeeAmount.taker());
+            newFeeAccumulator = newFeeAccumulator.add(takerPositionFee);
         }
 
         // If there are takers to distribute the maker's position fee to, distribute. Otherwise give it to the protocol
         if (!versionAccumulator.position.taker().isZero()) {
-            versionAccumulator.value.incrementTaker(Fixed18Lib.from(positionFeeAmount.maker()), versionAccumulator.position.taker());
+            versionAccumulator.value.incrementTaker(Fixed18Lib.from(makerPositionFee), versionAccumulator.position.taker());
         } else {
-            newFeeAccumulator = newFeeAccumulator.add(positionFeeAmount.maker());
+            newFeeAccumulator = newFeeAccumulator.add(makerPositionFee);
         }
 
         newFeeAccumulator = feeAccumulator.add(newFeeAccumulator);

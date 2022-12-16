@@ -31,44 +31,6 @@ library PositionLib {
     }
 
     /**
-     * @notice Returns whether the position is fully empty
-     * @param self A position
-     * @return Whether the position is empty
-     */
-    function isEmpty(Position memory self) internal pure returns (bool) {
-        return self.maker().isZero() && self.taker().isZero();
-    }
-
-    /**
-     * @notice Subtracts position `b` from `a`, returning the result
-     * @param a The position to subtract from
-     * @param b The position to subtract
-     * @return Resulting subtracted position
-     */
-    function sub(Position memory a, Position memory b) internal pure returns (Position memory) {
-        return Position(a.maker().sub(b.maker()).pack(), a.taker().sub(b.taker()).pack());
-    }
-
-    /**
-     * @notice Scales position `self` by fixed-decimal `scale` and returns the resulting position
-     * @param self The Position to operate on
-     * @param scale The Fixed-decimal to scale by
-     * @return Resulting scaled position
-     */
-    function mul(Position memory self, UFixed18 scale) internal pure returns (Position memory) {
-        return Position(self.maker().mul(scale).pack(), self.taker().mul(scale).pack());
-    }
-
-    /**
-     * @notice Sums the maker and taker together from a single position
-     * @param self The struct to operate on
-     * @return The sum of its maker and taker
-     */
-    function sum(Position memory self) internal pure returns (UFixed18) {
-        return self.maker().add(self.taker());
-    }
-
-    /**
      * @notice Computes the next position after the pending-settlement position delta is included
      * @param self The current Position
      * @param pre The pending-settlement position delta

@@ -35,8 +35,12 @@ library PrePositionLib {
         return self._taker.unpack();
     }
 
-    function fees(PrePosition memory self) internal pure returns (Position memory) {
-        return Position(self._makerFee, self._takerFee);
+    function makerFee(PrePosition memory self) internal pure returns (UFixed18) {
+        return self._makerFee.unpack();
+    }
+
+    function takerFee(PrePosition memory self) internal pure returns (UFixed18) {
+        return self._takerFee.unpack();
     }
 
     /**
@@ -47,7 +51,7 @@ library PrePositionLib {
      * @return Whether the pending-settlement position delta is empty
      */
     function isEmpty(PrePosition memory self) internal pure returns (bool) {
-        return self.maker().isZero() && self.taker().isZero() && self.fees().isEmpty();
+        return self.maker().isZero() && self.taker().isZero() && self.makerFee().isZero() && self.takerFee().isZero();
     }
 
     function clear(PrePosition memory self) internal pure {

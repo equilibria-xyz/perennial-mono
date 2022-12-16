@@ -22,7 +22,8 @@ interface ILens {
         PrePosition pre;
         Position position;
         Fee fee;
-        Position openInterest;
+        UFixed18 openMakerInterest;
+        UFixed18 openTakerInterest;
     }
 
     /// @dev Snapshot of User state for a Market
@@ -62,7 +63,7 @@ interface ILens {
     function latestVersion(IMarket market) external returns (OracleVersion memory);
     function atVersions(IMarket market, uint[] memory versions) external returns (OracleVersion[] memory);
     function rate(IMarket market) external returns (Fixed18);
-    function openInterest(IMarket market) external returns (Position memory);
+    function openInterest(IMarket market) external returns (UFixed18, UFixed18);
     function dailyRate(IMarket market) external returns (Fixed18);
 
     // UserMarket Values

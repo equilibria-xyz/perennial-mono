@@ -51,7 +51,7 @@ contract Lens is ILens {
         _snapshot.pre = pre(market);
         _snapshot.position = position(market);
         _snapshot.fee = fees(market);
-        _snapshot.openInterest = openInterest(market);
+        (_snapshot.openMakerInterest, _snapshot.openTakerInterest) = openInterest(market);
     }
 
     /**
@@ -236,8 +236,10 @@ contract Lens is ILens {
      * @param market Market address
      * @return Market maker and taker position multiplied by latest price after settle
      */
-    function openInterest(IMarket market) public settle(market) returns (Position memory) {
-        return _latestPosition(market).mul(_latestVersion(market).price.abs());
+    function openInterest(IMarket market) public settle(market) returns (UFixed18, UFixed18) {
+        Position memory _position = _latestPosition(market);
+        UFixed18 _price = _latestVersion(market).price.abs();
+        return (_position.maker().mul(_price), _position.taker().mul(_price));
     }
 
     /**
