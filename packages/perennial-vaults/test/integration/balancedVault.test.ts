@@ -115,6 +115,7 @@ describe('BalancedVault', () => {
   // - If we make a large deposit, we should be able to withdraw it if the oracle hasn't updated.
   // - We should be able to empty out the vault (no dust!)
   // - maxWithdraw should be correct (i.e. we can't withdraw maxWithdraw+1 but can withdraw maxWithdraw.)
+  // - Have someone take our positions and validate that we keep the vault balanced as our collateral changes due to settlement.
   //
   // Liqudations:
   // - If a position is liquidated, we shouldn't be able to do any actions and maxWithdraw should return 0.
