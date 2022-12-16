@@ -40,16 +40,6 @@ library PositionLib {
     }
 
     /**
-     * @notice Adds position `a` and `b` together, returning the result
-     * @param a The first position to sum
-     * @param b The second position to sum
-     * @return Resulting summed position
-     */
-    function add(Position memory a, Position memory b) internal pure returns (Position memory) {
-        return Position(a.maker().add(b.maker()).pack(), a.taker().add(b.taker()).pack());
-    }
-
-    /**
      * @notice Subtracts position `b` from `a`, returning the result
      * @param a The position to subtract from
      * @param b The position to subtract
@@ -60,19 +50,6 @@ library PositionLib {
     }
 
     /**
-     * @notice Multiplies position `self` by accumulator `accumulator` and returns the resulting accumulator
-     * @param self The Position to operate on
-     * @param accumulator The accumulator to multiply by
-     * @return Resulting multiplied accumulator
-     */
-    function mul(Position memory self, Accumulator memory accumulator) internal pure returns (Accumulator memory) {
-        return Accumulator(
-            Fixed18Lib.from(self.maker()).mul(accumulator.maker()).pack(),
-            Fixed18Lib.from(self.taker()).mul(accumulator.taker()).pack()
-        );
-    }
-
-    /**
      * @notice Scales position `self` by fixed-decimal `scale` and returns the resulting position
      * @param self The Position to operate on
      * @param scale The Fixed-decimal to scale by
@@ -80,28 +57,6 @@ library PositionLib {
      */
     function mul(Position memory self, UFixed18 scale) internal pure returns (Position memory) {
         return Position(self.maker().mul(scale).pack(), self.taker().mul(scale).pack());
-    }
-
-    /**
-     * @notice Divides position `self` by `b` and returns the resulting accumulator
-     * @param self The Position to operate on
-     * @param b The number to divide by
-     * @return Resulting divided accumulator
-     */
-    function div(Position memory self, uint256 b) internal pure returns (Accumulator memory) {
-        return Accumulator(
-            Fixed18Lib.from(self.maker()).div(Fixed18Lib.from(UFixed18Lib.from(b))).pack(),
-            Fixed18Lib.from(self.taker()).div(Fixed18Lib.from(UFixed18Lib.from(b))).pack()
-        );
-    }
-
-    /**
-     * @notice Returns the maximum of `self`'s maker and taker values
-     * @param self The struct to operate on
-     * @return Resulting maximum value
-     */
-    function max(Position memory self) internal pure returns (UFixed18) {
-        return self.maker().max(self.taker());
     }
 
     /**
