@@ -395,12 +395,12 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
     }
 
     function _checkPosition(CurrentContext memory context) private pure {
-        Position memory nextPosition = context.version.position().next(context.pre);
+        Position memory nextPosition = context.version.position.next(context.pre);
 
         if (!context.marketParameter.closed && nextPosition.socializationFactor().lt(UFixed18Lib.ONE))
             revert MarketInsufficientLiquidityError();
 
-        if (nextPosition.maker.gt(context.marketParameter.makerLimit))
+        if (nextPosition.maker().gt(context.marketParameter.makerLimit))
             revert MarketMakerOverLimitError();
     }
 

@@ -5,14 +5,13 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@equilibria/root/number/types/UFixed18.sol";
 import "./Accumulator.sol";
 import "./PrePosition.sol";
-import "./PackedPosition.sol";
 
 /// @dev Position type
 struct Position {
     /// @dev Quantity of the maker position
-    UFixed18 maker;
+    PackedUFixed18 _maker;
     /// @dev Quantity of the taker position
-    UFixed18 taker;
+    PackedUFixed18 _taker;
 }
 using PositionLib for Position global;
 
@@ -23,13 +22,12 @@ using PositionLib for Position global;
  *      denominated as a unit of the product's payoff function.
  */
 library PositionLib {
-    /**
-     * @notice Creates a packed position from an position
-     * @param self A position
-     * @return New packed position
-     */
-    function pack(Position memory self) internal pure returns (PackedPosition memory) {
-        return PackedPosition({maker: self.maker.pack(), taker: self.taker.pack()});
+    function maker(Position memory self) internal pure returns (UFixed18) {
+        return self._maker.unpack();
+    }
+
+    function taker(Position memory self) internal pure returns (UFixed18) {
+        return self._taker.unpack();
     }
 
     /**
@@ -38,7 +36,7 @@ library PositionLib {
      * @return Whether the position is empty
      */
     function isEmpty(Position memory self) internal pure returns (bool) {
-        return self.maker.isZero() && self.taker.isZero();
+        return self.maker().isZero() && self.taker().isZero();
     }
 
     /**
@@ -48,7 +46,7 @@ library PositionLib {
      * @return Resulting summed position
      */
     function add(Position memory a, Position memory b) internal pure returns (Position memory) {
-        return Position({maker: a.maker.add(b.maker), taker: a.taker.add(b.taker)});
+        return Position(a.maker().add(b.maker()).pack(), a.taker().add(b.taker()).pack());
     }
 
     /**
@@ -58,7 +56,7 @@ library PositionLib {
      * @return Resulting subtracted position
      */
     function sub(Position memory a, Position memory b) internal pure returns (Position memory) {
-        return Position({maker: a.maker.sub(b.maker), taker: a.taker.sub(b.taker)});
+        return Position(a.maker().sub(b.maker()).pack(), a.taker().sub(b.taker()).pack());
     }
 
     /**
@@ -69,8 +67,8 @@ library PositionLib {
      */
     function mul(Position memory self, Accumulator memory accumulator) internal pure returns (Accumulator memory) {
         return Accumulator(
-            Fixed18Lib.from(self.maker).mul(accumulator.maker()).pack(),
-            Fixed18Lib.from(self.taker).mul(accumulator.taker()).pack()
+            Fixed18Lib.from(self.maker()).mul(accumulator.maker()).pack(),
+            Fixed18Lib.from(self.taker()).mul(accumulator.taker()).pack()
         );
     }
 
@@ -81,7 +79,7 @@ library PositionLib {
      * @return Resulting scaled position
      */
     function mul(Position memory self, UFixed18 scale) internal pure returns (Position memory) {
-        return Position({maker: self.maker.mul(scale), taker: self.taker.mul(scale)});
+        return Position(self.maker().mul(scale).pack(), self.taker().mul(scale).pack());
     }
 
     /**
@@ -92,8 +90,8 @@ library PositionLib {
      */
     function div(Position memory self, uint256 b) internal pure returns (Accumulator memory) {
         return Accumulator(
-            Fixed18Lib.from(self.maker).div(Fixed18Lib.from(UFixed18Lib.from(b))).pack(),
-            Fixed18Lib.from(self.taker).div(Fixed18Lib.from(UFixed18Lib.from(b))).pack()
+            Fixed18Lib.from(self.maker()).div(Fixed18Lib.from(UFixed18Lib.from(b))).pack(),
+            Fixed18Lib.from(self.taker()).div(Fixed18Lib.from(UFixed18Lib.from(b))).pack()
         );
     }
 
@@ -103,7 +101,7 @@ library PositionLib {
      * @return Resulting maximum value
      */
     function max(Position memory self) internal pure returns (UFixed18) {
-        return UFixed18Lib.max(self.maker, self.taker);
+        return self.maker().max(self.taker());
     }
 
     /**
@@ -112,7 +110,7 @@ library PositionLib {
      * @return The sum of its maker and taker
      */
     function sum(Position memory self) internal pure returns (UFixed18) {
-        return self.maker.add(self.taker);
+        return self.maker().add(self.taker());
     }
 
     /**
@@ -123,8 +121,8 @@ library PositionLib {
      */
     function next(Position memory self, PrePosition memory pre) internal pure returns (Position memory) {
         return Position(
-            UFixed18Lib.from(Fixed18Lib.from(self.maker).add(pre.maker())),
-            UFixed18Lib.from(Fixed18Lib.from(self.taker).add(pre.taker()))
+            UFixed18Lib.from(Fixed18Lib.from(self.maker()).add(pre.maker())).pack(),
+            UFixed18Lib.from(Fixed18Lib.from(self.taker()).add(pre.taker())).pack()
         );
     }
 
@@ -134,7 +132,7 @@ library PositionLib {
      * @return utilization ratio
      */
     function utilization(Position memory self) internal pure returns (UFixed18) {
-        return self.taker.unsafeDiv(self.maker);
+        return self.taker().unsafeDiv(self.maker());
     }
 
     /**
@@ -146,6 +144,6 @@ library PositionLib {
      * @return Socialization factor
      */
     function socializationFactor(Position memory self) internal pure returns (UFixed18) {
-        return self.taker.isZero() ? UFixed18Lib.ONE : UFixed18Lib.min(UFixed18Lib.ONE, self.maker.div(self.taker));
+        return self.taker().isZero() ? UFixed18Lib.ONE : UFixed18Lib.min(UFixed18Lib.ONE, self.maker().div(self.taker()));
     }
 }

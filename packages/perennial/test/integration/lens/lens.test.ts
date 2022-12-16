@@ -47,13 +47,13 @@ describe('Lens', () => {
       _makerFee: 0,
       _takerFee: 0,
     })
-    expectPositionEq(globalPosition, { maker: 0, taker: 0 })
+    expectPositionEq(globalPosition, { _maker: 0, _taker: 0 })
     expect(marketSnapshot.latestVersion.price).to.equal('11388297509860897871140900')
     expect(marketSnapshot.rate).to.equal(utils.parseEther('5.00').div(SECONDS_IN_YEAR))
     expect(marketSnapshot.dailyRate).to.equal(utils.parseEther('5.00').div(SECONDS_IN_YEAR).mul(SECONDS_IN_DAY))
     expectPositionEq(marketSnapshot.openInterest, {
-      maker: 0,
-      taker: 0,
+      _maker: 0,
+      _taker: 0,
     })
 
     let userSnapshot = (await lens.callStatic['snapshots(address,address[])'](user.address, [market.address]))[0]
@@ -83,8 +83,8 @@ describe('Lens', () => {
 
     // Pre -> Position
     expectPositionEq(globalPosition, {
-      maker: POSITION,
-      taker: POSITION,
+      _maker: POSITION,
+      _taker: POSITION,
     })
     expect(userSnapshot.position).to.equal(POSITION.mul(-1))
 
@@ -110,8 +110,8 @@ describe('Lens', () => {
       '-1137964981955396520714',
     ) // Price * Position
     expectPositionEq(await lens.callStatic['openInterest(address)'](market.address), {
-      maker: '1137964981955396520714',
-      taker: '1137964981955396520714',
+      _maker: '1137964981955396520714',
+      _taker: '1137964981955396520714',
     })
 
     // User starts off as not liquidatable before price update

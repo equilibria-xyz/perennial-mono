@@ -36,7 +36,7 @@ library PrePositionLib {
     }
 
     function fees(PrePosition memory self) internal pure returns (Position memory) {
-        return Position(self._makerFee.unpack(), self._takerFee.unpack());
+        return Position(self._makerFee, self._takerFee);
     }
 
     /**

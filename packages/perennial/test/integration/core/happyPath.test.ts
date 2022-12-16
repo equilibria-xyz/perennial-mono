@@ -80,7 +80,7 @@ describe.only('Happy Path', () => {
 
     // Check global state
     expect(await market.latestVersion()).to.equal(INITIAL_VERSION)
-    expectPositionEq((await market.versions(INITIAL_VERSION))._position, { maker: 0, taker: 0 })
+    expectPositionEq((await market.versions(INITIAL_VERSION)).position, { _maker: 0, _taker: 0 })
     expectPrePositionEq(await market.pre(), {
       _maker: POSITION,
       _taker: 0,
@@ -96,7 +96,7 @@ describe.only('Happy Path', () => {
 
     // Check global post-settlement state
     expect(await market.latestVersion()).to.equal(INITIAL_VERSION + 1)
-    expectPositionEq((await market.versions(INITIAL_VERSION + 1))._position, { maker: POSITION, taker: 0 })
+    expectPositionEq((await market.versions(INITIAL_VERSION + 1)).position, { _maker: POSITION, _taker: 0 })
     expectPrePositionEq(await market.pre(), {
       _maker: 0,
       _taker: 0,
@@ -131,7 +131,7 @@ describe.only('Happy Path', () => {
 
     // Check global state
     expect(await market.latestVersion()).to.equal(INITIAL_VERSION)
-    expectPositionEq((await market.versions(INITIAL_VERSION))._position, { maker: 0, taker: 0 })
+    expectPositionEq((await market.versions(INITIAL_VERSION)).position, { _maker: 0, _taker: 0 })
     expectPrePositionEq(await market.pre(), {
       _maker: POSITION,
       _taker: 0,
@@ -147,7 +147,7 @@ describe.only('Happy Path', () => {
 
     // Check global post-settlement state
     expect(await market.latestVersion()).to.equal(INITIAL_VERSION + 1)
-    expectPositionEq((await market.versions(INITIAL_VERSION + 1))._position, { maker: POSITION, taker: 0 })
+    expectPositionEq((await market.versions(INITIAL_VERSION + 1)).position, { _maker: POSITION, _taker: 0 })
     expectPrePositionEq(await market.pre(), {
       _maker: 0,
       _taker: 0,
@@ -184,7 +184,7 @@ describe.only('Happy Path', () => {
 
     // Global State
     expect(await market.latestVersion()).to.equal(INITIAL_VERSION)
-    expectPositionEq((await market.versions(INITIAL_VERSION))._position, { maker: 0, taker: 0 })
+    expectPositionEq((await market.versions(INITIAL_VERSION)).position, { _maker: 0, _taker: 0 })
     expectPrePositionEq(await market.pre(), {
       _maker: 0,
       _taker: 0,
@@ -218,7 +218,7 @@ describe.only('Happy Path', () => {
 
     // Global State
     expect(await market.latestVersion()).to.equal(INITIAL_VERSION)
-    expectPositionEq((await market.versions(INITIAL_VERSION))._position, { maker: 0, taker: 0 })
+    expectPositionEq((await market.versions(INITIAL_VERSION)).position, { _maker: 0, _taker: 0 })
     expectPrePositionEq(await market.pre(), {
       _maker: 0,
       _taker: 0,
@@ -250,7 +250,7 @@ describe.only('Happy Path', () => {
 
     // Global State
     expect(await market.latestVersion()).to.equal(INITIAL_VERSION)
-    expectPositionEq((await market.versions(INITIAL_VERSION))._position, { maker: 0, taker: 0 })
+    expectPositionEq((await market.versions(INITIAL_VERSION)).position, { _maker: 0, _taker: 0 })
     expectPrePositionEq(await market.pre(), {
       _maker: MAKE_POSITION,
       _taker: TAKE_POSITION,
@@ -269,9 +269,9 @@ describe.only('Happy Path', () => {
     await market.settle(constants.AddressZero)
 
     expect(await market.latestVersion()).to.equal(INITIAL_VERSION + 2)
-    expectPositionEq((await market.versions(INITIAL_VERSION + 2))._position, {
-      maker: MAKE_POSITION,
-      taker: TAKE_POSITION,
+    expectPositionEq((await market.versions(INITIAL_VERSION + 2)).position, {
+      _maker: MAKE_POSITION,
+      _taker: TAKE_POSITION,
     })
     expectPrePositionEq(await market.pre(), {
       _maker: 0,
@@ -308,7 +308,7 @@ describe.only('Happy Path', () => {
 
     // Global State
     expect(await market.latestVersion()).to.equal(INITIAL_VERSION)
-    expectPositionEq((await market.versions(INITIAL_VERSION))._position, { maker: 0, taker: 0 })
+    expectPositionEq((await market.versions(INITIAL_VERSION)).position, { _maker: 0, _taker: 0 })
     expectPrePositionEq(await market.pre(), {
       _maker: MAKE_POSITION,
       _taker: TAKE_POSITION,
@@ -327,9 +327,9 @@ describe.only('Happy Path', () => {
     await market.settle(constants.AddressZero)
 
     expect(await market.latestVersion()).to.equal(INITIAL_VERSION + 2)
-    expectPositionEq((await market.versions(INITIAL_VERSION + 2))._position, {
-      maker: MAKE_POSITION,
-      taker: TAKE_POSITION,
+    expectPositionEq((await market.versions(INITIAL_VERSION + 2)).position, {
+      _maker: MAKE_POSITION,
+      _taker: TAKE_POSITION,
     })
     expectPrePositionEq(await market.pre(), {
       _maker: 0,
@@ -372,7 +372,7 @@ describe.only('Happy Path', () => {
 
     // Global State
     expect(await market.latestVersion()).to.equal(INITIAL_VERSION)
-    expectPositionEq((await market.versions(INITIAL_VERSION))._position, { maker: 0, taker: 0 })
+    expectPositionEq((await market.versions(INITIAL_VERSION)).position, { _maker: 0, _taker: 0 })
     expectPrePositionEq(await market.pre(), {
       _maker: OPEN_MAKE_POSITION,
       _taker: 0,
@@ -413,7 +413,7 @@ describe.only('Happy Path', () => {
 
     // Global State
     expect(await market.latestVersion()).to.equal(INITIAL_VERSION)
-    expectPositionEq((await market.versions(INITIAL_VERSION))._position, { maker: 0, taker: 0 })
+    expectPositionEq((await market.versions(INITIAL_VERSION)).position, { _maker: 0, _taker: 0 })
     expectPrePositionEq(await market.pre(), {
       _maker: OPEN_MAKE_POSITION,
       _taker: 0,
@@ -472,9 +472,9 @@ describe.only('Happy Path', () => {
 
     // Check global state
     expect(await market.latestVersion()).to.equal(INITIAL_VERSION + 2)
-    expectPositionEq((await market.versions(INITIAL_VERSION + 2))._position, {
-      maker: POSITION.div(2),
-      taker: POSITION.div(2),
+    expectPositionEq((await market.versions(INITIAL_VERSION + 2)).position, {
+      _maker: POSITION.div(2),
+      _taker: POSITION.div(2),
     })
     expectPrePositionEq(await market.pre(), {
       _maker: POSITION.div(2),

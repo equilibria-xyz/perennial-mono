@@ -20,7 +20,6 @@ using AccumulatorLib for Accumulator global;
  *      change in position value since last sync. This change in value is then used to compute P&L and fees.
  */
 library AccumulatorLib {
-
     function maker(Accumulator memory self) internal pure returns (Fixed18) {
         return self._maker.unpack();
     }

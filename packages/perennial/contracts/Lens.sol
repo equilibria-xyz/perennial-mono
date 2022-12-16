@@ -366,14 +366,14 @@ contract Lens is ILens {
      */
     function exposure(address account, IMarket market) public settleAccount(account, market) returns (Fixed18) {
         (, Position memory _pos) = globalPosition(market);
-        if (_pos.maker.isZero()) { return Fixed18Lib.ZERO; }
+        if (_pos.maker().isZero()) { return Fixed18Lib.ZERO; }
 
         Fixed18 _openInterest = openInterest(account, market);
         if (_openInterest.sign() == 1) {
             return _openInterest; // Taker exposure is always 100% of openInterest
         }
 
-        UFixed18 utilization = _pos.taker.div(_pos.maker);
+        UFixed18 utilization = _pos.utilization();
         return Fixed18Lib.from(utilization).mul(_openInterest); // Maker exposure is openInterest * utilization
     }
 
@@ -413,7 +413,7 @@ contract Lens is ILens {
      * @return Latest position for the market
      */
     function _latestPosition(IMarket market) private view returns (Position memory) {
-        return market.versions(market.latestVersion()).position();
+        return market.versions(market.latestVersion()).position;
     }
 
     /**
