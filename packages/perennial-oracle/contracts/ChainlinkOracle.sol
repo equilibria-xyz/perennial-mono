@@ -26,7 +26,7 @@ contract ChainlinkOracle is IOracleProvider {
     /// @dev Decimal offset used to normalize chainlink price to 18 decimals
     int256 private immutable _decimalOffset;
 
-    /// @dev Mapping of the first oracle version for each underlying phase ID
+    /// @dev Mapping of the starting data for each underlying phase
     Phase[] private _phases;
 
     struct Phase {
@@ -119,7 +119,7 @@ contract ChainlinkOracle is IOracleProvider {
 
     /**
      * @notice Computes the chainlink round ID from a version
-     * @notice version Version to compute from
+     * @param version Version to compute from
      * @return Chainlink round ID
      */
     function _versionToRoundId(uint256 version) private view returns (uint256) {
