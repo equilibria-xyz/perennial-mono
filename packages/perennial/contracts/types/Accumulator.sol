@@ -2,14 +2,13 @@
 pragma solidity ^0.8.13;
 
 import "@equilibria/root/number/types/Fixed18.sol";
-import "./PackedAccumulator.sol";
 
 /// @dev Accumulator type
 struct Accumulator {
     /// @dev maker accumulator per share
-    Fixed18 maker;
+    PackedFixed18 _maker;
     /// @dev taker accumulator per share
-    Fixed18 taker;
+    PackedFixed18 _taker;
 }
 using AccumulatorLib for Accumulator global;
 
@@ -21,13 +20,29 @@ using AccumulatorLib for Accumulator global;
  *      change in position value since last sync. This change in value is then used to compute P&L and fees.
  */
 library AccumulatorLib {
-    /**
-     * @notice Creates a packed accumulator from an accumulator
-     * @param self an accumulator
-     * @return New packed accumulator
-     */
-    function pack(Accumulator memory self) internal pure returns (PackedAccumulator memory) {
-        return PackedAccumulator({maker: self.maker.pack(), taker: self.taker.pack()});
+
+    function maker(Accumulator memory self) internal pure returns (Fixed18) {
+        return self._maker.unpack();
+    }
+
+    function taker(Accumulator memory self) internal pure returns (Fixed18) {
+        return self._taker.unpack();
+    }
+
+    function incrementMaker(Accumulator memory self, Fixed18 amount, UFixed18 total) internal pure {
+        self._maker = self._maker.unpack().add(amount.div(Fixed18Lib.from(total))).pack();
+    }
+
+    function decrementMaker(Accumulator memory self, Fixed18 amount, UFixed18 total) internal pure {
+        self._maker = self._maker.unpack().add(amount.div(Fixed18Lib.from(total)).mul(Fixed18Lib.NEG_ONE)).pack();
+    }
+
+    function incrementTaker(Accumulator memory self, Fixed18 amount, UFixed18 total) internal pure {
+        self._taker = self._taker.unpack().add(amount.div(Fixed18Lib.from(total))).pack();
+    }
+
+    function decrementTaker(Accumulator memory self, Fixed18 amount, UFixed18 total) internal pure {
+        self._taker = self._taker.unpack().add(amount.div(Fixed18Lib.from(total)).mul(Fixed18Lib.NEG_ONE)).pack();
     }
 
     /**
@@ -37,7 +52,10 @@ library AccumulatorLib {
      * @return The resulting summed accumulator
      */
     function add(Accumulator memory a, Accumulator memory b) internal pure returns (Accumulator memory) {
-        return Accumulator({maker: a.maker.add(b.maker), taker: a.taker.add(b.taker)});
+        return Accumulator(
+            PackedFixed18.wrap(PackedFixed18.unwrap(a._maker) + PackedFixed18.unwrap(b._maker)),
+            PackedFixed18.wrap(PackedFixed18.unwrap(a._taker) + PackedFixed18.unwrap(b._taker))
+        );
     }
 
     /**
@@ -47,7 +65,10 @@ library AccumulatorLib {
      * @return The resulting subtracted accumulator
      */
     function sub(Accumulator memory a, Accumulator memory b) internal pure returns (Accumulator memory) {
-        return Accumulator({maker: a.maker.sub(b.maker), taker: a.taker.sub(b.taker)});
+        return Accumulator(
+            PackedFixed18.wrap(PackedFixed18.unwrap(a._maker) - PackedFixed18.unwrap(b._maker)),
+            PackedFixed18.wrap(PackedFixed18.unwrap(a._taker) - PackedFixed18.unwrap(b._taker))
+        );
     }
 
     /**
@@ -57,7 +78,7 @@ library AccumulatorLib {
      * @return The resulting multiplied accumulator
      */
     function mul(Accumulator memory a, Accumulator memory b) internal pure returns (Accumulator memory) {
-        return Accumulator({maker: a.maker.mul(b.maker), taker: a.taker.mul(b.taker)});
+        return Accumulator(a.maker().mul(b.maker()).pack(), a.taker().mul(b.taker()).pack());
     }
 
     /**
@@ -66,6 +87,6 @@ library AccumulatorLib {
      * @return The sum of its maker and taker
      */
     function sum(Accumulator memory self) internal pure returns (Fixed18) {
-        return self.maker.add(self.taker);
+        return self.maker().add(self.taker());
     }
 }

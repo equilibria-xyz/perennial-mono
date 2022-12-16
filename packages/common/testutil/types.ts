@@ -6,6 +6,11 @@ export interface Position {
   taker: BigNumberish
 }
 
+export interface Accumulator {
+  _maker: BigNumberish
+  _taker: BigNumberish
+}
+
 export interface PrePosition {
   _maker: BigNumberish
   _taker: BigNumberish
@@ -22,6 +27,11 @@ export interface ProgramInfo {
   }
   start: BigNumberish
   duration: BigNumberish
+}
+
+export function expectAccumulatorEq(a: Accumulator, b: Accumulator): void {
+  expect(a._maker).to.equal(b._maker)
+  expect(a._taker).to.equal(b._taker)
 }
 
 export function expectPositionEq(a: Position, b: Position): void {

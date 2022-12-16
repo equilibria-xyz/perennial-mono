@@ -3,7 +3,6 @@ pragma solidity 0.8.17;
 
 import "@equilibria/root/curve/types/JumpRateUtilizationCurve.sol";
 import "./Accumulator.sol";
-import "./PackedAccumulator.sol";
 import "./PackedPosition.sol";
 import "./PrePosition.sol";
 import "./ProtocolParameter.sol";
@@ -13,10 +12,10 @@ import "./Fee.sol";
 /// @dev Version type
 struct Version {
     /// @dev Accumulator value at each settled oracle version
-    PackedAccumulator _value;
+    Accumulator value;
 
     /// @dev Accumulator reward at each settled oracle version
-    PackedAccumulator _reward;
+    Accumulator reward;
     
     /// @dev Global position at each version
     PackedPosition _position;
@@ -36,24 +35,6 @@ using VersionLib for Version global;
  */
 library VersionLib {
     /**
-     * @notice Returns the value accumulator
-     * @param self The struct to operate on
-     * @return The stamped value accumulator at the requested version
-     */
-    function value(Version memory self) internal pure returns (Accumulator memory) {
-        return self._value.unpack();
-    }
-
-    /**
-     * @notice Returns the reward accumulator
-     * @param self The struct to operate on
-     * @return The stamped reward accumulator at the requested version
-     */
-    function reward(Version memory self) internal pure returns (Accumulator memory) {
-        return self._reward.unpack();
-    }
-
-    /**
      * @notice Returns the global position
      * @param self The struct to operate on
      * @return Current global position
@@ -61,7 +42,7 @@ library VersionLib {
     function position(Version memory self) internal pure returns (Position memory) {
         return self._position.unpack();
     }
-    
+
     /**
      * @notice Accumulates the global state for the period from `period.fromVersion` to `period.toVersion`
      * @param versionAccumulator The struct to operate on
@@ -77,8 +58,9 @@ library VersionLib {
     ) internal pure {
         // unpack
         UFixed18 feeAccumulator;
+        //TODO: can pass the whole object around
         (Accumulator memory valueAccumulator, Accumulator memory rewardAccumulator, Position memory latestPosition) =
-            (versionAccumulator.value(), versionAccumulator.reward(), versionAccumulator.position());
+            (versionAccumulator.value, versionAccumulator.reward, versionAccumulator.position());
 
         // accumulate funding
         feeAccumulator = _accumulateFunding(
@@ -100,8 +82,8 @@ library VersionLib {
         feeAccumulator = _accumulatePositionFee(valueAccumulator, feeAccumulator, latestPosition, pre, marketParameter);
 
         // update
-        versionAccumulator._value = valueAccumulator.pack();
-        versionAccumulator._reward = rewardAccumulator.pack();
+        versionAccumulator.value = valueAccumulator;
+        versionAccumulator.reward = rewardAccumulator;
         versionAccumulator._position = latestPosition.next(pre).pack();
 
         // external
@@ -135,16 +117,14 @@ library VersionLib {
 
         // If there are makers to distribute the taker's position fee to, distribute. Otherwise give it to the protocol
         if (!latestPosition.maker.isZero()) {
-            valueAccumulator.maker = valueAccumulator.maker
-                .add(Fixed18Lib.from(positionFeeAmount.taker.div(latestPosition.maker)));
+            valueAccumulator.incrementMaker(Fixed18Lib.from(positionFeeAmount.taker), latestPosition.maker);
         } else {
             newFeeAccumulator = newFeeAccumulator.add(positionFeeAmount.taker);
         }
 
         // If there are takers to distribute the maker's position fee to, distribute. Otherwise give it to the protocol
         if (!latestPosition.taker.isZero()) {
-            valueAccumulator.taker = valueAccumulator.taker
-                .add(Fixed18Lib.from(positionFeeAmount.maker.div(latestPosition.taker)));
+            valueAccumulator.incrementTaker(Fixed18Lib.from(positionFeeAmount.maker), latestPosition.taker);
         } else {
             newFeeAccumulator = newFeeAccumulator.add(positionFeeAmount.maker);
         }
@@ -177,9 +157,9 @@ library VersionLib {
         UFixed18 socializedNotional = takerNotional.mul(latestPosition.socializationFactor());
 
         Fixed18 fundingAccumulated = marketParameter.utilizationCurve.compute(latestPosition.utilization())     // yearly funding rate
-            .mul(Fixed18Lib.from(period.timestampDelta()))                                                // multiply by seconds in period
-            .div(Fixed18Lib.from(365 days))                                                               // divide by seconds in year (funding rate for period)
-            .mul(Fixed18Lib.from(socializedNotional));                                                    // multiply by socialized notion (funding for period)
+            .mul(Fixed18Lib.from(period.timestampDelta()))                                                      // multiply by seconds in period
+            .div(Fixed18Lib.from(365 days))                                                                     // divide by seconds in year (funding rate for period)
+            .mul(Fixed18Lib.from(socializedNotional));                                                          // multiply by socialized notion (funding for period)
         UFixed18 boundedFundingFee = UFixed18Lib.max(marketParameter.fundingFee, protocolParameter.minFundingFee);
         newFeeAccumulator = fundingAccumulated.abs().mul(boundedFundingFee);
 
@@ -189,13 +169,10 @@ library VersionLib {
         );
 
         bool makerPaysFunding = fundingAccumulated.sign() < 0;
-        valueAccumulator.maker = valueAccumulator.maker
-            .add(makerPaysFunding ? fundingAccumulated : fundingAccumulatedWithoutFee)
-            .div(Fixed18Lib.from(latestPosition.maker));
-        valueAccumulator.taker = valueAccumulator.taker
-            .add(makerPaysFunding ? fundingAccumulatedWithoutFee : fundingAccumulated)
-            .div(Fixed18Lib.from(latestPosition.taker))
-            .mul(Fixed18Lib.NEG_ONE);
+        valueAccumulator
+            .incrementMaker(makerPaysFunding ? fundingAccumulated : fundingAccumulatedWithoutFee, latestPosition.maker);
+        valueAccumulator
+            .decrementTaker(makerPaysFunding ? fundingAccumulatedWithoutFee : fundingAccumulated, latestPosition.taker);
 
         newFeeAccumulator = feeAccumulator.add(newFeeAccumulator);
     }
@@ -218,13 +195,9 @@ library VersionLib {
         Fixed18 totalTakerDelta = period.priceDelta().mul(Fixed18Lib.from(latestPosition.taker));
         Fixed18 socializedTakerDelta = totalTakerDelta.mul(Fixed18Lib.from(latestPosition.socializationFactor()));
 
-        valueAccumulator.maker = valueAccumulator.maker
-            .add(socializedTakerDelta)
-            .div(Fixed18Lib.from(latestPosition.maker))
-            .mul(Fixed18Lib.NEG_ONE);
-        valueAccumulator.taker = valueAccumulator.taker
-            .add(socializedTakerDelta)
-            .div(Fixed18Lib.from(latestPosition.taker));
+        //TODO: can combine stuff like this into one accumulate
+        valueAccumulator.decrementMaker(socializedTakerDelta, latestPosition.maker);
+        valueAccumulator.incrementTaker(socializedTakerDelta, latestPosition.taker);
     }
 
     /**
@@ -241,19 +214,9 @@ library VersionLib {
     ) private pure {
         UFixed18 elapsed = period.timestampDelta();
 
-        rewardAccumulator.maker = latestPosition.maker.isZero() ?
-            rewardAccumulator.maker :
-            rewardAccumulator.maker.add(
-                Fixed18Lib.from(elapsed)
-                    .mul(marketParameter.rewardRate.taker)
-                    .div(Fixed18Lib.from(latestPosition.maker))
-            );
-        rewardAccumulator.taker = latestPosition.taker.isZero() ?
-            rewardAccumulator.taker :
-            rewardAccumulator.taker.add(
-                Fixed18Lib.from(elapsed)
-                    .mul(marketParameter.rewardRate.taker)
-                    .div(Fixed18Lib.from(latestPosition.taker))
-            );
+        if (!latestPosition.maker.isZero()) rewardAccumulator
+            .incrementMaker(Fixed18Lib.from(elapsed).mul(marketParameter.rewardRate.taker()), latestPosition.maker);
+        if (!latestPosition.taker.isZero()) rewardAccumulator
+            .incrementTaker(Fixed18Lib.from(elapsed).mul(marketParameter.rewardRate.maker()), latestPosition.taker);
     }
 }

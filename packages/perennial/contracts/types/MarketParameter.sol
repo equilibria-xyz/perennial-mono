@@ -3,7 +3,7 @@ pragma solidity ^0.8.13;
 
 import "@equilibria/root/number/types/UFixed18.sol";
 import "@equilibria/root/curve/types/JumpRateUtilizationCurve.sol";
-import "./PackedAccumulator.sol";
+import "./Accumulator.sol";
 
 /// @dev MarketParameter type
 struct MarketParameter {
@@ -29,7 +29,7 @@ struct PackedMarketParameter {
     bytes3 __unallocated__;
 
     JumpRateUtilizationCurve utilizationCurve;
-    PackedAccumulator rewardRate;
+    Accumulator rewardRate;
 }
 type MarketParameterStorage is bytes32;
 using MarketParameterStorageLib for MarketParameterStorage global;
@@ -54,7 +54,7 @@ library MarketParameterStorageLib {
             UFixed18.wrap(uint256(value.makerLimit) * OFFSET),
             value.closed,
             value.utilizationCurve,
-            value.rewardRate.unpack()
+            value.rewardRate
         );
     }
 
@@ -74,10 +74,10 @@ library MarketParameterStorageLib {
             uint32(UFixed18.unwrap(parameter.takerFee) / OFFSET),
             uint32(UFixed18.unwrap(parameter.positionFee) / OFFSET),
             uint64(UFixed18.unwrap(parameter.makerLimit) / OFFSET),
-                parameter.closed,
+            parameter.closed,
             bytes3(0x000000),
-                parameter.utilizationCurve,
-                parameter.rewardRate.pack()
+            parameter.utilizationCurve,
+            parameter.rewardRate
         );
     }
 

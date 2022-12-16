@@ -3,7 +3,12 @@ import 'hardhat'
 import { constants, utils } from 'ethers'
 
 import { InstanceVars, deployProtocol, createMarket, depositTo, INITIAL_VERSION } from '../helpers/setupHelpers'
-import { createPayoffDefinition, expectPositionEq, expectPrePositionEq } from '../../../../common/testutil/types'
+import {
+  createPayoffDefinition,
+  expectAccumulatorEq,
+  expectPositionEq,
+  expectPrePositionEq,
+} from '../../../../common/testutil/types'
 import { Market__factory } from '../../../types/generated'
 
 describe.only('Happy Path', () => {
@@ -40,8 +45,8 @@ describe.only('Happy Path', () => {
         targetUtilization: utils.parseEther('0.80'),
       },
       rewardRate: {
-        maker: 0,
-        taker: 0,
+        _maker: 0,
+        _taker: 0,
       },
     }
     const marketAddress = await controller.callStatic.createMarket(definition, parameter)
@@ -82,8 +87,8 @@ describe.only('Happy Path', () => {
       _makerFee: 0,
       _takerFee: 0,
     })
-    expectPositionEq((await market.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
-    expectPositionEq((await market.versions(INITIAL_VERSION))._reward, { maker: 0, taker: 0 })
+    expectAccumulatorEq((await market.versions(INITIAL_VERSION)).value, { _maker: 0, _taker: 0 })
+    expectAccumulatorEq((await market.versions(INITIAL_VERSION)).reward, { _maker: 0, _taker: 0 })
 
     // Settle the market with a new oracle version
     await chainlink.next()
@@ -133,8 +138,8 @@ describe.only('Happy Path', () => {
       _makerFee: 0,
       _takerFee: 0,
     })
-    expectPositionEq((await market.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
-    expectPositionEq((await market.versions(INITIAL_VERSION))._reward, { maker: 0, taker: 0 })
+    expectAccumulatorEq((await market.versions(INITIAL_VERSION)).value, { _maker: 0, _taker: 0 })
+    expectAccumulatorEq((await market.versions(INITIAL_VERSION)).reward, { _maker: 0, _taker: 0 })
 
     // Settle the market with a new oracle version
     await chainlink.next()
@@ -186,8 +191,8 @@ describe.only('Happy Path', () => {
       _makerFee: 0,
       _takerFee: 0,
     })
-    expectPositionEq((await market.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
-    expectPositionEq((await market.versions(INITIAL_VERSION))._reward, { maker: 0, taker: 0 })
+    expectAccumulatorEq((await market.versions(INITIAL_VERSION)).value, { _maker: 0, _taker: 0 })
+    expectAccumulatorEq((await market.versions(INITIAL_VERSION)).reward, { _maker: 0, _taker: 0 })
   })
 
   it('closes multiple make positions', async () => {
@@ -220,8 +225,8 @@ describe.only('Happy Path', () => {
       _makerFee: 0,
       _takerFee: 0,
     })
-    expectPositionEq((await market.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
-    expectPositionEq((await market.versions(INITIAL_VERSION))._reward, { maker: 0, taker: 0 })
+    expectAccumulatorEq((await market.versions(INITIAL_VERSION)).value, { _maker: 0, _taker: 0 })
+    expectAccumulatorEq((await market.versions(INITIAL_VERSION)).reward, { _maker: 0, _taker: 0 })
   })
 
   it('opens a take position', async () => {
@@ -252,8 +257,8 @@ describe.only('Happy Path', () => {
       _makerFee: 0,
       _takerFee: 0,
     })
-    expectPositionEq((await market.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
-    expectPositionEq((await market.versions(INITIAL_VERSION))._reward, { maker: 0, taker: 0 })
+    expectAccumulatorEq((await market.versions(INITIAL_VERSION)).value, { _maker: 0, _taker: 0 })
+    expectAccumulatorEq((await market.versions(INITIAL_VERSION)).reward, { _maker: 0, _taker: 0 })
 
     // One round
     await chainlink.next()
@@ -310,8 +315,8 @@ describe.only('Happy Path', () => {
       _makerFee: 0,
       _takerFee: 0,
     })
-    expectPositionEq((await market.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
-    expectPositionEq((await market.versions(INITIAL_VERSION))._reward, { maker: 0, taker: 0 })
+    expectAccumulatorEq((await market.versions(INITIAL_VERSION)).value, { _maker: 0, _taker: 0 })
+    expectAccumulatorEq((await market.versions(INITIAL_VERSION)).reward, { _maker: 0, _taker: 0 })
 
     // One round
     await chainlink.next()
@@ -374,8 +379,8 @@ describe.only('Happy Path', () => {
       _makerFee: 0,
       _takerFee: 0,
     })
-    expectPositionEq((await market.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
-    expectPositionEq((await market.versions(INITIAL_VERSION))._reward, { maker: 0, taker: 0 })
+    expectAccumulatorEq((await market.versions(INITIAL_VERSION)).value, { _maker: 0, _taker: 0 })
+    expectAccumulatorEq((await market.versions(INITIAL_VERSION)).reward, { _maker: 0, _taker: 0 })
   })
 
   it('closes multiple take positions', async () => {
@@ -415,8 +420,8 @@ describe.only('Happy Path', () => {
       _makerFee: 0,
       _takerFee: 0,
     })
-    expectPositionEq((await market.versions(INITIAL_VERSION))._value, { maker: 0, taker: 0 })
-    expectPositionEq((await market.versions(INITIAL_VERSION))._reward, { maker: 0, taker: 0 })
+    expectAccumulatorEq((await market.versions(INITIAL_VERSION)).value, { _maker: 0, _taker: 0 })
+    expectAccumulatorEq((await market.versions(INITIAL_VERSION)).reward, { _maker: 0, _taker: 0 })
   })
 
   it('settle no op (gas test)', async () => {
@@ -477,13 +482,13 @@ describe.only('Happy Path', () => {
       _makerFee: 0,
       _takerFee: 0,
     })
-    expectPositionEq((await market.versions(INITIAL_VERSION + 2))._value, {
-      maker: '-29840671308188362617140000',
-      taker: '-32892462923465729382860000',
+    expectAccumulatorEq((await market.versions(INITIAL_VERSION + 2)).value, {
+      _maker: '-123490361067779693900000',
+      _taker: '123325273872433235780000',
     })
-    expectPositionEq((await market.versions(INITIAL_VERSION + 2))._reward, {
-      maker: 0,
-      taker: 0,
+    expectAccumulatorEq((await market.versions(INITIAL_VERSION + 2)).reward, {
+      _maker: 0,
+      _taker: 0,
     })
   })
 })

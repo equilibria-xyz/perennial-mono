@@ -60,11 +60,11 @@ library AccountLib {
     ) internal pure {
         Fixed18 _position = position(account);
         Fixed18 valueDelta = (_position.sign() == 1)
-            ? toVersion.value().taker.sub(fromVersion.value().taker)
-            : toVersion.value().maker.sub(fromVersion.value().maker);
+            ? toVersion.value.taker().sub(fromVersion.value.taker())
+            : toVersion.value.maker().sub(fromVersion.value.maker());
         Fixed18 rewardDelta = (_position.sign() == 1)
-            ? toVersion.reward().taker.sub(fromVersion.reward().taker)
-            : toVersion.reward().maker.sub(fromVersion.reward().maker);
+            ? toVersion.reward.taker().sub(fromVersion.reward.taker())
+            : toVersion.reward.maker().sub(fromVersion.reward.maker());
 
         account._position = int96(Fixed18.unwrap(next(account)) / 1e9);
         account._pre = 0;

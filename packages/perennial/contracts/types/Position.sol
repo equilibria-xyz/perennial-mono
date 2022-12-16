@@ -68,10 +68,10 @@ library PositionLib {
      * @return Resulting multiplied accumulator
      */
     function mul(Position memory self, Accumulator memory accumulator) internal pure returns (Accumulator memory) {
-        return Accumulator({
-            maker: Fixed18Lib.from(self.maker).mul(accumulator.maker),
-            taker: Fixed18Lib.from(self.taker).mul(accumulator.taker)
-        });
+        return Accumulator(
+            Fixed18Lib.from(self.maker).mul(accumulator.maker()).pack(),
+            Fixed18Lib.from(self.taker).mul(accumulator.taker()).pack()
+        );
     }
 
     /**
@@ -91,10 +91,10 @@ library PositionLib {
      * @return Resulting divided accumulator
      */
     function div(Position memory self, uint256 b) internal pure returns (Accumulator memory) {
-        return Accumulator({
-            maker: Fixed18Lib.from(self.maker).div(Fixed18Lib.from(UFixed18Lib.from(b))),
-            taker: Fixed18Lib.from(self.taker).div(Fixed18Lib.from(UFixed18Lib.from(b)))
-        });
+        return Accumulator(
+            Fixed18Lib.from(self.maker).div(Fixed18Lib.from(UFixed18Lib.from(b))).pack(),
+            Fixed18Lib.from(self.taker).div(Fixed18Lib.from(UFixed18Lib.from(b))).pack()
+        );
     }
 
     /**

@@ -25,7 +25,6 @@ import {
   ProxyAdmin,
   ProxyAdmin__factory,
   TransparentUpgradeableProxy__factory,
-  ReservoirFeedOracle,
 } from '../../../types/generated'
 import { ChainlinkContext } from './chainlinkHelpers'
 import { createPayoffDefinition } from '../../../../common/testutil/types'
@@ -157,7 +156,7 @@ export async function deployProtocol(): Promise<InstanceVars> {
 export async function createMarket(
   instanceVars: InstanceVars,
   payoffProvider?: TestnetContractPayoffProvider,
-  oracle?: ChainlinkOracle | ReservoirFeedOracle,
+  oracle?: ChainlinkOracle,
 ): Promise<Market> {
   const { owner, controller, treasuryB, chainlinkOracle, rewardToken, dsu } = instanceVars
   if (!payoffProvider) {
@@ -190,8 +189,8 @@ export async function createMarket(
       targetUtilization: utils.parseEther('0.80'),
     },
     rewardRate: {
-      maker: 0,
-      taker: 0,
+      _maker: 0,
+      _taker: 0,
     },
   }
   const marketAddress = await controller.callStatic.createMarket(definition, parameter)
