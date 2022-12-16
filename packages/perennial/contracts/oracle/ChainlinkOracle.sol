@@ -3,7 +3,6 @@ pragma solidity 0.8.17;
 
 import "@chainlink/contracts/src/v0.8/interfaces/FeedRegistryInterface.sol";
 import "@openzeppelin/contracts/utils/math/SafeCast.sol";
-import "./types/ChainlinkRegistry.sol";
 import "../interfaces/IOracleProvider.sol";
 
 /**
@@ -14,8 +13,17 @@ import "../interfaces/IOracleProvider.sol";
  *      This implementation only support non-negative prices.
  */
 contract ChainlinkOracle is IOracleProvider {
+    struct ChainlinkRound {
+        uint256 roundId;
+        uint256 timestamp;
+        int256 answer;
+    }
+
+    /// @dev Phase ID offset location in the round ID
+    uint256 constant private PHASE_OFFSET = 64;
+
     /// @dev Chainlink registry feed address
-    ChainlinkRegistry public immutable registry;
+    FeedRegistryInterface public immutable registry;
 
     /// @dev Base token address for the Chainlink oracle
     address public immutable base;
@@ -40,15 +48,15 @@ contract ChainlinkOracle is IOracleProvider {
      * @param base_ base currency for feed
      * @param quote_ quote currency for feed
      */
-    constructor(ChainlinkRegistry registry_, address base_, address quote_) {
+    constructor(FeedRegistryInterface registry_, address base_, address quote_) {
         registry = registry_;
         base = base_;
         quote = quote_;
 
         _phases.push(Phase(uint128(0), uint128(0))); // phaseId is 1-indexed, skip index 0
-        _phases.push(Phase(uint128(0), uint128(registry_.getStartingRoundId(base_, quote_, 1)))); // phaseId is 1-indexed, first phase starts as version 0
+        _phases.push(Phase(uint128(0), uint128(_getStartingRoundId(1)))); // phaseId is 1-indexed, first phase starts as version 0
 
-        _decimalOffset = SafeCast.toInt256(10 ** registry_.decimals(base, quote));
+        _decimalOffset = SafeCast.toInt256(10 ** registry_.decimals(base_, quote_));
     }
 
     /**
@@ -57,14 +65,14 @@ contract ChainlinkOracle is IOracleProvider {
      */
     function sync() external returns (OracleVersion memory) {
         // Fetch latest round
-        ChainlinkRound memory round = registry.getLatestRound(base, quote);
+        ChainlinkRound memory round = _getLatestRound();
 
         // Update phase annotation when new phase detected
-        while (round.phaseId() > _latestPhaseId()) {
+        while (_phaseId(round) > _latestPhaseId()) {
             _phases.push(
                 Phase(
-                    uint128(registry.getRoundCount(base, quote, _latestPhaseId())),
-                    uint128(registry.getStartingRoundId(base, quote, _latestPhaseId()))
+                    uint128(_getRoundCount(_latestPhaseId())) + _phases[_phases.length - 1].startingRoundId,
+                    uint128(_getStartingRoundId(_latestPhaseId()))
                 )
             );
         }
@@ -78,7 +86,7 @@ contract ChainlinkOracle is IOracleProvider {
      * @return oracleVersion Current oracle version
      */
     function currentVersion() public view returns (OracleVersion memory oracleVersion) {
-        return _buildOracleVersion(registry.getLatestRound(base, quote));
+        return _buildOracleVersion(_getLatestRound());
     }
 
     /**
@@ -87,7 +95,7 @@ contract ChainlinkOracle is IOracleProvider {
      * @return oracleVersion Oracle version at version `version`
      */
     function atVersion(uint256 version) public view returns (OracleVersion memory oracleVersion) {
-        return _buildOracleVersion(registry.getRound(base, quote, _versionToRoundId(version)), version);
+        return _buildOracleVersion(_getRound(_versionToRoundId(version)), version);
     }
 
     /**
@@ -97,7 +105,7 @@ contract ChainlinkOracle is IOracleProvider {
      * @return Built oracle version
      */
     function _buildOracleVersion(ChainlinkRound memory round) private view returns (OracleVersion memory) {
-        Phase memory phase = _phases[round.phaseId()];
+        Phase memory phase = _phases[_phaseId(round)];
         uint256 version = uint256(phase.startingVersion) + round.roundId - uint256(phase.startingRoundId);
         return _buildOracleVersion(round, version);
     }
@@ -109,9 +117,12 @@ contract ChainlinkOracle is IOracleProvider {
      * @return Built oracle version
      */
     function _buildOracleVersion(ChainlinkRound memory round, uint256 version)
-    private view returns (OracleVersion memory) {
+        private
+        view
+        returns (OracleVersion memory)
+    {
         Fixed18 price = Fixed18Lib.ratio(round.answer, _decimalOffset);
-        return OracleVersion({ version: version, timestamp: round.timestamp, price: price });
+        return OracleVersion(version, round.timestamp, price);
     }
 
     /**
@@ -144,5 +155,53 @@ contract ChainlinkOracle is IOracleProvider {
      */
     function _latestPhaseId() private view returns (uint256) {
         return _phases.length - 1;
+    }
+
+    /**
+     * @notice Returns the latest round data for a specific feed
+     * @return Latest round data
+     */
+    function _getLatestRound() private view returns (ChainlinkRound memory) {
+        (uint80 roundId, int256 answer, , uint256 updatedAt, ) = registry.latestRoundData(base, quote);
+        return ChainlinkRound(uint256(roundId), updatedAt, answer);
+    }
+
+    /**
+     * @notice Returns a specific round's data for a specific feed
+     * @param roundId The specific round to fetch data for
+     * @return Specific round's data
+     */
+    function _getRound(uint256 roundId) private view returns (ChainlinkRound memory) {
+        (, int256 answer, , uint256 updatedAt, ) = registry.getRoundData(base, quote, uint80(roundId));
+        return ChainlinkRound(roundId, updatedAt, answer);
+    }
+
+    /**
+     * @notice Returns the first round ID for a specific phase ID
+     * @param phaseId The specific phase to fetch data for
+     * @return startingRoundId The starting round ID for the phase
+     */
+    function _getStartingRoundId(uint256 phaseId) private view returns (uint256) {
+        (uint80 startingRoundId, ) = registry.getPhaseRange(base, quote, uint16(phaseId));
+        return uint256(startingRoundId);
+    }
+
+    /**
+     * @notice Returns the quantity of rounds for a specific phase ID
+     * @param phaseId The specific phase to fetch data for
+     * @return The quantity of rounds for the phase
+     */
+    function _getRoundCount(uint256 phaseId) private view returns (uint256) {
+        (uint80 startingRoundId, uint80 endingRoundId) = registry.getPhaseRange(base, quote, uint16(phaseId));
+        return uint256(endingRoundId) - uint256(startingRoundId) + 1;
+    }
+
+    /**
+     * @notice Computes the chainlink phase ID from a round
+     * @param round Round to compute from
+     * @return Chainlink phase ID
+     */
+    function _phaseId(ChainlinkRound memory round) private pure returns (uint256) {
+        return round.roundId >> PHASE_OFFSET;
     }
 }
