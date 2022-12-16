@@ -415,7 +415,7 @@ contract Lens is ILens {
      * @return Latest position for the market
      */
     function _latestPosition(IMarket market) private view returns (Position memory) {
-        return market.versions(market.latestVersion()).position;
+        return market.position();
     }
 
     /**

@@ -33,6 +33,8 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
 
         Version version;
 
+        Position position;
+
         PrePosition pre;
 
         Fee fee;
@@ -74,6 +76,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
     /// @dev Mapping of the historical version data
     mapping(uint256 => Version) _versions;
 
+    Position private _position;
     PrePosition private _pre; //TODO: still outside?
 
     uint256 public latestVersion;
@@ -196,6 +199,10 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         return _versions[oracleVersion];
     }
 
+    function position() external view returns (Position memory) {
+        return _position;
+    }
+
     function pre() external view returns (PrePosition memory) {
         return _pre;
     }
@@ -294,6 +301,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         context.currentOracleVersion = _transform(oracle.sync());
         context.latestVersion = latestVersion;
         context.version = _versions[context.latestVersion];
+        context.position = _position;
         context.pre = _pre;
         context.fee = _fee;
 
@@ -315,6 +323,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         latestVersions[account] = context.latestAccountVersion;
         _accounts[account] = context.account;
         liquidation[account] = context.liquidation; //TODO: can pack this in account, only saves gas on liq.
+        _position = context.position;
         _pre = context.pre;
         _fee = context.fee;
 
@@ -363,12 +372,15 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
     function _settlePeriod(CurrentContext memory context, Period memory period) private {
         if (context.currentOracleVersion.version > context.latestVersion) {
             context.version.accumulate(
+                context.position,
                 context.pre,
                 context.fee,
                 period,
                 context.protocolParameter,
                 context.marketParameter
             );
+            context.position = context.position.next(context.pre);
+            context.pre.clear();
             context.latestVersion = period.toVersion.version;
             _versions[period.toVersion.version] = context.version;
         }
@@ -395,7 +407,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
     }
 
     function _checkPosition(CurrentContext memory context) private pure {
-        Position memory nextPosition = context.version.position.next(context.pre);
+        Position memory nextPosition = context.position.next(context.pre);
 
         if (!context.marketParameter.closed && nextPosition.socializationFactor().lt(UFixed18Lib.ONE))
             revert MarketInsufficientLiquidityError();

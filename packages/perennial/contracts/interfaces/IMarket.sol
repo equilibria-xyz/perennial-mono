@@ -63,6 +63,7 @@ interface IMarket {
     function latestVersions(address account) external view returns (uint256);
     function accounts(address account) external view returns (Account memory);
     function versions(uint256 oracleVersion) external view returns (Version memory);
+    function position() external view returns (Position memory);
     function pre() external view returns (PrePosition memory);
     function fee() external view returns (Fee memory);
     function settle(address account) external;
