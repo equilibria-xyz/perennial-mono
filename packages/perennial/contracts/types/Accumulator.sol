@@ -44,49 +44,4 @@ library AccumulatorLib {
     function decrementTaker(Accumulator memory self, Fixed18 amount, UFixed18 total) internal pure {
         self._taker = self._taker.unpack().add(amount.div(Fixed18Lib.from(total)).mul(Fixed18Lib.NEG_ONE)).pack();
     }
-
-    /**
-     * @notice Adds two accumulators together
-     * @param a The first accumulator to sum
-     * @param b The second accumulator to sum
-     * @return The resulting summed accumulator
-     */
-    function add(Accumulator memory a, Accumulator memory b) internal pure returns (Accumulator memory) {
-        return Accumulator(
-            PackedFixed18.wrap(PackedFixed18.unwrap(a._maker) + PackedFixed18.unwrap(b._maker)),
-            PackedFixed18.wrap(PackedFixed18.unwrap(a._taker) + PackedFixed18.unwrap(b._taker))
-        );
-    }
-
-    /**
-     * @notice Subtracts accumulator `b` from `a`
-     * @param a The accumulator to subtract from
-     * @param b The accumulator to subtract
-     * @return The resulting subtracted accumulator
-     */
-    function sub(Accumulator memory a, Accumulator memory b) internal pure returns (Accumulator memory) {
-        return Accumulator(
-            PackedFixed18.wrap(PackedFixed18.unwrap(a._maker) - PackedFixed18.unwrap(b._maker)),
-            PackedFixed18.wrap(PackedFixed18.unwrap(a._taker) - PackedFixed18.unwrap(b._taker))
-        );
-    }
-
-    /**
-     * @notice Multiplies two accumulators together
-     * @param a The first accumulator to multiply
-     * @param b The second accumulator to multiply
-     * @return The resulting multiplied accumulator
-     */
-    function mul(Accumulator memory a, Accumulator memory b) internal pure returns (Accumulator memory) {
-        return Accumulator(a.maker().mul(b.maker()).pack(), a.taker().mul(b.taker()).pack());
-    }
-
-    /**
-     * @notice Sums the maker and taker together from a single accumulator
-     * @param self The struct to operate on
-     * @return The sum of its maker and taker
-     */
-    function sum(Accumulator memory self) internal pure returns (Fixed18) {
-        return self.maker().add(self.taker());
-    }
 }
