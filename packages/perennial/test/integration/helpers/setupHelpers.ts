@@ -1,7 +1,6 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import HRE from 'hardhat'
 import { BigNumber, utils } from 'ethers'
-import { CHAINLINK_CUSTOM_CURRENCIES, buildChainlinkRoundId } from '@equilibria/perennial-oracle/util'
 
 import { time, impersonate } from '../../../../common/testutil'
 import {
@@ -30,6 +29,8 @@ import {
 } from '../../../types/generated'
 import { ChainlinkContext } from './chainlinkHelpers'
 import { createPayoffDefinition } from '../../../../common/testutil/types'
+import { buildChainlinkRoundId } from '../../../util/buildChainlinkRoundId'
+import { CHAINLINK_CUSTOM_CURRENCIES } from '../../../util/constants'
 const { config, deployments, ethers } = HRE
 
 export const INITIAL_PHASE_ID = 1

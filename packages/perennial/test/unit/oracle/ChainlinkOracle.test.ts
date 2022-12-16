@@ -6,7 +6,7 @@ import HRE, { waffle } from 'hardhat'
 
 import { ChainlinkOracle, ChainlinkOracle__factory, FeedRegistryInterface__factory } from '../../../types/generated'
 import { currentBlockTimestamp } from '../../../../common/testutil/time'
-import { buildChainlinkRoundId } from '../../../util'
+import { buildChainlinkRoundId } from '../../../util/buildChainlinkRoundId'
 
 const { ethers } = HRE
 

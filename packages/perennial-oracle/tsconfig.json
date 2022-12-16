@@ -1,8 +1,0 @@
-{
-  "extends": "../common/tsconfig.default",
-  "compilerOptions": {
-    "outDir": "dist"
-  },
-  "files": ["hardhat.config.ts"],
-  "include": ["deploy", "test", "types", "util"]
-}
