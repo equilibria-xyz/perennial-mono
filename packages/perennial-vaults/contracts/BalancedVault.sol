@@ -1,0 +1,186 @@
+//SPDX-License-Identifier: Apache-2.0
+pragma solidity 0.8.15; //TODO: fix after https://trello.com/c/EU1TJxCv/182-fix-pragma-version-in-payoffdefinition-type
+
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
+import "@equilibria/perennial/contracts/interfaces/IController.sol";
+import "@equilibria/root/number/types/UFixed18.sol";
+import "@equilibria/root/token/types/Token18.sol";
+
+//TODO(required): natspec
+//TODO(required): events, errors, interface
+//TODO(nice to have): pausable
+//TODO(nice to have): incentivize sync when near liquidation
+//TODO(nice to have): create collateral rebalance buffer so it doesn't need to every time
+contract BalancedVault is ERC4626 {
+    UFixed18 constant private TWO = UFixed18.wrap(2e18);
+
+    IController public immutable controller;
+    ICollateral public immutable collateral;
+    IProduct public immutable long;
+    IProduct public immutable short;
+    UFixed18 public immutable targetLeverage;
+    UFixed18 public immutable maxLeverage;
+    UFixed18 public immutable fixedFloat;
+
+    constructor(
+        IERC20 dsu_,
+        IController controller_,
+        IProduct long_,
+        IProduct short_,
+        UFixed18 targetLeverage_,
+        UFixed18 maxLeverage_,
+        UFixed18 fixedFloat_
+    )
+        ERC4626(dsu_)
+        ERC20(
+            string(abi.encodePacked("Perennial Balanced Vault: ", long_.name())),
+            string(abi.encodePacked("PBV-", long_.symbol()))
+        )
+    {
+        require(maxLeverage_.gt(targetLeverage_), "max leverage must be greater than leverage");
+
+        controller = controller_;
+        collateral = controller.collateral();
+        long = long_;
+        short = short_;
+        targetLeverage = targetLeverage_;
+        maxLeverage = maxLeverage_;
+        fixedFloat = fixedFloat_;
+        dsu_.approve(address(collateral), type(uint256).max);
+    }
+
+    function sync() external {
+        _before();
+        _updateCollateral(UFixed18Lib.ZERO, false);
+        _updatePosition();
+    }
+
+    function totalAssets() public view override returns (uint256) {
+        (UFixed18 longCollateral, UFixed18 shortCollateral) = _collateral();
+        return UFixed18.unwrap(longCollateral.add(shortCollateral));
+    }
+
+    // Precondition: Assumes the collateral is balanced and the positions have equal size.
+    function maxWithdraw(address owner) public view virtual override returns (uint256) {
+        // If we're in the middle of closing all positions due to liquidations, return 0.
+        if (!healthy()) return 0;
+
+        // Calculate the minimum amount of collateral we can have.
+        UFixed18 price = long.atVersion(long.latestVersion()).price.abs();
+        UFixed18 position = long.position(address(this)).maker;
+
+        // Calculate the minimum collateral for one product, which represents having a leverage of `maxLeverage`.
+        UFixed18 minimumCollateral = position.mul(price).div(maxLeverage).mul(TWO);
+        UFixed18 currentCollateral = UFixed18.wrap(totalAssets());
+        if (currentCollateral.lt(minimumCollateral)) return 0;
+
+        return Math.min(super.maxWithdraw(owner), UFixed18.unwrap(currentCollateral.sub(minimumCollateral)));
+    }
+
+    function deposit(uint256 assets, address receiver) public virtual override returns (uint256) {
+        _before();
+        return super.deposit(assets, receiver);
+    }
+
+    function mint(uint256 shares, address receiver) public virtual override returns (uint256) {
+        _before();
+        return super.mint(shares, receiver);
+    }
+
+    function withdraw(uint256 assets, address receiver, address owner) public virtual override returns (uint256) {
+        _before();
+        return super.withdraw(assets, receiver, owner);
+    }
+
+    function redeem(uint256 shares, address receiver, address owner) public virtual override returns (uint256) {
+        _before();
+        return super.redeem(shares, receiver, owner);
+    }
+
+    // Returns whether one of the positions has are equivalent
+    function healthy() public view returns (bool) {
+        return long.position(address(this)).maker.eq(short.position(address(this)).maker);
+    }
+
+    function _deposit(address caller, address receiver, uint256 assets, uint256 shares) internal override {
+        // Deposit assets into this vault.
+        super._deposit(caller, receiver, assets, shares);
+
+        // Deposit assets into collateral.
+        _updateCollateral(UFixed18.wrap(assets), true);
+
+        // Open positions to maintain leverage.
+        _updatePosition();
+    }
+
+    function _withdraw(address caller, address receiver, address owner, uint256 assets, uint256 shares) internal override {
+        // Withdraw assets from this vault.
+        _updateCollateral(UFixed18.wrap(assets), false);
+
+        // Close positions to maintain leverage.
+        _updatePosition();
+
+        // Make Withdrawal
+        super._withdraw(caller, receiver, owner, assets, shares);
+    }
+
+    function _before() private {
+        long.settleAccount(address(this));
+        short.settleAccount(address(this));
+    }
+
+    // If `deposit` is true, deposit a total of `amount` collateral into the two products.
+    // If `deposit` is false, withdraw a total of `amount` collateral from the two products.
+    function _updateCollateral(UFixed18 amount, bool isDeposit) private {
+        (UFixed18 longCollateral, UFixed18 shortCollateral) = _collateral();
+        UFixed18 currentCollateral = isDeposit ?
+            longCollateral.add(shortCollateral).add(amount) :
+            longCollateral.add(shortCollateral).sub(amount);
+        UFixed18 targetCollateral = currentCollateral.div(TWO);
+
+        (IProduct greaterProduct, IProduct lesserProduct) = longCollateral.gt(shortCollateral) ?
+            (long, short) :
+            (short, long);
+
+        _adjustCollateral(greaterProduct, targetCollateral);
+        _adjustCollateral(lesserProduct, currentCollateral.sub(targetCollateral));
+    }
+
+    // Precondition: the difference in collateral between long and short is at most 1.
+    function _updatePosition() private {
+        // 0. If recently liquidated, reset positions
+        if (!healthy()) {
+            _adjustPosition(long, UFixed18Lib.ZERO);
+            _adjustPosition(short, UFixed18Lib.ZERO);
+            return;
+        }
+
+        // 1. Calculate the target position size for each product.
+        UFixed18 totalCollateral = UFixed18.wrap(totalAssets());
+        UFixed18 totalUtilized = totalCollateral.gt(fixedFloat) ? totalCollateral.sub(fixedFloat) : UFixed18Lib.ZERO;
+        UFixed18 price = long.atVersion(long.latestVersion()).price.abs();
+        UFixed18 targetPosition = totalUtilized.mul(targetLeverage).div(price).div(TWO);
+
+        // 2. Adjust positions to target position size.
+        _adjustPosition(long, targetPosition);
+        _adjustPosition(short, targetPosition);
+    }
+
+    function _adjustPosition(IProduct product, UFixed18 targetPosition) private {
+        UFixed18 currentPosition = product.position(address(this)).next(product.pre(address(this))).maker;
+        if (currentPosition.gt(targetPosition)) product.closeMake(currentPosition.sub(targetPosition));
+        if (currentPosition.lt(targetPosition)) product.openMake(targetPosition.sub(currentPosition));
+    }
+
+    function _adjustCollateral(IProduct product, UFixed18 targetCollateral) private {
+        UFixed18 currentCollateral = collateral.collateral(address(this), product);
+        if (currentCollateral.gt(targetCollateral))
+            collateral.withdrawTo(address(this), product, currentCollateral.sub(targetCollateral));
+        if (currentCollateral.lt(targetCollateral))
+            collateral.depositTo(address(this), product, targetCollateral.sub(currentCollateral));
+    }
+
+    function _collateral() private view returns (UFixed18, UFixed18) {
+        return (collateral.collateral(address(this), long), collateral.collateral(address(this), short));
+    }
+}

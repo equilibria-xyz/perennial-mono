@@ -10,8 +10,8 @@ import {
   IController__factory,
   IProduct,
   IProduct__factory,
-  PerennialBalancedVault,
-  PerennialBalancedVault__factory,
+  BalancedVault,
+  BalancedVault__factory,
   IOracleProvider__factory,
   IOracleProvider,
   ICollateral,
@@ -25,7 +25,7 @@ use(smock.matchers)
 const DSU_HOLDER = '0x0B663CeaCEF01f2f88EB7451C70Aa069f19dB997'
 
 describe('BalancedVault', () => {
-  let vault: PerennialBalancedVault
+  let vault: BalancedVault
   let asset: IERC20Metadata
   let oracle: FakeContract<IOracleProvider>
   let collateral: ICollateral
@@ -35,9 +35,9 @@ describe('BalancedVault', () => {
   let long: IProduct
   let short: IProduct
   let leverage: BigNumber
+  let maxLeverage: BigNumber
   let fixedFloat: BigNumber
   let originalOraclePrice: BigNumber
-  let maxLeverageMultiplier: BigNumber
 
   async function updateOracle(newPrice?: BigNumber) {
     const [currentVersion, currentTimestamp, currentPrice] = await oracle.currentVersion()
@@ -81,17 +81,17 @@ describe('BalancedVault', () => {
     short = IProduct__factory.connect('0xfeD3E166330341e0305594B8c6e6598F9f4Cbe9B', owner)
     collateral = ICollateral__factory.connect('0x2d264ebdb6632a06a1726193d4d37fef1e5dbdcd', owner)
     leverage = utils.parseEther('1.2')
+    maxLeverage = utils.parseEther('1.32')
     fixedFloat = utils.parseEther('10000')
-    maxLeverageMultiplier = utils.parseEther('1.1')
 
-    vault = await new PerennialBalancedVault__factory(owner).deploy(
+    vault = await new BalancedVault__factory(owner).deploy(
       dsu.address,
       controller.address,
       long.address,
       short.address,
       leverage,
+      maxLeverage,
       fixedFloat,
-      maxLeverageMultiplier,
     )
     asset = IERC20Metadata__factory.connect(await vault.asset(), owner)
 
@@ -195,10 +195,7 @@ describe('BalancedVault', () => {
 
     const totalDeposits = smallDeposit.add(largeDeposit)
     const position = await longPosition()
-    const minCollateral = Big18Math.div(
-      Big18Math.mul(position, originalOraclePrice),
-      Big18Math.mul(leverage, maxLeverageMultiplier),
-    ).mul(2)
+    const minCollateral = Big18Math.div(Big18Math.mul(position, originalOraclePrice), maxLeverage).mul(2)
 
     expect(await vault.maxWithdraw(user.address)).to.equal(totalDeposits.sub(minCollateral))
 
