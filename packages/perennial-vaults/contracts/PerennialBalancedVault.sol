@@ -53,19 +53,12 @@ contract PerennialBalancedVault is ERC4626, UOwnable {
 
         // Calculate the minimum amount of collateral we can have.
         IOracleProvider.OracleVersion memory currentOracleVersion = long.atVersion(long.latestVersion());
-        UFixed18 position = long.position(owner).maker;
+        UFixed18 position = long.position(address(this)).maker;
         UFixed18 price = currentOracleVersion.price.abs();
-        // Calculate the minimum and target collateral for one product. The minimum collateral represents having a leverage of
-        // `leverage` * `maxLeverageMultiplier`. The target collateral represents having a leverage of `leverage`.
-        UFixed18 minimumCollateral = position.mul(price).div(leverage.mul(maxLeverageMultiplier));
-        UFixed18 targetCollateral = position.mul(price).div(leverage);
-        // If the difference between the target collateral and minimum collateral is less than `fixedFloat`, then we can
-        // withdraw everything.
-        if (2 * UFixed18.unwrap(targetCollateral.sub(minimumCollateral)) < UFixed18.unwrap(fixedFloat)) {
-            minimumCollateral = UFixed18Lib.ZERO;
-        } else {
-            minimumCollateral = minimumCollateral.add(minimumCollateral);
-        }
+
+        // Calculate the minimum collateral for one product, which represents having a leverage of `leverage` * `maxLeverageMultiplier`.
+        UFixed18 minimumCollateralForOneProduct = position.mul(price).div(leverage.mul(maxLeverageMultiplier));
+        UFixed18 minimumCollateral = minimumCollateralForOneProduct.mul(UFixed18Lib.from(2));
 
         UFixed18 currentCollateral = collateral.collateral(address(this), long).add(collateral.collateral(address(this), short));
         if (currentCollateral.lt(minimumCollateral)) {
@@ -214,7 +207,7 @@ contract PerennialBalancedVault is ERC4626, UOwnable {
         UFixed18 shortCollateral = collateral.collateral(address(this), short);
         UFixed18 collateralAmount = UFixed18Lib.min(longCollateral, shortCollateral);
 
-        collateralAmount = collateralAmount.gt(fixedFloat) ? collateralAmount.sub(fixedFloat) : UFixed18Lib.ZERO;
+        collateralAmount = collateralAmount.gt(fixedFloat.div(UFixed18Lib.from(2))) ? collateralAmount.sub(fixedFloat.div(UFixed18Lib.from(2))) : UFixed18Lib.ZERO;
         IOracleProvider.OracleVersion memory currentOracleVersion = long.atVersion(long.latestVersion());
         UFixed18 targetPosition = collateralAmount.mul(leverage).div(currentOracleVersion.price.abs());
 
