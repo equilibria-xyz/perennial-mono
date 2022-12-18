@@ -57,12 +57,19 @@ library ChainlinkAggregatorLib {
      * @param phaseId The specific phase to fetch data for
      * @return roundCount The number of rounds in the phase
      */
-    function getRoundCount(ChainlinkAggregator self, uint16 phaseId)
+    function getRoundCount(ChainlinkAggregator self, uint16 phaseId, uint256 maxTimestamp)
     internal view returns (uint256) {
         AggregatorProxyInterface proxy = AggregatorProxyInterface(ChainlinkAggregator.unwrap(self));
         AggregatorV2V3Interface agg = AggregatorV2V3Interface(proxy.phaseAggregators(phaseId));
 
-        (uint80 aggRoundId,,,,) = agg.latestRoundData();
+        (uint80 aggRoundId,,,uint256 updatedAt,) = agg.latestRoundData();
+
+        // If the latest round for the aggregator is after maxTimestamp, walk back until we find the
+        // correct round
+        while (updatedAt > maxTimestamp) {
+            aggRoundId--;
+            (,,,updatedAt,) = agg.getRoundData(aggRoundId);
+        }
         return aggRoundId + 1;
     }
 }

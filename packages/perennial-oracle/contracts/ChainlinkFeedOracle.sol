@@ -48,6 +48,10 @@ contract ChainlinkFeedOracle is IOracleProvider {
         _decimalOffset = SafeCast.toInt256(10 ** aggregator.decimals());
 
         _firstPhaseId = aggregator_.phase();
+        // Load the phases array with previous phase values
+        while (_firstPhaseId > _latestPhaseId()) {
+            _phases.push(Phase(_phases[_phases.length - 1].startingVersion, uint128(0)));
+        }
     }
 
     /**
@@ -62,7 +66,7 @@ contract ChainlinkFeedOracle is IOracleProvider {
         while (round.phaseId() > _latestPhaseId()) {
             _phases.push(
                 Phase(
-                    uint128(aggregator.getRoundCount(_latestPhaseId())) +
+                    uint128(aggregator.getRoundCount(_latestPhaseId(), round.timestamp)) +
                         _phases[_phases.length - 1].startingVersion,
                     uint128(_aggregatorRoundIdToProxyRoundId(_latestPhaseId() + 1, 1))
                 )
