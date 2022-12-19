@@ -29,7 +29,7 @@ contract ChainlinkFeedOracle is IOracleProvider {
 
     /**
      * @notice Initializes the contract state
-     * @param aggregator_ Chainlink price feed registry
+     * @param aggregator_ Chainlink price feed aggregator
      */
     constructor(ChainlinkAggregator aggregator_) {
         aggregator = aggregator_;

@@ -11,12 +11,12 @@ using ChainlinkAggregatorLib for ChainlinkAggregator global;
 
 /**
  * @title ChainlinkAggregatorLib
- * @notice Library that manages interfacing with the Chainlink Feed Registry.
+ * @notice Library that manages interfacing with the Chainlink Feed Aggregator Proxy.
  */
 library ChainlinkAggregatorLib {
     /**
      * @notice Returns the decimal amount for a specific feed
-     * @param self Chainlink Feed Registry to operate on
+     * @param self Chainlink Feed Aggregator to operate on
      * @return Decimal amount
      */
     function decimals(ChainlinkAggregator self) internal view returns (uint8) {
@@ -25,7 +25,7 @@ library ChainlinkAggregatorLib {
 
     /**
      * @notice Returns the latest round data for a specific feed
-     * @param self Chainlink Feed Registry to operate on
+     * @param self Chainlink Feed Aggregator to operate on
      * @return Latest round data
      */
     function getLatestRound(ChainlinkAggregator self) internal view returns (ChainlinkRound memory) {
@@ -36,7 +36,7 @@ library ChainlinkAggregatorLib {
 
     /**
      * @notice Returns a specific round's data for a specific feed
-     * @param self Chainlink Feed Registry to operate on
+     * @param self Chainlink Feed Aggregator to operate on
      * @param roundId The specific round to fetch data for
      * @return Specific round's data
      */
@@ -49,8 +49,10 @@ library ChainlinkAggregatorLib {
 
     /**
      * @notice Returns the first round ID for a specific phase ID
-     * @param self Chainlink Feed Registry to operate on
+     * @param self Chainlink Feed Aggregator to operate on
      * @param phaseId The specific phase to fetch data for
+     * @param startingRoundId starting roundId for the aggregator proxy
+     * @param maxTimestamp maximum timestamp allowed for the last round of the phase
      * @dev Assumes the phase ends at the aggregators latestRound or earlier
      * @return The number of rounds in the phase
      */
@@ -76,6 +78,8 @@ library ChainlinkAggregatorLib {
     /**
      * @notice Convert an aggregator round ID into a proxy round ID for the given phase
      * @dev Follows the logic specified in https://docs.chain.link/data-feeds/price-feeds/historical-data#roundid-in-proxy
+     * @param phaseId phase ID for the given aggregator round
+     * @param aggregatorRoundId round id for the aggregator round
      * @return Proxy roundId
      */
     function _aggregatorRoundIdToProxyRoundId(uint16 phaseId, uint80 aggregatorRoundId) private pure returns (uint256) {

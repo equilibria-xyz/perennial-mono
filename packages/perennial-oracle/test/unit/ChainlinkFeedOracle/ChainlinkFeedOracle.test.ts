@@ -241,12 +241,12 @@ describe('ChainlinkFeedOracle', () => {
           .whenCalledWith(roundId)
           .returns([roundId, ethers.BigNumber.from(133300000000), TIMESTAMP_START, TIMESTAMP_START + HOUR, roundId])
 
-        // const returnValue = await oracle.callStatic.sync({ gasLimit: 3e6 })
+        const returnValue = await oracle.callStatic.sync({ gasLimit: 3e6 })
         await oracle.connect(user).sync()
 
-        /* expect(returnValue.price).to.equal(utils.parseEther('1333'))
+        expect(returnValue.price).to.equal(utils.parseEther('1333'))
         expect(returnValue.timestamp).to.equal(TIMESTAMP_START + HOUR)
-        expect(returnValue.version).to.equal(80) */
+        expect(returnValue.version).to.equal(80)
 
         const currentVersion = await oracle.currentVersion()
         expect(currentVersion.price).to.equal(utils.parseEther('1333'))
