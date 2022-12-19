@@ -3,7 +3,7 @@ import { time, impersonate } from '../../../common/testutil'
 import { Big18Math } from '../../../common/testutil/types'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { FakeContract, smock } from '@defi-wonderland/smock'
-import { expect, use } from 'chai'
+import { assert, expect, use } from 'chai'
 import {
   IERC20Metadata,
   IERC20Metadata__factory,
@@ -32,6 +32,7 @@ describe('BalancedVault', () => {
   let owner: SignerWithAddress
   let user: SignerWithAddress
   let user2: SignerWithAddress
+  let liquidator: SignerWithAddress
   let long: IProduct
   let short: IProduct
   let leverage: BigNumber
@@ -73,7 +74,7 @@ describe('BalancedVault', () => {
 
   beforeEach(async () => {
     await time.reset(config)
-    ;[owner, user, user2] = await ethers.getSigners()
+    ;[owner, user, user2, liquidator] = await ethers.getSigners()
 
     const dsu = IERC20Metadata__factory.connect('0x605D26FBd5be761089281d5cec2Ce86eeA667109', owner)
     const controller = IController__factory.connect('0x9df509186b6d3b7D033359f94c8b1BB5544d51b3', owner)
@@ -96,10 +97,13 @@ describe('BalancedVault', () => {
     asset = IERC20Metadata__factory.connect(await vault.asset(), owner)
 
     const dsuHolder = await impersonate.impersonateWithBalance(DSU_HOLDER, utils.parseEther('10'))
-    await dsu.connect(dsuHolder).transfer(user.address, utils.parseEther('200000'))
-    await dsu.connect(user).approve(vault.address, ethers.constants.MaxUint256)
-    await dsu.connect(dsuHolder).transfer(user2.address, utils.parseEther('200000'))
-    await dsu.connect(user2).approve(vault.address, ethers.constants.MaxUint256)
+    const setUpWalletWithDSU = async (wallet: SignerWithAddress) => {
+      await dsu.connect(dsuHolder).transfer(wallet.address, utils.parseEther('200000'))
+      await dsu.connect(wallet).approve(vault.address, ethers.constants.MaxUint256)
+    }
+    await setUpWalletWithDSU(user)
+    await setUpWalletWithDSU(user2)
+    await setUpWalletWithDSU(liquidator)
 
     // Unfortunately, we can't make mocks of existing contracts.
     // So, we make a fake and initialize it with the values that the real contract had at this block.
@@ -256,10 +260,45 @@ describe('BalancedVault', () => {
     expect(await totalCollateralInVault()).to.be.greaterThan(originalTotalCollateral)
   })
 
+  it('rounds deposits correctly', async () => {
+    const collateralDifference = async () => {
+      return (await longCollateralInVault()).sub(await shortCollateralInVault()).abs()
+    }
+    const oddDepositAmount = utils.parseEther('10000').add(1) // 10K + 1 wei
+
+    await vault.connect(user).deposit(oddDepositAmount, user.address)
+    await updateOracle()
+    await vault.sync()
+    expect(await collateralDifference()).to.equal(1)
+
+    await vault.connect(user).deposit(oddDepositAmount, user.address)
+    await updateOracle()
+    await vault.sync()
+    expect(await collateralDifference()).to.equal(0)
+  })
+
+  describe('Liquidation', () => {
+    it.only('liquidates', async () => {
+      await vault.connect(user).deposit(utils.parseEther('100000'), user.address, { gasLimit: 3e6 })
+      await updateOracle()
+      await vault.sync()
+
+      console.log((await long['maintenance(address)'](vault.address)).toString())
+      console.log((await collateral['collateral(address,address)'](vault.address, long.address)).toString())
+      console.log(await long.isLiquidating(vault.address))
+      console.log(await collateral.liquidatable(vault.address, long.address))
+      console.log('--------------')
+
+      await updateOracle(utils.parseEther('500000'))
+
+      console.log(await collateral.liquidatable(vault.address, long.address))
+      console.log(await collateral.liquidatable(vault.address, short.address))
+    })
+  })
+
   // TESTS:
   //
   // - Invalid parameters should be rejected by all functions.
-  // - Deposit odd amounts to test rounding. If we deposit odd amounts twice, the collateral should be equal.
   //
   // Liqudations:
   // - If a position is liquidated, we shouldn't be able to do any actions and maxWithdraw should return 0.
