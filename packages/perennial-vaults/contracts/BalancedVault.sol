@@ -51,6 +51,11 @@ contract BalancedVault is ERC4626 {
 
     function sync() external {
         _before();
+        if (!healthy()) {
+            _adjustPosition(long, UFixed18Lib.ZERO);
+            _adjustPosition(short, UFixed18Lib.ZERO);
+            return;
+        }
         _updateCollateral(UFixed18Lib.ZERO, false);
         _updatePosition();
     }
@@ -97,9 +102,11 @@ contract BalancedVault is ERC4626 {
         return super.redeem(shares, receiver, owner);
     }
 
-    // Returns whether one of the positions has are equivalent
+    // Returns whether the vault's positions have not been liquidated or are eligible for liquidation.
     function healthy() public view returns (bool) {
-        return long.position(address(this)).maker.eq(short.position(address(this)).maker);
+        return long.position(address(this)).maker.eq(short.position(address(this)).maker) &&
+            !collateral.liquidatableNext(address(this), long) &&
+            !collateral.liquidatableNext(address(this), short);
     }
 
     function _deposit(address caller, address receiver, uint256 assets, uint256 shares) internal override {
