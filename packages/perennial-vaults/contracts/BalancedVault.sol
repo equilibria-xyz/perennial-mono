@@ -105,8 +105,8 @@ contract BalancedVault is ERC4626 {
     // Returns whether the vault's positions have not been liquidated or are eligible for liquidation.
     function healthy() public view returns (bool) {
         return long.position(address(this)).maker.eq(short.position(address(this)).maker) &&
-            !collateral.liquidatableNext(address(this), long) &&
-            !collateral.liquidatableNext(address(this), short);
+            !collateral.liquidatable(address(this), long) &&
+            !collateral.liquidatable(address(this), short);
     }
 
     function _deposit(address caller, address receiver, uint256 assets, uint256 shares) internal override {
