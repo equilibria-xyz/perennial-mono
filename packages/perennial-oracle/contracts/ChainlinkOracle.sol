@@ -67,7 +67,7 @@ contract ChainlinkOracle is IOracleProvider {
                 Phase(
                     uint128(registry.getRoundCount(base, quote, _latestPhaseId())) +
                         _phases[_phases.length - 1].startingVersion,
-                    uint128(registry.getStartingRoundId(base, quote, _latestPhaseId()))
+                    uint128(registry.getStartingRoundId(base, quote, _latestPhaseId() +  1))
                 )
             );
         }

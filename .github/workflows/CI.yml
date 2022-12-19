@@ -99,3 +99,44 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           delete-old-comments: true
         if: ${{ github.event_name == 'pull_request' && env.PARSER_BROKEN != 'true' }}
+  unit-test-oracle:
+    name: [Oracle] Unit Tests w/ Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node }}
+      - uses: actions/checkout@v3
+          with:
+            fetch-depth: 0
+      - name: Has Package Changes
+        id: oracleChanges
+        uses: tj-actions/changed-files@v35
+        with:
+          files: |
+            packages/perennial-oracle/**
+      - uses: actions/cache@v3
+        id: cache
+        with:
+          path: |
+            node_modules
+          key: ${{ runner.os }}-node-${{ matrix.node }}-${{ hashFiles('yarn.lock') }}
+      - name: Install
+        run: yarn --frozen-lockfile
+        if: ${{ steps.oracleChanges.outputs.any_changed == 'true' }}
+      - name: Compile
+        run: yarn workspace @equilibria/perennial run compile
+      - name: Run tests
+        if: ${{ steps.oracleChanges.outputs.any_changed == 'true' }}
+        env:
+          MOCHA_REPORTER: dot
+        run: | # for now, just run for perennial
+          yarn workspace @equilibria/perennial-oracle run ${{ env.PARSER_BROKEN != 'true' && 'coverage' || 'test' }}
+      - name: Unit Test Code Coverage Report
+        uses: romeovs/lcov-reporter-action@v0.3.1
+        with:
+          title: [Oracle] Unit Test Coverage Report
+          lcov-file: ./packages/perennial/coverage/lcov.info
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          delete-old-comments: true
+        if: ${{ github.event_name == 'pull_request' && env.PARSER_BROKEN != 'true' && steps.oracleChanges.outputs.any_changed == 'true' }}

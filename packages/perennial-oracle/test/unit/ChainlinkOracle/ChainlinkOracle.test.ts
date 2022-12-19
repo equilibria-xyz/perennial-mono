@@ -25,14 +25,17 @@ describe('ChainlinkOracle', () => {
   beforeEach(async () => {
     ;[owner, user, eth, usd] = await ethers.getSigners()
     registry = await deployMockContract(owner, FeedRegistryInterface__factory.abi)
+    await registry.mock.decimals.withArgs(eth.address, usd.address).returns(8)
+    await registry.mock.getPhaseRange
+      .withArgs(eth.address, usd.address, 1)
+      .returns(buildChainlinkRoundId(1, 100), buildChainlinkRoundId(1, 500))
+    oracle = await new ChainlinkOracle__factory(owner).deploy(registry.address, eth.address, usd.address, {
+      gasLimit: 3e6,
+    })
   })
 
   describe('#constructor', async () => {
     it('sets initial params', async () => {
-      await registry.mock.decimals.withArgs(eth.address, usd.address).returns(8)
-
-      oracle = await new ChainlinkOracle__factory(owner).deploy(registry.address, eth.address, usd.address)
-
       expect(await oracle.registry()).to.equal(registry.address)
       expect(await oracle.base()).to.equal(eth.address)
       expect(await oracle.quote()).to.equal(usd.address)
@@ -44,12 +47,6 @@ describe('ChainlinkOracle', () => {
 
     beforeEach(async () => {
       TIMESTAMP_START = await currentBlockTimestamp()
-
-      await registry.mock.decimals.withArgs(eth.address, usd.address).returns(8)
-      await registry.mock.getPhaseRange
-        .withArgs(eth.address, usd.address, 1)
-        .returns(buildChainlinkRoundId(1, 100), buildChainlinkRoundId(1, 500))
-      oracle = await new ChainlinkOracle__factory(owner).deploy(registry.address, eth.address, usd.address)
     })
 
     it('syncs first version', async () => {
@@ -186,12 +183,6 @@ describe('ChainlinkOracle', () => {
 
     beforeEach(async () => {
       TIMESTAMP_START = await currentBlockTimestamp()
-
-      await registry.mock.decimals.withArgs(eth.address, usd.address).returns(8)
-      await registry.mock.getPhaseRange
-        .withArgs(eth.address, usd.address, 1)
-        .returns(buildChainlinkRoundId(1, 100), buildChainlinkRoundId(1, 500))
-      oracle = await new ChainlinkOracle__factory(owner).deploy(registry.address, eth.address, usd.address)
 
       const roundId = buildChainlinkRoundId(1, 123)
 
