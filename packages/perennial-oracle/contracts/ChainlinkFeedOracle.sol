@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.15;
 
-import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV2V3Interface.sol";
 import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "./interfaces/IOracleProvider.sol";
 import "./types/ChainlinkAggregator.sol";
@@ -14,16 +13,11 @@ import "./types/ChainlinkAggregator.sol";
  *      This implementation only support non-negative prices.
  */
 contract ChainlinkFeedOracle is IOracleProvider {
-    error InvalidVersionRequested(uint256 version);
-
     /// @dev Chainlink feed aggregator address
     ChainlinkAggregator public immutable aggregator;
 
     /// @dev Decimal offset used to normalize chainlink price to 18 decimals
     int256 private immutable _decimalOffset;
-
-    /// @dev First valid phase for this Oracle
-    uint256 private _firstPhaseId;
 
     /// @dev Mapping of the starting data for each underlying phase
     Phase[] private _phases;
@@ -40,22 +34,25 @@ contract ChainlinkFeedOracle is IOracleProvider {
     constructor(ChainlinkAggregator aggregator_) {
         aggregator = aggregator_;
 
-        // phaseId is 1-indexed, skip index 0
-        _phases.push(Phase(uint128(0), uint128(0)));
-        // phaseId is 1-indexed, first phase starts as version 0
-        _phases.push(Phase(uint128(0), uint128(_aggregatorRoundIdToProxyRoundId(1, 1))));
-
         _decimalOffset = SafeCast.toInt256(10 ** aggregator.decimals());
 
-        _firstPhaseId = aggregator_.phase();
-        // Load the phases array with previous phase values
-        while (_firstPhaseId > _latestPhaseId()) {
-            _phases.push(Phase(_phases[_phases.length - 1].startingVersion, uint128(0)));
+        ChainlinkRound memory firstSeenRound = aggregator.getLatestRound();
+
+        // Load the phases array with empty phase values. these phases will be invalid if requested
+        while (firstSeenRound.phaseId() > _phases.length) {
+            _phases.push(Phase(uint128(0), uint128(0)));
         }
+
+        // first seen round starts as version 0 at current phase
+        _phases.push(Phase(uint128(0), uint128(firstSeenRound.roundId)));
     }
 
     /**
      * @notice Checks for a new price and updates the internal phase annotation state accordingly
+     * @dev `sync` is expected to be called soon after a phase update occurs in the underlying proxy.
+     *      Phase updates should be detected using off-chain mechanism and should trigger a `sync` call
+     *      This is feasible in the short term due to how infrequent phase updates are, but phase update
+     *      and roundCount detection should eventually be implemented at the contract level.
      * @return The current oracle version after sync
      */
     function sync() external returns (OracleVersion memory) {
@@ -64,11 +61,12 @@ contract ChainlinkFeedOracle is IOracleProvider {
 
         // Update phase annotation when new phase detected
         while (round.phaseId() > _latestPhaseId()) {
+            uint256 phaseRoundCount = aggregator.getRoundCount(
+                _latestPhaseId(), _phases[_latestPhaseId()].startingRoundId, round.timestamp);
             _phases.push(
                 Phase(
-                    uint128(aggregator.getRoundCount(_latestPhaseId(), round.timestamp)) +
-                        _phases[_phases.length - 1].startingVersion,
-                    uint128(_aggregatorRoundIdToProxyRoundId(_latestPhaseId() + 1, 1))
+                    uint128(phaseRoundCount) + _phases[_latestPhaseId()].startingVersion,
+                    uint128(round.roundId)
                 )
             );
         }
@@ -139,7 +137,6 @@ contract ChainlinkFeedOracle is IOracleProvider {
         while (uint256(phase.startingVersion) > version) {
             phaseId--;
             phase = _phases[phaseId];
-            if (phaseId < _firstPhaseId) revert InvalidVersionRequested(version);
         }
     }
 
@@ -149,9 +146,5 @@ contract ChainlinkFeedOracle is IOracleProvider {
      */
     function _latestPhaseId() private view returns (uint16) {
         return uint16(_phases.length - 1);
-    }
-
-    function _aggregatorRoundIdToProxyRoundId(uint16 phaseId, uint80 aggregatorRoundId) private pure returns (uint256) {
-        return (uint256(phaseId) << 64) + aggregatorRoundId;
     }
 }

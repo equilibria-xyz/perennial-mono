@@ -19,6 +19,8 @@ import { buildChainlinkRoundId } from '../../../util'
 const { ethers } = HRE
 
 const HOUR = 60 * 60
+const INITIAL_PHASE = 1
+const INITIAL_ROUND = 12
 
 describe('ChainlinkFeedOracle', () => {
   let owner: SignerWithAddress
@@ -33,37 +35,46 @@ describe('ChainlinkFeedOracle', () => {
   beforeEach(async () => {
     ;[owner, user] = await ethers.getSigners()
     aggregatorProxy = await smock.fake<AggregatorProxyInterface>(AggregatorProxyInterface__factory.abi)
-    aggregatorProxy.phaseId.returns(1)
+    const initialRound = buildChainlinkRoundId(INITIAL_PHASE, INITIAL_ROUND)
+    aggregatorProxy.latestRoundData.returns([initialRound, ethers.BigNumber.from(432100000000), 0, HOUR, initialRound])
 
     phase1Aggregator = await smock.fake<AggregatorV2V3Interface>(AggregatorV2V3Interface__factory.abi)
     phase2Aggregator = await smock.fake<AggregatorV2V3Interface>(AggregatorV2V3Interface__factory.abi)
 
     aggregatorProxy.phaseAggregators.whenCalledWith(1).returns(phase1Aggregator.address)
     aggregatorProxy.phaseAggregators.whenCalledWith(2).returns(phase2Aggregator.address)
+
+    aggregatorProxy.decimals.whenCalledWith().returns(8)
+    oracle = await new ChainlinkFeedOracle__factory(owner).deploy(aggregatorProxy.address)
   })
 
-  describe('#constructor', async () => {
+  describe('#constructor', () => {
     it('sets initial params', async () => {
-      aggregatorProxy.decimals.whenCalledWith().returns(8)
-
-      oracle = await new ChainlinkFeedOracle__factory(owner).deploy(aggregatorProxy.address)
-
       expect(await oracle.aggregator()).to.equal(aggregatorProxy.address)
+    })
+
+    it('returns version 0', async () => {
+      const initialRound = buildChainlinkRoundId(INITIAL_PHASE, INITIAL_ROUND)
+      aggregatorProxy.getRoundData
+        .whenCalledWith(initialRound)
+        .returns([initialRound, ethers.BigNumber.from(432100000000), 0, HOUR, initialRound])
+
+      const atVersion = await oracle.atVersion(0)
+      expect(atVersion.price).to.equal(utils.parseEther('4321'))
+      expect(atVersion.timestamp).to.equal(HOUR)
+      expect(atVersion.version).to.equal(0)
     })
   })
 
-  describe('#sync', async () => {
+  describe('#sync', () => {
     let TIMESTAMP_START: number
 
     beforeEach(async () => {
       TIMESTAMP_START = await currentBlockTimestamp()
-
-      aggregatorProxy.decimals.whenCalledWith().returns(8)
-      oracle = await new ChainlinkFeedOracle__factory(owner).deploy(aggregatorProxy.address)
     })
 
     it('syncs first version', async () => {
-      const roundId = buildChainlinkRoundId(1, 24)
+      const roundId = buildChainlinkRoundId(INITIAL_PHASE, INITIAL_ROUND + 23)
       aggregatorProxy.latestRoundData
         .whenCalledWith()
         .returns([roundId, ethers.BigNumber.from(111100000000), TIMESTAMP_START - HOUR, TIMESTAMP_START, roundId])
@@ -102,7 +113,7 @@ describe('ChainlinkFeedOracle', () => {
       })
 
       it('doesnt sync new version if not available', async () => {
-        const roundId = buildChainlinkRoundId(1, 24)
+        const roundId = buildChainlinkRoundId(INITIAL_PHASE, INITIAL_ROUND + 23)
         aggregatorProxy.latestRoundData
           .whenCalledWith()
           .returns([roundId, ethers.BigNumber.from(111100000000), TIMESTAMP_START - HOUR, TIMESTAMP_START, roundId])
@@ -130,7 +141,7 @@ describe('ChainlinkFeedOracle', () => {
       })
 
       it('syncs new version if available', async () => {
-        const roundId = buildChainlinkRoundId(1, 25)
+        const roundId = buildChainlinkRoundId(INITIAL_PHASE, INITIAL_ROUND + 24)
         aggregatorProxy.latestRoundData
           .whenCalledWith()
           .returns([roundId, ethers.BigNumber.from(122200000000), TIMESTAMP_START, TIMESTAMP_START + HOUR, roundId])
@@ -158,9 +169,18 @@ describe('ChainlinkFeedOracle', () => {
       })
 
       it('syncs with new phase', async () => {
-        phase1Aggregator.latestRoundData.returns([81, 0, 0, 0, 0])
+        // Last round of phase1
+        phase1Aggregator.latestRoundData.returns([
+          91,
+          ethers.BigNumber.from(122200000000),
+          TIMESTAMP_START - HOUR,
+          TIMESTAMP_START - HOUR,
+          91,
+        ])
 
-        const roundId = buildChainlinkRoundId(2, 345)
+        // This is the first seen round of the new phase
+        // Phase 1 was (91 - 12 + 1) = 80 rounds long (versions 0 to 79), so this is version 80
+        const roundId = buildChainlinkRoundId(INITIAL_PHASE + 1, 345)
         aggregatorProxy.latestRoundData
           .whenCalledWith()
           .returns([roundId, ethers.BigNumber.from(133300000000), TIMESTAMP_START, TIMESTAMP_START + HOUR, roundId])
@@ -174,33 +194,88 @@ describe('ChainlinkFeedOracle', () => {
 
         expect(returnValue.price).to.equal(utils.parseEther('1333'))
         expect(returnValue.timestamp).to.equal(TIMESTAMP_START + HOUR)
-        expect(returnValue.version).to.equal(426)
+        expect(returnValue.version).to.equal(80)
 
         const currentVersion = await oracle.currentVersion()
         expect(currentVersion.price).to.equal(utils.parseEther('1333'))
         expect(currentVersion.timestamp).to.equal(TIMESTAMP_START + HOUR)
-        expect(currentVersion.version).to.equal(426)
+        expect(currentVersion.version).to.equal(80)
 
-        const atVersion = await oracle.atVersion(426)
+        const atVersion = await oracle.atVersion(80)
         expect(atVersion.price).to.equal(utils.parseEther('1333'))
         expect(atVersion.timestamp).to.equal(TIMESTAMP_START + HOUR)
-        expect(atVersion.version).to.equal(426)
+        expect(atVersion.version).to.equal(80)
+      })
+
+      it('syncs with new phase with walkback', async () => {
+        // Last rounds of phase1 is later than first round seen in new phase
+        phase1Aggregator.latestRoundData.returns([
+          93,
+          ethers.BigNumber.from(122300000000),
+          TIMESTAMP_START + 3 * HOUR,
+          TIMESTAMP_START + 3 * HOUR,
+          93,
+        ])
+        phase1Aggregator.getRoundData
+          .whenCalledWith(92)
+          .returns([
+            92,
+            ethers.BigNumber.from(122200000000),
+            TIMESTAMP_START + 2 * HOUR,
+            TIMESTAMP_START + 2 * HOUR,
+            92,
+          ])
+        // Walk back to an earlier phase
+        phase1Aggregator.getRoundData
+          .whenCalledWith(91)
+          .returns([91, ethers.BigNumber.from(122200000000), TIMESTAMP_START + HOUR, TIMESTAMP_START + HOUR, 91])
+
+        // This is the first seen round of the new phase
+        // Phase 1 was (91 - 12 + 1) = 80 rounds long (versions 0 to 79), so this is version 80
+        const roundId = buildChainlinkRoundId(INITIAL_PHASE + 1, 345)
+        aggregatorProxy.latestRoundData
+          .whenCalledWith()
+          .returns([roundId, ethers.BigNumber.from(133300000000), TIMESTAMP_START, TIMESTAMP_START + HOUR, roundId])
+
+        aggregatorProxy.getRoundData
+          .whenCalledWith(roundId)
+          .returns([roundId, ethers.BigNumber.from(133300000000), TIMESTAMP_START, TIMESTAMP_START + HOUR, roundId])
+
+        // const returnValue = await oracle.callStatic.sync({ gasLimit: 3e6 })
+        await oracle.connect(user).sync()
+
+        /* expect(returnValue.price).to.equal(utils.parseEther('1333'))
+        expect(returnValue.timestamp).to.equal(TIMESTAMP_START + HOUR)
+        expect(returnValue.version).to.equal(80) */
+
+        const currentVersion = await oracle.currentVersion()
+        expect(currentVersion.price).to.equal(utils.parseEther('1333'))
+        expect(currentVersion.timestamp).to.equal(TIMESTAMP_START + HOUR)
+        expect(currentVersion.version).to.equal(80)
+
+        const atVersion = await oracle.atVersion(80)
+        expect(atVersion.price).to.equal(utils.parseEther('1333'))
+        expect(atVersion.timestamp).to.equal(TIMESTAMP_START + HOUR)
+        expect(atVersion.version).to.equal(80)
       })
     })
   })
 
-  describe.only('#atVersion', async () => {
+  describe('#atVersion', async () => {
     let TIMESTAMP_START: number
 
     beforeEach(async () => {
       TIMESTAMP_START = await currentBlockTimestamp()
 
-      aggregatorProxy.decimals.whenCalledWith().returns(8)
-      phase1Aggregator.latestRoundData.returns([400, 0, 0, 0, 0])
-      oracle = await new ChainlinkFeedOracle__factory(owner).deploy(aggregatorProxy.address)
+      phase1Aggregator.latestRoundData.returns([
+        91,
+        ethers.BigNumber.from(122200000000),
+        TIMESTAMP_START - HOUR,
+        TIMESTAMP_START - HOUR,
+        91,
+      ])
 
-      const roundId = buildChainlinkRoundId(1, 123)
-
+      const roundId = buildChainlinkRoundId(INITIAL_PHASE, INITIAL_ROUND + 200)
       aggregatorProxy.latestRoundData
         .whenCalledWith()
         .returns([roundId, ethers.BigNumber.from(111100000000), TIMESTAMP_START - HOUR, TIMESTAMP_START, roundId])
@@ -215,32 +290,58 @@ describe('ChainlinkFeedOracle', () => {
         .whenCalledWith(roundId)
         .returns([roundId, ethers.BigNumber.from(111100000000), TIMESTAMP_START - HOUR, TIMESTAMP_START, roundId])
 
-      const atVersion = await oracle.atVersion(12)
+      const atVersion = await oracle.atVersion(1)
       expect(atVersion.price).to.equal(utils.parseEther('1111'))
       expect(atVersion.timestamp).to.equal(TIMESTAMP_START)
-      expect(atVersion.version).to.equal(12)
+      expect(atVersion.version).to.equal(1)
     })
 
     it('reads versions in multiple phases', async () => {
       const currentRoundId = buildChainlinkRoundId(3, 350)
 
-      phase2Aggregator.latestRoundData.returns([299, 0, 0, 0, 0])
-
+      // Phase1 goes from round 12 -> 91 (versions 0 to 79)
+      phase1Aggregator.latestRoundData.returns([
+        91,
+        ethers.BigNumber.from(122200000000),
+        TIMESTAMP_START - HOUR,
+        TIMESTAMP_START - HOUR,
+        91,
+      ])
       aggregatorProxy.latestRoundData
         .whenCalledWith()
         .returns([
-          currentRoundId,
+          buildChainlinkRoundId(2, 356),
           ethers.BigNumber.from(111100000000),
           TIMESTAMP_START - HOUR,
+          TIMESTAMP_START - HOUR,
+          currentRoundId,
+        ])
+      // Syncs from Phase 1 to Phase 2
+      await oracle.connect(user).sync()
+
+      // Phase1 goes from round 356 -> 400 (versions 80 to 124)
+      phase2Aggregator.latestRoundData.returns([
+        400,
+        ethers.BigNumber.from(122200000000),
+        TIMESTAMP_START - HOUR,
+        TIMESTAMP_START - HOUR,
+        400,
+      ])
+      aggregatorProxy.latestRoundData
+        .whenCalledWith()
+        .returns([
+          buildChainlinkRoundId(3, 16),
+          ethers.BigNumber.from(111100000000),
+          TIMESTAMP_START,
           TIMESTAMP_START,
           currentRoundId,
         ])
-
-      // Syncs from Phase 1 to Phase 3
+      // Syncs from Phase 2 to Phase 3
       await oracle.connect(user).sync()
 
-      // Check Version from Phase 1: Versions 0 to 400
-      const roundIdPhase1 = buildChainlinkRoundId(1, 13)
+      // Check Version from Phase 1: Versions 0 to 79
+      // Check last round of phase1
+      const roundIdPhase1 = buildChainlinkRoundId(1, 91)
       aggregatorProxy.getRoundData
         .whenCalledWith(roundIdPhase1)
         .returns([
@@ -250,13 +351,13 @@ describe('ChainlinkFeedOracle', () => {
           TIMESTAMP_START - 5 * HOUR,
           roundIdPhase1,
         ])
-      const atVersionPhase1 = await oracle.atVersion(12)
+      const atVersionPhase1 = await oracle.atVersion(79)
       expect(atVersionPhase1.price).to.equal(utils.parseEther('1111'))
       expect(atVersionPhase1.timestamp).to.equal(TIMESTAMP_START - 5 * HOUR)
-      expect(atVersionPhase1.version).to.equal(12)
+      expect(atVersionPhase1.version).to.equal(79)
 
-      // Check Version from Phase 2: Versions 401 to 700
-      const roundIdPhase2 = buildChainlinkRoundId(2, 201)
+      // Check Version from Phase 2: Versions 80 to 124
+      const roundIdPhase2 = buildChainlinkRoundId(2, 356)
       aggregatorProxy.getRoundData
         .whenCalledWith(roundIdPhase2)
         .returns([
@@ -266,13 +367,14 @@ describe('ChainlinkFeedOracle', () => {
           TIMESTAMP_START - 2 * HOUR,
           roundIdPhase2,
         ])
-      const atVersion2 = await oracle.atVersion(601)
+      // Check first round of phase2
+      const atVersion2 = await oracle.atVersion(80)
       expect(atVersion2.price).to.equal(utils.parseEther('1234'))
       expect(atVersion2.timestamp).to.equal(TIMESTAMP_START - 2 * HOUR)
-      expect(atVersion2.version).to.equal(601)
+      expect(atVersion2.version).to.equal(80)
 
-      // Check Version from Phase 3: Versions 701 onwards
-      const roundIdPhase3 = buildChainlinkRoundId(3, 1)
+      // Check Version from Phase 3: Versions 125 onwards
+      const roundIdPhase3 = buildChainlinkRoundId(3, 16)
       aggregatorProxy.getRoundData
         .whenCalledWith(roundIdPhase3)
         .returns([
@@ -282,10 +384,11 @@ describe('ChainlinkFeedOracle', () => {
           TIMESTAMP_START - 1 * HOUR,
           roundIdPhase3,
         ])
-      const atVersion3 = await oracle.atVersion(701)
+      // Check first round of phase 3
+      const atVersion3 = await oracle.atVersion(125)
       expect(atVersion3.price).to.equal(utils.parseEther('2111'))
       expect(atVersion3.timestamp).to.equal(TIMESTAMP_START - 1 * HOUR)
-      expect(atVersion3.version).to.equal(701)
+      expect(atVersion3.version).to.equal(125)
     })
   })
 })

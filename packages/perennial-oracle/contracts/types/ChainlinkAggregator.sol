@@ -23,10 +23,6 @@ library ChainlinkAggregatorLib {
         return AggregatorProxyInterface(ChainlinkAggregator.unwrap(self)).decimals();
     }
 
-    function phase(ChainlinkAggregator self) internal view returns (uint16) {
-        return AggregatorProxyInterface(ChainlinkAggregator.unwrap(self)).phaseId();
-    }
-
     /**
      * @notice Returns the latest round data for a specific feed
      * @param self Chainlink Feed Registry to operate on
@@ -55,9 +51,10 @@ library ChainlinkAggregatorLib {
      * @notice Returns the first round ID for a specific phase ID
      * @param self Chainlink Feed Registry to operate on
      * @param phaseId The specific phase to fetch data for
-     * @return roundCount The number of rounds in the phase
+     * @dev Assumes the phase ends at the aggregators latestRound or earlier
+     * @return The number of rounds in the phase
      */
-    function getRoundCount(ChainlinkAggregator self, uint16 phaseId, uint256 maxTimestamp)
+    function getRoundCount(ChainlinkAggregator self, uint16 phaseId, uint256 startingRoundId, uint256 maxTimestamp)
     internal view returns (uint256) {
         AggregatorProxyInterface proxy = AggregatorProxyInterface(ChainlinkAggregator.unwrap(self));
         AggregatorV2V3Interface agg = AggregatorV2V3Interface(proxy.phaseAggregators(phaseId));
@@ -70,6 +67,18 @@ library ChainlinkAggregatorLib {
             aggRoundId--;
             (,,,updatedAt,) = agg.getRoundData(aggRoundId);
         }
-        return aggRoundId + 1;
+
+        // Convert the aggregator round to a proxy round
+        uint256 latestRoundId = _aggregatorRoundIdToProxyRoundId(phaseId, aggRoundId);
+        return uint256(latestRoundId - startingRoundId + 1);
+    }
+
+    /**
+     * @notice Convert an aggregator round ID into a proxy round ID for the given phase
+     * @dev Follows the logic specified in https://docs.chain.link/data-feeds/price-feeds/historical-data#roundid-in-proxy
+     * @return Proxy roundId
+     */
+    function _aggregatorRoundIdToProxyRoundId(uint16 phaseId, uint80 aggregatorRoundId) private pure returns (uint256) {
+        return (uint256(phaseId) << 64) + aggregatorRoundId;
     }
 }
