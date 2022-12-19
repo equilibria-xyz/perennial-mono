@@ -62,6 +62,8 @@ interface IProduct is IPayoffProvider, IParamProvider {
     error ProductInLiquidationError();
     error ProductMakerOverLimitError();
     error ProductOracleBootstrappingError();
+    error ProductNotOwnerError();
+    error ProductInvalidOracle();
     error ProductClosedError();
 
     function name() external view returns (string memory);
@@ -93,5 +95,4 @@ interface IProduct is IPayoffProvider, IParamProvider {
     function rate(Position memory position) external view returns (Fixed18);
     function closed() external view returns (bool);
     function updateClosed(bool newClosed) external;
-    function updateOracle(IOracleProvider newOracle) external;
 }

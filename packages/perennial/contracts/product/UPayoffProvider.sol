@@ -31,7 +31,8 @@ abstract contract UPayoffProvider is IPayoffProvider, UInitializable {
      */
     // solhint-disable-next-line func-name-mixedcase
     function __UPayoffProvider__initialize(IOracleProvider oracle_, PayoffDefinition calldata payoffDefinition_) internal onlyInitializer {
-        _updateOracle(address(oracle_));
+        if (!Address.isContract(address(oracle_))) revert PayoffProviderInvalidOracle();
+        _oracle.store(address(oracle_));
 
         if (!payoffDefinition_.valid()) revert PayoffProviderInvalidPayoffDefinitionError();
         _payoffDefinition.store(payoffDefinition_);
@@ -55,17 +56,7 @@ abstract contract UPayoffProvider is IPayoffProvider, UInitializable {
     }
 
     /**
-     * @notice Updates oracle to newOracle address
-     */
-    function _updateOracle(address newOracle) internal {
-        if (!Address.isContract(newOracle)) revert PayoffProviderInvalidOracle();
-        _oracle.store(newOracle);
-
-        emit OracleUpdated(newOracle);
-    }
-
-    /**
-     * @notice Hook to call sync() on the oracle provider and transform the resulting oracle version
+     * @notice Yook to call sync() on the oracle provider and transform the resulting oracle version
      */
     function _sync() internal returns (IOracleProvider.OracleVersion memory) {
         return _transform(oracle().sync());

@@ -7,7 +7,7 @@ import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 struct ChainlinkRound {
     uint256 timestamp;
     int256 answer;
-    uint256 roundId;
+    uint80 roundId;
 }
 using ChainlinkRoundLib for ChainlinkRound global;
 

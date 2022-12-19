@@ -6,8 +6,6 @@ import "@equilibria/perennial-oracle/contracts/interfaces/IOracleProvider.sol";
 import "./types/PayoffDefinition.sol";
 
 interface IPayoffProvider {
-    event OracleUpdated(address newOracle);
-
     error PayoffProviderInvalidOracle();
     error PayoffProviderInvalidPayoffDefinitionError();
 
