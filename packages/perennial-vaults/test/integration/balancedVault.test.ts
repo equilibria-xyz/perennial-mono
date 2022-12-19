@@ -119,7 +119,7 @@ describe('BalancedVault', () => {
     oracle.atVersion.whenCalledWith(currentVersion[0]).returns(currentVersion)
   })
 
-  it.only('names are correct', async () => {
+  it('names are correct', async () => {
     expect(await vault.name()).to.equal('Perennial Balanced Vault: Ether')
     expect(await vault.symbol()).to.equal('PBV-ETH')
   })
@@ -280,25 +280,6 @@ describe('BalancedVault', () => {
     await updateOracle()
     await vault.sync()
     expect(await collateralDifference()).to.equal(0)
-  })
-
-  describe('Liquidation', () => {
-    it('liquidates', async () => {
-      await vault.connect(user).deposit(utils.parseEther('100000'), user.address, { gasLimit: 3e6 })
-      await updateOracle()
-      await vault.sync()
-
-      console.log((await long['maintenance(address)'](vault.address)).toString())
-      console.log((await collateral['collateral(address,address)'](vault.address, long.address)).toString())
-      console.log(await long.isLiquidating(vault.address))
-      console.log(await collateral.liquidatable(vault.address, long.address))
-      console.log('--------------')
-
-      await updateOracle(utils.parseEther('50000'))
-
-      console.log(await collateral.liquidatable(vault.address, long.address))
-      console.log(await collateral.liquidatable(vault.address, short.address))
-    })
   })
 
   // TESTS:
