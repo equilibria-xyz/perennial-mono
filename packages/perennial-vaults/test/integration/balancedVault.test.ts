@@ -86,7 +86,6 @@ describe('BalancedVault', () => {
     fixedFloat = utils.parseEther('10000')
 
     vault = await new BalancedVault__factory(owner).deploy(
-      dsu.address,
       controller.address,
       long.address,
       short.address,
@@ -94,6 +93,7 @@ describe('BalancedVault', () => {
       maxLeverage,
       fixedFloat,
     )
+    await vault.initialize(dsu.address)
     asset = IERC20Metadata__factory.connect(await vault.asset(), owner)
 
     const dsuHolder = await impersonate.impersonateWithBalance(DSU_HOLDER, utils.parseEther('10'))

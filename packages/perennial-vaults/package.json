@@ -36,7 +36,8 @@
   "dependencies": {
     "@equilibria/perennial": "0.2.1",
     "@equilibria/root": "0.1.6",
-    "@openzeppelin/contracts": "4.8.0"
+    "@openzeppelin/contracts": "4.8.0",
+    "@openzeppelin/contracts-upgradeable": "4.8.0"
   },
   "peerDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.1.0",

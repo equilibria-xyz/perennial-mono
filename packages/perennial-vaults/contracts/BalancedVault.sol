@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.15; //TODO: fix after https://trello.com/c/EU1TJxCv/182-fix-pragma-version-in-payoffdefinition-type
 
-import "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import "@equilibria/perennial/contracts/interfaces/IController.sol";
 import "@equilibria/root/number/types/UFixed18.sol";
 import "@equilibria/root/token/types/Token18.sol";
@@ -11,7 +11,7 @@ import "@equilibria/root/token/types/Token18.sol";
 //TODO(nice to have): pausable
 //TODO(nice to have): incentivize sync when near liquidation
 //TODO(nice to have): create collateral rebalance buffer so it doesn't need to every time
-contract BalancedVault is ERC4626 {
+contract BalancedVault is ERC4626Upgradeable {
     UFixed18 constant private TWO = UFixed18.wrap(2e18);
 
     IController public immutable controller;
@@ -23,20 +23,13 @@ contract BalancedVault is ERC4626 {
     UFixed18 public immutable fixedFloat;
 
     constructor(
-        IERC20 dsu_,
         IController controller_,
         IProduct long_,
         IProduct short_,
         UFixed18 targetLeverage_,
         UFixed18 maxLeverage_,
         UFixed18 fixedFloat_
-    )
-        ERC4626(dsu_)
-        ERC20(
-            string(abi.encodePacked("Perennial Balanced Vault: ", long_.name())),
-            string(abi.encodePacked("PBV-", long_.symbol()))
-        )
-    {
+    ) {
         require(maxLeverage_.gt(targetLeverage_), "max leverage must be greater than leverage");
 
         controller = controller_;
@@ -46,6 +39,15 @@ contract BalancedVault is ERC4626 {
         targetLeverage = targetLeverage_;
         maxLeverage = maxLeverage_;
         fixedFloat = fixedFloat_;
+    }
+
+    function initialize(IERC20Upgradeable dsu_) external initializer {
+        __ERC20_init(
+            string(abi.encodePacked("Perennial Balanced Vault: ", long.name())),
+            string(abi.encodePacked("PBV-", long.symbol()))
+        );
+        __ERC4626_init(dsu_);
+
         dsu_.approve(address(collateral), type(uint256).max);
     }
 
