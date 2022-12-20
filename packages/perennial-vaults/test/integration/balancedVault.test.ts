@@ -238,7 +238,7 @@ describe('BalancedVault', () => {
     expect(await totalCollateralInVault()).to.equal(0)
   })
 
-  it.only('maxDeposit', async () => {
+  it('maxDeposit', async () => {
     expect(await vault.maxDeposit(user.address)).to.equal(maxCollateral)
     const depositSize = utils.parseEther('200000')
 
