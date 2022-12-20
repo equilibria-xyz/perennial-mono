@@ -158,10 +158,8 @@ contract BalancedVault is ERC4626Upgradeable {
             (long, short) :
             (short, long);
 
-        // If we're not adding or removing collateral, smoothly close the positions and return
-        if (!_adjustCollateral(greaterProduct, targetCollateral)) return false;
-        if (!_adjustCollateral(lesserProduct, currentCollateral.sub(targetCollateral))) return false;
-        return true;
+        return _adjustCollateral(greaterProduct, targetCollateral) &&
+            _adjustCollateral(lesserProduct, currentCollateral.sub(targetCollateral));
     }
 
     // Precondition: the difference in collateral between long and short is at most 1.
