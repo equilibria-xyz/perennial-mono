@@ -188,7 +188,7 @@ describe('Product', () => {
       const newOracle = await deployMockContract(owner, IOracleProvider__factory.abi)
       await expect(product.updateOracle(newOracle.address))
         .to.emit(product, 'OracleUpdated')
-        .withArgs(newOracle.address)
+        .withArgs(newOracle.address, 0)
 
       expect(product.settle).to.have.callCount(7)
 
