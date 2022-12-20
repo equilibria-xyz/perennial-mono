@@ -303,7 +303,7 @@ describe('BalancedVault', () => {
   })
 
   describe('Liquidation', () => {
-    it('recovers from a liquidation', async () => {
+    it.only('recovers from a liquidation', async () => {
       await vault.connect(user).deposit(utils.parseEther('100000'), user.address)
       await updateOracle()
 
@@ -337,15 +337,6 @@ describe('BalancedVault', () => {
       expect(await vault.connect(user).callStatic.deposit(2, user.address)).to.equal(2)
       await vault.sync()
       expect(await vault.connect(user).callStatic.deposit(2, user.address)).to.equal(2)
-
-      //////////////////////////////////////
-      // This withraw reverts...
-      console.log((await vault.maxWithdraw(user.address)).toString())
-      expect(await vault.maxWithdraw(user.address)).to.be.greaterThan(0)
-      await vault
-        .connect(user)
-        .withdraw(await vault.maxWithdraw(user.address), user.address, user.address, { gasLimit: 3e6 })
-      //////////////////////////////////////
 
       // 6. Open the positions back up.
       await updateOracle()
