@@ -53,18 +53,12 @@ contract BalancedVault is ERC4626Upgradeable {
 
     function sync() external {
         _before();
-        if (!healthy()) {
-            _adjustPosition(long, UFixed18Lib.ZERO);
-            _adjustPosition(short, UFixed18Lib.ZERO);
-            return;
-        }
-        _updateCollateral(UFixed18Lib.ZERO, false);
-        _updatePosition();
+        _update(UFixed18Lib.ZERO);
     }
 
     function totalAssets() public view override returns (uint256) {
-        (UFixed18 longCollateral, UFixed18 shortCollateral) = _collateral();
-        return UFixed18.unwrap(longCollateral.add(shortCollateral));
+        (UFixed18 longCollateral, UFixed18 shortCollateral, UFixed18 idleCollateral) = _collateral();
+        return UFixed18.unwrap(longCollateral.add(shortCollateral).add(idleCollateral));
     }
 
     // Precondition: Assumes the collateral is balanced and the positions have equal size.
@@ -106,30 +100,16 @@ contract BalancedVault is ERC4626Upgradeable {
 
     // Returns whether the vault's positions have not been liquidated or are eligible for liquidation.
     function healthy() public view returns (bool) {
-        return long.position(address(this)).maker.eq(short.position(address(this)).maker) &&
-            !collateral.liquidatable(address(this), long) &&
-            !collateral.liquidatable(address(this), short);
+        return long.position(address(this)).maker.eq(short.position(address(this)).maker);
     }
 
     function _deposit(address caller, address receiver, uint256 assets, uint256 shares) internal override {
-        // Deposit assets into this vault.
         super._deposit(caller, receiver, assets, shares);
-
-        // Deposit assets into collateral.
-        _updateCollateral(UFixed18.wrap(assets), true);
-
-        // Open positions to maintain leverage.
-        _updatePosition();
+        _update(UFixed18Lib.ZERO);
     }
 
     function _withdraw(address caller, address receiver, address owner, uint256 assets, uint256 shares) internal override {
-        // Withdraw assets from this vault.
-        _updateCollateral(UFixed18.wrap(assets), false);
-
-        // Close positions to maintain leverage.
-        _updatePosition();
-
-        // Make Withdrawal
+        _update(UFixed18.wrap(assets));
         super._withdraw(caller, receiver, owner, assets, shares);
     }
 
@@ -138,13 +118,25 @@ contract BalancedVault is ERC4626Upgradeable {
         short.settleAccount(address(this));
     }
 
+    function _update(UFixed18 withdrawalAmount) private {
+        // Rebalance collateral if possible
+        bool rebalanced = _updateCollateral(withdrawalAmount);
+
+        // Rebalance position if healthy
+        if (!healthy() || !rebalanced) _reset();
+        else _updatePosition(withdrawalAmount);
+    }
+
+    function _reset() private {
+        _adjustPosition(long, UFixed18Lib.ZERO);
+        _adjustPosition(short, UFixed18Lib.ZERO);
+    }
+
     // If `deposit` is true, deposit a total of `amount` collateral into the two products.
     // If `deposit` is false, withdraw a total of `amount` collateral from the two products.
-    function _updateCollateral(UFixed18 amount, bool isDeposit) private {
-        (UFixed18 longCollateral, UFixed18 shortCollateral) = _collateral();
-        UFixed18 currentCollateral = isDeposit ?
-            longCollateral.add(shortCollateral).add(amount) :
-            longCollateral.add(shortCollateral).sub(amount);
+    function _updateCollateral(UFixed18 withdrawalAmount) private returns (bool) {
+        (UFixed18 longCollateral, UFixed18 shortCollateral, ) = _collateral();
+        UFixed18 currentCollateral = UFixed18.wrap(totalAssets()).sub(withdrawalAmount);
         UFixed18 targetCollateral = currentCollateral.div(TWO);
 
         (IProduct greaterProduct, IProduct lesserProduct) = longCollateral.gt(shortCollateral) ?
@@ -152,31 +144,18 @@ contract BalancedVault is ERC4626Upgradeable {
             (short, long);
 
         // If we're not adding or removing collateral, smoothly close the positions and return
-        // in the case of not being able to rebalance. But if we're adding or removing collateral,
-        // allow this function to revert.
-        if (amount.isZero() && greaterProduct.maintenance(address(this)).gt(targetCollateral)) {
-            _adjustPosition(greaterProduct, UFixed18Lib.ZERO);
-            _adjustPosition(lesserProduct, UFixed18Lib.ZERO);
-            return;
-        }
-        _adjustCollateral(greaterProduct, targetCollateral);
-        _adjustCollateral(lesserProduct, currentCollateral.sub(targetCollateral));
+        if (!_adjustCollateral(greaterProduct, targetCollateral)) return false;
+        if (!_adjustCollateral(lesserProduct, currentCollateral.sub(targetCollateral))) return false;
+        return true;
     }
 
     // Precondition: the difference in collateral between long and short is at most 1.
-    function _updatePosition() private {
-        // 0. If recently liquidated, reset positions
-        if (!healthy()) {
-            _adjustPosition(long, UFixed18Lib.ZERO);
-            _adjustPosition(short, UFixed18Lib.ZERO);
-            return;
-        }
-
+    function _updatePosition(UFixed18 withdrawalAmount) private {
         // 1. Calculate the target position size for each product.
-        UFixed18 totalCollateral = UFixed18.wrap(totalAssets());
-        UFixed18 totalUtilized = totalCollateral.gt(fixedFloat) ? totalCollateral.sub(fixedFloat) : UFixed18Lib.ZERO;
-        UFixed18 price = long.atVersion(long.latestVersion()).price.abs();
-        UFixed18 targetPosition = totalUtilized.mul(targetLeverage).div(price).div(TWO);
+        UFixed18 currentCollateral = UFixed18.wrap(totalAssets()).sub(withdrawalAmount);
+        UFixed18 currentUtilized = currentCollateral.gt(fixedFloat) ? currentCollateral.sub(fixedFloat) : UFixed18Lib.ZERO;
+        UFixed18 currentPrice = long.atVersion(long.latestVersion()).price.abs();
+        UFixed18 targetPosition = currentUtilized.mul(targetLeverage).div(currentPrice).div(TWO);
 
         // 2. Adjust positions to target position size.
         _adjustPosition(long, targetPosition);
@@ -189,15 +168,22 @@ contract BalancedVault is ERC4626Upgradeable {
         if (currentPosition.lt(targetPosition)) product.openMake(targetPosition.sub(currentPosition));
     }
 
-    function _adjustCollateral(IProduct product, UFixed18 targetCollateral) private {
+    function _adjustCollateral(IProduct product, UFixed18 targetCollateral) private returns (bool) {
         UFixed18 currentCollateral = collateral.collateral(address(this), product);
         if (currentCollateral.gt(targetCollateral))
-            collateral.withdrawTo(address(this), product, currentCollateral.sub(targetCollateral));
+            try collateral.withdrawTo(address(this), product, currentCollateral.sub(targetCollateral)) { }
+            catch { return false; }
         if (currentCollateral.lt(targetCollateral))
-            collateral.depositTo(address(this), product, targetCollateral.sub(currentCollateral));
+            try collateral.depositTo(address(this), product, targetCollateral.sub(currentCollateral)) { }
+            catch { return false; }
+        return true;
     }
 
-    function _collateral() private view returns (UFixed18, UFixed18) {
-        return (collateral.collateral(address(this), long), collateral.collateral(address(this), short));
+    function _collateral() private view returns (UFixed18, UFixed18, UFixed18) {
+        return (
+            collateral.collateral(address(this), long),
+            collateral.collateral(address(this), short),
+            Token18.wrap(asset()).balanceOf()
+        );
     }
 }

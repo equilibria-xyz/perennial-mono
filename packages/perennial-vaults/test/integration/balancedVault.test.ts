@@ -183,9 +183,8 @@ describe('BalancedVault', () => {
 
     const largeDeposit = utils.parseEther('20000')
     await vault.connect(user).deposit(largeDeposit, user.address)
-    await expect(vault.connect(user).withdraw(largeDeposit, user.address, user.address)).to.be.revertedWithCustomError(
-      collateral,
-      'CollateralInsufficientCollateralError',
+    await expect(vault.connect(user).withdraw(largeDeposit, user.address, user.address)).to.be.revertedWith(
+      'ERC20: transfer amount exceeds balance',
     )
   })
 
@@ -283,7 +282,7 @@ describe('BalancedVault', () => {
   })
 
   describe('Liquidation', () => {
-    it.only('long liquidated', async () => {
+    it('long liquidated', async () => {
       await vault.connect(user).deposit(utils.parseEther('100000'), user.address)
 
       await updateOracle()
