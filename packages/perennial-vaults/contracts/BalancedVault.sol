@@ -1,17 +1,16 @@
 //SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.15; //TODO: fix after https://trello.com/c/EU1TJxCv/182-fix-pragma-version-in-payoffdefinition-type
+pragma solidity 0.8.15;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
-import "@equilibria/perennial/contracts/interfaces/IController.sol";
-import "@equilibria/root/number/types/UFixed18.sol";
 import "@equilibria/root/token/types/Token18.sol";
+import "./interfaces/IBalancedVault.sol";
 
 //TODO(required): natspec
-//TODO(required): events, errors, interface
+//TODO(required): events, errors
 //TODO(nice to have): pausable
 //TODO(nice to have): incentivize sync when near liquidation
 //TODO(nice to have): create collateral rebalance buffer so it doesn't need to every time
-contract BalancedVault is ERC4626Upgradeable {
+contract BalancedVault is IBalancedVault, ERC4626Upgradeable {
     UFixed18 constant private TWO = UFixed18.wrap(2e18);
 
     IController public immutable controller;
@@ -60,13 +59,13 @@ contract BalancedVault is ERC4626Upgradeable {
         _update(UFixed18Lib.ZERO);
     }
 
-    function totalAssets() public view override returns (uint256) {
+    function totalAssets() public override view returns (uint256) {
         (UFixed18 longCollateral, UFixed18 shortCollateral, UFixed18 idleCollateral) = _collateral();
         return UFixed18.unwrap(longCollateral.add(shortCollateral).add(idleCollateral));
     }
 
     // Precondition: Assumes the collateral is balanced and the positions have equal size.
-    function maxWithdraw(address owner) public view virtual override returns (uint256) {
+    function maxWithdraw(address owner) public view override returns (uint256) {
         // If we're in the middle of closing all positions due to liquidations, return 0.
         if (!healthy()) return 0;
 
@@ -82,7 +81,7 @@ contract BalancedVault is ERC4626Upgradeable {
         return Math.min(super.maxWithdraw(owner), UFixed18.unwrap(currentCollateral.sub(minimumCollateral)));
     }
 
-    function maxDeposit(address owner) public view virtual override returns (uint256) {
+    function maxDeposit(address owner) public view override returns (uint256) {
         UFixed18 currentCollateral = UFixed18.wrap(totalAssets());
         UFixed18 availableDeposit = currentCollateral.gt(maxCollateral) ?
             UFixed18Lib.ZERO :
@@ -91,22 +90,22 @@ contract BalancedVault is ERC4626Upgradeable {
         return Math.min(super.maxDeposit(owner), UFixed18.unwrap(availableDeposit));
     }
 
-    function deposit(uint256 assets, address receiver) public virtual override returns (uint256) {
+    function deposit(uint256 assets, address receiver) public override returns (uint256) {
         _before();
         return super.deposit(assets, receiver);
     }
 
-    function mint(uint256 shares, address receiver) public virtual override returns (uint256) {
+    function mint(uint256 shares, address receiver) public override returns (uint256) {
         _before();
         return super.mint(shares, receiver);
     }
 
-    function withdraw(uint256 assets, address receiver, address owner) public virtual override returns (uint256) {
+    function withdraw(uint256 assets, address receiver, address owner) public override returns (uint256) {
         _before();
         return super.withdraw(assets, receiver, owner);
     }
 
-    function redeem(uint256 shares, address receiver, address owner) public virtual override returns (uint256) {
+    function redeem(uint256 shares, address receiver, address owner) public override returns (uint256) {
         _before();
         return super.redeem(shares, receiver, owner);
     }
