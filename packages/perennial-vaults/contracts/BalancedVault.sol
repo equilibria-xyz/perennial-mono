@@ -147,8 +147,6 @@ contract BalancedVault is ERC4626Upgradeable {
         _adjustPosition(short, UFixed18Lib.ZERO);
     }
 
-    // If `deposit` is true, deposit a total of `amount` collateral into the two products.
-    // If `deposit` is false, withdraw a total of `amount` collateral from the two products.
     function _updateCollateral(UFixed18 withdrawalAmount) private returns (bool) {
         (UFixed18 longCollateral, UFixed18 shortCollateral, ) = _collateral();
         UFixed18 currentCollateral = UFixed18.wrap(totalAssets()).sub(withdrawalAmount);
