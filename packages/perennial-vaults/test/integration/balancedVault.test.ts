@@ -170,6 +170,46 @@ describe('BalancedVault', () => {
     expect(await totalCollateralInVault()).to.equal(0)
   })
 
+  it('multiple users', async () => {
+    const smallDeposit = utils.parseEther('1000')
+    await vault.connect(user).deposit(smallDeposit, user.address)
+    await updateOracle()
+    await vault.sync()
+
+    const largeDeposit = utils.parseEther('10000')
+    await vault.connect(user2).deposit(largeDeposit, user2.address)
+    await updateOracle()
+    await vault.sync()
+
+    // Now we should have opened positions.
+    // The positions should be equal to (smallDeposit + largeDeposit - fixedFloat) * leverage / 2 / originalOraclePrice.
+    expect(await longPosition()).to.be.equal(
+      smallDeposit.add(largeDeposit).sub(fixedFloat).mul(leverage).div(2).div(originalOraclePrice),
+    )
+    expect(await shortPosition()).to.equal(await longPosition())
+
+    while ((await vault.connect(user2).balanceOf(user2.address)).gt(0)) {
+      const maxWithdraw = await vault.maxWithdraw(user2.address)
+      await vault.connect(user2).withdraw(maxWithdraw, user2.address, user2.address)
+      await updateOracle()
+      await vault.sync()
+    }
+
+    while ((await vault.connect(user).balanceOf(user.address)).gt(0)) {
+      const maxWithdraw = await vault.maxWithdraw(user.address)
+      await vault.connect(user).withdraw(maxWithdraw, user.address, user.address)
+      await updateOracle()
+      await vault.sync()
+    }
+
+    // We should have closed all positions.
+    expect(await longPosition()).to.equal(0)
+    expect(await shortPosition()).to.equal(0)
+
+    // We should have withdrawn all of our collateral.
+    expect(await totalCollateralInVault()).to.equal(0)
+  })
+
   it('deposit then immediately withdraw', async () => {
     const originalDsuBalance = await asset.balanceOf(user.address)
 
