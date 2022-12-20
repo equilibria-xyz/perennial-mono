@@ -21,6 +21,8 @@ contract BalancedVault is ERC4626Upgradeable {
     UFixed18 public immutable targetLeverage;
     UFixed18 public immutable maxLeverage;
     UFixed18 public immutable fixedFloat;
+    UFixed18 public immutable maxCollateral;
+
 
     constructor(
         IController controller_,
@@ -28,7 +30,8 @@ contract BalancedVault is ERC4626Upgradeable {
         IProduct short_,
         UFixed18 targetLeverage_,
         UFixed18 maxLeverage_,
-        UFixed18 fixedFloat_
+        UFixed18 fixedFloat_,
+        UFixed18 maxCollateral_
     ) {
         require(maxLeverage_.gt(targetLeverage_), "max leverage must be greater than leverage");
 
@@ -39,6 +42,7 @@ contract BalancedVault is ERC4626Upgradeable {
         targetLeverage = targetLeverage_;
         maxLeverage = maxLeverage_;
         fixedFloat = fixedFloat_;
+        maxCollateral = maxCollateral_;
     }
 
     function initialize(IERC20Upgradeable dsu_) external initializer {
@@ -78,6 +82,15 @@ contract BalancedVault is ERC4626Upgradeable {
         return Math.min(super.maxWithdraw(owner), UFixed18.unwrap(currentCollateral.sub(minimumCollateral)));
     }
 
+    function maxDeposit(address owner) public view virtual override returns (uint256) {
+        UFixed18 currentCollateral = UFixed18.wrap(totalAssets());
+        UFixed18 availableDeposit = currentCollateral.gt(maxCollateral) ?
+            UFixed18Lib.ZERO :
+            maxCollateral.sub(currentCollateral);
+
+        return Math.min(super.maxDeposit(owner), UFixed18.unwrap(availableDeposit));
+    }
+
     function deposit(uint256 assets, address receiver) public virtual override returns (uint256) {
         _before();
         return super.deposit(assets, receiver);
@@ -100,7 +113,9 @@ contract BalancedVault is ERC4626Upgradeable {
 
     // Returns whether the vault's positions have not been liquidated or are eligible for liquidation.
     function healthy() public view returns (bool) {
-        return long.position(address(this)).maker.eq(short.position(address(this)).maker);
+        (bool isLongZero, bool isShortZero) =
+            (long.position(address(this)).maker.isZero(), short.position(address(this)).maker.isZero());
+        return ((isLongZero && isShortZero) || (!isLongZero && !isShortZero));
     }
 
     function _deposit(address caller, address receiver, uint256 assets, uint256 shares) internal override {
@@ -164,8 +179,12 @@ contract BalancedVault is ERC4626Upgradeable {
 
     function _adjustPosition(IProduct product, UFixed18 targetPosition) private {
         UFixed18 currentPosition = product.position(address(this)).next(product.pre(address(this))).maker;
+        UFixed18 currentMaker = product.positionAtVersion(product.latestVersion()).next(product.pre()).maker;
+        UFixed18 makerLimit = product.makerLimit();
+
         if (currentPosition.gt(targetPosition)) product.closeMake(currentPosition.sub(targetPosition));
-        if (currentPosition.lt(targetPosition)) product.openMake(targetPosition.sub(currentPosition));
+        if (currentPosition.lt(targetPosition))
+            product.openMake(targetPosition.sub(currentPosition).min(makerLimit.sub(currentMaker)));
     }
 
     function _adjustCollateral(IProduct product, UFixed18 targetCollateral) private returns (bool) {

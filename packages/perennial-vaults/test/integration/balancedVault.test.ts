@@ -38,6 +38,7 @@ describe('BalancedVault', () => {
   let leverage: BigNumber
   let maxLeverage: BigNumber
   let fixedFloat: BigNumber
+  let maxCollateral: BigNumber
   let originalOraclePrice: BigNumber
 
   async function updateOracle(newPrice?: BigNumber) {
@@ -84,6 +85,7 @@ describe('BalancedVault', () => {
     leverage = utils.parseEther('1.2')
     maxLeverage = utils.parseEther('1.32')
     fixedFloat = utils.parseEther('10000')
+    maxCollateral = utils.parseEther('1000000')
 
     vault = await new BalancedVault__factory(owner).deploy(
       controller.address,
@@ -92,6 +94,7 @@ describe('BalancedVault', () => {
       leverage,
       maxLeverage,
       fixedFloat,
+      maxCollateral,
     )
     await vault.initialize(dsu.address)
     asset = IERC20Metadata__factory.connect(await vault.asset(), owner)
