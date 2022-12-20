@@ -6,7 +6,7 @@ import "@equilibria/root/token/types/Token18.sol";
 import "./interfaces/IBalancedVault.sol";
 
 //TODO(required): natspec
-//TODO(required): events, errors
+//TODO(required): errors
 //TODO(nice to have): pausable
 //TODO(nice to have): incentivize sync when near liquidation
 //TODO(nice to have): create collateral rebalance buffer so it doesn't need to every time
@@ -21,7 +21,6 @@ contract BalancedVault is IBalancedVault, ERC4626Upgradeable {
     UFixed18 public immutable maxLeverage;
     UFixed18 public immutable fixedFloat;
     UFixed18 public immutable maxCollateral;
-
 
     constructor(
         IController controller_,
@@ -57,6 +56,8 @@ contract BalancedVault is IBalancedVault, ERC4626Upgradeable {
     function sync() external {
         _before();
         _update(UFixed18Lib.ZERO);
+
+        emit Sync();
     }
 
     function totalAssets() public override view returns (uint256) {
@@ -144,6 +145,8 @@ contract BalancedVault is IBalancedVault, ERC4626Upgradeable {
     function _reset() private {
         _adjustPosition(long, UFixed18Lib.ZERO);
         _adjustPosition(short, UFixed18Lib.ZERO);
+
+        emit Reset();
     }
 
     function _updateCollateral(UFixed18 withdrawalAmount) private returns (bool) {
@@ -170,6 +173,8 @@ contract BalancedVault is IBalancedVault, ERC4626Upgradeable {
         // 2. Adjust positions to target position size.
         _adjustPosition(long, targetPosition);
         _adjustPosition(short, targetPosition);
+
+        emit PositionUpdated(targetPosition);
     }
 
     function _adjustPosition(IProduct product, UFixed18 targetPosition) private {
@@ -190,6 +195,8 @@ contract BalancedVault is IBalancedVault, ERC4626Upgradeable {
         if (currentCollateral.lt(targetCollateral))
             try collateral.depositTo(address(this), product, targetCollateral.sub(currentCollateral)) { }
             catch { return false; }
+
+        emit CollateralUpdated(product, targetCollateral);
         return true;
     }
 

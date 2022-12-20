@@ -6,6 +6,11 @@ import "@equilibria/perennial/contracts/interfaces/IController.sol";
 import "@equilibria/root/number/types/UFixed18.sol";
 
 interface IBalancedVault {
+    event Sync();
+    event Reset();
+    event PositionUpdated(UFixed18 targetPosition);
+    event CollateralUpdated(IProduct product, UFixed18 targetCollateral);
+
     function initialize(IERC20Upgradeable dsu_) external;
     function sync() external;
     function healthy() external view returns (bool);
