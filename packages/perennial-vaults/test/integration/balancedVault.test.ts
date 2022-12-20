@@ -85,7 +85,7 @@ describe('BalancedVault', () => {
     leverage = utils.parseEther('1.2')
     maxLeverage = utils.parseEther('1.32')
     fixedFloat = utils.parseEther('10000')
-    maxCollateral = utils.parseEther('1000000')
+    maxCollateral = utils.parseEther('500000')
 
     vault = await new BalancedVault__factory(owner).deploy(
       controller.address,
@@ -238,6 +238,24 @@ describe('BalancedVault', () => {
     expect(await totalCollateralInVault()).to.equal(0)
   })
 
+  it.only('maxDeposit', async () => {
+    expect(await vault.maxDeposit(user.address)).to.equal(maxCollateral)
+    const depositSize = utils.parseEther('200000')
+
+    await vault.connect(user).deposit(depositSize, user.address)
+    expect(await vault.maxDeposit(user.address)).to.equal(maxCollateral.sub(depositSize))
+
+    await vault.connect(user2).deposit(utils.parseEther('200000'), user2.address)
+    expect(await vault.maxDeposit(user.address)).to.equal(maxCollateral.sub(depositSize).sub(depositSize))
+
+    await vault.connect(liquidator).deposit(utils.parseEther('100000'), liquidator.address)
+    expect(await vault.maxDeposit(user.address)).to.equal(0)
+
+    await expect(vault.connect(liquidator).deposit(1, liquidator.address)).to.revertedWith(
+      'ERC4626: deposit more than max',
+    )
+  })
+
   it('rebalances collateral', async () => {
     await vault.connect(user).deposit(utils.parseEther('100000'), user.address)
     await updateOracle()
@@ -340,8 +358,4 @@ describe('BalancedVault', () => {
       expect(await asset.balanceOf(vault.address)).to.equal(0)
     })
   })
-
-  // TESTS:
-  //
-  // - Invalid parameters should be rejected by all functions.
 })
