@@ -34,6 +34,7 @@
   "author": "",
   "license": "APACHE-2.0",
   "dependencies": {
+    "@chainlink/contracts": "0.5.1",
     "@equilibria/root": "0.1.6",
     "@openzeppelin/contracts": "4.6.0",
     "@ethersproject/bignumber": "^5.5.1"
