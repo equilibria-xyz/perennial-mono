@@ -115,7 +115,7 @@ contract BalancedVault is ERC4626Upgradeable {
     function healthy() public view returns (bool) {
         (bool isLongZero, bool isShortZero) =
             (long.position(address(this)).maker.isZero(), short.position(address(this)).maker.isZero());
-        return ((isLongZero && isShortZero) || (!isLongZero && !isShortZero));
+        return isLongZero == isShortZero;
     }
 
     function _deposit(address caller, address receiver, uint256 assets, uint256 shares) internal override {
