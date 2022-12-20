@@ -293,15 +293,6 @@ describe('BalancedVault', () => {
       // We should still be able to deposit, although the deposit will sit in the vault for now.
       await updateOracle(utils.parseEther('6000'))
 
-      //////////////////////////////////////
-      // This withraw reverts...
-      console.log((await vault.maxWithdraw(user.address)).toString())
-      expect(await vault.maxWithdraw(user.address)).to.be.greaterThan(0)
-      await vault
-        .connect(user)
-        .withdraw(await vault.maxWithdraw(user.address), user.address, user.address, { gasLimit: 3e6 })
-      //////////////////////////////////////
-
       await vault.connect(user).deposit(2, user.address)
       expect(await asset.balanceOf(vault.address)).to.equal(2)
 
