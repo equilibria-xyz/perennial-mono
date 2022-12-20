@@ -151,6 +151,14 @@ contract BalancedVault is ERC4626Upgradeable {
             (long, short) :
             (short, long);
 
+        // If we're not adding or removing collateral, smoothly close the positions and return
+        // in the case of not being able to rebalance. But if we're adding or removing collateral,
+        // allow this function to revert.
+        if (amount.isZero() && greaterProduct.maintenance(address(this)).gt(targetCollateral)) {
+            _adjustPosition(greaterProduct, UFixed18Lib.ZERO);
+            _adjustPosition(lesserProduct, UFixed18Lib.ZERO);
+            return;
+        }
         _adjustCollateral(greaterProduct, targetCollateral);
         _adjustCollateral(lesserProduct, currentCollateral.sub(targetCollateral));
     }
