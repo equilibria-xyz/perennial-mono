@@ -125,6 +125,7 @@ jobs:
         if: ${{ steps.oracleChanges.outputs.any_changed == 'true' }}
       - name: Compile
         run: yarn workspace @equilibria/perennial-oracle run compile
+        if: ${{ steps.oracleChanges.outputs.any_changed == 'true' }}
       - name: Run tests
         if: ${{ steps.oracleChanges.outputs.any_changed == 'true' }}
         env:
