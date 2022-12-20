@@ -285,52 +285,49 @@ describe('BalancedVault', () => {
   })
 
   describe('Liquidation', () => {
-    it('long liquidated', async () => {
+    it('recovers from a liquidation', async () => {
       await vault.connect(user).deposit(utils.parseEther('100000'), user.address)
-
       await updateOracle()
-      await vault.sync()
 
-      // This will make our long position liquidatable.
+      // 1. An oracle update makes the long position liquidatable.
+      // We should still be able to deposit, although the deposit will sit in the vault for now.
       await updateOracle(utils.parseEther('6000'))
-
-      // Even if we haven't synced yet, we should not be able to withdraw or deposit.
-      expect(await vault.maxWithdraw(user.address)).to.be.equal(0)
-      await expect(vault.connect(user).deposit(2, user.address)).to.revertedWithCustomError(
-        collateral,
-        'CollateralInsufficientCollateralError',
-      )
-
-      // The above deposit should have synced the vault, but sync again just for good measure.
-      await vault.sync()
-
-      // Again, we should not be able to withdraw but be able to deposit.
-      expect(await vault.maxWithdraw(user.address)).to.be.equal(0)
-      await expect(vault.connect(user).deposit(2, user.address)).to.revertedWithCustomError(
-        collateral,
-        'CollateralInsufficientCollateralError',
-      )
-
-      await collateral.connect(liquidator).liquidate(vault.address, long.address)
-
-      // Now liquidation has been called, but the liquidation hasn't settled yet.
-      expect(await vault.maxWithdraw(user.address)).to.be.equal(0)
-      await expect(vault.connect(user).deposit(2, user.address)).to.revertedWithCustomError(
-        collateral,
-        'CollateralInsufficientCollateralError',
-      )
-
-      await updateOracle()
-
-      // The liquidation has settled now. Now we can deposit.
-      expect(await vault.maxWithdraw(user.address)).to.be.equal(0)
       await vault.connect(user).deposit(2, user.address)
+      expect(await asset.balanceOf(vault.address)).to.equal(2)
 
+      // 2. Settle accounts.
+      // We should still be able to deposit.
+      await long.connect(user).settleAccount(vault.address)
+      await short.connect(user).settleAccount(vault.address)
+      expect(await vault.connect(user).callStatic.deposit(2, user.address)).to.equal(2)
+
+      // 3. Attempt to rebalance collateral. It won't succeed because rebalancing would also put the short
+      // position into a liquidatable state, but we still shouldn't revert.
+      // We should still be able to deposit.
+      await vault.sync()
+      expect(await vault.connect(user).callStatic.deposit(2, user.address)).to.equal(2)
+
+      // 4. Liquidate the long position.
+      // We should still be able to deposit.
+      await collateral.connect(liquidator).liquidate(vault.address, long.address)
+      expect(await vault.connect(user).callStatic.deposit(2, user.address)).to.equal(2)
+
+      // 5. Settle the liquidation.
+      // We should still be able to deposit.
+      await updateOracle()
+      expect(await vault.connect(user).callStatic.deposit(2, user.address)).to.equal(2)
+      await vault.sync()
+      expect(await vault.connect(user).callStatic.deposit(2, user.address)).to.equal(2)
+
+      // 6. Open the positions back up.
       await updateOracle()
       await vault.sync()
 
-      // Now our positions have opened back up, so we can withdraw.
-      expect(await vault.maxWithdraw(user.address)).to.be.greaterThan(0)
+      expect(await longPosition()).to.equal(await shortPosition())
+      expect(await longPosition()).to.be.greaterThan(0)
+      expect(await longCollateralInVault()).to.equal(await shortCollateralInVault())
+      // The deposit that sat in the vault should now be in the collateral.
+      expect(await asset.balanceOf(vault.address)).to.equal(0)
     })
   })
 
