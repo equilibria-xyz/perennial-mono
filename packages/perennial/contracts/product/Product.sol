@@ -503,7 +503,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @param newOracle new oracle address
      */
     function updateOracle(IOracleProvider newOracle) external onlyProductOwner {
-        _updateOracle(address(newOracle));
+        _updateOracle(address(newOracle), latestVersion());
     }
 
     /// @dev Limit total maker for guarded rollouts
