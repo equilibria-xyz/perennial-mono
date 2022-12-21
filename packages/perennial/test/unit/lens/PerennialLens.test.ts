@@ -31,6 +31,10 @@ describe('PerennialLens', () => {
 
   const lensFixture = async () => {
     ;[user, protocolTreasury, productTreasury] = await ethers.getSigners()
+  }
+
+  beforeEach(async () => {
+    await loadFixture(lensFixture)
 
     collateral = await smock.fake<ICollateral>('ICollateral')
     product = await smock.fake<IProduct>('IProduct')
@@ -63,10 +67,6 @@ describe('PerennialLens', () => {
     })
 
     lens = await new PerennialLens__factory(user).deploy(controller.address)
-  }
-
-  beforeEach(async () => {
-    await loadFixture(lensFixture)
   })
 
   describe('#constructor', () => {
