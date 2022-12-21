@@ -10,11 +10,11 @@ import "./Fee.sol";
 
 /// @dev Version type
 struct Version {
-    /// @dev Accumulator value at each settled oracle version
-    Accumulator value;
+    int64 _makerValue; //TODO: standardize Fixed6 for 4-value-per-slot packing (USD amounts)
+    int64 _takerValue;
 
-    /// @dev Accumulator reward at each settled oracle version
-    Accumulator reward;
+    int64 _makerReward;
+    int64 _takerReward;
 }
 using VersionLib for Version global;
 
@@ -30,6 +30,28 @@ using VersionLib for Version global;
  *      only versions when a settlement occurred are needed for this historical computation.
  */
 library VersionLib {
+
+    function value(Version memory self) internal pure returns (Accumulator memory) {
+        return Accumulator(
+            PackedFixed18.wrap(int128(self._makerValue * 1e12)),
+            PackedFixed18.wrap(int128(self._takerValue * 1e12))
+        );
+    }
+
+    function reward(Version memory self) internal pure returns (Accumulator memory) {
+        return Accumulator(
+            PackedFixed18.wrap(int128(self._makerReward * 1e12)),
+            PackedFixed18.wrap(int128(self._takerReward * 1e12))
+        );
+    }
+
+    function _update(Version memory self, Accumulator memory newValue, Accumulator memory newReward) private pure {
+        self._makerValue = int64(PackedFixed18.unwrap(newValue._maker) / 1e12);
+        self._takerValue = int64(PackedFixed18.unwrap(newValue._taker) / 1e12);
+        self._makerReward = int64(PackedFixed18.unwrap(newReward._maker) / 1e12);
+        self._takerReward = int64(PackedFixed18.unwrap(newReward._taker) / 1e12);
+    }
+
     /**
      * @notice Accumulates the global state for the period from `period.fromVersion` to `period.toVersion`
      * @param versionAccumulator The struct to operate on
@@ -46,20 +68,23 @@ library VersionLib {
     ) internal pure {
         // load
         UFixed18 feeAccumulator;
+        (Accumulator memory valueAccumulator, Accumulator memory rewardAccumulator) =
+            (versionAccumulator.value(), versionAccumulator.reward());
 
         // accumulate funding
-        feeAccumulator = _accumulateFunding(versionAccumulator, feeAccumulator, position, period, protocolParameter, marketParameter);
+        feeAccumulator = _accumulateFunding(valueAccumulator, feeAccumulator, position, period, protocolParameter, marketParameter);
 
         // accumulate position
-        _accumulatePosition(versionAccumulator, position, period, marketParameter);
+        _accumulatePosition(valueAccumulator, position, period, marketParameter);
 
         // accumulate reward
-        _accumulateReward(versionAccumulator, position, period, marketParameter); //TODO: auto-shutoff if not enough reward ERC20s in contract?
+        _accumulateReward(rewardAccumulator, position, period, marketParameter); //TODO: auto-shutoff if not enough reward ERC20s in contract?
 
         // accumulate position fee
-        feeAccumulator = _accumulatePositionFee(versionAccumulator, feeAccumulator, position, pre, marketParameter);
+        feeAccumulator = _accumulatePositionFee(valueAccumulator, feeAccumulator, position, pre, marketParameter);
 
         // update
+        _update(versionAccumulator, valueAccumulator, rewardAccumulator);
         fee.update(feeAccumulator, protocolParameter.protocolFee); //TODO: pull out?
     }
 
@@ -73,7 +98,7 @@ library VersionLib {
      * @return newFeeAccumulator The position fee that is retained by the protocol and product
      */
     function _accumulatePositionFee(
-        Version memory versionAccumulator,
+        Accumulator memory valueAccumulator,
         UFixed18 feeAccumulator,
         Position memory position,
         PrePosition memory pre,
@@ -90,14 +115,14 @@ library VersionLib {
 
         // If there are makers to distribute the taker's position fee to, distribute. Otherwise give it to the protocol
         if (!position.maker().isZero()) {
-            versionAccumulator.value.incrementMaker(Fixed18Lib.from(takerPositionFee), position.maker());
+            valueAccumulator.incrementMaker(Fixed18Lib.from(takerPositionFee), position.maker());
         } else {
             newFeeAccumulator = newFeeAccumulator.add(takerPositionFee);
         }
 
         // If there are takers to distribute the maker's position fee to, distribute. Otherwise give it to the protocol
         if (!position.taker().isZero()) {
-            versionAccumulator.value.incrementTaker(Fixed18Lib.from(makerPositionFee), position.taker());
+            valueAccumulator.incrementTaker(Fixed18Lib.from(makerPositionFee), position.taker());
         } else {
             newFeeAccumulator = newFeeAccumulator.add(makerPositionFee);
         }
@@ -114,7 +139,7 @@ library VersionLib {
      * @return newFeeAccumulator The total fee accrued from funding accumulation
      */
     function _accumulateFunding(
-        Version memory versionAccumulator,
+        Accumulator memory valueAccumulator,
         UFixed18 feeAccumulator,
         Position memory position,
         Period memory period,
@@ -141,9 +166,9 @@ library VersionLib {
         );
 
         bool makerPaysFunding = fundingAccumulated.sign() < 0;
-        versionAccumulator.value.incrementMaker(
+        valueAccumulator.incrementMaker(
             makerPaysFunding ? fundingAccumulated : fundingAccumulatedWithoutFee, position.maker());
-        versionAccumulator.value.decrementTaker(
+        valueAccumulator.decrementTaker(
             makerPaysFunding ? fundingAccumulatedWithoutFee : fundingAccumulated, position.taker());
 
         newFeeAccumulator = feeAccumulator.add(newFeeAccumulator);
@@ -154,7 +179,7 @@ library VersionLib {
      * @param period The oracle version period to settle for
      */
     function _accumulatePosition(
-        Version memory versionAccumulator,
+        Accumulator memory valueAccumulator,
         Position memory position,
         Period memory period,
         MarketParameter memory marketParameter
@@ -167,8 +192,8 @@ library VersionLib {
         Fixed18 socializedTakerDelta = totalTakerDelta.mul(Fixed18Lib.from(position.socializationFactor()));
 
         //TODO: can combine stuff like this into one accumulate
-        versionAccumulator.value.decrementMaker(socializedTakerDelta, position.maker());
-        versionAccumulator.value.incrementTaker(socializedTakerDelta, position.taker());
+        valueAccumulator.decrementMaker(socializedTakerDelta, position.maker());
+        valueAccumulator.incrementTaker(socializedTakerDelta, position.taker());
     }
 
     /**
@@ -177,16 +202,16 @@ library VersionLib {
      * @param period The oracle version period to settle for
      */
     function _accumulateReward(
-        Version memory versionAccumulator,
+        Accumulator memory rewardAccumulator,
         Position memory position,
         Period memory period,
         MarketParameter memory marketParameter
     ) private pure {
         UFixed18 elapsed = period.timestampDelta();
 
-        if (!position.maker().isZero()) versionAccumulator.reward
+        if (!position.maker().isZero()) rewardAccumulator
             .incrementMaker(Fixed18Lib.from(elapsed).mul(marketParameter.rewardRate.taker()), position.maker());
-        if (!position.taker().isZero()) versionAccumulator.reward
+        if (!position.taker().isZero()) rewardAccumulator
             .incrementTaker(Fixed18Lib.from(elapsed).mul(marketParameter.rewardRate.maker()), position.taker());
     }
 }

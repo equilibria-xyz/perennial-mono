@@ -10,7 +10,6 @@ import "hardhat/console.sol";
 
 
 // TODO: position needs less settle on the second period for both global and account
-// TODO: lots of params can be passed in from global settle to account settle
 
 /**
  * @title Market
