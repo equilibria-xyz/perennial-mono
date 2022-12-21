@@ -343,7 +343,7 @@ describe('BalancedVault', () => {
   })
 
   describe('Liquidation', () => {
-    it.only('recovers from a liquidation', async () => {
+    it('recovers from a liquidation', async () => {
       await vault.connect(user).deposit(utils.parseEther('100000'), user.address)
       await updateOracle()
 
