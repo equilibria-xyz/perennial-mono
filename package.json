@@ -17,6 +17,7 @@
     "deploy:fork:mainnet": "concurrently \"yarn workspace @equilibria/perennial run node:fork:mainnet --no-deploy > /dev/null\" \"./scripts/deploy_mainnet_fork.sh\""
   },
   "devDependencies": {
+    "@chainlink/contracts": "0.5.1",
     "@codechecks/client": "^0.1.10",
     "@defi-wonderland/smock": "^2.0.7",
     "@equilibria/root": "0.1.6",
@@ -26,7 +27,6 @@
     "@nomicfoundation/hardhat-chai-matchers": "^1.0.4",
     "@nomiclabs/hardhat-ethers": "^2.2.1",
     "@nomiclabs/hardhat-etherscan": "^2.1.1",
-    "@chainlink/contracts": "0.5.1",
     "@openzeppelin/contracts": "4.6.0",
     "@typechain/ethers-v5": "^10.1.0",
     "@typechain/hardhat": "^6.1.0",
