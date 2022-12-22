@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.17;
 
-import "./PrePosition.sol";
 import "./Version.sol";
 
 /// @dev Account type
@@ -23,21 +22,16 @@ using AccountLib for Account global;
 library AccountLib {
     function update(
         Account memory account,
-        Fixed18 positionAmount,
-        Fixed18 collateralAmount,
+        Fixed18 newPosition,
+        Fixed18 newCollateral,
         OracleVersion memory currentOracleVersion,
         MarketParameter memory marketParameter
-    ) internal pure returns (Fixed18 makerAmount, Fixed18 takerAmount) {
+    ) internal pure returns (Fixed18 makerAmount, Fixed18 takerAmount, Fixed18 collateralAmount) {
         // compute position update
-        Fixed18 currentNext = next(account);
-        (Fixed18 currentMaker, Fixed18 currentTaker) =
-            (currentNext.min(Fixed18Lib.ZERO).mul(Fixed18Lib.NEG_ONE), currentNext.max(Fixed18Lib.ZERO));
-
-        Fixed18 nextNext = currentNext.add(positionAmount);
-        (Fixed18 nextMaker, Fixed18 nextTaker) =
-            (nextNext.min(Fixed18Lib.ZERO).mul(Fixed18Lib.NEG_ONE), nextNext.max(Fixed18Lib.ZERO));
-
-        (makerAmount, takerAmount) = (nextMaker.sub(currentMaker), nextTaker.sub(currentTaker));
+        (Fixed18 currentMaker, Fixed18 currentTaker) = _splitPosition(pre(account));
+        (Fixed18 nextMaker, Fixed18 nextTaker) = _splitPosition(newPosition);
+        (makerAmount, takerAmount, collateralAmount) =
+            (nextMaker.sub(currentMaker), nextTaker.sub(currentTaker), newCollateral.sub(collateral(account)));
 
         // compute collateral update
         collateralAmount = collateralAmount
@@ -45,8 +39,12 @@ library AccountLib {
             .sub(Fixed18Lib.from(takerAmount.mul(currentOracleVersion.price).abs().mul(marketParameter.takerFee)));
 
         // update position
-        account._pre = int96(Fixed18.unwrap(pre(account).add(positionAmount)) / 1e9);
-        account._collateral = int64(Fixed18.unwrap(collateral(account).add(collateralAmount)) / 1e12);
+        account._pre = int96(Fixed18.unwrap(newPosition) / 1e9);
+        account._collateral = int64(Fixed18.unwrap(newCollateral) / 1e12);
+    }
+
+    function _splitPosition(Fixed18 newPosition) private pure returns (Fixed18, Fixed18) {
+        return (newPosition.min(Fixed18Lib.ZERO).mul(Fixed18Lib.NEG_ONE), newPosition.max(Fixed18Lib.ZERO));
     }
 
     /**
@@ -66,8 +64,7 @@ library AccountLib {
             ? toVersion.reward().taker().sub(fromVersion.reward().taker())
             : toVersion.reward().maker().sub(fromVersion.reward().maker());
 
-        account._position = int96(Fixed18.unwrap(next(account)) / 1e9);
-        account._pre = 0;
+        account._position = account._pre;
         account._collateral = int64(Fixed18.unwrap(collateral(account).add(_position.mul(valueDelta))) / 1e12);
         account.reward = account.reward + UFixed18.unwrap(_position.mul(rewardDelta).abs());
     }
@@ -97,7 +94,7 @@ library AccountLib {
         OracleVersion memory currentOracleVersion,
         UFixed18 maintenanceRatio
     ) internal pure returns (UFixed18) {
-        return _maintenance(next(self), currentOracleVersion, maintenanceRatio);
+        return _maintenance(pre(self), currentOracleVersion, maintenanceRatio);
     }
 
     /**
@@ -126,9 +123,5 @@ library AccountLib {
 
     function collateral(Account memory self) internal pure returns (Fixed18) {
         return Fixed18.wrap(int256(self._collateral) * 1e12);
-    }
-
-    function next(Account memory self) internal pure returns (Fixed18) {
-        return position(self).add(pre(self));
     }
 }

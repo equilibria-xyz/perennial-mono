@@ -33,15 +33,15 @@ library VersionLib {
 
     function value(Version memory self) internal pure returns (Accumulator memory) {
         return Accumulator(
-            PackedFixed18.wrap(int128(self._makerValue * 1e12)),
-            PackedFixed18.wrap(int128(self._takerValue * 1e12))
+            PackedFixed18.wrap(int128(self._makerValue) * 1e12),
+            PackedFixed18.wrap(int128(self._takerValue) * 1e12)
         );
     }
 
     function reward(Version memory self) internal pure returns (Accumulator memory) {
         return Accumulator(
-            PackedFixed18.wrap(int128(self._makerReward * 1e12)),
-            PackedFixed18.wrap(int128(self._takerReward * 1e12))
+            PackedFixed18.wrap(int128(self._makerReward) * 1e12),
+            PackedFixed18.wrap(int128(self._takerReward) * 1e12)
         );
     }
 

@@ -202,14 +202,3 @@ export async function createMarket(
 
   return market
 }
-
-export async function depositTo(
-  instanceVars: InstanceVars,
-  user: SignerWithAddress,
-  market: Market,
-  position: BigNumber,
-): Promise<void> {
-  const { dsu } = instanceVars
-  await dsu.connect(user).approve(market.address, position)
-  await market.connect(user).update(0, position)
-}

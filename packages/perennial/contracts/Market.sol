@@ -124,10 +124,10 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
     }
 
     //TODO support depositTo and withdrawTo
-    function update(Fixed18 positionAmount, Fixed18 collateralAmount) external nonReentrant {
+    function update(Fixed18 newPosition, Fixed18 newCollateral) external {
         CurrentContext memory context = _loadContext(msg.sender);
         _settle(context);
-        _update(context, msg.sender, positionAmount, collateralAmount, false);
+        _update(context, msg.sender, newPosition, newCollateral, false);
         _saveContext(context, msg.sender);
     }
 
@@ -245,20 +245,20 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
     function _update(
         CurrentContext memory context,
         address account, //TODO: use for onbehalf of?
-        Fixed18 positionAmount,
-        Fixed18 collateralAmount,
+        Fixed18 newPosition,
+        Fixed18 newCollateral,
         bool force
     ) private {
         _startGas(context, "_update before-update-after: %s");
 
         // before
         if (context.liquidation) revert MarketInLiquidationError();
-        if (context.marketParameter.closed && !_closingNext(context, positionAmount)) revert MarketClosedError();
+        if (context.marketParameter.closed && !newPosition.isZero()) revert MarketClosedError();
 
         // update
-        (Fixed18 makerAmount, Fixed18 takerAmount) = context.account.update(
-            positionAmount,
-            collateralAmount,
+        (Fixed18 makerAmount, Fixed18 takerAmount, Fixed18 collateralAmount) = context.account.update(
+            newPosition,
+            newCollateral,
             context.currentOracleVersion,
             context.marketParameter
         );
@@ -282,7 +282,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         if (collateralAmount.sign() == -1) token.push(account, collateralAmount.abs());
 
         // events
-        emit Updated(account, context.currentOracleVersion.version, positionAmount, collateralAmount);
+        emit Updated(account, context.currentOracleVersion.version, newPosition, newCollateral);
 
         _endGas(context);
     }
@@ -390,19 +390,11 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         Period memory period,
         Version memory fromVersion,
         Version memory toVersion
-    ) private pure {
+    ) private view {
         if (context.currentOracleVersion.version > context.latestAccountVersion) {
             context.account.accumulate(fromVersion, toVersion);
             context.latestAccountVersion = period.toVersion.version;
         }
-    }
-
-    function _closingNext(CurrentContext memory context, Fixed18 amount) private pure returns (bool) {
-        Fixed18 nextAccountPosition = context.account.next();
-        if (nextAccountPosition.sign() == 0) return true;
-        if (context.account.position().sign() == amount.sign()) return false;
-        if (nextAccountPosition.sign() != context.account.position().sign()) return false;
-        return true;
     }
 
     function _checkPosition(CurrentContext memory context) private pure {

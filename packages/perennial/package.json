@@ -34,7 +34,8 @@
     "@chainlink/contracts": "0.3.1",
     "@equilibria/emptyset-batcher": "0.0.4",
     "@equilibria/root": "0.1.6",
-    "@openzeppelin/contracts": "4.7.3"
+    "@openzeppelin/contracts": "4.7.3",
+    "hardhat": "^2.12.1-ir.0"
   },
   "devDependencies": {
     "@ethersproject/abstract-provider": "^5",
