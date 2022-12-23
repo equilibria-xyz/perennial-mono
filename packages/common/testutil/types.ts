@@ -4,6 +4,8 @@ import { expect } from 'chai'
 export interface Position {
   _maker: BigNumberish
   _taker: BigNumberish
+  _makerNext: BigNumberish
+  _takerNext: BigNumberish
 }
 
 export interface Accumulator {
@@ -12,8 +14,6 @@ export interface Accumulator {
 }
 
 export interface PrePosition {
-  _maker: BigNumberish
-  _taker: BigNumberish
   _makerFee: BigNumberish
   _takerFee: BigNumberish
 }
@@ -37,11 +37,11 @@ export function expectAccumulatorEq(a: Accumulator, b: Accumulator): void {
 export function expectPositionEq(a: Position, b: Position): void {
   expect(a._maker).to.equal(b._maker)
   expect(a._taker).to.equal(b._taker)
+  expect(a._makerNext).to.equal(b._makerNext)
+  expect(a._takerNext).to.equal(b._takerNext)
 }
 
 export function expectPrePositionEq(a: PrePosition, b: PrePosition): void {
-  expect(a._maker).to.equal(b._maker)
-  expect(a._taker).to.equal(b._taker)
   expect(a._makerFee).to.equal(b._makerFee)
   expect(a._takerFee).to.equal(b._takerFee)
 }

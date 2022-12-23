@@ -40,12 +40,15 @@ describe('Lens', () => {
     let globalPre = marketSnapshot.pre
     let globalPosition = marketSnapshot.position
     expectPrePositionEq(globalPre, {
-      _maker: POSITION,
-      _taker: POSITION,
       _makerFee: 0,
       _takerFee: 0,
     })
-    expectPositionEq(globalPosition, { _maker: 0, _taker: 0 })
+    expectPositionEq(globalPosition, {
+      _maker: 0,
+      _taker: 0,
+      _makerNext: POSITION,
+      _takerNext: POSITION,
+    })
     expect(marketSnapshot.latestVersion.price).to.equal('11388297509860897871140900')
     expect(marketSnapshot.rate).to.equal(utils.parseEther('5.00').div(SECONDS_IN_YEAR))
     expect(marketSnapshot.dailyRate).to.equal(utils.parseEther('5.00').div(SECONDS_IN_YEAR).mul(SECONDS_IN_DAY))
@@ -68,8 +71,6 @@ describe('Lens', () => {
     globalPre = marketSnapshot.pre
     globalPosition = marketSnapshot.position
     expectPrePositionEq(globalPre, {
-      _maker: 0,
-      _taker: 0,
       _makerFee: 0,
       _takerFee: 0,
     })
@@ -81,6 +82,8 @@ describe('Lens', () => {
     expectPositionEq(globalPosition, {
       _maker: POSITION,
       _taker: POSITION,
+      _makerNext: POSITION,
+      _takerNext: POSITION,
     })
     expect(userSnapshot.position).to.equal(POSITION.mul(-1))
 

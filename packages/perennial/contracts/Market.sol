@@ -262,6 +262,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
             context.currentOracleVersion,
             context.marketParameter
         );
+        context.position.update(makerAmount, takerAmount);
         context.pre.update(
             makerAmount,
             takerAmount,
@@ -378,7 +379,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
                 context.protocolParameter,
                 context.marketParameter
             );
-            context.position = context.position.next(context.pre);
+            context.position.settle();
             context.pre.clear();
             context.latestVersion = period.toVersion.version;
             _versions[period.toVersion.version] = context.version;
@@ -398,12 +399,10 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
     }
 
     function _checkPosition(CurrentContext memory context) private pure {
-        Position memory nextPosition = context.position.next(context.pre);
-
-        if (!context.marketParameter.closed && nextPosition.socializationFactor().lt(UFixed18Lib.ONE))
+        if (!context.marketParameter.closed && context.position.socializationFactorNext().lt(UFixed18Lib.ONE))
             revert MarketInsufficientLiquidityError();
 
-        if (nextPosition.maker().gt(context.marketParameter.makerLimit))
+        if (context.position.makerNext().gt(context.marketParameter.makerLimit))
             revert MarketMakerOverLimitError();
     }
 

@@ -73,10 +73,13 @@ describe.only('Happy Path', () => {
 
     // Check global state
     expect(await market.latestVersion()).to.equal(INITIAL_VERSION)
-    expectPositionEq(await market.position(), { _maker: 0, _taker: 0 })
-    expectPrePositionEq(await market.pre(), {
-      _maker: POSITION,
+    expectPositionEq(await market.position(), {
+      _maker: 0,
       _taker: 0,
+      _makerNext: POSITION.div(1e12),
+      _takerNext: 0,
+    })
+    expectPrePositionEq(await market.pre(), {
       _makerFee: 0,
       _takerFee: 0,
     })
@@ -92,10 +95,13 @@ describe.only('Happy Path', () => {
 
     // Check global post-settlement state
     expect(await market.latestVersion()).to.equal(INITIAL_VERSION + 1)
-    expectPositionEq(await market.position(), { _maker: POSITION.div(1e12), _taker: 0 })
-    expectPrePositionEq(await market.pre(), {
-      _maker: 0,
+    expectPositionEq(await market.position(), {
+      _maker: POSITION.div(1e12),
       _taker: 0,
+      _makerNext: POSITION.div(1e12),
+      _takerNext: 0,
+    })
+    expectPrePositionEq(await market.pre(), {
       _makerFee: 0,
       _takerFee: 0,
     })
@@ -128,10 +134,13 @@ describe.only('Happy Path', () => {
 
     // Check global state
     expect(await market.latestVersion()).to.equal(INITIAL_VERSION)
-    expectPositionEq(await market.position(), { _maker: 0, _taker: 0 })
-    expectPrePositionEq(await market.pre(), {
-      _maker: POSITION,
+    expectPositionEq(await market.position(), {
+      _maker: 0,
       _taker: 0,
+      _makerNext: POSITION.div(1e12),
+      _takerNext: 0,
+    })
+    expectPrePositionEq(await market.pre(), {
       _makerFee: 0,
       _takerFee: 0,
     })
@@ -147,10 +156,13 @@ describe.only('Happy Path', () => {
 
     // Check global post-settlement state
     expect(await market.latestVersion()).to.equal(INITIAL_VERSION + 1)
-    expectPositionEq(await market.position(), { _maker: POSITION.div(1e12), _taker: 0 })
-    expectPrePositionEq(await market.pre(), {
-      _maker: 0,
+    expectPositionEq(await market.position(), {
+      _maker: POSITION.div(1e12),
       _taker: 0,
+      _makerNext: POSITION.div(1e12),
+      _takerNext: 0,
+    })
+    expectPrePositionEq(await market.pre(), {
       _makerFee: 0,
       _takerFee: 0,
     })
@@ -184,10 +196,13 @@ describe.only('Happy Path', () => {
 
     // Global State
     expect(await market.latestVersion()).to.equal(INITIAL_VERSION)
-    expectPositionEq(await market.position(), { _maker: 0, _taker: 0 })
-    expectPrePositionEq(await market.pre(), {
+    expectPositionEq(await market.position(), {
       _maker: 0,
       _taker: 0,
+      _makerNext: 0,
+      _takerNext: 0,
+    })
+    expectPrePositionEq(await market.pre(), {
       _makerFee: 0,
       _takerFee: 0,
     })
@@ -222,10 +237,13 @@ describe.only('Happy Path', () => {
 
     // Global State
     expect(await market.latestVersion()).to.equal(INITIAL_VERSION)
-    expectPositionEq(await market.position(), { _maker: 0, _taker: 0 })
-    expectPrePositionEq(await market.pre(), {
+    expectPositionEq(await market.position(), {
       _maker: 0,
       _taker: 0,
+      _makerNext: 0,
+      _takerNext: 0,
+    })
+    expectPrePositionEq(await market.pre(), {
       _makerFee: 0,
       _takerFee: 0,
     })
@@ -258,10 +276,13 @@ describe.only('Happy Path', () => {
 
     // Global State
     expect(await market.latestVersion()).to.equal(INITIAL_VERSION)
-    expectPositionEq(await market.position(), { _maker: 0, _taker: 0 })
+    expectPositionEq(await market.position(), {
+      _maker: 0,
+      _taker: 0,
+      _makerNext: POSITION.div(1e12),
+      _takerNext: POSITION_B.div(1e12),
+    })
     expectPrePositionEq(await market.pre(), {
-      _maker: POSITION,
-      _taker: POSITION_B,
       _makerFee: 0,
       _takerFee: 0,
     })
@@ -283,10 +304,10 @@ describe.only('Happy Path', () => {
     expectPositionEq(await market.position(), {
       _maker: POSITION.div(1e12),
       _taker: POSITION_B.div(1e12),
+      _makerNext: POSITION.div(1e12),
+      _takerNext: POSITION_B.div(1e12),
     })
     expectPrePositionEq(await market.pre(), {
-      _maker: 0,
-      _taker: 0,
       _makerFee: 0,
       _takerFee: 0,
     })
@@ -320,10 +341,13 @@ describe.only('Happy Path', () => {
 
     // Global State
     expect(await market.latestVersion()).to.equal(INITIAL_VERSION)
-    expectPositionEq(await market.position(), { _maker: 0, _taker: 0 })
+    expectPositionEq(await market.position(), {
+      _maker: 0,
+      _taker: 0,
+      _makerNext: POSITION.div(1e12),
+      _takerNext: POSITION_B.div(1e12),
+    })
     expectPrePositionEq(await market.pre(), {
-      _maker: POSITION,
-      _taker: POSITION_B,
       _makerFee: 0,
       _takerFee: 0,
     })
@@ -345,10 +369,10 @@ describe.only('Happy Path', () => {
     expectPositionEq(await market.position(), {
       _maker: POSITION.div(1e12),
       _taker: POSITION_B.div(1e12),
+      _makerNext: POSITION.div(1e12),
+      _takerNext: POSITION_B.div(1e12),
     })
     expectPrePositionEq(await market.pre(), {
-      _maker: 0,
-      _taker: 0,
       _makerFee: 0,
       _takerFee: 0,
     })
@@ -387,10 +411,13 @@ describe.only('Happy Path', () => {
 
     // Global State
     expect(await market.latestVersion()).to.equal(INITIAL_VERSION)
-    expectPositionEq(await market.position(), { _maker: 0, _taker: 0 })
-    expectPrePositionEq(await market.pre(), {
-      _maker: POSITION,
+    expectPositionEq(await market.position(), {
+      _maker: 0,
       _taker: 0,
+      _makerNext: POSITION.div(1e12),
+      _takerNext: 0,
+    })
+    expectPrePositionEq(await market.pre(), {
       _makerFee: 0,
       _takerFee: 0,
     })
@@ -431,10 +458,13 @@ describe.only('Happy Path', () => {
 
     // Global State
     expect(await market.latestVersion()).to.equal(INITIAL_VERSION)
-    expectPositionEq(await market.position(), { _maker: 0, _taker: 0 })
-    expectPrePositionEq(await market.pre(), {
-      _maker: POSITION,
+    expectPositionEq(await market.position(), {
+      _maker: 0,
       _taker: 0,
+      _makerNext: POSITION.div(1e12),
+      _takerNext: 0,
+    })
+    expectPrePositionEq(await market.pre(), {
       _makerFee: 0,
       _takerFee: 0,
     })
@@ -526,10 +556,10 @@ describe.only('Happy Path', () => {
     expectPositionEq(await market.position(), {
       _maker: POSITION.div(2).div(1e12),
       _taker: POSITION.div(2).div(1e12),
+      _makerNext: POSITION.div(1e12),
+      _takerNext: POSITION.div(2).div(1e12),
     })
     expectPrePositionEq(await market.pre(), {
-      _maker: POSITION.div(2),
-      _taker: 0,
       _makerFee: '587312764910861482',
       _takerFee: 0,
     })

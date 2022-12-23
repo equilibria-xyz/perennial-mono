@@ -12,6 +12,11 @@ struct Position {
     uint64 _maker; // 6 decimals
     /// @dev Quantity of the taker position
     uint64 _taker; // 6 decimals
+
+    /// @dev Quantity of the maker position
+    uint64 _makerNext; // 6 decimals
+    /// @dev Quantity of the taker position
+    uint64 _takerNext; // 6 decimals
 }
 using PositionLib for Position global;
 
@@ -30,17 +35,22 @@ library PositionLib {
         return UFixed18.wrap(uint256(self._taker) * 1e12);
     }
 
-    /**
-     * @notice Computes the next position after the pending-settlement position delta is included
-     * @param self The current Position
-     * @param pre The pending-settlement position delta
-     * @return Next Position
-     */
-    function next(Position memory self, PrePosition memory pre) internal pure returns (Position memory) {
-        return Position(
-            uint64(UFixed18.unwrap(UFixed18Lib.from(Fixed18Lib.from(self.maker()).add(pre.maker()))) / 1e12),
-            uint64(UFixed18.unwrap(UFixed18Lib.from(Fixed18Lib.from(self.taker()).add(pre.taker()))) / 1e12)
-        );
+    function makerNext(Position memory self) internal pure returns (UFixed18) {
+        return UFixed18.wrap(uint256(self._makerNext) * 1e12);
+    }
+
+    function takerNext(Position memory self) internal pure returns (UFixed18) {
+        return UFixed18.wrap(uint256(self._takerNext) * 1e12);
+    }
+
+    function update(Position memory self, Fixed18 makerAmount, Fixed18 takerAmount) internal pure {
+        self._makerNext = uint64(int64(self._makerNext) + int64(Fixed18.unwrap(makerAmount) / 1e12));
+        self._takerNext = uint64(int64(self._takerNext) + int64(Fixed18.unwrap(takerAmount) / 1e12));
+    }
+
+    function settle(Position memory self) internal pure {
+        self._maker = self._makerNext;
+        self._taker = self._takerNext;
     }
 
     /**
@@ -61,6 +71,14 @@ library PositionLib {
      * @return Socialization factor
      */
     function socializationFactor(Position memory self) internal pure returns (UFixed18) {
-        return self.taker().isZero() ? UFixed18Lib.ONE : UFixed18Lib.min(UFixed18Lib.ONE, self.maker().div(self.taker()));
+        return _socializationFactor(maker(self), taker(self));
+    }
+
+    function socializationFactorNext(Position memory self) internal pure returns (UFixed18) {
+        return _socializationFactor(makerNext(self), takerNext(self));
+    }
+
+    function _socializationFactor(UFixed18 makerAmount, UFixed18 takerAmount) private pure returns (UFixed18) {
+        return takerAmount.isZero() ? UFixed18Lib.ONE : UFixed18Lib.min(UFixed18Lib.ONE, makerAmount.div(takerAmount));
     }
 }

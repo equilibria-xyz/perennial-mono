@@ -8,10 +8,8 @@ import "./OracleVersion.sol";
 
 /// @dev PrePosition type
 struct PrePosition {
-    PackedFixed18 _maker;
-    PackedFixed18 _taker;
     PackedUFixed18 _makerFee;
-    PackedUFixed18 _takerFee; //TODO: introduce intra-version netting for fees
+    PackedUFixed18 _takerFee; //TODO: move these fees to the version + 1 accumulator
 }
 using PrePositionLib for PrePosition global;
 
@@ -27,14 +25,6 @@ using PrePositionLib for PrePosition global;
  *      global state types.
  */
 library PrePositionLib {
-    function maker(PrePosition memory self) internal pure returns (Fixed18) {
-        return self._maker.unpack();
-    }
-
-    function taker(PrePosition memory self) internal pure returns (Fixed18) {
-        return self._taker.unpack();
-    }
-
     function makerFee(PrePosition memory self) internal pure returns (UFixed18) {
         return self._makerFee.unpack();
     }
@@ -51,12 +41,10 @@ library PrePositionLib {
      * @return Whether the pending-settlement position delta is empty
      */
     function isEmpty(PrePosition memory self) internal pure returns (bool) {
-        return self.maker().isZero() && self.taker().isZero() && self.makerFee().isZero() && self.takerFee().isZero();
+        return self.makerFee().isZero() && self.takerFee().isZero();
     }
 
     function clear(PrePosition memory self) internal pure {
-        self._maker = PackedFixed18.wrap(0);
-        self._taker = PackedFixed18.wrap(0);
         self._makerFee = PackedUFixed18.wrap(0);
         self._takerFee = PackedUFixed18.wrap(0);
     }
@@ -68,8 +56,6 @@ library PrePositionLib {
         OracleVersion memory currentOracleVersion,
         MarketParameter memory marketParameter
     ) internal pure {
-        self._maker = self.maker().add(makerAmount).pack();
-        self._taker = self.taker().add(takerAmount).pack();
         self._makerFee = self._makerFee //TODO: double computing
             .unpack()
             .add(makerAmount.mul(currentOracleVersion.price).abs().mul(marketParameter.makerFee))
