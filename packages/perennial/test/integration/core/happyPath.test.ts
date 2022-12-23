@@ -66,8 +66,8 @@ describe.only('Happy Path', () => {
       .withArgs(user.address, INITIAL_VERSION, POSITION.mul(-1), COLLATERAL)
 
     // Check user is in the correct state
-    expect((await market.accounts(user.address))._position).to.equal(0)
-    expect((await market.accounts(user.address))._next).to.equal(POSITION.mul(-1).div(1e12))
+    expect((await market.accounts(user.address)).position).to.equal(0)
+    expect((await market.accounts(user.address)).next).to.equal(POSITION.mul(-1))
     expect(await market.latestVersions(user.address)).to.equal(INITIAL_VERSION)
 
     // Check global state
@@ -99,8 +99,8 @@ describe.only('Happy Path', () => {
 
     // Settle user and check state
     await market.settle(user.address)
-    expect((await market.accounts(user.address))._position).to.equal(POSITION.mul(-1).div(1e12))
-    expect((await market.accounts(user.address))._next).to.equal(POSITION.mul(-1).div(1e12))
+    expect((await market.accounts(user.address)).position).to.equal(POSITION.mul(-1))
+    expect((await market.accounts(user.address)).next).to.equal(POSITION.mul(-1))
     expect(await market.latestVersions(user.address)).to.equal(INITIAL_VERSION + 1)
   })
 
@@ -119,8 +119,8 @@ describe.only('Happy Path', () => {
       .withArgs(user.address, INITIAL_VERSION, POSITION.mul(-1), COLLATERAL)
 
     // Check user is in the correct state
-    expect((await market.accounts(user.address))._position).to.equal(0)
-    expect((await market.accounts(user.address))._next).to.equal(POSITION.mul(-1).div(1e12))
+    expect((await market.accounts(user.address)).position).to.equal(0)
+    expect((await market.accounts(user.address)).next).to.equal(POSITION.mul(-1))
     expect(await market.latestVersions(user.address)).to.equal(INITIAL_VERSION)
 
     // Check global state
@@ -152,8 +152,8 @@ describe.only('Happy Path', () => {
 
     // Settle user and check state
     await market.settle(user.address)
-    expect((await market.accounts(user.address))._position).to.equal(POSITION.mul(-1).div(1e12))
-    expect((await market.accounts(user.address))._next).to.equal(POSITION.mul(-1).div(1e12))
+    expect((await market.accounts(user.address)).position).to.equal(POSITION.mul(-1))
+    expect((await market.accounts(user.address)).next).to.equal(POSITION.mul(-1))
     expect(await market.latestVersions(user.address)).to.equal(INITIAL_VERSION + 1)
   })
 
@@ -173,8 +173,8 @@ describe.only('Happy Path', () => {
     // User state
     expect(await lens.callStatic.maintenance(user.address, market.address)).to.equal(0)
     expect(await lens.callStatic.maintenanceNext(user.address, market.address)).to.equal(0)
-    expect((await market.accounts(user.address))._position).to.equal(0)
-    expect((await market.accounts(user.address))._next).to.equal(0)
+    expect((await market.accounts(user.address)).position).to.equal(0)
+    expect((await market.accounts(user.address)).next).to.equal(0)
     expect(await market.latestVersions(user.address)).to.equal(INITIAL_VERSION)
 
     // Global State
@@ -210,8 +210,8 @@ describe.only('Happy Path', () => {
     // User state
     expect(await lens.callStatic.maintenance(user.address, market.address)).to.equal(0)
     expect(await lens.callStatic.maintenanceNext(user.address, market.address)).to.equal(0)
-    expect((await market.accounts(user.address))._position).to.equal(0)
-    expect((await market.accounts(user.address))._next).to.equal(0)
+    expect((await market.accounts(user.address)).position).to.equal(0)
+    expect((await market.accounts(user.address)).next).to.equal(0)
     expect(await market.latestVersions(user.address)).to.equal(INITIAL_VERSION)
 
     // Global State
@@ -245,8 +245,8 @@ describe.only('Happy Path', () => {
       .withArgs(userB.address, INITIAL_VERSION, POSITION_B, COLLATERAL)
 
     // User State
-    expect((await market.accounts(userB.address))._position).to.equal(0)
-    expect((await market.accounts(userB.address))._next).to.equal(POSITION_B.div(1e12))
+    expect((await market.accounts(userB.address)).position).to.equal(0)
+    expect((await market.accounts(userB.address)).next).to.equal(POSITION_B)
     expect(await market.latestVersions(userB.address)).to.equal(INITIAL_VERSION)
 
     // Global State
@@ -279,8 +279,8 @@ describe.only('Happy Path', () => {
       _takerNext: POSITION_B.div(1e12),
     })
     await market.settle(userB.address)
-    expect((await market.accounts(userB.address))._position).to.equal(POSITION_B.div(1e12))
-    expect((await market.accounts(userB.address))._next).to.equal(POSITION_B.div(1e12))
+    expect((await market.accounts(userB.address)).position).to.equal(POSITION_B)
+    expect((await market.accounts(userB.address)).next).to.equal(POSITION_B)
     expect(await market.latestVersions(userB.address)).to.equal(INITIAL_VERSION + 2)
   })
 
@@ -302,8 +302,8 @@ describe.only('Happy Path', () => {
       .withArgs(userB.address, INITIAL_VERSION, POSITION_B, COLLATERAL)
 
     // User State
-    expect((await market.accounts(userB.address))._position).to.equal(0)
-    expect((await market.accounts(userB.address))._next).to.equal(POSITION_B.div(1e12))
+    expect((await market.accounts(userB.address)).position).to.equal(0)
+    expect((await market.accounts(userB.address)).next).to.equal(POSITION_B)
     expect(await market.latestVersions(userB.address)).to.equal(INITIAL_VERSION)
 
     // Global State
@@ -336,8 +336,8 @@ describe.only('Happy Path', () => {
       _takerNext: POSITION_B.div(1e12),
     })
     await market.settle(userB.address)
-    expect((await market.accounts(userB.address))._position).to.equal(POSITION_B.div(1e12))
-    expect((await market.accounts(userB.address))._next).to.equal(POSITION_B.div(1e12))
+    expect((await market.accounts(userB.address)).position).to.equal(POSITION_B)
+    expect((await market.accounts(userB.address)).next).to.equal(POSITION_B)
     expect(await market.latestVersions(userB.address)).to.equal(INITIAL_VERSION + 2)
   })
 
@@ -364,8 +364,8 @@ describe.only('Happy Path', () => {
     // User State
     expect(await lens.callStatic.maintenance(userB.address, market.address)).to.equal(0)
     expect(await lens.callStatic.maintenanceNext(userB.address, market.address)).to.equal(0)
-    expect((await market.accounts(userB.address))._position).to.equal(0)
-    expect((await market.accounts(userB.address))._next).to.equal(0)
+    expect((await market.accounts(userB.address)).position).to.equal(0)
+    expect((await market.accounts(userB.address)).next).to.equal(0)
     expect(await market.latestVersions(user.address)).to.equal(INITIAL_VERSION)
 
     // Global State
@@ -407,8 +407,8 @@ describe.only('Happy Path', () => {
     // User State
     expect(await lens.callStatic.maintenance(userB.address, market.address)).to.equal(0)
     expect(await lens.callStatic.maintenanceNext(userB.address, market.address)).to.equal(0)
-    expect((await market.accounts(userB.address))._position).to.equal(0)
-    expect((await market.accounts(userB.address))._next).to.equal(0)
+    expect((await market.accounts(userB.address)).position).to.equal(0)
+    expect((await market.accounts(userB.address)).next).to.equal(0)
     expect(await market.latestVersions(user.address)).to.equal(INITIAL_VERSION)
 
     // Global State
@@ -498,8 +498,8 @@ describe.only('Happy Path', () => {
       .withArgs(user.address, INITIAL_VERSION + 4, POSITION.mul(-1), COLLATERAL.sub(1))
 
     // Check user is in the correct state
-    expect((await market.accounts(user.address))._position).to.equal(POSITION.div(2).mul(-1).div(1e12))
-    expect((await market.accounts(user.address))._next).to.equal(POSITION.mul(-1).div(1e12))
+    expect((await market.accounts(user.address)).position).to.equal(POSITION.div(2).mul(-1))
+    expect((await market.accounts(user.address)).next).to.equal(POSITION.mul(-1))
     expect(await market.latestVersions(user.address)).to.equal(INITIAL_VERSION + 4)
 
     // Check global state

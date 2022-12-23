@@ -78,7 +78,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
     uint256 public latestVersion;
 
     /// @dev The individual state for each account
-    mapping(address => Account) private _accounts;
+    mapping(address => StoredAccountStorage) private _accounts;
 
     mapping(address => uint256) public latestVersions;
 
@@ -189,7 +189,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
     }
 
     function accounts(address account) external view returns (Account memory) {
-        return _accounts[account];
+        return _accounts[account].read();
     }
 
     function versions(uint256 oracleVersion) external view returns (Version memory) {
@@ -211,15 +211,15 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
     function _liquidate(CurrentContext memory context, address account) private {
         // before
         UFixed18 maintenance = context.account.maintenance(context.currentOracleVersion, context.marketParameter.maintenance);
-        if (context.account.collateral().gte(Fixed18Lib.from(maintenance))) revert MarketCantLiquidate();
+        if (context.account.collateral.gte(Fixed18Lib.from(maintenance))) revert MarketCantLiquidate();
 
         // close all positions
-        _update(context, account, context.account.position().mul(Fixed18Lib.NEG_ONE), Fixed18Lib.ZERO, true);
+        _update(context, account, context.account.position.mul(Fixed18Lib.NEG_ONE), Fixed18Lib.ZERO, true);
 
         // handle liquidation fee
         UFixed18 liquidationFee = factory.liquidationFee(); // TODO: external call
         UFixed18 liquidationReward = UFixed18Lib.min(
-            context.account.collateral().max(Fixed18Lib.ZERO).abs(),
+            context.account.collateral.max(Fixed18Lib.ZERO).abs(),
             maintenance.mul(liquidationFee)
         );
         context.account.update(
@@ -308,7 +308,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
 
         // Load account state
         context.latestAccountVersion = latestVersions[account];
-        context.account = _accounts[account];
+        context.account = _accounts[account].read();
         context.liquidation = liquidation[account]; //TODO: packing into account will save gas on liquidation
 
         // after
@@ -328,7 +328,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
 
         // Load account state
         latestVersions[account] = context.latestAccountVersion;
-        _accounts[account] = context.account;
+        _accounts[account].store(context.account);
         liquidation[account] = context.liquidation; //TODO: can pack this in account, only saves gas on liq.
 
         _endGas(context);
@@ -409,11 +409,11 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
     }
 
     function _checkCollateral(CurrentContext memory context) private pure {
-        if (context.account.collateral().sign() == -1) revert MarketInDebtError();
+        if (context.account.collateral.sign() == -1) revert MarketInDebtError();
 
-        UFixed18 boundedCollateral = UFixed18Lib.from(context.account.collateral());
+        UFixed18 boundedCollateral = UFixed18Lib.from(context.account.collateral);
 
-        if (!context.account.collateral().isZero() && boundedCollateral.lt(context.protocolParameter.minCollateral))
+        if (!context.account.collateral.isZero() && boundedCollateral.lt(context.protocolParameter.minCollateral))
             revert MarketCollateralUnderLimitError();
 
         (UFixed18 maintenanceAmount, UFixed18 maintenanceNextAmount) = (

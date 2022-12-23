@@ -4,14 +4,19 @@ pragma solidity 0.8.17;
 import "./Version.sol";
 
 /// @dev Account type
-struct Account {
+struct StoredAccount {
     int64 _position; // 6 decimals
-
     int64 _next; // 6 decimals
-
     int64 _collateral; // 6 decimals
-
     uint64 _reward; // 6 decimals
+}
+struct StoredAccountStorage { StoredAccount value; }
+using StoredAccountStorageLib for StoredAccountStorage global;
+struct Account {
+    Fixed18 position; // 6 decimals
+    Fixed18 next; // 6 decimals
+    Fixed18 collateral; // 6 decimals
+    UFixed18 reward; // 6 decimals
 }
 using AccountLib for Account global;
 
@@ -21,7 +26,7 @@ using AccountLib for Account global;
  */
 library AccountLib {
     function update(
-        Account memory account,
+        Account memory self,
         Fixed18 newPosition,
         Fixed18 newCollateral,
         OracleVersion memory currentOracleVersion,
@@ -34,7 +39,7 @@ library AccountLib {
         Fixed18 collateralAmount
     ) {
         // compute position update
-        (Fixed18 currentMaker, Fixed18 currentTaker) = _splitPosition(next(account));
+        (Fixed18 currentMaker, Fixed18 currentTaker) = _splitPosition(self.next);
         (Fixed18 nextMaker, Fixed18 nextTaker) = _splitPosition(newPosition);
         (makerAmount, takerAmount) =
             (nextMaker.sub(currentMaker), nextTaker.sub(currentTaker));
@@ -44,11 +49,11 @@ library AccountLib {
             makerAmount.mul(currentOracleVersion.price).abs().mul(marketParameter.makerFee),
             takerAmount.mul(currentOracleVersion.price).abs().mul(marketParameter.takerFee)
         );
-        collateralAmount = newCollateral.sub(collateral(account)).sub(Fixed18Lib.from(makerFee.add(takerFee)));
+        collateralAmount = newCollateral.sub(self.collateral).sub(Fixed18Lib.from(makerFee.add(takerFee)));
 
         // update position
-        account._next = int64(Fixed18.unwrap(newPosition) / 1e12);
-        account._collateral = int64(Fixed18.unwrap(newCollateral) / 1e12);
+        self.next = newPosition;
+        self.collateral = newCollateral;
     }
 
     function _splitPosition(Fixed18 newPosition) private pure returns (Fixed18, Fixed18) {
@@ -57,24 +62,19 @@ library AccountLib {
 
     /**
      * @notice Settled the account's position to oracle version `toOracleVersion`
-     * @param account The struct to operate on
+     * @param self The struct to operate on
      */
-    function accumulate(
-        Account memory account,
-        Version memory fromVersion,
-        Version memory toVersion
-    ) internal pure {
-        Fixed18 _position = position(account);
-        Fixed18 valueDelta = (_position.sign() == 1)
+    function accumulate(Account memory self, Version memory fromVersion, Version memory toVersion) internal pure {
+        Fixed18 valueDelta = (self.position.sign() == 1)
             ? toVersion.value().taker().sub(fromVersion.value().taker())
             : toVersion.value().maker().sub(fromVersion.value().maker());
-        Fixed18 rewardDelta = (_position.sign() == 1)
+        Fixed18 rewardDelta = (self.position.sign() == 1)
             ? toVersion.reward().taker().sub(fromVersion.reward().taker())
             : toVersion.reward().maker().sub(fromVersion.reward().maker());
 
-        account._position = account._next;
-        account._collateral += int64(Fixed18.unwrap(Fixed18Lib.from(_position.abs()).mul(valueDelta)) / 1e12);
-        account._reward += uint64(UFixed18.unwrap(_position.abs().mul(UFixed18Lib.from(rewardDelta))) / 1e12);
+        self.collateral = self.collateral.add(Fixed18Lib.from(self.position.abs()).mul(valueDelta));
+        self.reward = self.reward.add(self.position.abs().mul(UFixed18Lib.from(rewardDelta)));
+        self.position = self.next;
     }
 
     /**
@@ -88,7 +88,7 @@ library AccountLib {
         OracleVersion memory currentOracleVersion,
         UFixed18 maintenanceRatio
     ) internal pure returns (UFixed18) {
-        return _maintenance(position(self), currentOracleVersion, maintenanceRatio);
+        return _maintenance(self.position, currentOracleVersion, maintenanceRatio);
     }
 
     /**
@@ -102,7 +102,7 @@ library AccountLib {
         OracleVersion memory currentOracleVersion,
         UFixed18 maintenanceRatio
     ) internal pure returns (UFixed18) {
-        return _maintenance(next(self), currentOracleVersion, maintenanceRatio);
+        return _maintenance(self.next, currentOracleVersion, maintenanceRatio);
     }
 
     /**
@@ -116,23 +116,27 @@ library AccountLib {
         OracleVersion memory currentOracleVersion,
         UFixed18 maintenanceRatio
     ) private pure returns (UFixed18) {
-        UFixed18 notionalMax = _position.mul(currentOracleVersion.price).abs();
-        return notionalMax.mul(maintenanceRatio);
+        return _position.mul(currentOracleVersion.price).abs().mul(maintenanceRatio);
+    }
+}
+
+library StoredAccountStorageLib {
+    function read(StoredAccountStorage storage self) internal view returns (Account memory) {
+        StoredAccount memory storedValue =  self.value;
+        return Account(
+            Fixed18.wrap(int256(storedValue._position) * 1e12),
+            Fixed18.wrap(int256(storedValue._next) * 1e12),
+            Fixed18.wrap(int256(storedValue._collateral) * 1e12),
+            UFixed18.wrap(uint256(storedValue._reward) * 1e12)
+        );
     }
 
-    function position(Account memory self) internal pure returns (Fixed18) {
-        return Fixed18.wrap(int256(self._position) * 1e12);
-    }
-
-    function next(Account memory self) internal pure returns (Fixed18) {
-        return Fixed18.wrap(int256(self._next) * 1e12);
-    }
-
-    function collateral(Account memory self) internal pure returns (Fixed18) {
-        return Fixed18.wrap(int256(self._collateral) * 1e12);
-    }
-
-    function reward(Account memory self) internal pure returns (UFixed18) {
-        return UFixed18.wrap(uint256(self._reward) * 1e12);
+    function store(StoredAccountStorage storage self, Account memory newValue) internal {
+        self.value = StoredAccount(
+            int64(Fixed18.unwrap(newValue.position) / 1e12),
+            int64(Fixed18.unwrap(newValue.next) / 1e12),
+            int64(Fixed18.unwrap(newValue.collateral) / 1e12),
+            uint64(UFixed18.unwrap(newValue.reward) / 1e12)
+        );
     }
 }

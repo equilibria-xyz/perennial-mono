@@ -86,8 +86,8 @@ describe('Closed Market', () => {
     await market.settle(user.address)
     await market.settle(userB.address)
 
-    const userCollateralBefore = (await market.accounts(user.address))._collateral
-    const userBCollateralBefore = (await market.accounts(userB.address))._collateral
+    const userCollateralBefore = (await market.accounts(user.address)).collateral
+    const userBCollateralBefore = (await market.accounts(userB.address)).collateral
     const feesABefore = (await market.fee())._protocol
     const feesBBefore = (await market.fee())._market
 
@@ -96,8 +96,8 @@ describe('Closed Market', () => {
     await market.settle(user.address)
     await market.settle(userB.address)
 
-    expect((await market.accounts(user.address))._collateral).to.equal(userCollateralBefore)
-    expect((await market.accounts(userB.address))._collateral).to.equal(userBCollateralBefore)
+    expect((await market.accounts(user.address)).collateral).to.equal(userCollateralBefore)
+    expect((await market.accounts(userB.address)).collateral).to.equal(userBCollateralBefore)
     expect((await market.fee())._protocol).to.equal(feesABefore)
     expect((await market.fee())._market).to.equal(feesBBefore)
   })
@@ -123,8 +123,8 @@ describe('Closed Market', () => {
     await market.settle(userB.address)
 
     expect(await market.liquidation(user.address)).to.be.false
-    const userCollateralBefore = (await market.accounts(user.address))._collateral
-    const userBCollateralBefore = (await market.accounts(userB.address))._collateral
+    const userCollateralBefore = (await market.accounts(user.address)).collateral
+    const userBCollateralBefore = (await market.accounts(userB.address)).collateral
     const feesABefore = (await market.fee())._protocol
     const feesBBefore = (await market.fee())._market
 
@@ -133,8 +133,8 @@ describe('Closed Market', () => {
     await market.settle(user.address)
     await market.settle(userB.address)
 
-    expect((await market.accounts(user.address))._collateral).to.equal(userCollateralBefore)
-    expect((await market.accounts(userB.address))._collateral).to.equal(userBCollateralBefore)
+    expect((await market.accounts(user.address)).collateral).to.equal(userCollateralBefore)
+    expect((await market.accounts(userB.address)).collateral).to.equal(userBCollateralBefore)
     expect((await market.fee())._protocol).to.equal(feesABefore)
     expect((await market.fee())._market).to.equal(feesBBefore)
   })

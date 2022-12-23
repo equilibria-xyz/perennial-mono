@@ -238,7 +238,7 @@ contract Lens is ILens {
      */
     function collateral(address account, IMarket market) public settleAccount(account, market) returns (Fixed18) {
         Account memory marketAccount = market.accounts(account);
-        return marketAccount.collateral();
+        return marketAccount.collateral;
     }
 
     /**
@@ -249,12 +249,12 @@ contract Lens is ILens {
      */
     function maintenance(address account, IMarket market) public settleAccount(account, market) returns (UFixed18) {
         Account memory marketAccount = market.accounts(account);
-        return _maintenance(market, marketAccount.position());
+        return _maintenance(market, marketAccount.position);
     }
 
     function maintenanceNext(address account, IMarket market) public settleAccount(account, market) returns (UFixed18) {
         Account memory marketAccount = market.accounts(account);
-        return _maintenance(market, marketAccount.next());
+        return _maintenance(market, marketAccount.next);
     }
 
     /**
@@ -265,8 +265,8 @@ contract Lens is ILens {
      */
     function liquidatable(address account, IMarket market) public settleAccount(account, market) returns (bool) {
         Account memory marketAccount = market.accounts(account);
-        UFixed18 maintenanceAmount = _maintenance(market, marketAccount.position());
-        return Fixed18Lib.from(maintenanceAmount).gt(marketAccount.collateral());
+        UFixed18 maintenanceAmount = _maintenance(market, marketAccount.position);
+        return Fixed18Lib.from(maintenanceAmount).gt(marketAccount.collateral);
     }
 
     /**
@@ -291,7 +291,7 @@ contract Lens is ILens {
         returns (Fixed18)
     {
         Account memory marketAccount = market.accounts(account);
-        return marketAccount.next();
+        return marketAccount.next;
     }
 
     /**
@@ -306,7 +306,7 @@ contract Lens is ILens {
         returns (Fixed18)
     {
         Account memory marketAccount = market.accounts(account);
-        return marketAccount.position();
+        return marketAccount.position;
     }
 
     /**
@@ -322,7 +322,7 @@ contract Lens is ILens {
         returns (Fixed18, Fixed18)
     {
         Account memory marketAccount = market.accounts(account);
-        return (marketAccount.position(), marketAccount.next());
+        return (marketAccount.position, marketAccount.next);
     }
 
     /**
@@ -337,7 +337,7 @@ contract Lens is ILens {
         returns (Fixed18)
     {
         Account memory marketAccount = market.accounts(account);
-        return marketAccount.position().mul(_latestVersion(market).price);
+        return marketAccount.position.mul(_latestVersion(market).price);
     }
 
     /**

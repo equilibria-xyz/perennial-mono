@@ -32,7 +32,7 @@ describe('Liquidate', () => {
 
     expect(await market.liquidation(user.address)).to.be.true
 
-    expect((await market.accounts(user.address))._collateral).to.equal(0)
+    expect((await market.accounts(user.address)).collateral).to.equal(0)
     expect(await lens.callStatic['collateral(address)'](market.address)).to.equal(0)
     expect(await dsu.balanceOf(userB.address)).to.equal(utils.parseEther('21000')) // Original 20000 + fee
 
@@ -58,17 +58,15 @@ describe('Liquidate', () => {
     await market.settle(user.address)
     await market.settle(userB.address)
 
-    expect((await market.accounts(user.address))._collateral).to.equal(
-      BigNumber.from('-2463736825720737646856').div(1e12),
-    )
+    expect((await market.accounts(user.address)).collateral).to.equal(BigNumber.from('-2463736825720737646856'))
 
-    const userBCollateral = (await market.accounts(userB.address))._collateral
+    const userBCollateral = (await market.accounts(userB.address)).collateral
     await expect(market.connect(userB).update(0, userBCollateral.mul(-1))).to.be.revertedWith('0x11') // underflow
 
     await dsu.connect(userB).approve(market.address, constants.MaxUint256)
     await market.connect(user).update(0, '2463736825720737646856') //TODO: from userB?
 
-    expect((await market.accounts(user.address))._collateral).to.equal(0)
+    expect((await market.accounts(user.address)).collateral).to.equal(0)
   })
 
   it('uses a socialization factor', async () => {
@@ -98,10 +96,10 @@ describe('Liquidate', () => {
     await market.settle(userC.address)
     await market.settle(userD.address)
 
-    const currA = (await market.accounts(user.address))._collateral
-    const currB = (await market.accounts(userB.address))._collateral
-    const currC = (await market.accounts(userC.address))._collateral
-    const currD = (await market.accounts(userD.address))._collateral
+    const currA = (await market.accounts(user.address)).collateral
+    const currB = (await market.accounts(userB.address)).collateral
+    const currC = (await market.accounts(userC.address)).collateral
+    const currD = (await market.accounts(userD.address)).collateral
     const totalCurr = currA.add(currB).add(currC).add(currD)
     const feesCurr = (await market.fee())._protocol.add((await market.fee())._market)
 
@@ -110,10 +108,10 @@ describe('Liquidate', () => {
     await market.settle(userC.address)
     await market.settle(userD.address)
 
-    const newA = (await market.accounts(user.address))._collateral
-    const newB = (await market.accounts(userB.address))._collateral
-    const newC = (await market.accounts(userC.address))._collateral
-    const newD = (await market.accounts(userD.address))._collateral
+    const newA = (await market.accounts(user.address)).collateral
+    const newB = (await market.accounts(userB.address)).collateral
+    const newC = (await market.accounts(userC.address)).collateral
+    const newD = (await market.accounts(userD.address)).collateral
     const totalNew = newA.add(newB).add(newC).add(newD)
 
     // Expect the loss from B to be socialized equally to C and D
