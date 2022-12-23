@@ -32,7 +32,7 @@ interface ILens {
         address userAddress;
         Fixed18 collateral;
         UFixed18 maintenance;
-        Fixed18 pre;
+        Fixed18 next;
         Fixed18 position;
         bool liquidatable;
         bool liquidating;
@@ -72,7 +72,7 @@ interface ILens {
     function maintenanceNext(address account, IMarket market) external returns (UFixed18);
     function liquidatable(address account, IMarket market) external returns (bool);
     function liquidating(address account, IMarket market) external returns (bool);
-    function pre(address account, IMarket market) external returns (Fixed18);
+    function next(address account, IMarket market) external returns (Fixed18);
     function position(address account, IMarket market) external returns (Fixed18);
     function userPosition(address account, IMarket market) external returns (Fixed18, Fixed18);
     function openInterest(address account, IMarket market) external returns (Fixed18);

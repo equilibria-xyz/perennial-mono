@@ -5,13 +5,13 @@ import "./Version.sol";
 
 /// @dev Account type
 struct Account {
-    int96 _pre; // 9 decimals
+    int64 _position; // 6 decimals
 
-    int96 _position; // 9 decimals
+    int64 _next; // 6 decimals
 
     int64 _collateral; // 6 decimals
 
-    uint256 reward; // 18 decimals //TODO: pack more?
+    uint64 _reward; // 6 decimals
 }
 using AccountLib for Account global;
 
@@ -28,7 +28,7 @@ library AccountLib {
         MarketParameter memory marketParameter
     ) internal pure returns (Fixed18 makerAmount, Fixed18 takerAmount, Fixed18 collateralAmount) {
         // compute position update
-        (Fixed18 currentMaker, Fixed18 currentTaker) = _splitPosition(pre(account));
+        (Fixed18 currentMaker, Fixed18 currentTaker) = _splitPosition(next(account));
         (Fixed18 nextMaker, Fixed18 nextTaker) = _splitPosition(newPosition);
         (makerAmount, takerAmount, collateralAmount) = //TODO: rounding errors here
             (nextMaker.sub(currentMaker), nextTaker.sub(currentTaker), newCollateral.sub(collateral(account)));
@@ -39,7 +39,7 @@ library AccountLib {
             .sub(Fixed18Lib.from(takerAmount.mul(currentOracleVersion.price).abs().mul(marketParameter.takerFee)));
 
         // update position
-        account._pre = int96(Fixed18.unwrap(newPosition) / 1e9);
+        account._next = int64(Fixed18.unwrap(newPosition) / 1e12);
         account._collateral = int64(Fixed18.unwrap(newCollateral) / 1e12);
     }
 
@@ -64,9 +64,9 @@ library AccountLib {
             ? toVersion.reward().taker().sub(fromVersion.reward().taker())
             : toVersion.reward().maker().sub(fromVersion.reward().maker());
 
-        account._position = account._pre;
-        account._collateral = int64(Fixed18.unwrap(collateral(account).add(_position.mul(valueDelta))) / 1e12);
-        account.reward = account.reward + UFixed18.unwrap(_position.mul(rewardDelta).abs());
+        account._position = account._next;
+        account._collateral += int64(Fixed18.unwrap(Fixed18Lib.from(_position.abs()).mul(valueDelta)) / 1e12);
+        account._reward += uint64(UFixed18.unwrap(_position.abs().mul(UFixed18Lib.from(rewardDelta))) / 1e12);
     }
 
     /**
@@ -94,7 +94,7 @@ library AccountLib {
         OracleVersion memory currentOracleVersion,
         UFixed18 maintenanceRatio
     ) internal pure returns (UFixed18) {
-        return _maintenance(pre(self), currentOracleVersion, maintenanceRatio);
+        return _maintenance(next(self), currentOracleVersion, maintenanceRatio);
     }
 
     /**
@@ -112,16 +112,19 @@ library AccountLib {
         return notionalMax.mul(maintenanceRatio);
     }
 
-
-    function pre(Account memory self) internal pure returns (Fixed18) {
-        return Fixed18.wrap(int256(self._pre) * 1e9);
+    function position(Account memory self) internal pure returns (Fixed18) {
+        return Fixed18.wrap(int256(self._position) * 1e12);
     }
 
-    function position(Account memory self) internal pure returns (Fixed18) {
-        return Fixed18.wrap(int256(self._position) * 1e9);
+    function next(Account memory self) internal pure returns (Fixed18) {
+        return Fixed18.wrap(int256(self._next) * 1e12);
     }
 
     function collateral(Account memory self) internal pure returns (Fixed18) {
         return Fixed18.wrap(int256(self._collateral) * 1e12);
+    }
+
+    function reward(Account memory self) internal pure returns (UFixed18) {
+        return UFixed18.wrap(uint256(self._reward) * 1e12);
     }
 }

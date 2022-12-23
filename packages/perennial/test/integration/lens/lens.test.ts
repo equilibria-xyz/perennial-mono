@@ -53,7 +53,7 @@ describe('Lens', () => {
     expect(marketSnapshot.openTakerInterest).to.equal(0)
 
     let userSnapshot = (await lens.callStatic['snapshots(address,address[])'](user.address, [market.address]))[0]
-    expect(userSnapshot.pre).to.equal(POSITION.mul(-1))
+    expect(userSnapshot.next).to.equal(POSITION.mul(-1))
     expect(userSnapshot.position).to.equal(0)
     expect(userSnapshot.maintenance).to.equal('341648925295826936134')
     expect(await lens.callStatic.maintenanceRequired(user.address, market.address, 1000)).to.equal('3416489252')
@@ -75,7 +75,7 @@ describe('Lens', () => {
     })
 
     userSnapshot = await lens.callStatic['snapshot(address,address)'](user.address, market.address)
-    expect(userSnapshot.pre).to.equal(0)
+    expect(userSnapshot.next).to.equal(0)
 
     // Pre -> Position
     expectPositionEq(globalPosition, {

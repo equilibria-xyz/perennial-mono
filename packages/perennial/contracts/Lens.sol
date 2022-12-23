@@ -84,7 +84,7 @@ contract Lens is ILens {
         _snapshot.userAddress = account;
         _snapshot.collateral = collateral(account, market);
         _snapshot.maintenance = maintenance(account, market);
-        _snapshot.pre = pre(account, market);
+        _snapshot.next = next(account, market);
         _snapshot.position = position(account, market);
         _snapshot.liquidatable = liquidatable(account, market);
         _snapshot.liquidating = liquidating(account, market);
@@ -274,7 +274,7 @@ contract Lens is ILens {
 
     function maintenanceNext(address account, IMarket market) public settleAccount(account, market) returns (UFixed18) {
         Account memory marketAccount = market.accounts(account);
-        return _maintenance(market, marketAccount.position().add(marketAccount.pre()));
+        return _maintenance(market, marketAccount.next());
     }
 
     /**
@@ -300,18 +300,18 @@ contract Lens is ILens {
     }
 
     /**
-     * @notice User pre position for market after settle
+     * @notice User next position for market after settle
      * @param account Account address
      * @param market Market address
-     * @return User pre-position
+     * @return User next position
      */
-    function pre(address account, IMarket market)
+    function next(address account, IMarket market)
         public
         settleAccount(account, market)
         returns (Fixed18)
     {
         Account memory marketAccount = market.accounts(account);
-        return marketAccount.pre();
+        return marketAccount.next();
     }
 
     /**
@@ -330,11 +330,11 @@ contract Lens is ILens {
     }
 
     /**
-     * @notice User pre-position and position for market after settle
+     * @notice User current and next position for market after settle
      * @param account Account address
      * @param market Market address
-     * @return User pre-position
-     * @return User position
+     * @return User current position
+     * @return User next position
      */
     function userPosition(address account, IMarket market)
         public
@@ -342,7 +342,7 @@ contract Lens is ILens {
         returns (Fixed18, Fixed18)
     {
         Account memory marketAccount = market.accounts(account);
-        return (marketAccount.pre(), marketAccount.position());
+        return (marketAccount.position(), marketAccount.next());
     }
 
     /**

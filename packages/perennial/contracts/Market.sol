@@ -390,7 +390,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         Period memory period,
         Version memory fromVersion,
         Version memory toVersion
-    ) private view {
+    ) private pure {
         if (context.currentOracleVersion.version > context.latestAccountVersion) {
             context.account.accumulate(fromVersion, toVersion);
             context.latestAccountVersion = period.toVersion.version;
