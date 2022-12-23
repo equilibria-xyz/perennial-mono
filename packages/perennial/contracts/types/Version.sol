@@ -2,9 +2,10 @@
 pragma solidity 0.8.17;
 
 import "@equilibria/root/curve/types/JumpRateUtilizationCurve.sol";
+import "./Position.sol";
 import "./Accumulator.sol";
-import "./PrePosition.sol";
 import "./ProtocolParameter.sol";
+import "./MarketParameter.sol";
 import "./Period.sol";
 import "./Fee.sol";
 
@@ -53,6 +54,45 @@ library VersionLib {
     }
 
     /**
+     * @notice Globally accumulates position fees since last oracle update
+     * @dev Position fees are calculated based on the price at `latestOracleVersion` as that is the price used to
+     *      calculate the user's fee total. In the event that settlement is occurring over multiple oracle versions
+     *      (i.e. from a -> b -> c) it is safe to use the latestOracleVersion because in the a -> b case, a is always
+     *      b - 1, and in the b -> c case the `PrePosition` is always empty so this is skipped.
+     * @return positionFee The position fee that is retained by the protocol and product
+     */
+    function update(
+        Version memory self,
+        Position memory position,
+        UFixed18 makerFee,
+        UFixed18 takerFee,
+        ProtocolParameter memory protocolParameter,
+        MarketParameter memory marketParameter
+    ) internal pure returns (UFixed18 positionFee) {
+        Accumulator memory valueAccumulator = self.value();
+        (UFixed18 makerProtocolFee, UFixed18 takerProtocolFee) =
+            (marketParameter.positionFee.mul(makerFee), marketParameter.positionFee.mul(takerFee));
+        (makerFee, takerFee) = (makerFee.sub(makerProtocolFee), takerFee.sub(takerProtocolFee));
+        positionFee = makerProtocolFee.add(takerProtocolFee);
+
+        // If there are makers to distribute the taker's position fee to, distribute. Otherwise give it to the protocol
+        if (!position.maker().isZero()) {
+            valueAccumulator.incrementMaker(Fixed18Lib.from(takerFee), position.maker());
+        } else {
+            positionFee = protocolParameter.protocolFee.add(takerFee);
+        }
+
+        // If there are takers to distribute the maker's position fee to, distribute. Otherwise give it to the protocol
+        if (!position.taker().isZero()) {
+            valueAccumulator.incrementTaker(Fixed18Lib.from(makerFee), position.taker());
+        } else {
+            positionFee = protocolParameter.protocolFee.add(makerFee);
+        }
+
+        _update(self, valueAccumulator, self.reward());
+    }
+
+    /**
      * @notice Accumulates the global state for the period from `period.fromVersion` to `period.toVersion`
      * @param versionAccumulator The struct to operate on
      * @param period The oracle version period to settle for
@@ -60,19 +100,17 @@ library VersionLib {
     function accumulate(
         Version memory versionAccumulator,
         Position memory position,
-        PrePosition memory pre,
-        Fee memory fee,
         Period memory period,
         ProtocolParameter memory protocolParameter,
         MarketParameter memory marketParameter
-    ) internal pure {
+    ) internal pure returns (UFixed18 fundingFeeAmount) {
         // load
-        UFixed18 feeAccumulator;
         (Accumulator memory valueAccumulator, Accumulator memory rewardAccumulator) =
             (versionAccumulator.value(), versionAccumulator.reward());
 
         // accumulate funding
-        feeAccumulator = _accumulateFunding(valueAccumulator, feeAccumulator, position, period, protocolParameter, marketParameter);
+        fundingFeeAmount =
+            _accumulateFunding(valueAccumulator, position, period, protocolParameter, marketParameter);
 
         // accumulate position
         _accumulatePosition(valueAccumulator, position, period, marketParameter);
@@ -80,54 +118,8 @@ library VersionLib {
         // accumulate reward
         _accumulateReward(rewardAccumulator, position, period, marketParameter); //TODO: auto-shutoff if not enough reward ERC20s in contract?
 
-        // accumulate position fee
-        feeAccumulator = _accumulatePositionFee(valueAccumulator, feeAccumulator, position, pre, marketParameter);
-
         // update
         _update(versionAccumulator, valueAccumulator, rewardAccumulator);
-        fee.update(feeAccumulator, protocolParameter.protocolFee); //TODO: pull out?
-    }
-
-    /**
-     * @notice Globally accumulates position fees since last oracle update
-     * @dev Position fees are calculated based on the price at `latestOracleVersion` as that is the price used to
-     *      calculate the user's fee total. In the event that settlement is occurring over multiple oracle versions
-     *      (i.e. from a -> b -> c) it is safe to use the latestOracleVersion because in the a -> b case, a is always
-     *      b - 1, and in the b -> c case the `PrePosition` is always empty so this is skipped.
-     * @param pre The global pre-position
-     * @return newFeeAccumulator The position fee that is retained by the protocol and product
-     */
-    function _accumulatePositionFee(
-        Accumulator memory valueAccumulator,
-        UFixed18 feeAccumulator,
-        Position memory position,
-        PrePosition memory pre,
-        MarketParameter memory marketParameter
-    ) private pure returns (UFixed18 newFeeAccumulator) {
-        if (pre.isEmpty()) return feeAccumulator;
-
-        (UFixed18 makerPositionFee, UFixed18 takerPositionFee) = (pre.makerFee(), pre.takerFee());
-        (UFixed18 makerProtocolFee, UFixed18 takerProtocolFee) =
-            (marketParameter.positionFee.mul(makerPositionFee), marketParameter.positionFee.mul(takerPositionFee));
-        (makerPositionFee, takerPositionFee) =
-            (makerPositionFee.sub(makerProtocolFee), takerPositionFee.sub(takerProtocolFee));
-        newFeeAccumulator = makerProtocolFee.add(takerProtocolFee);
-
-        // If there are makers to distribute the taker's position fee to, distribute. Otherwise give it to the protocol
-        if (!position.maker().isZero()) {
-            valueAccumulator.incrementMaker(Fixed18Lib.from(takerPositionFee), position.maker());
-        } else {
-            newFeeAccumulator = newFeeAccumulator.add(takerPositionFee);
-        }
-
-        // If there are takers to distribute the maker's position fee to, distribute. Otherwise give it to the protocol
-        if (!position.taker().isZero()) {
-            valueAccumulator.incrementTaker(Fixed18Lib.from(makerPositionFee), position.taker());
-        } else {
-            newFeeAccumulator = newFeeAccumulator.add(makerPositionFee);
-        }
-
-        newFeeAccumulator = feeAccumulator.add(newFeeAccumulator);
     }
 
     /**
@@ -136,19 +128,18 @@ library VersionLib {
      *      pegged to the price of the last snapshotted oracleVersion until a new one is accumulated.
      *      This is an acceptable approximation.
      * @param period The oracle version period to settle for
-     * @return newFeeAccumulator The total fee accrued from funding accumulation
+     * @return fundingFeeAmount The total fee accrued from funding accumulation
      */
     function _accumulateFunding(
         Accumulator memory valueAccumulator,
-        UFixed18 feeAccumulator,
         Position memory position,
         Period memory period,
         ProtocolParameter memory protocolParameter,
         MarketParameter memory marketParameter
-    ) private pure returns (UFixed18 newFeeAccumulator) {
-        if (marketParameter.closed) return feeAccumulator;
-        if (position.taker().isZero()) return feeAccumulator;
-        if (position.maker().isZero()) return feeAccumulator;
+    ) private pure returns (UFixed18 fundingFeeAmount) {
+        if (marketParameter.closed) return UFixed18Lib.ZERO;
+        if (position.taker().isZero()) return UFixed18Lib.ZERO;
+        if (position.maker().isZero()) return UFixed18Lib.ZERO;
 
         UFixed18 takerNotional = Fixed18Lib.from(position.taker()).mul(period.fromVersion.price).abs();
         UFixed18 socializedNotional = takerNotional.mul(position.socializationFactor());
@@ -158,11 +149,11 @@ library VersionLib {
             .div(Fixed18Lib.from(365 days))                                                                     // divide by seconds in year (funding rate for period)
             .mul(Fixed18Lib.from(socializedNotional));                                                          // multiply by socialized notion (funding for period)
         UFixed18 boundedFundingFee = UFixed18Lib.max(marketParameter.fundingFee, protocolParameter.minFundingFee);
-        newFeeAccumulator = fundingAccumulated.abs().mul(boundedFundingFee);
+        fundingFeeAmount = fundingAccumulated.abs().mul(boundedFundingFee);
 
         Fixed18 fundingAccumulatedWithoutFee = Fixed18Lib.from(
             fundingAccumulated.sign(),
-            fundingAccumulated.abs().sub(newFeeAccumulator)
+            fundingAccumulated.abs().sub(fundingFeeAmount)
         );
 
         bool makerPaysFunding = fundingAccumulated.sign() < 0;
@@ -170,8 +161,6 @@ library VersionLib {
             makerPaysFunding ? fundingAccumulated : fundingAccumulatedWithoutFee, position.maker());
         valueAccumulator.decrementTaker(
             makerPaysFunding ? fundingAccumulatedWithoutFee : fundingAccumulated, position.taker());
-
-        newFeeAccumulator = feeAccumulator.add(newFeeAccumulator);
     }
 
     /**

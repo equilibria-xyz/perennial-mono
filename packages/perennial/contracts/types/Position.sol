@@ -4,7 +4,6 @@ pragma solidity ^0.8.13;
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@equilibria/root/number/types/UFixed18.sol";
 import "./Accumulator.sol";
-import "./PrePosition.sol";
 
 /// @dev Position type
 struct Position {

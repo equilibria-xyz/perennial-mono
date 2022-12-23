@@ -48,7 +48,6 @@ contract Lens is ILens {
         _snapshot.dailyRate = dailyRate(market);
         _snapshot.latestVersion = latestVersion(market);
         _snapshot.collateral = collateral(market);
-        _snapshot.pre = pre(market);
         _snapshot.position = position(market);
         _snapshot.fee = fees(market);
         (_snapshot.openMakerInterest, _snapshot.openTakerInterest) = openInterest(market);
@@ -147,31 +146,12 @@ contract Lens is ILens {
     }
 
     /**
-     * @notice Market pre position after settle
-     * @param market Market address
-     * @return Market pre-position
-     */
-    function pre(IMarket market) public settle(market) returns (PrePosition memory) {
-        return market.pre();
-    }
-
-    /**
      * @notice Market position after settle
      * @param market Market address
      * @return market position
      */
     function position(IMarket market) public settle(market) returns (Position memory) {
         return _latestPosition(market);
-    }
-
-    /**
-     * @notice Market pre-position and position after settle
-     * @param market Market address
-     * @return Market pre-position
-     * @return Market position
-     */
-    function globalPosition(IMarket market) public settle(market) returns (PrePosition memory, Position memory) {
-        return (market.pre(), _latestPosition(market));
     }
 
     /**
@@ -367,7 +347,7 @@ contract Lens is ILens {
      * @return User's exposure (openInterest * utilization) after settle
      */
     function exposure(address account, IMarket market) public settleAccount(account, market) returns (Fixed18) {
-        (, Position memory _pos) = globalPosition(market);
+        Position memory _pos = position(market);
         if (_pos.maker().isZero()) { return Fixed18Lib.ZERO; }
 
         Fixed18 _openInterest = openInterest(account, market);

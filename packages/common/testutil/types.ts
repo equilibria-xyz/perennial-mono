@@ -13,11 +13,6 @@ export interface Accumulator {
   _taker: BigNumberish
 }
 
-export interface PrePosition {
-  _makerFee: BigNumberish
-  _takerFee: BigNumberish
-}
-
 export interface ProgramInfo {
   coordinatorId: BigNumberish
   token: string
@@ -39,11 +34,6 @@ export function expectPositionEq(a: Position, b: Position): void {
   expect(a._taker).to.equal(b._taker)
   expect(a._makerNext).to.equal(b._makerNext)
   expect(a._takerNext).to.equal(b._takerNext)
-}
-
-export function expectPrePositionEq(a: PrePosition, b: PrePosition): void {
-  expect(a._makerFee).to.equal(b._makerFee)
-  expect(a._takerFee).to.equal(b._takerFee)
 }
 
 export function expectProgramInfoEq(a: ProgramInfo, b: ProgramInfo): void {

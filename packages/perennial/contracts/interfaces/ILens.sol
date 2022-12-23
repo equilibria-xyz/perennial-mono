@@ -19,7 +19,6 @@ interface ILens {
         Fixed18 dailyRate;
         OracleVersion latestVersion;
         Fixed18 collateral;
-        PrePosition pre;
         Position position;
         Fee fee;
         UFixed18 openMakerInterest;
@@ -56,10 +55,8 @@ interface ILens {
     function definition(IMarket market) external view returns (IMarket.MarketDefinition memory);
     function parameter(IMarket market) external view returns (MarketParameter memory);
     function collateral(IMarket market) external returns (Fixed18);
-    function pre(IMarket market) external returns (PrePosition memory);
     function fees(IMarket market) external returns (Fee memory);
     function position(IMarket market) external returns (Position memory);
-    function globalPosition(IMarket market) external returns (PrePosition memory, Position memory);
     function latestVersion(IMarket market) external returns (OracleVersion memory);
     function atVersions(IMarket market, uint[] memory versions) external returns (OracleVersion[] memory);
     function rate(IMarket market) external returns (Fixed18);

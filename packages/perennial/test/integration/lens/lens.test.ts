@@ -3,7 +3,7 @@ import 'hardhat'
 import { constants, utils } from 'ethers'
 
 import { InstanceVars, deployProtocol, createMarket } from '../helpers/setupHelpers'
-import { expectPositionEq, expectPrePositionEq } from '../../../../common/testutil/types'
+import { expectPositionEq } from '../../../../common/testutil/types'
 
 const SECONDS_IN_YEAR = 60 * 60 * 24 * 365
 const SECONDS_IN_DAY = 60 * 60 * 24
@@ -37,12 +37,7 @@ describe('Lens', () => {
 
     // PrePositions should exist for user and userB
     let marketSnapshot = (await lens.callStatic['snapshots(address[])']([market.address]))[0]
-    let globalPre = marketSnapshot.pre
     let globalPosition = marketSnapshot.position
-    expectPrePositionEq(globalPre, {
-      _makerFee: 0,
-      _takerFee: 0,
-    })
     expectPositionEq(globalPosition, {
       _maker: 0,
       _taker: 0,
@@ -68,12 +63,7 @@ describe('Lens', () => {
 
     // PrePositions are zeroed out after price update and settlement
     marketSnapshot = await lens.callStatic['snapshot(address)'](market.address)
-    globalPre = marketSnapshot.pre
     globalPosition = marketSnapshot.position
-    expectPrePositionEq(globalPre, {
-      _makerFee: 0,
-      _takerFee: 0,
-    })
 
     userSnapshot = await lens.callStatic['snapshot(address,address)'](user.address, market.address)
     expect(userSnapshot.next).to.equal(0)

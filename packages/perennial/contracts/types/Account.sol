@@ -26,17 +26,25 @@ library AccountLib {
         Fixed18 newCollateral,
         OracleVersion memory currentOracleVersion,
         MarketParameter memory marketParameter
-    ) internal pure returns (Fixed18 makerAmount, Fixed18 takerAmount, Fixed18 collateralAmount) {
+    ) internal pure returns (
+        Fixed18 makerAmount,
+        Fixed18 takerAmount,
+        UFixed18 makerFee,
+        UFixed18 takerFee,
+        Fixed18 collateralAmount
+    ) {
         // compute position update
         (Fixed18 currentMaker, Fixed18 currentTaker) = _splitPosition(next(account));
         (Fixed18 nextMaker, Fixed18 nextTaker) = _splitPosition(newPosition);
-        (makerAmount, takerAmount, collateralAmount) = //TODO: rounding errors here
-            (nextMaker.sub(currentMaker), nextTaker.sub(currentTaker), newCollateral.sub(collateral(account)));
+        (makerAmount, takerAmount) =
+            (nextMaker.sub(currentMaker), nextTaker.sub(currentTaker));
 
         // compute collateral update
-        collateralAmount = collateralAmount
-            .sub(Fixed18Lib.from(makerAmount.mul(currentOracleVersion.price).abs().mul(marketParameter.makerFee)))
-            .sub(Fixed18Lib.from(takerAmount.mul(currentOracleVersion.price).abs().mul(marketParameter.takerFee)));
+        (makerFee, takerFee) = (
+            makerAmount.mul(currentOracleVersion.price).abs().mul(marketParameter.makerFee),
+            takerAmount.mul(currentOracleVersion.price).abs().mul(marketParameter.takerFee)
+        );
+        collateralAmount = newCollateral.sub(collateral(account)).sub(Fixed18Lib.from(makerFee.add(takerFee)));
 
         // update position
         account._next = int64(Fixed18.unwrap(newPosition) / 1e12);

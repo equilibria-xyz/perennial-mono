@@ -34,8 +34,6 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
 
         Position position;
 
-        PrePosition pre;
-
         Fee fee;
 
         /* Current Account State */
@@ -66,26 +64,26 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
     /// @dev ERC20 stablecoin for reward
     Token18 public reward;
 
+    /// @dev Treasury of the market, collects fees
+    address public treasury;
+
     /// @dev Protocol and market fees collected, but not yet claimed
     Fee private _fee;
 
-    /// @dev The individual state for each account
-    mapping(address => Account) private _accounts;
+    Position private _position;
 
     /// @dev Mapping of the historical version data
     mapping(uint256 => Version) _versions;
 
-    Position private _position;
-    PrePosition private _pre; //TODO: still outside?
-
     uint256 public latestVersion;
+
+    /// @dev The individual state for each account
+    mapping(address => Account) private _accounts;
+
     mapping(address => uint256) public latestVersions;
 
     /// @dev Whether the account is currently locked for liquidation
     mapping(address => bool) public liquidation;
-
-    /// @dev Treasury of the market, collects fees
-    address public treasury;
 
     MarketParameterStorage private constant _parameter = MarketParameterStorage.wrap(keccak256("equilibria.perennial.Market.parameter"));
     function parameter() public view returns (MarketParameter memory) { return _parameter.read(); }
@@ -202,10 +200,6 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         return _position;
     }
 
-    function pre() external view returns (PrePosition memory) {
-        return _pre;
-    }
-
     function fee() external view returns (Fee memory) {
         return _fee;
     }
@@ -256,19 +250,27 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         if (context.marketParameter.closed && !newPosition.isZero()) revert MarketClosedError();
 
         // update
-        (Fixed18 makerAmount, Fixed18 takerAmount, Fixed18 collateralAmount) = context.account.update(
+        (
+            Fixed18 makerAmount,
+            Fixed18 takerAmount,
+            UFixed18 makerFee,
+            UFixed18 takerFee,
+            Fixed18 collateralAmount
+        ) = context.account.update(
             newPosition,
             newCollateral,
             context.currentOracleVersion,
             context.marketParameter
         );
         context.position.update(makerAmount, takerAmount);
-        context.pre.update(
-            makerAmount,
-            takerAmount,
-            context.currentOracleVersion,
+        UFixed18 positionFee = context.version.update(
+            context.position,
+            makerFee,
+            takerFee,
+            context.protocolParameter,
             context.marketParameter
         );
+        context.fee.update(positionFee, context.protocolParameter);
 
         // after
         if (!force) _checkPosition(context);
@@ -300,9 +302,8 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         // Load market state
         context.currentOracleVersion = _transform(oracle.sync());
         context.latestVersion = latestVersion;
-        context.version = _versions[context.latestVersion];
+        context.version = _versions[context.latestVersion + 1];
         context.position = _position;
-        context.pre = _pre;
         context.fee = _fee;
 
         // Load account state
@@ -319,13 +320,16 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
     function _saveContext(CurrentContext memory context, address account) private {
         _startGas(context, "_saveContext: %s");
 
+        // Save market state
         latestVersion = context.latestVersion;
+        _versions[context.latestVersion + 1] = context.version;
+        _position = context.position;
+        _fee = context.fee;
+
+        // Load account state
         latestVersions[account] = context.latestAccountVersion;
         _accounts[account] = context.account;
         liquidation[account] = context.liquidation; //TODO: can pack this in account, only saves gas on liq.
-        _position = context.position;
-        _pre = context.pre;
-        _fee = context.fee;
 
         _endGas(context);
     }
@@ -371,16 +375,14 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
 
     function _settlePeriod(CurrentContext memory context, Period memory period) private {
         if (context.currentOracleVersion.version > context.latestVersion) {
-            context.version.accumulate(
+            UFixed18 fundingFee = context.version.accumulate(
                 context.position,
-                context.pre,
-                context.fee,
                 period,
                 context.protocolParameter,
                 context.marketParameter
             );
+            context.fee.update(fundingFee, context.protocolParameter);
             context.position.settle();
-            context.pre.clear();
             context.latestVersion = period.toVersion.version;
             _versions[period.toVersion.version] = context.version;
         }

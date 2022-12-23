@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.17;
 
-import "./PrePosition.sol";
-import "./Version.sol";
+import "./ProtocolParameter.sol";
 
 //TODO: add interface fee?
 
@@ -19,8 +18,8 @@ using FeeLib for Fee global;
  * @notice
  */
 library FeeLib {
-    function update(Fee memory self, UFixed18 amount, UFixed18 protocolFee) internal pure {
-        UFixed18 protocolAmount = amount.mul(protocolFee);
+    function update(Fee memory self, UFixed18 amount, ProtocolParameter memory protocolParameter) internal pure {
+        UFixed18 protocolAmount = amount.mul(protocolParameter.protocolFee);
         UFixed18 marketAmount = amount.sub(protocolAmount);
         self._protocol = uint128(UFixed18.unwrap(protocol(self).add(protocolAmount)));
         self._market = uint128(UFixed18.unwrap(market(self).add(marketAmount)));

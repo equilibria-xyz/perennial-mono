@@ -7,7 +7,6 @@ import "@equilibria/root/curve/types/JumpRateUtilizationCurve.sol";
 import "./IOracleProvider.sol";
 import "../types/PayoffDefinition.sol";
 import "../types/Position.sol";
-import "../types/PrePosition.sol";
 import "../types/Accumulator.sol";
 import "../types/Version.sol";
 import "../types/Account.sol";
@@ -64,7 +63,6 @@ interface IMarket {
     function accounts(address account) external view returns (Account memory);
     function versions(uint256 oracleVersion) external view returns (Version memory);
     function position() external view returns (Position memory);
-    function pre() external view returns (PrePosition memory);
     function fee() external view returns (Fee memory);
     function settle(address account) external;
     function update(Fixed18 positionAmount, Fixed18 collateralAmount) external;

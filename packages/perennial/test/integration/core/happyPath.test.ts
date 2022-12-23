@@ -3,7 +3,7 @@ import 'hardhat'
 import { constants, utils } from 'ethers'
 
 import { InstanceVars, deployProtocol, createMarket, INITIAL_VERSION } from '../helpers/setupHelpers'
-import { createPayoffDefinition, expectPositionEq, expectPrePositionEq } from '../../../../common/testutil/types'
+import { createPayoffDefinition, expectPositionEq } from '../../../../common/testutil/types'
 import { Market__factory } from '../../../types/generated'
 
 //TODO: gas -> make sure all fees are non-zero (maker / taker / position)
@@ -17,8 +17,7 @@ describe.only('Happy Path', () => {
   })
 
   it('creates a market', async () => {
-    const { owner, user, controller, treasuryB, contractPayoffProvider, chainlinkOracle, dsu, rewardToken, lens } =
-      instanceVars
+    const { owner, controller, treasuryB, contractPayoffProvider, chainlinkOracle, dsu, rewardToken } = instanceVars
 
     const definition = {
       name: 'Squeeth',
@@ -79,10 +78,6 @@ describe.only('Happy Path', () => {
       _makerNext: POSITION.div(1e12),
       _takerNext: 0,
     })
-    expectPrePositionEq(await market.pre(), {
-      _makerFee: 0,
-      _takerFee: 0,
-    })
     const version = await market.versions(INITIAL_VERSION)
     expect(version._makerValue).to.equal(0)
     expect(version._takerValue).to.equal(0)
@@ -100,10 +95,6 @@ describe.only('Happy Path', () => {
       _taker: 0,
       _makerNext: POSITION.div(1e12),
       _takerNext: 0,
-    })
-    expectPrePositionEq(await market.pre(), {
-      _makerFee: 0,
-      _takerFee: 0,
     })
 
     // Settle user and check state
@@ -140,10 +131,6 @@ describe.only('Happy Path', () => {
       _makerNext: POSITION.div(1e12),
       _takerNext: 0,
     })
-    expectPrePositionEq(await market.pre(), {
-      _makerFee: 0,
-      _takerFee: 0,
-    })
     const version = await market.versions(INITIAL_VERSION)
     expect(version._makerValue).to.equal(0)
     expect(version._takerValue).to.equal(0)
@@ -161,10 +148,6 @@ describe.only('Happy Path', () => {
       _taker: 0,
       _makerNext: POSITION.div(1e12),
       _takerNext: 0,
-    })
-    expectPrePositionEq(await market.pre(), {
-      _makerFee: 0,
-      _takerFee: 0,
     })
 
     // Settle user and check state
@@ -201,10 +184,6 @@ describe.only('Happy Path', () => {
       _taker: 0,
       _makerNext: 0,
       _takerNext: 0,
-    })
-    expectPrePositionEq(await market.pre(), {
-      _makerFee: 0,
-      _takerFee: 0,
     })
     const version = await market.versions(INITIAL_VERSION)
     expect(version._makerValue).to.equal(0)
@@ -243,10 +222,6 @@ describe.only('Happy Path', () => {
       _makerNext: 0,
       _takerNext: 0,
     })
-    expectPrePositionEq(await market.pre(), {
-      _makerFee: 0,
-      _takerFee: 0,
-    })
     const version = await market.versions(INITIAL_VERSION)
     expect(version._makerValue).to.equal(0)
     expect(version._takerValue).to.equal(0)
@@ -282,10 +257,6 @@ describe.only('Happy Path', () => {
       _makerNext: POSITION.div(1e12),
       _takerNext: POSITION_B.div(1e12),
     })
-    expectPrePositionEq(await market.pre(), {
-      _makerFee: 0,
-      _takerFee: 0,
-    })
     const version = await market.versions(INITIAL_VERSION)
     expect(version._makerValue).to.equal(0)
     expect(version._takerValue).to.equal(0)
@@ -306,10 +277,6 @@ describe.only('Happy Path', () => {
       _taker: POSITION_B.div(1e12),
       _makerNext: POSITION.div(1e12),
       _takerNext: POSITION_B.div(1e12),
-    })
-    expectPrePositionEq(await market.pre(), {
-      _makerFee: 0,
-      _takerFee: 0,
     })
     await market.settle(userB.address)
     expect((await market.accounts(userB.address))._position).to.equal(POSITION_B.div(1e12))
@@ -347,10 +314,6 @@ describe.only('Happy Path', () => {
       _makerNext: POSITION.div(1e12),
       _takerNext: POSITION_B.div(1e12),
     })
-    expectPrePositionEq(await market.pre(), {
-      _makerFee: 0,
-      _takerFee: 0,
-    })
     const version = await market.versions(INITIAL_VERSION)
     expect(version._makerValue).to.equal(0)
     expect(version._takerValue).to.equal(0)
@@ -371,10 +334,6 @@ describe.only('Happy Path', () => {
       _taker: POSITION_B.div(1e12),
       _makerNext: POSITION.div(1e12),
       _takerNext: POSITION_B.div(1e12),
-    })
-    expectPrePositionEq(await market.pre(), {
-      _makerFee: 0,
-      _takerFee: 0,
     })
     await market.settle(userB.address)
     expect((await market.accounts(userB.address))._position).to.equal(POSITION_B.div(1e12))
@@ -416,10 +375,6 @@ describe.only('Happy Path', () => {
       _taker: 0,
       _makerNext: POSITION.div(1e12),
       _takerNext: 0,
-    })
-    expectPrePositionEq(await market.pre(), {
-      _makerFee: 0,
-      _takerFee: 0,
     })
     const version = await market.versions(INITIAL_VERSION)
     expect(version._makerValue).to.equal(0)
@@ -463,10 +418,6 @@ describe.only('Happy Path', () => {
       _taker: 0,
       _makerNext: POSITION.div(1e12),
       _takerNext: 0,
-    })
-    expectPrePositionEq(await market.pre(), {
-      _makerFee: 0,
-      _takerFee: 0,
     })
     const version = await market.versions(INITIAL_VERSION)
     expect(version._makerValue).to.equal(0)
@@ -559,13 +510,9 @@ describe.only('Happy Path', () => {
       _makerNext: POSITION.div(1e12),
       _takerNext: POSITION.div(2).div(1e12),
     })
-    expectPrePositionEq(await market.pre(), {
-      _makerFee: '587312764910861482',
-      _takerFee: 0,
-    })
     const version = await market.versions(INITIAL_VERSION + 4)
     expect(version._makerValue).to.equal('-357213762097')
-    expect(version._takerValue).to.equal('367430826480')
+    expect(version._takerValue).to.equal('367430826479')
     expect(version._makerReward).to.equal(0)
     expect(version._takerReward).to.equal(0)
   })
