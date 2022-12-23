@@ -2,7 +2,7 @@ import { expect } from 'chai'
 import 'hardhat'
 import { constants, utils } from 'ethers'
 
-import { InstanceVars, deployProtocol, createMarket, depositTo } from '../helpers/setupHelpers'
+import { InstanceVars, deployProtocol, createMarket } from '../helpers/setupHelpers'
 import { expectPositionEq, expectPrePositionEq } from '../../../../common/testutil/types'
 
 const SECONDS_IN_YEAR = 60 * 60 * 24 * 365
@@ -26,10 +26,8 @@ describe('Lens', () => {
     controller.updateParameter(protocolParameter)
     const market = await createMarket(instanceVars)
 
-    await depositTo(instanceVars, user, market, utils.parseEther('1000'))
-    await depositTo(instanceVars, userB, market, utils.parseEther('1000'))
-    await market.connect(user).update(POSITION.mul(-1), 0)
-    await market.connect(userB).update(POSITION, 0)
+    await market.connect(user).update(POSITION.mul(-1), utils.parseEther('1000'))
+    await market.connect(userB).update(POSITION, utils.parseEther('1000'))
 
     // Returns the market name
     const info = await lens.callStatic.definition(market.address)

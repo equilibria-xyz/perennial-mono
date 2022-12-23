@@ -2,7 +2,7 @@ import { expect } from 'chai'
 import 'hardhat'
 import { BigNumber, constants, utils } from 'ethers'
 
-import { InstanceVars, deployProtocol, createMarket, depositTo } from '../helpers/setupHelpers'
+import { InstanceVars, deployProtocol, createMarket } from '../helpers/setupHelpers'
 
 describe('Liquidate', () => {
   let instanceVars: InstanceVars
@@ -16,8 +16,7 @@ describe('Liquidate', () => {
     const { user, userB, dsu, chainlink, lens } = instanceVars
 
     const market = await createMarket(instanceVars)
-    await depositTo(instanceVars, user, market, utils.parseEther('1000'))
-    await market.connect(user).update(POSITION.mul(-1), 0)
+    await market.connect(user).update(POSITION.mul(-1), utils.parseEther('1000'))
 
     expect(await lens.callStatic.liquidatable(user.address, market.address)).to.be.false
 
@@ -48,10 +47,8 @@ describe('Liquidate', () => {
     const { user, userB, dsu, chainlink } = instanceVars
 
     const market = await createMarket(instanceVars)
-    await depositTo(instanceVars, user, market, utils.parseEther('1000'))
-    await depositTo(instanceVars, userB, market, utils.parseEther('1000'))
-    await market.connect(user).update(POSITION.mul(-1), 0)
-    await market.connect(userB).update(POSITION, 0)
+    await market.connect(user).update(POSITION.mul(-1), utils.parseEther('1000'))
+    await market.connect(userB).update(POSITION, utils.parseEther('1000'))
 
     // Settle the market with a new oracle version
     await chainlink.next()
@@ -79,14 +76,10 @@ describe('Liquidate', () => {
     const { user, userB, userC, userD, chainlink, lens } = instanceVars
 
     const market = await createMarket(instanceVars)
-    await depositTo(instanceVars, user, market, utils.parseEther('1000'))
-    await depositTo(instanceVars, userB, market, utils.parseEther('1000'))
-    await depositTo(instanceVars, userC, market, utils.parseEther('10000'))
-    await depositTo(instanceVars, userD, market, utils.parseEther('10000'))
-    await market.connect(user).update(POSITION.mul(-1), 0)
-    await market.connect(userB).update(POSITION.mul(-1), 0)
-    await market.connect(userC).update(POSITION, 0)
-    await market.connect(userD).update(POSITION, 0)
+    await market.connect(user).update(POSITION.mul(-1), utils.parseEther('1000'))
+    await market.connect(userB).update(POSITION.mul(-1), utils.parseEther('1000'))
+    await market.connect(userC).update(POSITION, utils.parseEther('10000'))
+    await market.connect(userD).update(POSITION, utils.parseEther('10000'))
 
     expect(await lens.callStatic.liquidatable(user.address, market.address)).to.be.false
 

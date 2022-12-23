@@ -2,7 +2,7 @@ import { expect } from 'chai'
 import 'hardhat'
 import { utils, constants } from 'ethers'
 
-import { InstanceVars, deployProtocol, createMarket, depositTo } from '../helpers/setupHelpers'
+import { InstanceVars, deployProtocol, createMarket } from '../helpers/setupHelpers'
 import { Market } from '../../../types/generated'
 
 describe('Closed Market', () => {
@@ -17,8 +17,7 @@ describe('Closed Market', () => {
     const { user, chainlink } = instanceVars
 
     const market = await createMarket(instanceVars)
-    await depositTo(instanceVars, user, market, utils.parseEther('1000'))
-    await market.connect(user).update(POSITION.mul(-1), 0)
+    await market.connect(user).update(POSITION.mul(-1), utils.parseEther('1000'))
 
     //TODO: uncomment when versioned params are added
     //expect(await market.closed()).to.be.false
@@ -46,10 +45,8 @@ describe('Closed Market', () => {
       const { user, userB } = instanceVars
 
       market = await createMarket(instanceVars)
-      await depositTo(instanceVars, user, market, utils.parseEther('1000'))
-      await depositTo(instanceVars, userB, market, utils.parseEther('1000'))
-      await market.connect(user).update(POSITION.mul(-1), 0)
-      await market.connect(userB).update(POSITION, 0)
+      await market.connect(user).update(POSITION.mul(-1), utils.parseEther('1000'))
+      await market.connect(userB).update(POSITION, utils.parseEther('1000'))
       const parameters = await market.parameter()
       parameters.closed = true
       await market.updateParameter(parameters)
@@ -78,10 +75,8 @@ describe('Closed Market', () => {
     const { user, userB, chainlink } = instanceVars
 
     const market = await createMarket(instanceVars)
-    await depositTo(instanceVars, user, market, utils.parseEther('1000'))
-    await depositTo(instanceVars, userB, market, utils.parseEther('1000'))
-    await market.connect(user).update(POSITION.mul(-1), 0)
-    await market.connect(userB).update(POSITION, 0)
+    await market.connect(user).update(POSITION.mul(-1), utils.parseEther('1000'))
+    await market.connect(userB).update(POSITION, utils.parseEther('1000'))
 
     await chainlink.next()
     await chainlink.next()
@@ -112,10 +107,8 @@ describe('Closed Market', () => {
     const { user, userB, chainlink } = instanceVars
 
     const market = await createMarket(instanceVars)
-    await depositTo(instanceVars, user, market, utils.parseEther('1000'))
-    await depositTo(instanceVars, userB, market, utils.parseEther('1000'))
-    await market.connect(user).update(POSITION.mul(-1), 0)
-    await market.connect(userB).update(POSITION, 0)
+    await market.connect(user).update(POSITION.mul(-1), utils.parseEther('1000'))
+    await market.connect(userB).update(POSITION, utils.parseEther('1000'))
 
     await chainlink.next()
     await chainlink.nextWithPriceModification(price => price.mul(2))

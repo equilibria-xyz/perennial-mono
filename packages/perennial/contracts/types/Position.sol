@@ -9,9 +9,9 @@ import "./PrePosition.sol";
 /// @dev Position type
 struct Position {
     /// @dev Quantity of the maker position
-    PackedUFixed18 _maker;
+    uint96 _maker; // 9 decimals
     /// @dev Quantity of the taker position
-    PackedUFixed18 _taker;
+    uint96 _taker; // 9 decimals
 }
 using PositionLib for Position global;
 
@@ -23,11 +23,11 @@ using PositionLib for Position global;
  */
 library PositionLib {
     function maker(Position memory self) internal pure returns (UFixed18) {
-        return self._maker.unpack();
+        return UFixed18.wrap(uint256(self._maker) * 1e9);
     }
 
     function taker(Position memory self) internal pure returns (UFixed18) {
-        return self._taker.unpack();
+        return UFixed18.wrap(uint256(self._taker) * 1e9);
     }
 
     /**
@@ -38,8 +38,8 @@ library PositionLib {
      */
     function next(Position memory self, PrePosition memory pre) internal pure returns (Position memory) {
         return Position(
-            UFixed18Lib.from(Fixed18Lib.from(self.maker()).add(pre.maker())).pack(),
-            UFixed18Lib.from(Fixed18Lib.from(self.taker()).add(pre.taker())).pack()
+            uint64(UFixed18.unwrap(UFixed18Lib.from(Fixed18Lib.from(self.maker()).add(pre.maker()))) / 1e9),
+            uint64(UFixed18.unwrap(UFixed18Lib.from(Fixed18Lib.from(self.taker()).add(pre.taker()))) / 1e9)
         );
     }
 

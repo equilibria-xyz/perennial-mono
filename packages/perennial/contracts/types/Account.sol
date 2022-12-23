@@ -30,7 +30,7 @@ library AccountLib {
         // compute position update
         (Fixed18 currentMaker, Fixed18 currentTaker) = _splitPosition(pre(account));
         (Fixed18 nextMaker, Fixed18 nextTaker) = _splitPosition(newPosition);
-        (makerAmount, takerAmount, collateralAmount) =
+        (makerAmount, takerAmount, collateralAmount) = //TODO: rounding errors here
             (nextMaker.sub(currentMaker), nextTaker.sub(currentTaker), newCollateral.sub(collateral(account)));
 
         // compute collateral update

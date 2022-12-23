@@ -92,7 +92,7 @@ describe.only('Happy Path', () => {
 
     // Check global post-settlement state
     expect(await market.latestVersion()).to.equal(INITIAL_VERSION + 1)
-    expectPositionEq(await market.position(), { _maker: POSITION, _taker: 0 })
+    expectPositionEq(await market.position(), { _maker: POSITION.div(1e9), _taker: 0 })
     expectPrePositionEq(await market.pre(), {
       _maker: 0,
       _taker: 0,
@@ -147,7 +147,7 @@ describe.only('Happy Path', () => {
 
     // Check global post-settlement state
     expect(await market.latestVersion()).to.equal(INITIAL_VERSION + 1)
-    expectPositionEq(await market.position(), { _maker: POSITION, _taker: 0 })
+    expectPositionEq(await market.position(), { _maker: POSITION.div(1e9), _taker: 0 })
     expectPrePositionEq(await market.pre(), {
       _maker: 0,
       _taker: 0,
@@ -281,8 +281,8 @@ describe.only('Happy Path', () => {
 
     expect(await market.latestVersion()).to.equal(INITIAL_VERSION + 2)
     expectPositionEq(await market.position(), {
-      _maker: POSITION,
-      _taker: POSITION_B,
+      _maker: POSITION.div(1e9),
+      _taker: POSITION_B.div(1e9),
     })
     expectPrePositionEq(await market.pre(), {
       _maker: 0,
@@ -343,8 +343,8 @@ describe.only('Happy Path', () => {
 
     expect(await market.latestVersion()).to.equal(INITIAL_VERSION + 2)
     expectPositionEq(await market.position(), {
-      _maker: POSITION,
-      _taker: POSITION_B,
+      _maker: POSITION.div(1e9),
+      _taker: POSITION_B.div(1e9),
     })
     expectPrePositionEq(await market.pre(), {
       _maker: 0,
@@ -474,6 +474,12 @@ describe.only('Happy Path', () => {
     await dsu.connect(user).approve(market.address, COLLATERAL)
     await dsu.connect(userB).approve(market.address, COLLATERAL)
 
+    await market.connect(user).update(POSITION.div(3).mul(-1), COLLATERAL)
+    await market.connect(userB).update(POSITION.div(3), COLLATERAL)
+
+    await chainlink.next()
+    await chainlink.next()
+
     await market.connect(user).update(POSITION.div(2).mul(-1), COLLATERAL)
     await market.connect(userB).update(POSITION.div(2), COLLATERAL)
 
@@ -486,18 +492,18 @@ describe.only('Happy Path', () => {
 
     await expect(market.connect(user).update(POSITION.mul(-1), COLLATERAL.sub(1)))
       .to.emit(market, 'Updated')
-      .withArgs(user.address, INITIAL_VERSION + 2, POSITION.mul(-1), COLLATERAL.sub(1))
+      .withArgs(user.address, INITIAL_VERSION + 4, POSITION.mul(-1), COLLATERAL.sub(1))
 
     // Check user is in the correct state
     expect((await market.accounts(user.address))._position).to.equal(POSITION.div(2).mul(-1).div(1e9))
     expect((await market.accounts(user.address))._pre).to.equal(POSITION.mul(-1).div(1e9))
-    expect(await market.latestVersions(user.address)).to.equal(INITIAL_VERSION + 2)
+    expect(await market.latestVersions(user.address)).to.equal(INITIAL_VERSION + 4)
 
     // Check global state
-    expect(await market.latestVersion()).to.equal(INITIAL_VERSION + 2)
+    expect(await market.latestVersion()).to.equal(INITIAL_VERSION + 4)
     expectPositionEq(await market.position(), {
-      _maker: POSITION.div(2),
-      _taker: POSITION.div(2),
+      _maker: POSITION.div(2).div(1e9),
+      _taker: POSITION.div(2).div(1e9),
     })
     expectPrePositionEq(await market.pre(), {
       _maker: POSITION.div(2),
@@ -505,9 +511,9 @@ describe.only('Happy Path', () => {
       _makerFee: 0,
       _takerFee: 0,
     })
-    const version = await market.versions(INITIAL_VERSION + 2)
-    expect(version._makerValue).to.equal('-123490361067')
-    expect(version._takerValue).to.equal('123325273872')
+    const version = await market.versions(INITIAL_VERSION + 4)
+    expect(version._makerValue).to.equal('-362547725045')
+    expect(version._takerValue).to.equal('362096863532')
     expect(version._makerReward).to.equal(0)
     expect(version._takerReward).to.equal(0)
   })
