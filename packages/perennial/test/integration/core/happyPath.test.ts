@@ -466,11 +466,36 @@ describe.only('Happy Path', () => {
   })
 
   it('delayed update w/ collateral (gas)', async () => {
+    const positionFeesOn = true
+    const incentizesOn = false
+
+    const parameter = {
+      maintenance: utils.parseEther('0.3'),
+      fundingFee: utils.parseEther('0.1'),
+      makerFee: positionFeesOn ? utils.parseEther('0.001') : 0,
+      takerFee: positionFeesOn ? utils.parseEther('0.001') : 0,
+      positionFee: positionFeesOn ? utils.parseEther('0.1') : 0,
+      makerLimit: utils.parseEther('1'),
+      closed: false,
+      utilizationCurve: {
+        minRate: 0,
+        maxRate: utils.parseEther('5.00'),
+        targetRate: utils.parseEther('0.80'),
+        targetUtilization: utils.parseEther('0.80'),
+      },
+      rewardRate: {
+        _maker: incentizesOn ? utils.parseEther('0.01') : 0,
+        _taker: incentizesOn ? utils.parseEther('0.001') : 0,
+      },
+    }
+
     const POSITION = utils.parseEther('0.0001')
     const COLLATERAL = utils.parseEther('1000')
     const { user, userB, dsu, chainlink } = instanceVars
 
     const market = await createMarket(instanceVars)
+    await market.updateParameter(parameter)
+
     await dsu.connect(user).approve(market.address, COLLATERAL)
     await dsu.connect(userB).approve(market.address, COLLATERAL)
 
@@ -482,9 +507,6 @@ describe.only('Happy Path', () => {
 
     await market.connect(user).update(POSITION.div(2).mul(-1), COLLATERAL)
     await market.connect(userB).update(POSITION.div(2), COLLATERAL)
-
-    // Test with rewards on
-    // await market.updateRewardRate({maker: utils.parseEther('0.01'), taker: utils.parseEther('0.001')})
 
     // Ensure a->b->c
     await chainlink.next()
@@ -508,12 +530,12 @@ describe.only('Happy Path', () => {
     expectPrePositionEq(await market.pre(), {
       _maker: POSITION.div(2),
       _taker: 0,
-      _makerFee: 0,
+      _makerFee: '587312764910861482',
       _takerFee: 0,
     })
     const version = await market.versions(INITIAL_VERSION + 4)
-    expect(version._makerValue).to.equal('-362547725045')
-    expect(version._takerValue).to.equal('362096863532')
+    expect(version._makerValue).to.equal('-357370488046')
+    expect(version._takerValue).to.equal('367274100531')
     expect(version._makerReward).to.equal(0)
     expect(version._takerReward).to.equal(0)
   })
