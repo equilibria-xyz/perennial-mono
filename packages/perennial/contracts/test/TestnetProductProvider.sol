@@ -5,7 +5,7 @@ import "@equilibria/root/curve/types/JumpRateUtilizationCurve.sol";
 import "../interfaces/IPayoffProvider.sol";
 
 contract TestnetContractPayoffProvider is IPayoffProvider {
-    function payoff(Fixed18 price) public pure returns (Fixed18) {
+    function payoff(Fixed6 price) public pure returns (Fixed6) {
         return price.mul(price);
     }
 }

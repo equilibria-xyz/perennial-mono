@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.13;
 
-import "@equilibria/root/number/types/Fixed18.sol";
+import "./number/Fixed6.sol";
 
 /// @dev Accumulator type
 struct Accumulator {
     /// @dev maker accumulator per share
-    Fixed18 maker;
+    Fixed6 maker;
     /// @dev taker accumulator per share
-    Fixed18 taker;
+    Fixed6 taker;
 }
 using AccumulatorLib for Accumulator global;
 
@@ -20,19 +20,19 @@ using AccumulatorLib for Accumulator global;
  *      change in position value since last sync. This change in value is then used to compute P&L and fees.
  */
 library AccumulatorLib {
-    function incrementMaker(Accumulator memory self, Fixed18 amount, UFixed18 total) internal pure {
-        self.maker = self.maker.add(amount.div(Fixed18Lib.from(total)));
+    function incrementMaker(Accumulator memory self, Fixed6 amount, UFixed6 total) internal pure {
+        self.maker = self.maker.add(amount.div(Fixed6Lib.from(total)));
     }
 
-    function decrementMaker(Accumulator memory self, Fixed18 amount, UFixed18 total) internal pure {
-        self.maker = self.maker.add(amount.div(Fixed18Lib.from(total)).mul(Fixed18Lib.NEG_ONE));
+    function decrementMaker(Accumulator memory self, Fixed6 amount, UFixed6 total) internal pure {
+        self.maker = self.maker.add(amount.div(Fixed6Lib.from(total)).mul(Fixed6Lib.NEG_ONE));
     }
 
-    function incrementTaker(Accumulator memory self, Fixed18 amount, UFixed18 total) internal pure {
-        self.taker = self.taker.add(amount.div(Fixed18Lib.from(total)));
+    function incrementTaker(Accumulator memory self, Fixed6 amount, UFixed6 total) internal pure {
+        self.taker = self.taker.add(amount.div(Fixed6Lib.from(total)));
     }
 
-    function decrementTaker(Accumulator memory self, Fixed18 amount, UFixed18 total) internal pure {
-        self.taker = self.taker.add(amount.div(Fixed18Lib.from(total)).mul(Fixed18Lib.NEG_ONE));
+    function decrementTaker(Accumulator memory self, Fixed6 amount, UFixed6 total) internal pure {
+        self.taker = self.taker.add(amount.div(Fixed6Lib.from(total)).mul(Fixed6Lib.NEG_ONE));
     }
 }

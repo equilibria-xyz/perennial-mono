@@ -15,27 +15,27 @@ interface ILens {
         IMarket.MarketDefinition definition;
         MarketParameter parameter;
         address marketAddress;
-        Fixed18 rate;
-        Fixed18 dailyRate;
+        Fixed6 rate;
+        Fixed6 dailyRate;
         OracleVersion latestVersion;
-        Fixed18 collateral;
+        Fixed6 collateral;
         Position position;
         Fee fee;
-        UFixed18 openMakerInterest;
-        UFixed18 openTakerInterest;
+        UFixed6 openMakerInterest;
+        UFixed6 openTakerInterest;
     }
 
     /// @dev Snapshot of User state for a Market
     struct UserMarketSnapshot {
         address marketAddress;
         address userAddress;
-        Fixed18 collateral;
-        UFixed18 maintenance;
-        Fixed18 next;
-        Fixed18 position;
+        Fixed6 collateral;
+        UFixed6 maintenance;
+        Fixed6 next;
+        Fixed6 position;
         bool liquidatable;
-        Fixed18 openInterest;
-        Fixed18 exposure;
+        Fixed6 openInterest;
+        Fixed6 exposure;
     }
 
     // Protocol Values
@@ -53,28 +53,28 @@ interface ILens {
     function token(IMarket market) external view returns (Token18);
     function definition(IMarket market) external view returns (IMarket.MarketDefinition memory);
     function parameter(IMarket market) external view returns (MarketParameter memory);
-    function collateral(IMarket market) external returns (Fixed18);
+    function collateral(IMarket market) external returns (Fixed6);
     function fees(IMarket market) external returns (Fee memory);
     function position(IMarket market) external returns (Position memory);
     function latestVersion(IMarket market) external returns (OracleVersion memory);
     function atVersions(IMarket market, uint[] memory versions) external returns (OracleVersion[] memory);
-    function rate(IMarket market) external returns (Fixed18);
-    function openInterest(IMarket market) external returns (UFixed18, UFixed18);
-    function dailyRate(IMarket market) external returns (Fixed18);
+    function rate(IMarket market) external returns (Fixed6);
+    function openInterest(IMarket market) external returns (UFixed6, UFixed6);
+    function dailyRate(IMarket market) external returns (Fixed6);
 
     // UserMarket Values
-    function collateral(address account, IMarket market) external returns (Fixed18);
-    function maintenance(address account, IMarket market) external returns (UFixed18);
-    function maintenanceNext(address account, IMarket market) external returns (UFixed18);
+    function collateral(address account, IMarket market) external returns (Fixed6);
+    function maintenance(address account, IMarket market) external returns (UFixed6);
+    function maintenanceNext(address account, IMarket market) external returns (UFixed6);
     function liquidatable(address account, IMarket market) external returns (bool);
-    function next(address account, IMarket market) external returns (Fixed18);
-    function position(address account, IMarket market) external returns (Fixed18);
-    function userPosition(address account, IMarket market) external returns (Fixed18, Fixed18);
-    function openInterest(address account, IMarket market) external returns (Fixed18);
-    function exposure(address account, IMarket market) external returns (Fixed18);
+    function next(address account, IMarket market) external returns (Fixed6);
+    function position(address account, IMarket market) external returns (Fixed6);
+    function userPosition(address account, IMarket market) external returns (Fixed6, Fixed6);
+    function openInterest(address account, IMarket market) external returns (Fixed6);
+    function exposure(address account, IMarket market) external returns (Fixed6);
     function maintenanceRequired(
         address account,
         IMarket market,
-        Fixed18 positionSize
-    ) external returns (UFixed18);
+        Fixed6 positionSize
+    ) external returns (UFixed6);
 }

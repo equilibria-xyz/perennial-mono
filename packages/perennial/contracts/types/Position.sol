@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.13;
 
-import "@openzeppelin/contracts/utils/math/Math.sol";
-import "@equilibria/root/number/types/UFixed18.sol";
+import "./number/UFixed6.sol";
 import "./Accumulator.sol";
 
 /// @dev Position type
@@ -26,25 +25,25 @@ using PositionLib for Position global;
  *      denominated as a unit of the product's payoff function.
  */
 library PositionLib {
-    function maker(Position memory self) internal pure returns (UFixed18) {
-        return UFixed18.wrap(uint256(self._maker) * 1e12);
+    function maker(Position memory self) internal pure returns (UFixed6) {
+        return UFixed6.wrap(uint256(self._maker));
     }
 
-    function taker(Position memory self) internal pure returns (UFixed18) {
-        return UFixed18.wrap(uint256(self._taker) * 1e12);
+    function taker(Position memory self) internal pure returns (UFixed6) {
+        return UFixed6.wrap(uint256(self._taker));
     }
 
-    function makerNext(Position memory self) internal pure returns (UFixed18) {
-        return UFixed18.wrap(uint256(self._makerNext) * 1e12);
+    function makerNext(Position memory self) internal pure returns (UFixed6) {
+        return UFixed6.wrap(uint256(self._makerNext));
     }
 
-    function takerNext(Position memory self) internal pure returns (UFixed18) {
-        return UFixed18.wrap(uint256(self._takerNext) * 1e12);
+    function takerNext(Position memory self) internal pure returns (UFixed6) {
+        return UFixed6.wrap(uint256(self._takerNext));
     }
 
-    function update(Position memory self, Fixed18 makerAmount, Fixed18 takerAmount) internal pure {
-        self._makerNext = uint64(int64(self._makerNext) + int64(Fixed18.unwrap(makerAmount) / 1e12));
-        self._takerNext = uint64(int64(self._takerNext) + int64(Fixed18.unwrap(takerAmount) / 1e12));
+    function update(Position memory self, Fixed6 makerAmount, Fixed6 takerAmount) internal pure {
+        self._makerNext = uint64(int64(self._makerNext) + int64(Fixed6.unwrap(makerAmount)));
+        self._takerNext = uint64(int64(self._takerNext) + int64(Fixed6.unwrap(takerAmount)));
     }
 
     function settle(Position memory self) internal pure {
@@ -57,7 +56,7 @@ library PositionLib {
      * @param self The Position to operate on
      * @return utilization ratio
      */
-    function utilization(Position memory self) internal pure returns (UFixed18) {
+    function utilization(Position memory self) internal pure returns (UFixed6) {
         return self.taker().unsafeDiv(self.maker());
     }
 
@@ -69,15 +68,15 @@ library PositionLib {
      * @param self The Position to operate on
      * @return Socialization factor
      */
-    function socializationFactor(Position memory self) internal pure returns (UFixed18) {
+    function socializationFactor(Position memory self) internal pure returns (UFixed6) {
         return _socializationFactor(maker(self), taker(self));
     }
 
-    function socializationFactorNext(Position memory self) internal pure returns (UFixed18) {
+    function socializationFactorNext(Position memory self) internal pure returns (UFixed6) {
         return _socializationFactor(makerNext(self), takerNext(self));
     }
 
-    function _socializationFactor(UFixed18 makerAmount, UFixed18 takerAmount) private pure returns (UFixed18) {
-        return takerAmount.isZero() ? UFixed18Lib.ONE : UFixed18Lib.min(UFixed18Lib.ONE, makerAmount.div(takerAmount));
+    function _socializationFactor(UFixed6 makerAmount, UFixed6 takerAmount) private pure returns (UFixed6) {
+        return takerAmount.isZero() ? UFixed6Lib.ONE : UFixed6Lib.min(UFixed6Lib.ONE, makerAmount.div(takerAmount));
     }
 }

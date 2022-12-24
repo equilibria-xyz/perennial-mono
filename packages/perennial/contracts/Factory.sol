@@ -19,8 +19,8 @@ contract Factory is IFactory, UInitializable, UOwnable {
     function marketBeacon() public view returns (IBeacon) { return IBeacon(_marketBeacon.read()); }
 
     /// @dev Fee on maintenance for liquidation
-    UFixed18Storage private constant _liquidationFee = UFixed18Storage.wrap(keccak256("equilibria.perennial.Factory.liquidationFee"));
-    function liquidationFee() public view returns (UFixed18) { return _liquidationFee.read(); }
+    UFixed6Storage private constant _liquidationFee = UFixed6Storage.wrap(keccak256("equilibria.perennial.Factory.liquidationFee"));
+    function liquidationFee() public view returns (UFixed6) { return _liquidationFee.read(); }
 
     /// @dev Protocol pauser address. address(0) defaults to owner(0)
     AddressStorage private constant _treasury = AddressStorage.wrap(keccak256("equilibria.perennial.Factory.treasury"));
@@ -109,8 +109,8 @@ contract Factory is IFactory, UInitializable, UOwnable {
      * @notice Updates the liquidation fee
      * @param newLiquidationFee New liquidation fee
      */
-    function updateLiquidationFee(UFixed18 newLiquidationFee) public onlyOwner {
-        if (newLiquidationFee.gt(UFixed18Lib.ONE)) revert FactoryInvalidLiquidationFeeError();
+    function updateLiquidationFee(UFixed6 newLiquidationFee) public onlyOwner {
+        if (newLiquidationFee.gt(UFixed6Lib.ONE)) revert FactoryInvalidLiquidationFeeError();
 
         _liquidationFee.store(newLiquidationFee);
         emit LiquidationFeeUpdated(newLiquidationFee);

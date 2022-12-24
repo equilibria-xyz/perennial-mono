@@ -7,9 +7,9 @@ import "./ProtocolParameter.sol";
 
 /// @dev Fee type
 struct Fee {
-    uint128 _protocol; // 18 decimals
+    uint64 _protocol; // 6 decimals
 
-    uint128 _market; // 18 decimals
+    uint64 _market; // 6 decimals
 }
 using FeeLib for Fee global;
 
@@ -18,18 +18,18 @@ using FeeLib for Fee global;
  * @notice
  */
 library FeeLib {
-    function update(Fee memory self, UFixed18 amount, ProtocolParameter memory protocolParameter) internal pure {
-        UFixed18 protocolAmount = amount.mul(protocolParameter.protocolFee);
-        UFixed18 marketAmount = amount.sub(protocolAmount);
-        self._protocol = uint128(UFixed18.unwrap(protocol(self).add(protocolAmount)));
-        self._market = uint128(UFixed18.unwrap(market(self).add(marketAmount)));
+    function update(Fee memory self, UFixed6 amount, ProtocolParameter memory protocolParameter) internal pure {
+        UFixed6 protocolAmount = amount.mul(protocolParameter.protocolFee);
+        UFixed6 marketAmount = amount.sub(protocolAmount);
+        self._protocol = uint64(UFixed6.unwrap(protocol(self).add(protocolAmount)));
+        self._market = uint64(UFixed6.unwrap(market(self).add(marketAmount)));
     }
 
-    function protocol(Fee memory self) internal pure returns (UFixed18) {
-        return UFixed18.wrap(uint256(self._protocol));
+    function protocol(Fee memory self) internal pure returns (UFixed6) {
+        return UFixed6.wrap(uint256(self._protocol));
     }
 
-    function market(Fee memory self) internal pure returns (UFixed18) {
-        return UFixed18.wrap(uint256(self._market));
+    function market(Fee memory self) internal pure returns (UFixed6) {
+        return UFixed6.wrap(uint256(self._market));
     }
 }

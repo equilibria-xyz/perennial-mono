@@ -4,6 +4,7 @@ import { constants, utils } from 'ethers'
 
 import { InstanceVars, deployProtocol, createMarket } from '../helpers/setupHelpers'
 import { expectPositionEq } from '../../../../common/testutil/types'
+import { parse6decimal } from '../../../util/number'
 
 const SECONDS_IN_YEAR = 60 * 60 * 24 * 365
 const SECONDS_IN_DAY = 60 * 60 * 24
@@ -16,18 +17,18 @@ describe('Lens', () => {
   })
 
   it('returns correct lens values', async () => {
-    const POSITION = utils.parseEther('0.0001')
+    const POSITION = parse6decimal('0.0001')
     const { user, userB, chainlink, lens, controller } = instanceVars
 
     expect(await lens.callStatic.factory()).to.equal(controller.address)
     // Setup fees
     const protocolParameter = await controller.parameter()
-    protocolParameter.protocolFee = utils.parseEther('0.25')
+    protocolParameter.protocolFee = parse6decimal('0.25')
     controller.updateParameter(protocolParameter)
     const market = await createMarket(instanceVars)
 
-    await market.connect(user).update(POSITION.mul(-1), utils.parseEther('1000'))
-    await market.connect(userB).update(POSITION, utils.parseEther('1000'))
+    await market.connect(user).update(POSITION.mul(-1), parse6decimal('1000'))
+    await market.connect(userB).update(POSITION, parse6decimal('1000'))
 
     // Returns the market name
     const info = await lens.callStatic.definition(market.address)
@@ -45,8 +46,8 @@ describe('Lens', () => {
       _takerNext: POSITION,
     })
     expect(marketSnapshot.latestVersion.price).to.equal('11388297509860897871140900')
-    expect(marketSnapshot.rate).to.equal(utils.parseEther('5.00').div(SECONDS_IN_YEAR))
-    expect(marketSnapshot.dailyRate).to.equal(utils.parseEther('5.00').div(SECONDS_IN_YEAR).mul(SECONDS_IN_DAY))
+    expect(marketSnapshot.rate).to.equal(parse6decimal('5.00').div(SECONDS_IN_YEAR))
+    expect(marketSnapshot.dailyRate).to.equal(parse6decimal('5.00').div(SECONDS_IN_YEAR).mul(SECONDS_IN_DAY))
     expect(marketSnapshot.openMakerInterest).to.equal(0)
     expect(marketSnapshot.openTakerInterest).to.equal(0)
 
@@ -87,9 +88,9 @@ describe('Lens', () => {
     // Price is updated
     expect((await lens.callStatic.latestVersion(market.address)).price).to.equal('11379649819553965207140100')
     // Rate is updated
-    expect(await lens.callStatic.rate(market.address)).to.equal(utils.parseEther('5.00').div(SECONDS_IN_YEAR))
+    expect(await lens.callStatic.rate(market.address)).to.equal(parse6decimal('5.00').div(SECONDS_IN_YEAR))
     expect(await lens.callStatic.dailyRate(market.address)).to.equal(
-      utils.parseEther('5.00').div(SECONDS_IN_YEAR).mul(SECONDS_IN_DAY),
+      parse6decimal('5.00').div(SECONDS_IN_YEAR).mul(SECONDS_IN_DAY),
     )
     // OpenInterest is updated
     expect(await lens.callStatic['openInterest(address,address)'](user.address, market.address)).to.equal(

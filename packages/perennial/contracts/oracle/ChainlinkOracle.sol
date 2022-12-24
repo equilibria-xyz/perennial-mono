@@ -31,7 +31,7 @@ contract ChainlinkOracle is IOracleProvider {
     /// @dev Quote token address for the Chainlink oracle
     address public immutable quote;
 
-    /// @dev Decimal offset used to normalize chainlink price to 18 decimals
+    /// @dev Decimal offset used to normalize chainlink price to 6 decimals
     int256 private immutable _decimalOffset;
 
     /// @dev Mapping of the first oracle version for each underlying phase ID
@@ -121,7 +121,7 @@ contract ChainlinkOracle is IOracleProvider {
         view
         returns (OracleVersion memory)
     {
-        Fixed18 price = Fixed18Lib.ratio(round.answer, _decimalOffset);
+        Fixed6 price = Fixed6Lib.ratio(round.answer, _decimalOffset);
         return OracleVersion(version, round.timestamp, price);
     }
 

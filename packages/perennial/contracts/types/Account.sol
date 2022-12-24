@@ -13,10 +13,10 @@ struct StoredAccount {
 struct StoredAccountStorage { StoredAccount value; }
 using StoredAccountStorageLib for StoredAccountStorage global;
 struct Account {
-    Fixed18 position; // 6 decimals
-    Fixed18 next; // 6 decimals
-    Fixed18 collateral; // 6 decimals
-    UFixed18 reward; // 6 decimals
+    Fixed6 position; // 6 decimals
+    Fixed6 next; // 6 decimals
+    Fixed6 collateral; // 6 decimals
+    UFixed6 reward; // 6 decimals
     bool liquidation;
 }
 using AccountLib for Account global;
@@ -28,20 +28,20 @@ using AccountLib for Account global;
 library AccountLib {
     function update(
         Account memory self,
-        Fixed18 newPosition,
-        Fixed18 newCollateral,
+        Fixed6 newPosition,
+        Fixed6 newCollateral,
         OracleVersion memory currentOracleVersion,
         MarketParameter memory marketParameter
     ) internal pure returns (
-        Fixed18 makerAmount,
-        Fixed18 takerAmount,
-        UFixed18 makerFee,
-        UFixed18 takerFee,
-        Fixed18 collateralAmount
+        Fixed6 makerAmount,
+        Fixed6 takerAmount,
+        UFixed6 makerFee,
+        UFixed6 takerFee,
+        Fixed6 collateralAmount
     ) {
         // compute position update
-        (Fixed18 currentMaker, Fixed18 currentTaker) = _splitPosition(self.next);
-        (Fixed18 nextMaker, Fixed18 nextTaker) = _splitPosition(newPosition);
+        (Fixed6 currentMaker, Fixed6 currentTaker) = _splitPosition(self.next);
+        (Fixed6 nextMaker, Fixed6 nextTaker) = _splitPosition(newPosition);
         (makerAmount, takerAmount) = (nextMaker.sub(currentMaker), nextTaker.sub(currentTaker));
 
         // compute collateral update
@@ -49,15 +49,15 @@ library AccountLib {
             makerAmount.mul(currentOracleVersion.price).abs().mul(marketParameter.makerFee),
             takerAmount.mul(currentOracleVersion.price).abs().mul(marketParameter.takerFee)
         );
-        collateralAmount = newCollateral.sub(self.collateral).sub(Fixed18Lib.from(makerFee.add(takerFee)));
+        collateralAmount = newCollateral.sub(self.collateral).sub(Fixed6Lib.from(makerFee.add(takerFee)));
 
         // update position
         self.next = newPosition;
         self.collateral = newCollateral;
     }
 
-    function _splitPosition(Fixed18 newPosition) private pure returns (Fixed18, Fixed18) {
-        return (newPosition.min(Fixed18Lib.ZERO).mul(Fixed18Lib.NEG_ONE), newPosition.max(Fixed18Lib.ZERO));
+    function _splitPosition(Fixed6 newPosition) private pure returns (Fixed6, Fixed6) {
+        return (newPosition.min(Fixed6Lib.ZERO).mul(Fixed6Lib.NEG_ONE), newPosition.max(Fixed6Lib.ZERO));
     }
 
     /**
@@ -65,15 +65,15 @@ library AccountLib {
      * @param self The struct to operate on
      */
     function accumulate(Account memory self, Version memory fromVersion, Version memory toVersion) internal pure {
-        Fixed18 valueDelta = (self.position.sign() == 1)
+        Fixed6 valueDelta = (self.position.sign() == 1)
             ? toVersion.value().taker.sub(fromVersion.value().taker)
             : toVersion.value().maker.sub(fromVersion.value().maker);
-        Fixed18 rewardDelta = (self.position.sign() == 1)
+        Fixed6 rewardDelta = (self.position.sign() == 1)
             ? toVersion.reward().taker.sub(fromVersion.reward().taker)
             : toVersion.reward().maker.sub(fromVersion.reward().maker);
 
-        self.collateral = self.collateral.add(Fixed18Lib.from(self.position.abs()).mul(valueDelta));
-        self.reward = self.reward.add(self.position.abs().mul(UFixed18Lib.from(rewardDelta)));
+        self.collateral = self.collateral.add(Fixed6Lib.from(self.position.abs()).mul(valueDelta));
+        self.reward = self.reward.add(self.position.abs().mul(UFixed6Lib.from(rewardDelta)));
         self.position = self.next;
     }
 
@@ -86,8 +86,8 @@ library AccountLib {
     function maintenance(
         Account memory self,
         OracleVersion memory currentOracleVersion,
-        UFixed18 maintenanceRatio
-    ) internal pure returns (UFixed18) {
+        UFixed6 maintenanceRatio
+    ) internal pure returns (UFixed6) {
         return _maintenance(self.position, currentOracleVersion, maintenanceRatio);
     }
 
@@ -100,8 +100,8 @@ library AccountLib {
     function maintenanceNext(
         Account memory self,
         OracleVersion memory currentOracleVersion,
-        UFixed18 maintenanceRatio
-    ) internal pure returns (UFixed18) {
+        UFixed6 maintenanceRatio
+    ) internal pure returns (UFixed6) {
         return _maintenance(self.next, currentOracleVersion, maintenanceRatio);
     }
 
@@ -112,10 +112,10 @@ library AccountLib {
      * @return Next maintenance requirement for the account
      */
     function _maintenance(
-        Fixed18 _position,
+        Fixed6 _position,
         OracleVersion memory currentOracleVersion,
-        UFixed18 maintenanceRatio
-    ) private pure returns (UFixed18) {
+        UFixed6 maintenanceRatio
+    ) private pure returns (UFixed6) {
         return _position.mul(currentOracleVersion.price).abs().mul(maintenanceRatio);
     }
 }
@@ -126,10 +126,10 @@ library StoredAccountStorageLib {
     function read(StoredAccountStorage storage self) internal view returns (Account memory) {
         StoredAccount memory storedValue =  self.value;
         return Account(
-            Fixed18.wrap(int256(storedValue._position) * 1e12),
-            Fixed18.wrap(int256(storedValue._next) * 1e12),
-            Fixed18.wrap(int256(storedValue._collateral) * 1e12),
-            UFixed18.wrap(uint256(storedValue._liquidationAndReward & ~LIQUIDATION_MASK) * 1e12),
+            Fixed6.wrap(int256(storedValue._position)),
+            Fixed6.wrap(int256(storedValue._next)),
+            Fixed6.wrap(int256(storedValue._collateral)),
+            UFixed6.wrap(uint256(storedValue._liquidationAndReward & ~LIQUIDATION_MASK)),
             bool(storedValue._liquidationAndReward & LIQUIDATION_MASK != 0)
         );
     }
@@ -137,10 +137,10 @@ library StoredAccountStorageLib {
     function store(StoredAccountStorage storage self, Account memory newValue) internal {
         //TODO: validation on bounds
         self.value = StoredAccount(
-            int64(Fixed18.unwrap(newValue.position) / 1e12),
-            int64(Fixed18.unwrap(newValue.next) / 1e12),
-            int64(Fixed18.unwrap(newValue.collateral) / 1e12),
-            uint64((UFixed18.unwrap(newValue.reward) / 1e12) | (uint64(newValue.liquidation ? 1 : 0) << 63))
+            int64(Fixed6.unwrap(newValue.position)),
+            int64(Fixed6.unwrap(newValue.next)),
+            int64(Fixed6.unwrap(newValue.collateral)),
+            uint64((UFixed6.unwrap(newValue.reward)) | (uint64(newValue.liquidation ? 1 : 0) << 63))
         );
     }
 }

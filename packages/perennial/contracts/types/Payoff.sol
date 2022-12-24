@@ -19,6 +19,6 @@ using PayoffLib for Payoff global;
 library PayoffLib {
     function transform(Payoff memory self, OracleVersion memory oracleVersion) internal pure {
         if (address(self.provider) != address(0)) oracleVersion.price = self.provider.payoff(oracleVersion.price);
-        if (self.short) oracleVersion.price = oracleVersion.price.mul(Fixed18Lib.NEG_ONE);
+        if (self.short) oracleVersion.price = oracleVersion.price.mul(Fixed6Lib.NEG_ONE);
     }
 }

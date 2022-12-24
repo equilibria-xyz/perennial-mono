@@ -27,9 +27,9 @@ import {
   TransparentUpgradeableProxy__factory,
 } from '../../../types/generated'
 import { ChainlinkContext } from './chainlinkHelpers'
-import { createPayoffDefinition } from '../../../../common/testutil/types'
 import { buildChainlinkRoundId } from '../../../util/buildChainlinkRoundId'
 import { CHAINLINK_CUSTOM_CURRENCIES } from '../../../util/constants'
+import { parse6decimal } from '../../../util/number'
 const { config, deployments, ethers } = HRE
 
 export const INITIAL_PHASE_ID = 1
@@ -107,12 +107,12 @@ export async function deployProtocol(): Promise<InstanceVars> {
   await controller.updatePauser(pauser.address)
   await controller.updateTreasury(treasuryA.address)
   await controller.updateParameter({
-    protocolFee: utils.parseEther('0.50'),
-    minFundingFee: utils.parseEther('0.10'),
-    minCollateral: utils.parseEther('500'),
+    protocolFee: parse6decimal('0.50'),
+    minFundingFee: parse6decimal('0.10'),
+    minCollateral: parse6decimal('500'),
     paused: false,
   })
-  await controller.updateLiquidationFee(utils.parseEther('0.50'))
+  await controller.updateLiquidationFee(parse6decimal('0.50'))
 
   // Set state
   const dsuHolder = await impersonate.impersonateWithBalance(DSU_HOLDER, utils.parseEther('10'))
@@ -173,12 +173,12 @@ export async function createMarket(
     reward: rewardToken.address,
   }
   const parameter = {
-    maintenance: utils.parseEther('0.3'),
-    fundingFee: utils.parseEther('0.1'),
+    maintenance: parse6decimal('0.3'),
+    fundingFee: parse6decimal('0.1'),
     makerFee: 0,
     takerFee: 0,
     positionFee: 0,
-    makerLimit: utils.parseEther('1'),
+    makerLimit: parse6decimal('1'),
     closed: false,
     utilizationCurve: {
       minRate: 0,

@@ -109,7 +109,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
     }
 
     //TODO support depositTo and withdrawTo
-    function update(Fixed18 newPosition, Fixed18 newCollateral) external {
+    function update(Fixed6 newPosition, Fixed6 newCollateral) external {
         CurrentContext memory context = _loadContext(msg.sender);
         _settle(context);
         _update(context, msg.sender, newPosition, newCollateral, false);
@@ -141,16 +141,16 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         Fee memory newFee = _fee;
 
         if (msg.sender == treasury) {
-            UFixed18 feeAmount = newFee.market();
+            UFixed6 feeAmount = newFee.market();
             newFee._market = 0;
-            token.push(msg.sender, feeAmount);
+            token.push(msg.sender, UFixed18.wrap(UFixed6.unwrap(feeAmount) * 1e12));
             emit FeeClaimed(msg.sender, feeAmount);
         }
 
         if (msg.sender == factory.treasury()) {
-            UFixed18 feeAmount = newFee.protocol();
+            UFixed6 feeAmount = newFee.protocol();
             newFee._protocol = 0;
-            token.push(msg.sender, feeAmount);
+            token.push(msg.sender, UFixed18.wrap(UFixed6.unwrap(feeAmount) * 1e12));
             emit FeeClaimed(msg.sender, feeAmount);
         }
 
@@ -177,28 +177,28 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
 
     function _liquidate(CurrentContext memory context, address account) private {
         // before
-        UFixed18 maintenance = context.account.maintenance(context.currentOracleVersion, context.marketParameter.maintenance);
-        if (context.account.collateral.gte(Fixed18Lib.from(maintenance))) revert MarketCantLiquidate();
+        UFixed6 maintenance = context.account.maintenance(context.currentOracleVersion, context.marketParameter.maintenance);
+        if (context.account.collateral.gte(Fixed6Lib.from(maintenance))) revert MarketCantLiquidate();
 
         // close all positions
-        _update(context, account, context.account.position.mul(Fixed18Lib.NEG_ONE), Fixed18Lib.ZERO, true);
+        _update(context, account, context.account.position.mul(Fixed6Lib.NEG_ONE), Fixed6Lib.ZERO, true);
 
         // handle liquidation fee
-        UFixed18 liquidationFee = factory.liquidationFee(); // TODO: external call
-        UFixed18 liquidationReward = UFixed18Lib.min(
-            context.account.collateral.max(Fixed18Lib.ZERO).abs(),
+        UFixed6 liquidationFee = factory.liquidationFee(); // TODO: external call
+        UFixed6 liquidationReward = UFixed6Lib.min(
+            context.account.collateral.max(Fixed6Lib.ZERO).abs(),
             maintenance.mul(liquidationFee)
         );
         context.account.update(
-            Fixed18Lib.ZERO, //TODO: all the position stuff is not needed here so might be a gas efficiency check here
-            Fixed18Lib.from(-1, liquidationReward),
+            Fixed6Lib.ZERO, //TODO: all the position stuff is not needed here so might be a gas efficiency check here
+            Fixed6Lib.from(-1, liquidationReward),
             context.currentOracleVersion,
             context.marketParameter
         );
         context.account.liquidation = true;
 
         // remit liquidation reward
-        token.push(msg.sender, liquidationReward);
+        token.push(msg.sender, UFixed18.wrap(UFixed6.unwrap(liquidationReward) * 1e12));
 
         emit Liquidation(account, msg.sender, liquidationReward);
     }
@@ -206,8 +206,8 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
     function _update(
         CurrentContext memory context,
         address account, //TODO: use for onbehalf of?
-        Fixed18 newPosition,
-        Fixed18 newCollateral,
+        Fixed6 newPosition,
+        Fixed6 newCollateral,
         bool force
     ) private {
         _startGas(context, "_update before-update-after: %s");
@@ -218,11 +218,11 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
 
         // update
         (
-            Fixed18 makerAmount,
-            Fixed18 takerAmount,
-            UFixed18 makerFee,
-            UFixed18 takerFee,
-            Fixed18 collateralAmount
+            Fixed6 makerAmount,
+            Fixed6 takerAmount,
+            UFixed6 makerFee,
+            UFixed6 takerFee,
+            Fixed6 collateralAmount
         ) = context.account.update(
             newPosition,
             newCollateral,
@@ -230,7 +230,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
             context.marketParameter
         );
         context.position.update(makerAmount, takerAmount);
-        UFixed18 positionFee = context.version.update(
+        UFixed6 positionFee = context.version.update(
             context.position,
             makerFee,
             takerFee,
@@ -248,8 +248,8 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         _startGas(context, "_update fund-events: %s");
 
         // fund
-        if (collateralAmount.sign() == 1) token.pull(account, collateralAmount.abs());
-        if (collateralAmount.sign() == -1) token.push(account, collateralAmount.abs());
+        if (collateralAmount.sign() == 1) token.pull(account, UFixed18.wrap(UFixed6.unwrap(collateralAmount.abs()) * 1e12));
+        if (collateralAmount.sign() == -1) token.push(account, UFixed18.wrap(UFixed6.unwrap(collateralAmount.abs()) * 1e12));
 
         // events
         emit Updated(account, context.currentOracleVersion.version, newPosition, newCollateral);
@@ -345,7 +345,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         OracleVersion memory toOracleVersion
     ) private {
         if (context.currentOracleVersion.version > context.latestVersion) {
-            UFixed18 fundingFee = context.version.accumulate(
+            UFixed6 fundingFee = context.version.accumulate(
                 context.position,
                 fromOracleVersion,
                 toOracleVersion,
@@ -373,7 +373,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
     }
 
     function _checkPosition(CurrentContext memory context) private pure {
-        if (!context.marketParameter.closed && context.position.socializationFactorNext().lt(UFixed18Lib.ONE))
+        if (!context.marketParameter.closed && context.position.socializationFactorNext().lt(UFixed6Lib.ONE))
             revert MarketInsufficientLiquidityError();
 
         if (context.position.makerNext().gt(context.marketParameter.makerLimit))
@@ -383,12 +383,12 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
     function _checkCollateral(CurrentContext memory context) private pure {
         if (context.account.collateral.sign() == -1) revert MarketInDebtError();
 
-        UFixed18 boundedCollateral = UFixed18Lib.from(context.account.collateral);
+        UFixed6 boundedCollateral = UFixed6Lib.from(context.account.collateral);
 
         if (!context.account.collateral.isZero() && boundedCollateral.lt(context.protocolParameter.minCollateral))
             revert MarketCollateralUnderLimitError();
 
-        (UFixed18 maintenanceAmount, UFixed18 maintenanceNextAmount) = (
+        (UFixed6 maintenanceAmount, UFixed6 maintenanceNextAmount) = (
             context.account.maintenance(context.currentOracleVersion, context.marketParameter.maintenance),
             context.account.maintenanceNext(context.currentOracleVersion, context.marketParameter.maintenance)
         );

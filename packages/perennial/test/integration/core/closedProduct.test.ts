@@ -4,6 +4,7 @@ import { utils, constants } from 'ethers'
 
 import { InstanceVars, deployProtocol, createMarket } from '../helpers/setupHelpers'
 import { Market } from '../../../types/generated'
+import { parse6decimal } from '../../../util/number'
 
 describe('Closed Market', () => {
   let instanceVars: InstanceVars
@@ -13,11 +14,11 @@ describe('Closed Market', () => {
   })
 
   it('closes the market', async () => {
-    const POSITION = utils.parseEther('0.0001')
+    const POSITION = parse6decimal('0.0001')
     const { user, chainlink } = instanceVars
 
     const market = await createMarket(instanceVars)
-    await market.connect(user).update(POSITION.mul(-1), utils.parseEther('1000'))
+    await market.connect(user).update(POSITION.mul(-1), parse6decimal('1000'))
 
     //TODO: uncomment when versioned params are added
     //expect(await market.closed()).to.be.false
@@ -39,14 +40,14 @@ describe('Closed Market', () => {
 
   describe('changes to system constraints', async () => {
     let market: Market
-    const POSITION = utils.parseEther('0.0001')
+    const POSITION = parse6decimal('0.0001')
 
     beforeEach(async () => {
       const { user, userB } = instanceVars
 
       market = await createMarket(instanceVars)
-      await market.connect(user).update(POSITION.mul(-1), utils.parseEther('1000'))
-      await market.connect(userB).update(POSITION, utils.parseEther('1000'))
+      await market.connect(user).update(POSITION.mul(-1), parse6decimal('1000'))
+      await market.connect(userB).update(POSITION, parse6decimal('1000'))
       const parameters = await market.parameter()
       parameters.closed = true
       await market.updateParameter(parameters)
@@ -71,12 +72,12 @@ describe('Closed Market', () => {
   })
 
   it('zeroes PnL and fees', async () => {
-    const POSITION = utils.parseEther('0.0001')
+    const POSITION = parse6decimal('0.0001')
     const { user, userB, chainlink } = instanceVars
 
     const market = await createMarket(instanceVars)
-    await market.connect(user).update(POSITION.mul(-1), utils.parseEther('1000'))
-    await market.connect(userB).update(POSITION, utils.parseEther('1000'))
+    await market.connect(user).update(POSITION.mul(-1), parse6decimal('1000'))
+    await market.connect(userB).update(POSITION, parse6decimal('1000'))
 
     await chainlink.next()
     await chainlink.next()
@@ -103,12 +104,12 @@ describe('Closed Market', () => {
   })
 
   it('handles closing during liquidations', async () => {
-    const POSITION = utils.parseEther('0.0001')
+    const POSITION = parse6decimal('0.0001')
     const { user, userB, chainlink } = instanceVars
 
     const market = await createMarket(instanceVars)
-    await market.connect(user).update(POSITION.mul(-1), utils.parseEther('1000'))
-    await market.connect(userB).update(POSITION, utils.parseEther('1000'))
+    await market.connect(user).update(POSITION.mul(-1), parse6decimal('1000'))
+    await market.connect(userB).update(POSITION, parse6decimal('1000'))
 
     await chainlink.next()
     await chainlink.nextWithPriceModification(price => price.mul(2))

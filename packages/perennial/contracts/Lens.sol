@@ -135,11 +135,11 @@ contract Lens is ILens {
      * @param market Market address
      * @return Total collateral for market
      */
-    function collateral(IMarket market) public settle(market) returns (Fixed18) {
+    function collateral(IMarket market) public settle(market) returns (Fixed6) {
         Fee memory fee = market.fee();
-        return Fixed18Lib.from(market.token().balanceOf(address(market)))
-            .sub(Fixed18Lib.from(fee.protocol()))
-            .sub(Fixed18Lib.from(fee.market()));
+        return Fixed6.wrap(int256(UFixed18.unwrap(market.token().balanceOf(address(market))) / 1e12))
+            .sub(Fixed6Lib.from(fee.protocol()))
+            .sub(Fixed6Lib.from(fee.market()));
     }
 
     /**
@@ -184,10 +184,10 @@ contract Lens is ILens {
      * @param market Market address
      * @return Market current funding rate
      */
-    function rate(IMarket market) public settle(market) returns (Fixed18) {
-        Position memory position_ = _latestPosition(market);
-        JumpRateUtilizationCurve memory utilizationCurve_ = market.parameter().utilizationCurve;
-        return utilizationCurve_.compute(position_.utilization()).div(Fixed18Lib.from(365 days));
+    function rate(IMarket market) public settle(market) returns (Fixed6) {
+        UFixed18 utilization_ = UFixed18.wrap(UFixed6.unwrap(_latestPosition(market).utilization()) * 1e12);
+        Fixed6 annualRate_ = Fixed6.wrap(Fixed18.unwrap(market.parameter().utilizationCurve.compute(utilization_)) / 1e12);
+        return annualRate_.div(Fixed6Lib.from(365 days));
     }
 
     /**
@@ -195,10 +195,10 @@ contract Lens is ILens {
      * @param market Market address
      * @return Market current funding extrapolated to a daily rate
      */
-    function dailyRate(IMarket market) public settle(market) returns (Fixed18) {
-        Position memory position_ = _latestPosition(market);
-        JumpRateUtilizationCurve memory utilizationCurve_ = market.parameter().utilizationCurve;
-        return utilizationCurve_.compute(position_.utilization()).div(Fixed18Lib.from(365));
+    function dailyRate(IMarket market) public settle(market) returns (Fixed6) {
+        UFixed18 utilization_ = UFixed18.wrap(UFixed6.unwrap(_latestPosition(market).utilization()) * 1e12);
+        Fixed6 annualRate_ = Fixed6.wrap(Fixed18.unwrap(market.parameter().utilizationCurve.compute(utilization_)) / 1e12);
+        return annualRate_.div(Fixed6Lib.from(365));
     }
 
     /**
@@ -215,9 +215,9 @@ contract Lens is ILens {
      * @param market Market address
      * @return Market maker and taker position multiplied by latest price after settle
      */
-    function openInterest(IMarket market) public settle(market) returns (UFixed18, UFixed18) {
+    function openInterest(IMarket market) public settle(market) returns (UFixed6, UFixed6) {
         Position memory _position = _latestPosition(market);
-        UFixed18 _price = _latestVersion(market).price.abs();
+        UFixed6 _price = _latestVersion(market).price.abs();
         return (_position.maker().mul(_price), _position.taker().mul(_price));
     }
 
@@ -235,7 +235,7 @@ contract Lens is ILens {
      * @param market Market address
      * @return User deposited collateral for market
      */
-    function collateral(address account, IMarket market) public settleAccount(account, market) returns (Fixed18) {
+    function collateral(address account, IMarket market) public settleAccount(account, market) returns (Fixed6) {
         Account memory marketAccount = market.accounts(account);
         return marketAccount.collateral;
     }
@@ -246,12 +246,12 @@ contract Lens is ILens {
      * @param market Market address
      * @return Maximum of user maintenance, and maintenanceNext
      */
-    function maintenance(address account, IMarket market) public settleAccount(account, market) returns (UFixed18) {
+    function maintenance(address account, IMarket market) public settleAccount(account, market) returns (UFixed6) {
         Account memory marketAccount = market.accounts(account);
         return _maintenance(market, marketAccount.position);
     }
 
-    function maintenanceNext(address account, IMarket market) public settleAccount(account, market) returns (UFixed18) {
+    function maintenanceNext(address account, IMarket market) public settleAccount(account, market) returns (UFixed6) {
         Account memory marketAccount = market.accounts(account);
         return _maintenance(market, marketAccount.next);
     }
@@ -264,8 +264,8 @@ contract Lens is ILens {
      */
     function liquidatable(address account, IMarket market) public settleAccount(account, market) returns (bool) {
         Account memory marketAccount = market.accounts(account);
-        UFixed18 maintenanceAmount = _maintenance(market, marketAccount.position);
-        return Fixed18Lib.from(maintenanceAmount).gt(marketAccount.collateral);
+        UFixed6 maintenanceAmount = _maintenance(market, marketAccount.position);
+        return Fixed6Lib.from(maintenanceAmount).gt(marketAccount.collateral);
     }
 
     /**
@@ -277,7 +277,7 @@ contract Lens is ILens {
     function next(address account, IMarket market)
         public
         settleAccount(account, market)
-        returns (Fixed18)
+        returns (Fixed6)
     {
         Account memory marketAccount = market.accounts(account);
         return marketAccount.next;
@@ -292,7 +292,7 @@ contract Lens is ILens {
     function position(address account, IMarket market)
         public
         settleAccount(account, market)
-        returns (Fixed18)
+        returns (Fixed6)
     {
         Account memory marketAccount = market.accounts(account);
         return marketAccount.position;
@@ -308,7 +308,7 @@ contract Lens is ILens {
     function userPosition(address account, IMarket market)
         public
         settleAccount(account, market)
-        returns (Fixed18, Fixed18)
+        returns (Fixed6, Fixed6)
     {
         Account memory marketAccount = market.accounts(account);
         return (marketAccount.position, marketAccount.next);
@@ -323,7 +323,7 @@ contract Lens is ILens {
     function openInterest(address account, IMarket market)
         public
         settleAccount(account, market)
-        returns (Fixed18)
+        returns (Fixed6)
     {
         Account memory marketAccount = market.accounts(account);
         return marketAccount.position.mul(_latestVersion(market).price);
@@ -335,17 +335,17 @@ contract Lens is ILens {
      * @param market Market address
      * @return User's exposure (openInterest * utilization) after settle
      */
-    function exposure(address account, IMarket market) public settleAccount(account, market) returns (Fixed18) {
+    function exposure(address account, IMarket market) public settleAccount(account, market) returns (Fixed6) {
         Position memory _pos = position(market);
-        if (_pos.maker().isZero()) { return Fixed18Lib.ZERO; }
+        if (_pos.maker().isZero()) { return Fixed6Lib.ZERO; }
 
-        Fixed18 _openInterest = openInterest(account, market);
+        Fixed6 _openInterest = openInterest(account, market);
         if (_openInterest.sign() == 1) {
             return _openInterest; // Taker exposure is always 100% of openInterest
         }
 
-        UFixed18 utilization = _pos.utilization();
-        return Fixed18Lib.from(utilization).mul(_openInterest); // Maker exposure is openInterest * utilization
+        UFixed6 utilization = _pos.utilization();
+        return Fixed6Lib.from(utilization).mul(_openInterest); // Maker exposure is openInterest * utilization
     }
 
     /**
@@ -355,10 +355,10 @@ contract Lens is ILens {
      * @param positionSize size of position for maintenance calculation
      * @return Maintenance required for position in market
      */
-    function maintenanceRequired(address account, IMarket market, Fixed18 positionSize)
+    function maintenanceRequired(address account, IMarket market, Fixed6 positionSize)
         public
         settleAccount(account, market)
-        returns (UFixed18)
+        returns (UFixed6)
     {
         return _maintenance(market, positionSize);
     }
@@ -367,9 +367,9 @@ contract Lens is ILens {
      *  End UserMarket Individual Fields Functions
      */
 
-    function _maintenance(IMarket market, Fixed18 positionSize) private view returns (UFixed18) {
-        UFixed18 maintenance_ = market.parameter().maintenance;
-        UFixed18 notional = positionSize.mul(_latestVersion(market).price).abs();
+    function _maintenance(IMarket market, Fixed6 positionSize) private view returns (UFixed6) {
+        UFixed6 maintenance_ = market.parameter().maintenance;
+        UFixed6 notional = positionSize.mul(_latestVersion(market).price).abs();
         return notional.mul(maintenance_);
     }
 

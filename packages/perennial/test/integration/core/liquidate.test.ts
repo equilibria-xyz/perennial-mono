@@ -3,6 +3,7 @@ import 'hardhat'
 import { BigNumber, constants, utils } from 'ethers'
 
 import { InstanceVars, deployProtocol, createMarket } from '../helpers/setupHelpers'
+import { parse6decimal } from '../../../util/number'
 
 describe('Liquidate', () => {
   let instanceVars: InstanceVars
@@ -12,11 +13,11 @@ describe('Liquidate', () => {
   })
 
   it('liquidates a user', async () => {
-    const POSITION = utils.parseEther('0.0001')
+    const POSITION = parse6decimal('0.0001')
     const { user, userB, dsu, chainlink, lens } = instanceVars
 
     const market = await createMarket(instanceVars)
-    await market.connect(user).update(POSITION.mul(-1), utils.parseEther('1000'))
+    await market.connect(user).update(POSITION.mul(-1), parse6decimal('1000'))
 
     expect(await lens.callStatic.liquidatable(user.address, market.address)).to.be.false
 
@@ -28,7 +29,7 @@ describe('Liquidate', () => {
 
     await expect(market.connect(userB).liquidate(user.address))
       .to.emit(market, 'Liquidation')
-      .withArgs(user.address, market.address, userB.address, utils.parseEther('1000'))
+      .withArgs(user.address, market.address, userB.address, parse6decimal('1000'))
 
     expect((await market.accounts(user.address)).liquidation).to.be.true
 
@@ -43,12 +44,12 @@ describe('Liquidate', () => {
   })
 
   it('creates and resolves a shortfall', async () => {
-    const POSITION = utils.parseEther('0.0001')
+    const POSITION = parse6decimal('0.0001')
     const { user, userB, dsu, chainlink } = instanceVars
 
     const market = await createMarket(instanceVars)
-    await market.connect(user).update(POSITION.mul(-1), utils.parseEther('1000'))
-    await market.connect(userB).update(POSITION, utils.parseEther('1000'))
+    await market.connect(user).update(POSITION.mul(-1), parse6decimal('1000'))
+    await market.connect(userB).update(POSITION, parse6decimal('1000'))
 
     // Settle the market with a new oracle version
     await chainlink.next()
@@ -70,14 +71,14 @@ describe('Liquidate', () => {
   })
 
   it('uses a socialization factor', async () => {
-    const POSITION = utils.parseEther('0.0001')
+    const POSITION = parse6decimal('0.0001')
     const { user, userB, userC, userD, chainlink, lens } = instanceVars
 
     const market = await createMarket(instanceVars)
-    await market.connect(user).update(POSITION.mul(-1), utils.parseEther('1000'))
-    await market.connect(userB).update(POSITION.mul(-1), utils.parseEther('1000'))
-    await market.connect(userC).update(POSITION, utils.parseEther('10000'))
-    await market.connect(userD).update(POSITION, utils.parseEther('10000'))
+    await market.connect(user).update(POSITION.mul(-1), parse6decimal('1000'))
+    await market.connect(userB).update(POSITION.mul(-1), parse6decimal('1000'))
+    await market.connect(userC).update(POSITION, parse6decimal('10000'))
+    await market.connect(userD).update(POSITION, parse6decimal('10000'))
 
     expect(await lens.callStatic.liquidatable(user.address, market.address)).to.be.false
 
@@ -126,6 +127,6 @@ describe('Liquidate', () => {
     expect(totalCurr.add(feesCurr)).to.be.closeTo(totalNew.add(feesNew), 1)
 
     // Expect the system to remain solvent
-    expect(totalNew.add(feesNew)).to.equal(utils.parseEther('22000').sub(expectedLiquidationFee))
+    expect(totalNew.add(feesNew)).to.equal(parse6decimal('22000').sub(expectedLiquidationFee))
   }).timeout(120000)
 })
