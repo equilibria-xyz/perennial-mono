@@ -30,7 +30,7 @@ describe('Liquidate', () => {
       .to.emit(market, 'Liquidation')
       .withArgs(user.address, market.address, userB.address, utils.parseEther('1000'))
 
-    expect(await market.liquidation(user.address)).to.be.true
+    expect((await market.accounts(user.address)).liquidation).to.be.true
 
     expect((await market.accounts(user.address)).collateral).to.equal(0)
     expect(await lens.callStatic['collateral(address)'](market.address)).to.equal(0)
@@ -39,7 +39,7 @@ describe('Liquidate', () => {
     await chainlink.next()
     await market.settle(user.address)
 
-    expect(await market.liquidation(user.address)).to.be.false
+    expect((await market.accounts(user.address)).liquidation).to.be.false
   })
 
   it('creates and resolves a shortfall', async () => {

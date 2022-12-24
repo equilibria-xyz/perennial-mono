@@ -34,23 +34,23 @@ library VersionLib {
 
     function value(Version memory self) internal pure returns (Accumulator memory) {
         return Accumulator(
-            PackedFixed18.wrap(int128(self._makerValue) * 1e12),
-            PackedFixed18.wrap(int128(self._takerValue) * 1e12)
+            Fixed18.wrap(int256(self._makerValue) * 1e12),
+            Fixed18.wrap(int256(self._takerValue) * 1e12)
         );
     }
 
     function reward(Version memory self) internal pure returns (Accumulator memory) {
         return Accumulator(
-            PackedFixed18.wrap(int128(self._makerReward) * 1e12),
-            PackedFixed18.wrap(int128(self._takerReward) * 1e12)
+            Fixed18.wrap(int256(self._makerReward) * 1e12),
+            Fixed18.wrap(int256(self._takerReward) * 1e12)
         );
     }
 
     function _update(Version memory self, Accumulator memory newValue, Accumulator memory newReward) private pure {
-        self._makerValue = int64(PackedFixed18.unwrap(newValue._maker) / 1e12);
-        self._takerValue = int64(PackedFixed18.unwrap(newValue._taker) / 1e12);
-        self._makerReward = int64(PackedFixed18.unwrap(newReward._maker) / 1e12);
-        self._takerReward = int64(PackedFixed18.unwrap(newReward._taker) / 1e12);
+        self._makerValue = int64(Fixed18.unwrap(newValue.maker) / 1e12);
+        self._takerValue = int64(Fixed18.unwrap(newValue.taker) / 1e12);
+        self._makerReward = int64(Fixed18.unwrap(newReward.maker) / 1e12);
+        self._takerReward = int64(Fixed18.unwrap(newReward.taker) / 1e12);
     }
 
     /**
@@ -199,8 +199,8 @@ library VersionLib {
         UFixed18 elapsed = period.timestampDelta();
 
         if (!position.maker().isZero()) rewardAccumulator
-            .incrementMaker(Fixed18Lib.from(elapsed).mul(marketParameter.rewardRate.taker()), position.maker());
+            .incrementMaker(Fixed18Lib.from(elapsed).mul(marketParameter.rewardRate.taker), position.maker());
         if (!position.taker().isZero()) rewardAccumulator
-            .incrementTaker(Fixed18Lib.from(elapsed).mul(marketParameter.rewardRate.maker()), position.taker());
+            .incrementTaker(Fixed18Lib.from(elapsed).mul(marketParameter.rewardRate.maker), position.taker());
     }
 }

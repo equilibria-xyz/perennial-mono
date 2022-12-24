@@ -6,9 +6,6 @@ import { InstanceVars, deployProtocol, createMarket, INITIAL_VERSION } from '../
 import { createPayoffDefinition, expectPositionEq } from '../../../../common/testutil/types'
 import { Market__factory } from '../../../types/generated'
 
-//TODO: gas -> make sure all fees are non-zero (maker / taker / position)
-//TODO: gas -> a/b/c settle where both versions have non-zero position
-
 describe.only('Happy Path', () => {
   let instanceVars: InstanceVars
 
@@ -42,8 +39,8 @@ describe.only('Happy Path', () => {
         targetUtilization: utils.parseEther('0.80'),
       },
       rewardRate: {
-        _maker: 0,
-        _taker: 0,
+        maker: 0,
+        taker: 0,
       },
     }
     const marketAddress = await controller.callStatic.createMarket(definition, parameter)
@@ -465,8 +462,8 @@ describe.only('Happy Path', () => {
         targetUtilization: utils.parseEther('0.80'),
       },
       rewardRate: {
-        _maker: incentizesOn ? utils.parseEther('0.01') : 0,
-        _taker: incentizesOn ? utils.parseEther('0.001') : 0,
+        maker: incentizesOn ? utils.parseEther('0.01') : 0,
+        taker: incentizesOn ? utils.parseEther('0.001') : 0,
       },
     }
 

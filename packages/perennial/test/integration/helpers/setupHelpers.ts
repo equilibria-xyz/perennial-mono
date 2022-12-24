@@ -189,8 +189,8 @@ export async function createMarket(
       targetUtilization: utils.parseEther('0.80'),
     },
     rewardRate: {
-      _maker: 0,
-      _taker: 0,
+      maker: 0,
+      taker: 0,
     },
   }
   const marketAddress = await controller.callStatic.createMarket(definition, parameter)

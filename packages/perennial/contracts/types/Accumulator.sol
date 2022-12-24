@@ -6,9 +6,9 @@ import "@equilibria/root/number/types/Fixed18.sol";
 /// @dev Accumulator type
 struct Accumulator {
     /// @dev maker accumulator per share
-    PackedFixed18 _maker;
+    Fixed18 maker;
     /// @dev taker accumulator per share
-    PackedFixed18 _taker;
+    Fixed18 taker;
 }
 using AccumulatorLib for Accumulator global;
 
@@ -20,27 +20,19 @@ using AccumulatorLib for Accumulator global;
  *      change in position value since last sync. This change in value is then used to compute P&L and fees.
  */
 library AccumulatorLib {
-    function maker(Accumulator memory self) internal pure returns (Fixed18) {
-        return self._maker.unpack();
-    }
-
-    function taker(Accumulator memory self) internal pure returns (Fixed18) {
-        return self._taker.unpack();
-    }
-
     function incrementMaker(Accumulator memory self, Fixed18 amount, UFixed18 total) internal pure {
-        self._maker = self._maker.unpack().add(amount.div(Fixed18Lib.from(total))).pack();
+        self.maker = self.maker.add(amount.div(Fixed18Lib.from(total)));
     }
 
     function decrementMaker(Accumulator memory self, Fixed18 amount, UFixed18 total) internal pure {
-        self._maker = self._maker.unpack().add(amount.div(Fixed18Lib.from(total)).mul(Fixed18Lib.NEG_ONE)).pack();
+        self.maker = self.maker.add(amount.div(Fixed18Lib.from(total)).mul(Fixed18Lib.NEG_ONE));
     }
 
     function incrementTaker(Accumulator memory self, Fixed18 amount, UFixed18 total) internal pure {
-        self._taker = self._taker.unpack().add(amount.div(Fixed18Lib.from(total))).pack();
+        self.taker = self.taker.add(amount.div(Fixed18Lib.from(total)));
     }
 
     function decrementTaker(Accumulator memory self, Fixed18 amount, UFixed18 total) internal pure {
-        self._taker = self._taker.unpack().add(amount.div(Fixed18Lib.from(total)).mul(Fixed18Lib.NEG_ONE)).pack();
+        self.taker = self.taker.add(amount.div(Fixed18Lib.from(total)).mul(Fixed18Lib.NEG_ONE));
     }
 }
