@@ -24,32 +24,27 @@ struct MarketParameter {
 }
 struct PackedMarketParameter {
     /* slot 1 */
+    address oracle;
     uint24 maintenance; // <= 1677%
     uint24 fundingFee;  // <= 1677%
     uint24 makerFee;    // <= 1677%
     uint24 takerFee;    // <= 1677%
-    uint24 positionFee; // <= 1677%
-    uint48 makerLimit;  // <= 281m
-    bool closed;
-    bytes11 __unallocated0__;
 
     /* slot 2 */
-    int32 rewardRateMaker;                    // <= 2147.48 / s
-    int32 rewardRateTaker;                    // <= 2147.48 / s
+    address payoffProvider;
+    bool payoffShort;
+    int32 rewardRateMaker;  // <= 2147.48 / s
+    int32 rewardRateTaker;  // <= 2147.48 / s
+    uint24 positionFee;     // <= 1677%
+
+    /* slot 3 */
+    uint48 makerLimit;  // <= 281m
     int32 utilizationCurveMinRate;            // <= 214748%
     int32 utilizationCurveMaxRate;            // <= 214748%
     int32 utilizationCurveTargetRate;         // <= 214748%
     uint24 utilizationCurveTargetUtilization; // <= 1677%
-    bytes9 __unallocated1__;
-
-    /* slot 3 */
-    address oracle;
-    bytes12 __unallocated2__;
-
-    /* slot 4 */
-    address payoffProvider;
-    bool payoffShort;
-    bytes11 __unallocated3__;
+    bool closed;
+    bytes10 __unallocated0__;
 }
 type MarketParameterStorage is bytes32;
 using MarketParameterStorageLib for MarketParameterStorage global;
@@ -92,28 +87,25 @@ library MarketParameterStorageLib {
         if (parameter.takerFee.gt(UFixed18Lib.ONE)) revert MarketParameterStorageOverflowError();
         if (parameter.positionFee.gt(UFixed18Lib.ONE)) revert MarketParameterStorageOverflowError();
 
-        _pointer(self).value = PackedMarketParameter(
-            uint24(UFixed18.unwrap(parameter.maintenance) / 1e12),
-            uint24(UFixed18.unwrap(parameter.fundingFee) / 1e12),
-            uint24(UFixed18.unwrap(parameter.makerFee) / 1e12),
-            uint24(UFixed18.unwrap(parameter.takerFee) / 1e12),
-            uint24(UFixed18.unwrap(parameter.positionFee) / 1e12),
-            uint48(UFixed18.unwrap(parameter.makerLimit) / 1e12),
-            parameter.closed,
-            bytes6(0x000000000000),
-            int32(Fixed18.unwrap(parameter.rewardRate.maker) / 1e12),
-            int32(Fixed18.unwrap(parameter.rewardRate.taker) / 1e12),
-            int32(PackedFixed18.unwrap(parameter.utilizationCurve.minRate) / 1e12),
-            int32(PackedFixed18.unwrap(parameter.utilizationCurve.maxRate) / 1e12),
-            int32(PackedFixed18.unwrap(parameter.utilizationCurve.targetRate) / 1e12),
-            uint24(PackedUFixed18.unwrap(parameter.utilizationCurve.targetUtilization) / 1e12),
-            bytes8(0x00000000000000),
-            address(parameter.oracle),
-            bytes12(0x0000000000000000000000),
-            address(parameter.payoff.provider),
-            parameter.payoff.short,
-            bytes11(0x00000000000000000000)
-        );
+        _pointer(self).value = PackedMarketParameter({
+            maintenance: uint24(UFixed18.unwrap(parameter.maintenance) / 1e12),
+            fundingFee: uint24(UFixed18.unwrap(parameter.fundingFee) / 1e12),
+            makerFee: uint24(UFixed18.unwrap(parameter.makerFee) / 1e12),
+            takerFee: uint24(UFixed18.unwrap(parameter.takerFee) / 1e12),
+            positionFee: uint24(UFixed18.unwrap(parameter.positionFee) / 1e12),
+            makerLimit: uint48(UFixed18.unwrap(parameter.makerLimit) / 1e12),
+            closed: parameter.closed,
+            rewardRateMaker: int32(Fixed18.unwrap(parameter.rewardRate.maker) / 1e12),
+            rewardRateTaker: int32(Fixed18.unwrap(parameter.rewardRate.taker) / 1e12),
+            utilizationCurveMinRate: int32(PackedFixed18.unwrap(parameter.utilizationCurve.minRate) / 1e12),
+            utilizationCurveMaxRate: int32(PackedFixed18.unwrap(parameter.utilizationCurve.maxRate) / 1e12),
+            utilizationCurveTargetRate: int32(PackedFixed18.unwrap(parameter.utilizationCurve.targetRate) / 1e12),
+            utilizationCurveTargetUtilization: uint24(PackedUFixed18.unwrap(parameter.utilizationCurve.targetUtilization) / 1e12),
+            oracle: address(parameter.oracle),
+            payoffProvider: address(parameter.payoff.provider),
+            payoffShort: parameter.payoff.short,
+            __unallocated0__: bytes10(0x00000000000000000000)
+        });
     }
 
     function _pointer(MarketParameterStorage self) private pure returns (MarketParameterStoragePointer storage pointer) {
