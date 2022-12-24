@@ -4,9 +4,9 @@ pragma solidity 0.8.17;
 import "@equilibria/root/curve/types/JumpRateUtilizationCurve.sol";
 import "./Position.sol";
 import "./Accumulator.sol";
+import "./OracleVersion.sol";
 import "./ProtocolParameter.sol";
 import "./MarketParameter.sol";
-import "./Period.sol";
 import "./Fee.sol";
 
 /// @dev Version type
@@ -93,14 +93,14 @@ library VersionLib {
     }
 
     /**
-     * @notice Accumulates the global state for the period from `period.fromVersion` to `period.toVersion`
+     * @notice Accumulates the global state for the period from `fromVersion` to `toOracleVersion`
      * @param versionAccumulator The struct to operate on
-     * @param period The oracle version period to settle for
      */
     function accumulate(
         Version memory versionAccumulator,
         Position memory position,
-        Period memory period,
+        OracleVersion memory fromOracleVersion,
+        OracleVersion memory toOracleVersion,
         ProtocolParameter memory protocolParameter,
         MarketParameter memory marketParameter
     ) internal pure returns (UFixed18 fundingFeeAmount) {
@@ -109,14 +109,20 @@ library VersionLib {
             (versionAccumulator.value(), versionAccumulator.reward());
 
         // accumulate funding
-        fundingFeeAmount =
-            _accumulateFunding(valueAccumulator, position, period, protocolParameter, marketParameter);
+        fundingFeeAmount = _accumulateFunding(
+            valueAccumulator,
+            position,
+            fromOracleVersion,
+            toOracleVersion,
+            protocolParameter,
+            marketParameter
+        );
 
         // accumulate position
-        _accumulatePosition(valueAccumulator, position, period, marketParameter);
+        _accumulatePosition(valueAccumulator, position, fromOracleVersion, toOracleVersion, marketParameter);
 
         // accumulate reward
-        _accumulateReward(rewardAccumulator, position, period, marketParameter); //TODO: auto-shutoff if not enough reward ERC20s in contract?
+        _accumulateReward(rewardAccumulator, position, fromOracleVersion, toOracleVersion, marketParameter); //TODO: auto-shutoff if not enough reward ERC20s in contract?
 
         // update
         _update(versionAccumulator, valueAccumulator, rewardAccumulator);
@@ -127,13 +133,13 @@ library VersionLib {
      * @dev If an oracle version is skipped due to no pre positions, funding will continue to be
      *      pegged to the price of the last snapshotted oracleVersion until a new one is accumulated.
      *      This is an acceptable approximation.
-     * @param period The oracle version period to settle for
      * @return fundingFeeAmount The total fee accrued from funding accumulation
      */
     function _accumulateFunding(
         Accumulator memory valueAccumulator,
         Position memory position,
-        Period memory period,
+        OracleVersion memory fromOracleVersion,
+        OracleVersion memory toOracleVersion,
         ProtocolParameter memory protocolParameter,
         MarketParameter memory marketParameter
     ) private pure returns (UFixed18 fundingFeeAmount) {
@@ -141,13 +147,13 @@ library VersionLib {
         if (position.taker().isZero()) return UFixed18Lib.ZERO;
         if (position.maker().isZero()) return UFixed18Lib.ZERO;
 
-        UFixed18 takerNotional = Fixed18Lib.from(position.taker()).mul(period.fromVersion.price).abs();
+        UFixed18 takerNotional = Fixed18Lib.from(position.taker()).mul(fromOracleVersion.price).abs();
         UFixed18 socializedNotional = takerNotional.mul(position.socializationFactor());
 
         Fixed18 fundingAccumulated = marketParameter.utilizationCurve.compute(position.utilization())     // yearly funding rate
-            .mul(Fixed18Lib.from(period.timestampDelta()))                                                      // multiply by seconds in period
-            .div(Fixed18Lib.from(365 days))                                                                     // divide by seconds in year (funding rate for period)
-            .mul(Fixed18Lib.from(socializedNotional));                                                          // multiply by socialized notion (funding for period)
+            .mul(Fixed18Lib.from(int256(toOracleVersion.timestamp - fromOracleVersion.timestamp)))        // multiply by seconds in period
+            .div(Fixed18Lib.from(365 days))                                                               // divide by seconds in year (funding rate for period)
+            .mul(Fixed18Lib.from(socializedNotional));                                                    // multiply by socialized notion (funding for period)
         UFixed18 boundedFundingFee = UFixed18Lib.max(marketParameter.fundingFee, protocolParameter.minFundingFee);
         fundingFeeAmount = fundingAccumulated.abs().mul(boundedFundingFee);
 
@@ -165,19 +171,20 @@ library VersionLib {
 
     /**
      * @notice Globally accumulates position PNL since last oracle update
-     * @param period The oracle version period to settle for
      */
     function _accumulatePosition(
         Accumulator memory valueAccumulator,
         Position memory position,
-        Period memory period,
+        OracleVersion memory fromOracleVersion,
+        OracleVersion memory toOracleVersion,
         MarketParameter memory marketParameter
     ) private pure {
         if (marketParameter.closed) return;
         if (position.taker().isZero()) return;
         if (position.maker().isZero()) return;
 
-        Fixed18 totalTakerDelta = period.priceDelta().mul(Fixed18Lib.from(position.taker()));
+        Fixed18 totalTakerDelta =
+            toOracleVersion.price.sub(fromOracleVersion.price).mul(Fixed18Lib.from(position.taker()));
         Fixed18 socializedTakerDelta = totalTakerDelta.mul(Fixed18Lib.from(position.socializationFactor()));
 
         //TODO: can combine stuff like this into one accumulate
@@ -188,15 +195,15 @@ library VersionLib {
     /**
      * @notice Globally accumulates position's reward since last oracle update
      * @dev This is used to compute incentivization rewards based on market participation
-     * @param period The oracle version period to settle for
      */
     function _accumulateReward(
         Accumulator memory rewardAccumulator,
         Position memory position,
-        Period memory period,
+        OracleVersion memory fromOracleVersion,
+        OracleVersion memory toOracleVersion,
         MarketParameter memory marketParameter
     ) private pure {
-        UFixed18 elapsed = period.timestampDelta();
+        UFixed18 elapsed = UFixed18Lib.from(toOracleVersion.timestamp - fromOracleVersion.timestamp);
 
         if (!position.maker().isZero()) rewardAccumulator
             .incrementMaker(Fixed18Lib.from(elapsed).mul(marketParameter.rewardRate.taker), position.maker());

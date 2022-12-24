@@ -331,66 +331,72 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         _startGas(context, "_settle: %s");
 
         // Initialize memory
-        Period memory period;
+        OracleVersion memory fromOracleVersion;
+        OracleVersion memory toOracleVersion;
         Version memory fromVersion;
         Version memory toVersion;
 
         // settle market a->b if necessary
-        period.fromVersion = context.latestVersion == context.currentOracleVersion.version ? // TODO: make a lazy loader here
+        fromOracleVersion = context.latestVersion == context.currentOracleVersion.version ? // TODO: make a lazy loader here
             context.currentOracleVersion :
             atVersion(context.latestVersion);
-        period.toVersion = context.latestVersion + 1 == context.currentOracleVersion.version ?
+        toOracleVersion = context.latestVersion + 1 == context.currentOracleVersion.version ?
             context.currentOracleVersion :
             atVersion(context.latestVersion + 1);
-        _settlePeriod(context, period);
+        _settlePeriod(context, fromOracleVersion, toOracleVersion);
 
         // settle market b->c if necessary
-        period.fromVersion = period.toVersion;
-        period.toVersion = context.currentOracleVersion;
-        _settlePeriod(context, period);
+        fromOracleVersion = toOracleVersion;
+        toOracleVersion = context.currentOracleVersion;
+        _settlePeriod(context, fromOracleVersion, toOracleVersion);
 
         // settle account a->b if necessary
-        period.toVersion = context.latestAccountVersion + 1 == context.currentOracleVersion.version ?
+        toOracleVersion = context.latestAccountVersion + 1 == context.currentOracleVersion.version ?
             context.currentOracleVersion :
             atVersion(context.latestAccountVersion + 1);
         fromVersion = _versions[context.latestAccountVersion];
         toVersion = _versions[context.latestAccountVersion + 1];
-        _settlePeriodAccount(context, period, fromVersion, toVersion);
+        _settlePeriodAccount(context, toOracleVersion, fromVersion, toVersion);
 
         // settle account b->c if necessary
-        period.toVersion = context.currentOracleVersion;
+        toOracleVersion = context.currentOracleVersion;
         fromVersion = toVersion;
         toVersion = context.version;
-        _settlePeriodAccount(context, period, fromVersion, toVersion);
+        _settlePeriodAccount(context, toOracleVersion, fromVersion, toVersion);
 
         _endGas(context);
     }
 
-    function _settlePeriod(CurrentContext memory context, Period memory period) private {
+    function _settlePeriod(
+        CurrentContext memory context,
+        OracleVersion memory fromOracleVersion,
+        OracleVersion memory toOracleVersion
+    ) private {
         if (context.currentOracleVersion.version > context.latestVersion) {
             UFixed18 fundingFee = context.version.accumulate(
                 context.position,
-                period,
+                fromOracleVersion,
+                toOracleVersion,
                 context.protocolParameter,
                 context.marketParameter
             );
             context.fee.update(fundingFee, context.protocolParameter);
             context.position.settle();
-            context.latestVersion = period.toVersion.version;
-            _versions[period.toVersion.version] = context.version;
+            context.latestVersion = toOracleVersion.version;
+            _versions[toOracleVersion.version] = context.version;
         }
     }
 
     function _settlePeriodAccount(
         CurrentContext memory context,
-        Period memory period,
+        OracleVersion memory toOracleVersion,
         Version memory fromVersion,
         Version memory toVersion
     ) private pure {
         if (context.currentOracleVersion.version > context.latestAccountVersion) {
             context.account.accumulate(fromVersion, toVersion);
             context.account.liquidation = false;
-            context.latestAccountVersion = period.toVersion.version;
+            context.latestAccountVersion = toOracleVersion.version;
         }
     }
 
