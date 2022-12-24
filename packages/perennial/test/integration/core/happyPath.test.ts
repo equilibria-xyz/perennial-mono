@@ -448,7 +448,7 @@ describe.only('Happy Path', () => {
 
   it('delayed update w/ collateral (gas)', async () => {
     const positionFeesOn = true
-    const incentizesOn = false
+    const incentizesOn = true
 
     const parameter = {
       maintenance: utils.parseEther('0.3'),
@@ -513,7 +513,7 @@ describe.only('Happy Path', () => {
     const version = await market.versions(INITIAL_VERSION + 4)
     expect(version._makerValue).to.equal('-357213762097')
     expect(version._takerValue).to.equal('367430826479')
-    expect(version._makerReward).to.equal(0)
-    expect(version._takerReward).to.equal(0)
+    expect(version._makerReward).to.equal('60683636363')
+    expect(version._takerReward).to.equal('606836363635')
   })
 })

@@ -34,7 +34,6 @@ interface ILens {
         Fixed18 next;
         Fixed18 position;
         bool liquidatable;
-        bool liquidating;
         Fixed18 openInterest;
         Fixed18 exposure;
     }
@@ -68,7 +67,6 @@ interface ILens {
     function maintenance(address account, IMarket market) external returns (UFixed18);
     function maintenanceNext(address account, IMarket market) external returns (UFixed18);
     function liquidatable(address account, IMarket market) external returns (bool);
-    function liquidating(address account, IMarket market) external returns (bool);
     function next(address account, IMarket market) external returns (Fixed18);
     function position(address account, IMarket market) external returns (Fixed18);
     function userPosition(address account, IMarket market) external returns (Fixed18, Fixed18);

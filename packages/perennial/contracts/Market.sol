@@ -41,8 +41,6 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
 
         Account account;
 
-        bool liquidation;
-
         /* Debugging */
         uint256 gasCounter;
 
@@ -81,9 +79,6 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
     mapping(address => StoredAccountStorage) private _accounts;
 
     mapping(address => uint256) public latestVersions;
-
-    /// @dev Whether the account is currently locked for liquidation
-    mapping(address => bool) public liquidation;
 
     MarketParameterStorage private constant _parameter = MarketParameterStorage.wrap(keccak256("equilibria.perennial.Market.parameter"));
     function parameter() public view returns (MarketParameter memory) { return _parameter.read(); }
@@ -228,7 +223,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
             context.currentOracleVersion,
             context.marketParameter
         );
-        context.liquidation = true;
+        context.account.liquidation = true;
 
         // remit liquidation reward
         token.push(msg.sender, liquidationReward);
@@ -246,7 +241,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         _startGas(context, "_update before-update-after: %s");
 
         // before
-        if (context.liquidation) revert MarketInLiquidationError();
+        if (context.account.liquidation) revert MarketInLiquidationError();
         if (context.marketParameter.closed && !newPosition.isZero()) revert MarketClosedError();
 
         // update
@@ -309,7 +304,6 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         // Load account state
         context.latestAccountVersion = latestVersions[account];
         context.account = _accounts[account].read();
-        context.liquidation = liquidation[account]; //TODO: packing into account will save gas on liquidation
 
         // after
         if (context.protocolParameter.paused) revert MarketPausedError();
@@ -329,7 +323,6 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         // Load account state
         latestVersions[account] = context.latestAccountVersion;
         _accounts[account].store(context.account);
-        liquidation[account] = context.liquidation; //TODO: can pack this in account, only saves gas on liq.
 
         _endGas(context);
     }
@@ -396,6 +389,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
     ) private pure {
         if (context.currentOracleVersion.version > context.latestAccountVersion) {
             context.account.accumulate(fromVersion, toVersion);
+            context.account.liquidation = false;
             context.latestAccountVersion = period.toVersion.version;
         }
     }

@@ -8,7 +8,7 @@ struct StoredAccount {
     int64 _position; // 6 decimals
     int64 _next; // 6 decimals
     int64 _collateral; // 6 decimals
-    uint64 _reward; // 6 decimals
+    uint64 _liquidationAndReward; // 6 decimals
 }
 struct StoredAccountStorage { StoredAccount value; }
 using StoredAccountStorageLib for StoredAccountStorage global;
@@ -17,6 +17,7 @@ struct Account {
     Fixed18 next; // 6 decimals
     Fixed18 collateral; // 6 decimals
     UFixed18 reward; // 6 decimals
+    bool liquidation;
 }
 using AccountLib for Account global;
 
@@ -41,8 +42,7 @@ library AccountLib {
         // compute position update
         (Fixed18 currentMaker, Fixed18 currentTaker) = _splitPosition(self.next);
         (Fixed18 nextMaker, Fixed18 nextTaker) = _splitPosition(newPosition);
-        (makerAmount, takerAmount) =
-            (nextMaker.sub(currentMaker), nextTaker.sub(currentTaker));
+        (makerAmount, takerAmount) = (nextMaker.sub(currentMaker), nextTaker.sub(currentTaker));
 
         // compute collateral update
         (makerFee, takerFee) = (
@@ -121,22 +121,26 @@ library AccountLib {
 }
 
 library StoredAccountStorageLib {
+    uint64 constant LIQUIDATION_MASK = uint64(1 << 63);
+
     function read(StoredAccountStorage storage self) internal view returns (Account memory) {
         StoredAccount memory storedValue =  self.value;
         return Account(
             Fixed18.wrap(int256(storedValue._position) * 1e12),
             Fixed18.wrap(int256(storedValue._next) * 1e12),
             Fixed18.wrap(int256(storedValue._collateral) * 1e12),
-            UFixed18.wrap(uint256(storedValue._reward) * 1e12)
+            UFixed18.wrap(uint256(storedValue._liquidationAndReward & ~LIQUIDATION_MASK) * 1e12),
+            bool(storedValue._liquidationAndReward & LIQUIDATION_MASK != 0)
         );
     }
 
     function store(StoredAccountStorage storage self, Account memory newValue) internal {
+        //TODO: validation on bounds
         self.value = StoredAccount(
             int64(Fixed18.unwrap(newValue.position) / 1e12),
             int64(Fixed18.unwrap(newValue.next) / 1e12),
             int64(Fixed18.unwrap(newValue.collateral) / 1e12),
-            uint64(UFixed18.unwrap(newValue.reward) / 1e12)
+            uint64((UFixed18.unwrap(newValue.reward) / 1e12) | (uint64(newValue.liquidation ? 1 : 0) << 63))
         );
     }
 }

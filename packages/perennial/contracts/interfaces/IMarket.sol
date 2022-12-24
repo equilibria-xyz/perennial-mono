@@ -57,7 +57,6 @@ interface IMarket {
     function payoffDefinition() external view returns (PayoffDefinition memory);
     function currentVersion() external view returns (OracleVersion memory);
     function atVersion(uint256 oracleVersion) external view returns (OracleVersion memory);
-    function liquidation(address account) external view returns (bool);
     function latestVersion() external view returns (uint256);
     function latestVersions(address account) external view returns (uint256);
     function accounts(address account) external view returns (Account memory);

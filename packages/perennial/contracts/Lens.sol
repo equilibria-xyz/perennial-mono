@@ -86,7 +86,6 @@ contract Lens is ILens {
         _snapshot.next = next(account, market);
         _snapshot.position = position(account, market);
         _snapshot.liquidatable = liquidatable(account, market);
-        _snapshot.liquidating = liquidating(account, market);
         _snapshot.openInterest = openInterest(account, market);
         _snapshot.exposure = exposure(account, market);
     }
@@ -267,16 +266,6 @@ contract Lens is ILens {
         Account memory marketAccount = market.accounts(account);
         UFixed18 maintenanceAmount = _maintenance(market, marketAccount.position);
         return Fixed18Lib.from(maintenanceAmount).gt(marketAccount.collateral);
-    }
-
-    /**
-     * @notice User liquidating status for market after settle
-     * @param account Account address
-     * @param market Market address
-     * @return Whether or not the user's position is being liquidated
-     */
-    function liquidating(address account, IMarket market) public settleAccount(account, market) returns (bool) {
-        return market.liquidation(account);
     }
 
     /**
