@@ -124,8 +124,6 @@ contract Lens is ILens {
         _definition.name = name(market);
         _definition.symbol = symbol(market);
         _definition.token = token(market);
-        _definition.payoffDefinition = market.payoffDefinition();
-        _definition.oracle = market.oracle();
     }
 
     function parameter(IMarket market) public view returns (MarketParameter memory) {
@@ -173,9 +171,11 @@ contract Lens is ILens {
         settle(market)
         returns (OracleVersion[] memory prices)
     {
+        MarketParameter memory marketParameter = market.parameter();
         prices = new OracleVersion[](versions.length);
         for (uint256 i = 0; i < versions.length; i++) {
-            prices[i] = market.atVersion(versions[i]);
+            prices[i] = marketParameter.oracle.atVersion(versions[i]);
+            marketParameter.payoff.transform(prices[i]);
         }
     }
 
@@ -391,10 +391,12 @@ contract Lens is ILens {
      * @notice Returns the Market's latest version
      * @dev Private function, does not call settle itself
      * @param market Market address
-     * @return Latest version for the market
+     * @return oracleVersion Latest version for the market
      */
-    function _latestVersion(IMarket market) private view returns (OracleVersion memory) {
-        return market.atVersion(market.latestVersion());
+    function _latestVersion(IMarket market) private view returns (OracleVersion memory oracleVersion) {
+        MarketParameter memory marketParameter = market.parameter();
+        oracleVersion = marketParameter.oracle.atVersion(market.latestVersion());
+        marketParameter.payoff.transform(oracleVersion);
     }
 
     /**

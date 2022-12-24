@@ -21,8 +21,6 @@ describe.only('Happy Path', () => {
       symbol: 'SQTH',
       token: dsu.address,
       reward: rewardToken.address,
-      payoffDefinition: createPayoffDefinition({ contractAddress: contractPayoffProvider.address }),
-      oracle: chainlinkOracle.address,
     }
     const parameter = {
       maintenance: utils.parseEther('0.3'),
@@ -41,6 +39,11 @@ describe.only('Happy Path', () => {
       rewardRate: {
         maker: 0,
         taker: 0,
+      },
+      oracle: chainlinkOracle.address,
+      payoff: {
+        provider: contractPayoffProvider.address,
+        short: false,
       },
     }
     const marketAddress = await controller.callStatic.createMarket(definition, parameter)
@@ -447,6 +450,10 @@ describe.only('Happy Path', () => {
     const positionFeesOn = true
     const incentizesOn = true
 
+    const POSITION = utils.parseEther('0.0001')
+    const COLLATERAL = utils.parseEther('1000')
+    const { user, userB, dsu, chainlink, chainlinkOracle, contractPayoffProvider } = instanceVars
+
     const parameter = {
       maintenance: utils.parseEther('0.3'),
       fundingFee: utils.parseEther('0.1'),
@@ -465,11 +472,12 @@ describe.only('Happy Path', () => {
         maker: incentizesOn ? utils.parseEther('0.01') : 0,
         taker: incentizesOn ? utils.parseEther('0.001') : 0,
       },
+      oracle: chainlinkOracle.address,
+      payoff: {
+        provider: contractPayoffProvider.address,
+        short: false,
+      },
     }
-
-    const POSITION = utils.parseEther('0.0001')
-    const COLLATERAL = utils.parseEther('1000')
-    const { user, userB, dsu, chainlink } = instanceVars
 
     const market = await createMarket(instanceVars)
     await market.updateParameter(parameter)

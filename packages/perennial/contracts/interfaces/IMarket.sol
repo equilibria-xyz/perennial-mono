@@ -5,7 +5,6 @@ import "@equilibria/root/number/types/UFixed18.sol";
 import "@equilibria/root/token/types/Token18.sol";
 import "@equilibria/root/curve/types/JumpRateUtilizationCurve.sol";
 import "./IOracleProvider.sol";
-import "../types/PayoffDefinition.sol";
 import "../types/Position.sol";
 import "../types/Accumulator.sol";
 import "../types/Version.sol";
@@ -19,8 +18,6 @@ interface IMarket {
         string symbol;
         Token18 token;
         Token18 reward;
-        IOracleProvider oracle;
-        PayoffDefinition payoffDefinition;
     }
 
     event Settle(uint256 preVersion, uint256 toVersion);
@@ -53,10 +50,6 @@ interface IMarket {
     function symbol() external view returns (string memory);
     function token() external view returns (Token18);
     function treasury() external view returns (address);
-    function oracle() external view returns (IOracleProvider);
-    function payoffDefinition() external view returns (PayoffDefinition memory);
-    function currentVersion() external view returns (OracleVersion memory);
-    function atVersion(uint256 oracleVersion) external view returns (OracleVersion memory);
     function latestVersion() external view returns (uint256);
     function latestVersions(address account) external view returns (uint256);
     function accounts(address account) external view returns (Account memory);

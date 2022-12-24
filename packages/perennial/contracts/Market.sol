@@ -47,14 +47,14 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         string gasCounterMessage;
     }
 
-    /// @dev The protocol factory
-    IFactory public factory;
-
     /// @dev The name of the market
     string public name;
 
     /// @dev The symbol of the market
     string public symbol;
+
+    /// @dev The protocol factory
+    IFactory public factory;
 
     /// @dev ERC20 stablecoin for collateral
     Token18 public token;
@@ -83,12 +83,6 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
     MarketParameterStorage private constant _parameter = MarketParameterStorage.wrap(keccak256("equilibria.perennial.Market.parameter"));
     function parameter() public view returns (MarketParameter memory) { return _parameter.read(); }
 
-    /// @dev The oracle contract address
-    IOracleProvider public oracle;
-
-    /// @dev Payoff definition struct
-    PayoffDefinition private _payoffDefinition;
-
     /**
      * @notice Initializes the contract state
      */
@@ -104,8 +98,6 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         symbol = definition_.symbol;
         token = definition_.token;
         reward = definition_.reward;
-        oracle = definition_.oracle;
-        _payoffDefinition = definition_.payoffDefinition;
         updateParameter(parameter_);
     }
 
@@ -140,6 +132,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
     }
 
     function updateParameter(MarketParameter memory newParameter) public onlyOwner {
+        //TODO: disallow non-editable params
         _parameter.store(newParameter);
         emit ParameterUpdated(newParameter);
     }
@@ -166,23 +159,6 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
 
     //TODO: claim reward
 
-    /**
-     * @notice Returns the current oracle version transformed by the payoff definition
-     * @return Current oracle version transformed by the payoff definition
-     */
-    function currentVersion() public view returns (OracleVersion memory) {
-        return _transform(oracle.currentVersion());
-    }
-
-    /**
-     * @notice Returns the oracle version at `oracleVersion` transformed by the payoff definition
-     * @param oracleVersion Oracle version to return for
-     * @return Oracle version at `oracleVersion` with price transformed by payoff function
-     */
-    function atVersion(uint256 oracleVersion) public view returns (OracleVersion memory) {
-        return _transform(oracle.atVersion(oracleVersion));
-    }
-
     function accounts(address account) external view returns (Account memory) {
         return _accounts[account].read();
     }
@@ -197,10 +173,6 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
 
     function fee() external view returns (Fee memory) {
         return _fee;
-    }
-
-    function payoffDefinition() external view returns (PayoffDefinition memory) {
-        return _payoffDefinition;
     }
 
     function _liquidate(CurrentContext memory context, address account) private {
@@ -295,7 +267,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         context.marketParameter = parameter();
 
         // Load market state
-        context.currentOracleVersion = _transform(oracle.sync());
+        context.currentOracleVersion = _sync(context.marketParameter);
         context.latestVersion = latestVersion;
         context.version = _versions[context.latestVersion + 1];
         context.position = _position;
@@ -339,10 +311,10 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         // settle market a->b if necessary
         fromOracleVersion = context.latestVersion == context.currentOracleVersion.version ? // TODO: make a lazy loader here
             context.currentOracleVersion :
-            atVersion(context.latestVersion);
+            _oracleVersionAt(context.marketParameter, context.latestVersion);
         toOracleVersion = context.latestVersion + 1 == context.currentOracleVersion.version ?
             context.currentOracleVersion :
-            atVersion(context.latestVersion + 1);
+            _oracleVersionAt(context.marketParameter, context.latestVersion + 1);
         _settlePeriod(context, fromOracleVersion, toOracleVersion);
 
         // settle market b->c if necessary
@@ -353,7 +325,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         // settle account a->b if necessary
         toOracleVersion = context.latestAccountVersion + 1 == context.currentOracleVersion.version ?
             context.currentOracleVersion :
-            atVersion(context.latestAccountVersion + 1);
+            _oracleVersionAt(context.marketParameter, context.latestAccountVersion + 1);
         fromVersion = _versions[context.latestAccountVersion];
         toVersion = _versions[context.latestAccountVersion + 1];
         _settlePeriodAccount(context, toOracleVersion, fromVersion, toVersion);
@@ -424,18 +396,17 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
             revert MarketInsufficientCollateralError();
     }
 
-    /**
-     * @notice Returns the transformed oracle version
-     * @param oracleVersion Oracle version to transform
-     * @return Transformed oracle version
-     */
-    function _transform(OracleVersion memory oracleVersion)
-        internal
-        view
-        returns (OracleVersion memory)
-    {
-        oracleVersion.price = _payoffDefinition.transform(oracleVersion.price);
-        return oracleVersion;
+    function _sync(MarketParameter memory marketParameter) private returns (OracleVersion memory oracleVersion) {
+        oracleVersion = marketParameter.oracle.sync();
+        marketParameter.payoff.transform(oracleVersion);
+    }
+
+    function _oracleVersionAt(
+        MarketParameter memory marketParameter,
+        uint256 version
+    ) internal view returns (OracleVersion memory oracleVersion) {
+        oracleVersion = marketParameter.oracle.atVersion(version);
+        marketParameter.payoff.transform(oracleVersion);
     }
 
     // Debug

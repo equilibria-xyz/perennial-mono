@@ -171,8 +171,6 @@ export async function createMarket(
     symbol: 'SQTH',
     token: dsu.address,
     reward: rewardToken.address,
-    payoffDefinition: createPayoffDefinition({ contractAddress: payoffProvider.address }),
-    oracle: oracle.address,
   }
   const parameter = {
     maintenance: utils.parseEther('0.3'),
@@ -191,6 +189,11 @@ export async function createMarket(
     rewardRate: {
       maker: 0,
       taker: 0,
+    },
+    oracle: oracle.address,
+    payoff: {
+      provider: payoffProvider.address,
+      short: false,
     },
   }
   const marketAddress = await controller.callStatic.createMarket(definition, parameter)
