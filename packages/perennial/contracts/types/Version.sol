@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.17;
 
-import "./root/UFixed6.sol";
+import "./root/Accumulator6.sol";
+import "./root/UAccumulator6.sol";
 import "./Position.sol";
-import "./Accumulator.sol";
 import "./OracleVersion.sol";
 import "./ProtocolParameter.sol";
 import "./MarketParameter.sol";
@@ -11,15 +11,17 @@ import "./Fee.sol";
 
 /// @dev Version type
 struct Version {
-    Accumulator value;
-    Accumulator reward;
+    Accumulator6 makerValue;
+    Accumulator6 takerValue;
+    UAccumulator6 makerReward;
+    UAccumulator6 takerReward;
 }
 using VersionLib for Version global;
 struct StoredVersion {
     int64 _makerValue;
     int64 _takerValue;
-    int64 _makerReward;
-    int64 _takerReward;
+    uint64 _makerReward;
+    uint64 _takerReward;
 }
 struct StoredVersionStorage { StoredVersion value; }
 using StoredVersionStorageLib for StoredVersionStorage global;
@@ -59,14 +61,14 @@ library VersionLib {
 
         // If there are makers to distribute the taker's position fee to, distribute. Otherwise give it to the protocol
         if (!position.maker().isZero()) {
-            self.value.incrementMaker(Fixed6Lib.from(takerFee), position.maker());
+            self.makerValue.increment(Fixed6Lib.from(takerFee), position.maker());
         } else {
             positionFee = protocolParameter.protocolFee.add(takerFee);
         }
 
         // If there are takers to distribute the maker's position fee to, distribute. Otherwise give it to the protocol
         if (!position.taker().isZero()) {
-            self.value.incrementTaker(Fixed6Lib.from(makerFee), position.taker());
+            self.takerValue.increment(Fixed6Lib.from(makerFee), position.taker());
         } else {
             positionFee = protocolParameter.protocolFee.add(makerFee);
         }
@@ -85,20 +87,14 @@ library VersionLib {
         MarketParameter memory marketParameter
     ) internal pure returns (UFixed6 fundingFeeAmount) {
         // accumulate funding
-        fundingFeeAmount = _accumulateFunding(
-            self.value,
-            position,
-            fromOracleVersion,
-            toOracleVersion,
-            protocolParameter,
-            marketParameter
-        );
+        fundingFeeAmount =
+            _accumulateFunding(self, position, fromOracleVersion, toOracleVersion, protocolParameter, marketParameter);
 
         // accumulate position
-        _accumulatePosition(self.value, position, fromOracleVersion, toOracleVersion, marketParameter);
+        _accumulatePosition(self, position, fromOracleVersion, toOracleVersion, marketParameter);
 
         // accumulate reward
-        _accumulateReward(self.reward, position, fromOracleVersion, toOracleVersion, marketParameter); //TODO: auto-shutoff if not enough reward ERC20s in contract?
+        _accumulateReward(self, position, fromOracleVersion, toOracleVersion, marketParameter); //TODO: auto-shutoff if not enough reward ERC20s in contract?
     }
 
     /**
@@ -109,7 +105,7 @@ library VersionLib {
      * @return fundingFeeAmount The total fee accrued from funding accumulation
      */
     function _accumulateFunding(
-        Accumulator memory valueAccumulator,
+        Version memory self,
         Position memory position,
         OracleVersion memory fromOracleVersion,
         OracleVersion memory toOracleVersion,
@@ -136,9 +132,9 @@ library VersionLib {
         );
 
         bool makerPaysFunding = fundingAccumulated.sign() < 0;
-        valueAccumulator.incrementMaker(
+        self.makerValue.increment(
             makerPaysFunding ? fundingAccumulated : fundingAccumulatedWithoutFee, position.maker());
-        valueAccumulator.decrementTaker(
+        self.takerValue.decrement(
             makerPaysFunding ? fundingAccumulatedWithoutFee : fundingAccumulated, position.taker());
     }
 
@@ -146,7 +142,7 @@ library VersionLib {
      * @notice Globally accumulates position PNL since last oracle update
      */
     function _accumulatePosition(
-        Accumulator memory valueAccumulator,
+        Version memory self,
         Position memory position,
         OracleVersion memory fromOracleVersion,
         OracleVersion memory toOracleVersion,
@@ -160,9 +156,8 @@ library VersionLib {
             toOracleVersion.price.sub(fromOracleVersion.price).mul(Fixed6Lib.from(position.taker()));
         Fixed6 socializedTakerDelta = totalTakerDelta.mul(Fixed6Lib.from(position.socializationFactor()));
 
-        //TODO: can combine stuff like this into one accumulate
-        valueAccumulator.decrementMaker(socializedTakerDelta, position.maker());
-        valueAccumulator.incrementTaker(socializedTakerDelta, position.taker());
+        self.makerValue.decrement(socializedTakerDelta, position.maker());
+        self.takerValue.increment(socializedTakerDelta, position.taker());
     }
 
     /**
@@ -170,7 +165,7 @@ library VersionLib {
      * @dev This is used to compute incentivization rewards based on market participation
      */
     function _accumulateReward(
-        Accumulator memory rewardAccumulator,
+        Version memory self,
         Position memory position,
         OracleVersion memory fromOracleVersion,
         OracleVersion memory toOracleVersion,
@@ -178,10 +173,10 @@ library VersionLib {
     ) private pure {
         UFixed6 elapsed = UFixed6Lib.from(toOracleVersion.timestamp - fromOracleVersion.timestamp);
 
-        if (!position.maker().isZero()) rewardAccumulator
-            .incrementMaker(Fixed6Lib.from(elapsed).mul(marketParameter.rewardRate.taker), position.maker());
-        if (!position.taker().isZero()) rewardAccumulator
-            .incrementTaker(Fixed6Lib.from(elapsed).mul(marketParameter.rewardRate.maker), position.taker());
+        if (!position.maker().isZero())
+            self.makerReward.increment(elapsed.mul(marketParameter.takerRewardRate), position.maker());
+        if (!position.taker().isZero())
+            self.takerReward.increment(elapsed.mul(marketParameter.makerRewardRate), position.taker());
     }
 }
 
@@ -189,17 +184,19 @@ library StoredVersionStorageLib {
     function read(StoredVersionStorage storage self) internal view returns (Version memory) {
         StoredVersion memory storedValue =  self.value;
         return Version(
-            Accumulator(Fixed6.wrap(int256(storedValue._makerValue)), Fixed6.wrap(int256(storedValue._takerValue))),
-            Accumulator(Fixed6.wrap(int256(storedValue._makerReward)), Fixed6.wrap(int256(storedValue._takerReward)))
+            Accumulator6(Fixed6.wrap(int256(storedValue._makerValue))),
+            Accumulator6(Fixed6.wrap(int256(storedValue._takerValue))),
+            UAccumulator6(UFixed6.wrap(uint256(storedValue._makerReward))),
+            UAccumulator6(UFixed6.wrap(uint256(storedValue._takerReward)))
         );
     }
 
     function store(StoredVersionStorage storage self, Version memory newValue) internal {
         self.value = StoredVersion(
-            int64(Fixed6.unwrap(newValue.value.maker)),
-            int64(Fixed6.unwrap(newValue.value.taker)),
-            int64(Fixed6.unwrap(newValue.reward.maker)),
-            int64(Fixed6.unwrap(newValue.reward.taker))
+            int64(Fixed6.unwrap(newValue.makerValue._value)),
+            int64(Fixed6.unwrap(newValue.takerValue._value)),
+            uint64(UFixed6.unwrap(newValue.makerReward._value)),
+            uint64(UFixed6.unwrap(newValue.takerReward._value))
         );
     }
 }

@@ -37,10 +37,8 @@ describe.only('Happy Path', () => {
         targetRate: parse6decimal('0.80'),
         targetUtilization: parse6decimal('0.80'),
       },
-      rewardRate: {
-        maker: 0,
-        taker: 0,
-      },
+      makerRewardRate: 0,
+      takerRewardRate: 0,
       oracle: chainlinkOracle.address,
       payoff: {
         provider: contractPayoffProvider.address,
@@ -80,10 +78,10 @@ describe.only('Happy Path', () => {
       _takerNext: 0,
     })
     const version = await market.versions(INITIAL_VERSION)
-    expect(version.value.maker).to.equal(0)
-    expect(version.value.taker).to.equal(0)
-    expect(version.reward.maker).to.equal(0)
-    expect(version.reward.taker).to.equal(0)
+    expect(version.makerValue._value).to.equal(0)
+    expect(version.takerValue._value).to.equal(0)
+    expect(version.makerReward._value).to.equal(0)
+    expect(version.takerReward._value).to.equal(0)
 
     // Settle the market with a new oracle version
     await chainlink.next()
@@ -133,10 +131,10 @@ describe.only('Happy Path', () => {
       _takerNext: 0,
     })
     const version = await market.versions(INITIAL_VERSION)
-    expect(version.value.maker).to.equal(0)
-    expect(version.value.taker).to.equal(0)
-    expect(version.reward.maker).to.equal(0)
-    expect(version.reward.taker).to.equal(0)
+    expect(version.makerValue._value).to.equal(0)
+    expect(version.takerValue._value).to.equal(0)
+    expect(version.makerReward._value).to.equal(0)
+    expect(version.takerReward._value).to.equal(0)
 
     // Settle the market with a new oracle version
     await chainlink.next()
@@ -187,10 +185,10 @@ describe.only('Happy Path', () => {
       _takerNext: 0,
     })
     const version = await market.versions(INITIAL_VERSION)
-    expect(version.value.maker).to.equal(0)
-    expect(version.value.taker).to.equal(0)
-    expect(version.reward.maker).to.equal(0)
-    expect(version.reward.taker).to.equal(0)
+    expect(version.makerValue._value).to.equal(0)
+    expect(version.takerValue._value).to.equal(0)
+    expect(version.makerReward._value).to.equal(0)
+    expect(version.takerReward._value).to.equal(0)
   })
 
   it('closes multiple make positions', async () => {
@@ -224,10 +222,10 @@ describe.only('Happy Path', () => {
       _takerNext: 0,
     })
     const version = await market.versions(INITIAL_VERSION)
-    expect(version.value.maker).to.equal(0)
-    expect(version.value.taker).to.equal(0)
-    expect(version.reward.maker).to.equal(0)
-    expect(version.reward.taker).to.equal(0)
+    expect(version.makerValue._value).to.equal(0)
+    expect(version.takerValue._value).to.equal(0)
+    expect(version.makerReward._value).to.equal(0)
+    expect(version.takerReward._value).to.equal(0)
   })
 
   it('opens a take position', async () => {
@@ -259,10 +257,10 @@ describe.only('Happy Path', () => {
       _takerNext: POSITION_B,
     })
     const version = await market.versions(INITIAL_VERSION)
-    expect(version.value.maker).to.equal(0)
-    expect(version.value.taker).to.equal(0)
-    expect(version.reward.maker).to.equal(0)
-    expect(version.reward.taker).to.equal(0)
+    expect(version.makerValue._value).to.equal(0)
+    expect(version.takerValue._value).to.equal(0)
+    expect(version.makerReward._value).to.equal(0)
+    expect(version.takerReward._value).to.equal(0)
 
     // One round
     await chainlink.next()
@@ -316,10 +314,10 @@ describe.only('Happy Path', () => {
       _takerNext: POSITION_B,
     })
     const version = await market.versions(INITIAL_VERSION)
-    expect(version.value.maker).to.equal(0)
-    expect(version.value.taker).to.equal(0)
-    expect(version.reward.maker).to.equal(0)
-    expect(version.reward.taker).to.equal(0)
+    expect(version.makerValue._value).to.equal(0)
+    expect(version.takerValue._value).to.equal(0)
+    expect(version.makerReward._value).to.equal(0)
+    expect(version.takerReward._value).to.equal(0)
 
     // One round
     await chainlink.next()
@@ -378,10 +376,10 @@ describe.only('Happy Path', () => {
       _takerNext: 0,
     })
     const version = await market.versions(INITIAL_VERSION)
-    expect(version.value.maker).to.equal(0)
-    expect(version.value.taker).to.equal(0)
-    expect(version.reward.maker).to.equal(0)
-    expect(version.reward.taker).to.equal(0)
+    expect(version.makerValue._value).to.equal(0)
+    expect(version.takerValue._value).to.equal(0)
+    expect(version.makerReward._value).to.equal(0)
+    expect(version.takerReward._value).to.equal(0)
   })
 
   it('closes multiple take positions', async () => {
@@ -421,10 +419,10 @@ describe.only('Happy Path', () => {
       _takerNext: 0,
     })
     const version = await market.versions(INITIAL_VERSION)
-    expect(version.value.maker).to.equal(0)
-    expect(version.value.taker).to.equal(0)
-    expect(version.reward.maker).to.equal(0)
-    expect(version.reward.taker).to.equal(0)
+    expect(version.makerValue._value).to.equal(0)
+    expect(version.takerValue._value).to.equal(0)
+    expect(version.makerReward._value).to.equal(0)
+    expect(version.takerReward._value).to.equal(0)
   })
 
   it('settle no op (gas test)', async () => {
@@ -469,10 +467,8 @@ describe.only('Happy Path', () => {
         targetRate: parse6decimal('0.80'),
         targetUtilization: parse6decimal('0.80'),
       },
-      rewardRate: {
-        maker: incentizesOn ? parse6decimal('0.01') : 0,
-        taker: incentizesOn ? parse6decimal('0.001') : 0,
-      },
+      makerRewardRate: incentizesOn ? parse6decimal('0.01') : 0,
+      takerRewardRate: incentizesOn ? parse6decimal('0.001') : 0,
       oracle: chainlinkOracle.address,
       payoff: {
         provider: contractPayoffProvider.address,
@@ -517,9 +513,9 @@ describe.only('Happy Path', () => {
       _takerNext: POSITION.div(2),
     })
     const version = await market.versions(INITIAL_VERSION + 4)
-    expect(version.value.maker).to.equal('-357225572122')
-    expect(version.value.taker).to.equal('367444018181')
-    expect(version.reward.maker).to.equal('60683636363')
-    expect(version.reward.taker).to.equal('606836363635')
+    expect(version.makerValue._value).to.equal('-357225572122')
+    expect(version.takerValue._value).to.equal('367444018181')
+    expect(version.makerReward._value).to.equal('60683636363')
+    expect(version.takerReward._value).to.equal('606836363635')
   })
 })

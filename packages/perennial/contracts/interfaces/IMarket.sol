@@ -5,7 +5,6 @@ import "../types/root/UFixed6.sol";
 import "@equilibria/root/token/types/Token18.sol";
 import "./IOracleProvider.sol";
 import "../types/Position.sol";
-import "../types/Accumulator.sol";
 import "../types/Version.sol";
 import "../types/Account.sol";
 import "../types/Fee.sol";

@@ -99,7 +99,7 @@ export async function deployProtocol(): Promise<InstanceVars> {
   // Init
   await controller.initialize(marketImpl.address)
 
-  // Params - TODO: finalize before launch
+  // Params
   await controller.updatePauser(pauser.address)
   await controller.updateTreasury(treasuryA.address)
   await controller.updateParameter({
@@ -181,10 +181,8 @@ export async function createMarket(
       targetRate: parse6decimal('0.80'),
       targetUtilization: parse6decimal('0.80'),
     },
-    rewardRate: {
-      maker: 0,
-      taker: 0,
-    },
+    makerRewardRate: 0,
+    takerRewardRate: 0,
     oracle: oracle.address,
     payoff: {
       provider: payoffProvider.address,

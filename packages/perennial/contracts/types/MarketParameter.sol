@@ -5,7 +5,6 @@ import "./root/UFixed6.sol";
 import "./root/JumpRateUtilizationCurve6.sol";
 import "../interfaces/IPayoffProvider.sol";
 import "../interfaces/IOracleProvider.sol";
-import "./Accumulator.sol";
 import "./Payoff.sol";
 
 /// @dev MarketParameter type
@@ -17,7 +16,8 @@ struct MarketParameter {
     UFixed6 positionFee; // <= 429496%
     UFixed6 makerLimit;  // <= 18.45tn
     bool closed;
-    Accumulator rewardRate; //TODO: better to represent as non-negative accumulator?
+    UFixed6 makerRewardRate;
+    UFixed6 takerRewardRate;
     JumpRateUtilizationCurve6 utilizationCurve;
     IOracleProvider oracle;
     Payoff payoff;
@@ -33,8 +33,8 @@ struct StoredMarketParameter {
     /* slot 2 */
     address payoffProvider;
     bool payoffShort;
-    int32 rewardRateMaker;  // <= 2147.48 / s
-    int32 rewardRateTaker;  // <= 2147.48 / s
+    uint32 makerRewardRate;  // <= 2147.48 / s
+    uint32 takerRewardRate;  // <= 2147.48 / s
     uint24 positionFee;     // <= 1677%
 
     /* slot 3 */
@@ -62,10 +62,8 @@ library StoredMarketParameterStorageLib {
             UFixed6.wrap(uint256(value.positionFee)),
             UFixed6.wrap(uint256(value.makerLimit)),
             value.closed,
-            Accumulator(
-                Fixed6.wrap(int256(value.rewardRateMaker)),
-                Fixed6.wrap(int256(value.rewardRateTaker))
-            ),
+            UFixed6.wrap(uint256(value.makerRewardRate)),
+            UFixed6.wrap(uint256(value.takerRewardRate)),
             JumpRateUtilizationCurve6(
                 Fixed6.wrap(int128(value.utilizationCurveMinRate)),
                 Fixed6.wrap(int128(value.utilizationCurveMaxRate)),
@@ -93,8 +91,8 @@ library StoredMarketParameterStorageLib {
             positionFee: uint24(UFixed6.unwrap(parameter.positionFee)),
             makerLimit: uint48(UFixed6.unwrap(parameter.makerLimit)),
             closed: parameter.closed,
-            rewardRateMaker: int32(Fixed6.unwrap(parameter.rewardRate.maker)),
-            rewardRateTaker: int32(Fixed6.unwrap(parameter.rewardRate.taker)),
+            makerRewardRate: uint32(UFixed6.unwrap(parameter.makerRewardRate)),
+            takerRewardRate: uint32(UFixed6.unwrap(parameter.takerRewardRate)),
             utilizationCurveMinRate: int32(Fixed6.unwrap(parameter.utilizationCurve.minRate)),
             utilizationCurveMaxRate: int32(Fixed6.unwrap(parameter.utilizationCurve.maxRate)),
             utilizationCurveTargetRate: int32(Fixed6.unwrap(parameter.utilizationCurve.targetRate)),

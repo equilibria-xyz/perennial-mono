@@ -2,7 +2,6 @@
 pragma solidity ^0.8.13;
 
 import "./root/UFixed6.sol";
-import "./Accumulator.sol";
 
 /// @dev Position type
 struct Position {
