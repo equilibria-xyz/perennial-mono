@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.17;
 
-import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@equilibria/root/control/unstructured/UOwnable.sol";
 import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 import "./interfaces/IFactory.sol";
@@ -10,7 +9,7 @@ import "./interfaces/IFactory.sol";
  * @title Factory
  * @notice Manages creating new markets and global protocol parameters.
  */
-contract Factory is IFactory, UInitializable, UOwnable {
+contract Factory is IFactory, UOwnable {
     StoredProtocolParameterStorage private _parameter;
 
     /// @dev Market implementation address
@@ -64,7 +63,7 @@ contract Factory is IFactory, UInitializable, UOwnable {
 
     /**
      * @notice Creates a new market market with `provider`
-     * @return New market contract address
+     * @return newMarket New market contract address
      */
     function createMarket(
         IMarket.MarketDefinition calldata definition,
