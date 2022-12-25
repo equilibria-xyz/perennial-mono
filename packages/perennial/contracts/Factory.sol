@@ -11,36 +11,36 @@ import "./interfaces/IFactory.sol";
  * @notice Manages creating new markets and global protocol parameters.
  */
 contract Factory is IFactory, UInitializable, UOwnable {
-    ProtocolParameterStorage private constant _parameter = ProtocolParameterStorage.wrap(keccak256("equilibria.perennial.UParamProvider.parameter"));
-    function parameter() public view returns (ProtocolParameter memory) { return _parameter.read(); }
+    StoredProtocolParameterStorage private _parameter;
 
-    /// @dev Market implementation beacon address for the protocol
-    AddressStorage private constant _marketBeacon = AddressStorage.wrap(keccak256("equilibria.perennial.Factory.marketBeacon"));
-    function marketBeacon() public view returns (IBeacon) { return IBeacon(_marketBeacon.read()); }
+    /// @dev Market implementation address
+    address public implementation;
 
     /// @dev Protocol pauser address. address(0) defaults to owner(0)
-    AddressStorage private constant _treasury = AddressStorage.wrap(keccak256("equilibria.perennial.Factory.treasury"));
-    function treasury() public view returns (address) {
-        address treasury_ = _treasury.read();
-        return treasury_ == address(0) ? owner() : treasury_;
-    }
+    address private _treasury;
 
     /// @dev Protocol pauser address. address(0) defaults to owner(0)
-    AddressStorage private constant _pauser = AddressStorage.wrap(keccak256("equilibria.perennial.Factory.pauser"));
-    function pauser() public view returns (address) {
-        address pauser_ = _pauser.read();
-        return pauser_ == address(0) ? owner() : pauser_;
-    }
+    address private _pauser;
 
     /**
      * @notice Initializes the contract state
      * @dev Must be called atomically as part of the upgradeable proxy deployment to
      *      avoid front-running
-     * @param marketBeacon_ Market implementation beacon address
+     * @param implementation_ Market implementation address
      */
-    function initialize(IBeacon marketBeacon_) external initializer(1) {
+    function initialize(address implementation_) external initializer(1) {
         __UOwnable__initialize();
-        updateMarketBeacon(marketBeacon_);
+        updateImplementation(implementation_);
+    }
+
+    function updateImplementation(address newImplementation) public onlyOwner {
+        implementation = newImplementation;
+        emit ImplementationUpdated(newImplementation);
+    }
+
+    function updateParameter(ProtocolParameter memory newParameter) public onlyOwner {
+        _parameter.store(newParameter);
+        emit ParameterUpdated(newParameter);
     }
 
     /**
@@ -49,7 +49,7 @@ contract Factory is IFactory, UInitializable, UOwnable {
      * @param newTreasury New treasury address
      */
     function updateTreasury(address newTreasury) external onlyOwner {
-        _treasury.store(newTreasury);
+        _treasury = newTreasury;
         emit TreasuryUpdated(newTreasury);
     }
 
@@ -58,47 +58,39 @@ contract Factory is IFactory, UInitializable, UOwnable {
      * @param newPauser New protocol pauser address
      */
     function updatePauser(address newPauser) public onlyOwner {
-        _pauser.store(newPauser);
+        _pauser = newPauser;
         emit PauserUpdated(newPauser);
     }
 
     /**
      * @notice Creates a new market market with `provider`
-     * @dev Can only be called by the coordinator owner
      * @return New market contract address
      */
-    function createMarket(IMarket.MarketDefinition calldata definition, MarketParameter calldata marketParameter)
-        external
-        returns (IMarket)
-    {
-        BeaconProxy newMarketProxy = new BeaconProxy(
-            address(marketBeacon()),
+    function createMarket(
+        IMarket.MarketDefinition calldata definition,
+        MarketParameter calldata marketParameter
+    ) external returns (IMarket newMarket) {
+        newMarket = IMarket(address(new BeaconProxy(
+            address(this),
             abi.encodeCall(IMarket.initialize, (definition, marketParameter))
-        );
-        IMarket newMarket = IMarket(address(newMarketProxy));
-
+        )));
         UOwnable(address(newMarket)).updatePendingOwner(msg.sender); //TODO: IOwnable in root
 
         //TODO: create2 or registration?
 
         emit MarketCreated(newMarket, definition, marketParameter);
-
-        return newMarket;
     }
 
-    /**
-     * @notice Updates the Market implementation beacon address
-     * @param newMarketBeacon New Market implementation beacon address
-     */
-    function updateMarketBeacon(IBeacon newMarketBeacon) public onlyOwner {
-        if (!Address.isContract(address(newMarketBeacon))) revert FactoryNotContractAddressError();
-        _marketBeacon.store(address(newMarketBeacon));
-        emit MarketBeaconUpdated(newMarketBeacon);
+    function parameter() public view returns (ProtocolParameter memory) {
+        return _parameter.read();
     }
 
-    function updateParameter(ProtocolParameter memory newParameter) public onlyOwner {
-        _parameter.store(newParameter);
-        emit ParameterUpdated(newParameter);
+    function treasury() external view returns (address) {
+        return _treasury == address(0) ? owner() : _treasury;
+    }
+
+    function pauser() public view returns (address) {
+        return _pauser == address(0) ? owner() : _pauser;
     }
 
     /**

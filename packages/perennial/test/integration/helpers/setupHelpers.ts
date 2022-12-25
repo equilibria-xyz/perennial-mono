@@ -1,6 +1,6 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import HRE from 'hardhat'
-import { BigNumber, utils } from 'ethers'
+import { utils } from 'ethers'
 
 import { time, impersonate } from '../../../../common/testutil'
 import {
@@ -9,13 +9,11 @@ import {
   IERC20Metadata,
   ChainlinkOracle,
   Market,
-  IBeacon,
   IERC20Metadata__factory,
   Factory__factory,
   TestnetContractPayoffProvider__factory,
   ChainlinkOracle__factory,
   Market__factory,
-  UpgradeableBeacon__factory,
   Lens,
   Lens__factory,
   IBatcher,
@@ -56,7 +54,6 @@ export interface InstanceVars {
   usdcHolder: SignerWithAddress
   chainlink: ChainlinkContext
   chainlinkOracle: ChainlinkOracle
-  marketBeacon: IBeacon
   marketImpl: Market
   lens: Lens
   batcher: IBatcher
@@ -98,10 +95,9 @@ export async function deployProtocol(): Promise<InstanceVars> {
   const controller = await new Factory__factory(owner).attach(controllerProxy.address)
 
   const marketImpl = await new Market__factory(owner).deploy()
-  const marketBeacon = await new UpgradeableBeacon__factory(owner).deploy(marketImpl.address)
 
   // Init
-  await controller.initialize(marketBeacon.address)
+  await controller.initialize(marketImpl.address)
 
   // Params - TODO: finalize before launch
   await controller.updatePauser(pauser.address)
@@ -145,7 +141,6 @@ export async function deployProtocol(): Promise<InstanceVars> {
     usdcHolder,
     proxyAdmin,
     controller,
-    marketBeacon,
     marketImpl,
     lens,
     batcher,

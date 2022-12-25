@@ -11,7 +11,7 @@ struct ProtocolParameter {
     UFixed6 minCollateral;  // <= 281mn
     bool paused;
 }
-struct PackedProtocolParameter {
+struct StoredProtocolParameter {
     uint24 protocolFee;     // <= 1677%
     uint24 minFundingFee;   // <= 1677%
     uint24 liquidationFee;  // <= 1677
@@ -20,18 +20,14 @@ struct PackedProtocolParameter {
 
     bytes16 __unallocated__;
 }
-type ProtocolParameterStorage is bytes32;
-using ProtocolParameterStorageLib for ProtocolParameterStorage global;
+struct StoredProtocolParameterStorage { StoredProtocolParameter value; }
+using StoredProtocolParameterStorageLib for StoredProtocolParameterStorage global;
 
-library ProtocolParameterStorageLib {
-    struct ProtocolParameterStoragePointer {
-        PackedProtocolParameter value;
-    }
+library StoredProtocolParameterStorageLib {
+    error StoredProtocolParameterStorageOverflowError();
 
-    error ProtocolParameterStorageOverflowError();
-
-    function read(ProtocolParameterStorage self) internal view returns (ProtocolParameter memory) {
-        PackedProtocolParameter memory value = _pointer(self).value;
+    function read(StoredProtocolParameterStorage storage self) internal view returns (ProtocolParameter memory) {
+        StoredProtocolParameter memory value = self.value;
         return ProtocolParameter(
             UFixed6.wrap(uint256(value.protocolFee)),
             UFixed6.wrap(uint256(value.minFundingFee)),
@@ -41,14 +37,14 @@ library ProtocolParameterStorageLib {
         );
     }
 
-    function store(ProtocolParameterStorage self, ProtocolParameter memory parameter) internal {
+    function store(StoredProtocolParameterStorage storage self, ProtocolParameter memory parameter) internal {
         //TODO: check mod for precision
-        if (parameter.protocolFee.gt(UFixed6Lib.ONE)) revert ProtocolParameterStorageOverflowError();
-        if (parameter.minFundingFee.gt(UFixed6Lib.ONE)) revert ProtocolParameterStorageOverflowError();
-        if (parameter.liquidationFee.gt(UFixed6Lib.ONE)) revert ProtocolParameterStorageOverflowError();
-        if (parameter.minCollateral.gt(UFixed6Lib.from(281_474_976))) revert ProtocolParameterStorageOverflowError();
+        if (parameter.protocolFee.gt(UFixed6Lib.ONE)) revert StoredProtocolParameterStorageOverflowError();
+        if (parameter.minFundingFee.gt(UFixed6Lib.ONE)) revert StoredProtocolParameterStorageOverflowError();
+        if (parameter.liquidationFee.gt(UFixed6Lib.ONE)) revert StoredProtocolParameterStorageOverflowError();
+        if (parameter.minCollateral.gt(UFixed6Lib.from(281_474_976))) revert StoredProtocolParameterStorageOverflowError();
 
-        _pointer(self).value = PackedProtocolParameter(
+        self.value = StoredProtocolParameter(
             uint24(UFixed6.unwrap(parameter.protocolFee)),
             uint24(UFixed6.unwrap(parameter.minFundingFee)),
             uint24(UFixed6.unwrap(parameter.liquidationFee)),
@@ -56,9 +52,5 @@ library ProtocolParameterStorageLib {
             parameter.paused,
             bytes16(0x00000000000000000000000000000000)
         );
-    }
-
-    function _pointer(ProtocolParameterStorage self) private pure returns (ProtocolParameterStoragePointer storage pointer) {
-        assembly ("memory-safe") { pointer.slot := self }
     }
 }

@@ -6,8 +6,8 @@ import "@openzeppelin/contracts/proxy/beacon/IBeacon.sol";
 import "./IMarket.sol";
 import "../types/ProtocolParameter.sol";
 
-interface IFactory {
-    event MarketBeaconUpdated(IBeacon newMarketBeacon);
+interface IFactory is IBeacon {
+    event ImplementationUpdated(address newImplementation);
     event ParameterUpdated(ProtocolParameter newParameter);
     event TreasuryUpdated(address newTreasury);
     event PauserUpdated(address newPauser);
@@ -17,15 +17,14 @@ interface IFactory {
     error FactoryPausedError();
     error FactoryNotContractAddressError();
 
-    function marketBeacon() external view returns (IBeacon);
     function parameter() external view returns (ProtocolParameter memory);
     function treasury() external view returns (address);
     function pauser() external view returns (address);
-    function initialize(IBeacon marketBeacon_) external;
-    function updateTreasury(address newTreasury) external;
-    function createMarket(IMarket.MarketDefinition calldata definition, MarketParameter calldata marketParameter) external returns (IMarket);
-    function updateMarketBeacon(IBeacon newMarketBeacon) external;
+    function initialize(address implementation_) external;
+    function updateImplementation(address newImplementation) external;
     function updateParameter(ProtocolParameter memory newParameter) external;
+    function updateTreasury(address newTreasury) external;
     function updatePauser(address newPauser) external;
+    function createMarket(IMarket.MarketDefinition calldata definition, MarketParameter calldata marketParameter) external returns (IMarket);
     function updatePaused(bool newPaused) external;
 }

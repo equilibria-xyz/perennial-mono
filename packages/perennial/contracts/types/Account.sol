@@ -4,14 +4,6 @@ pragma solidity 0.8.17;
 import "./Version.sol";
 
 /// @dev Account type
-struct StoredAccount {
-    int64 _position; // 6 decimals
-    int64 _next; // 6 decimals
-    int64 _collateral; // 6 decimals
-    uint64 _liquidationAndReward; // 6 decimals
-}
-struct StoredAccountStorage { StoredAccount value; }
-using StoredAccountStorageLib for StoredAccountStorage global;
 struct Account {
     Fixed6 position; // 6 decimals
     Fixed6 next; // 6 decimals
@@ -20,6 +12,14 @@ struct Account {
     bool liquidation;
 }
 using AccountLib for Account global;
+struct StoredAccount {
+    int64 _position; // 6 decimals
+    int64 _next; // 6 decimals
+    int64 _collateral; // 6 decimals
+    uint64 _liquidationAndReward; // 6 decimals
+}
+struct StoredAccountStorage { StoredAccount value; }
+using StoredAccountStorageLib for StoredAccountStorage global;
 
 /**
  * @title AccountLib
