@@ -66,11 +66,11 @@ library AccountLib {
      */
     function accumulate(Account memory self, Version memory fromVersion, Version memory toVersion) internal pure {
         Fixed6 valueDelta = (self.position.sign() == 1)
-            ? toVersion.value().taker.sub(fromVersion.value().taker)
-            : toVersion.value().maker.sub(fromVersion.value().maker);
+            ? toVersion.value.taker.sub(fromVersion.value.taker)
+            : toVersion.value.maker.sub(fromVersion.value.maker);
         Fixed6 rewardDelta = (self.position.sign() == 1)
-            ? toVersion.reward().taker.sub(fromVersion.reward().taker)
-            : toVersion.reward().maker.sub(fromVersion.reward().maker);
+            ? toVersion.reward.taker.sub(fromVersion.reward.taker)
+            : toVersion.reward.maker.sub(fromVersion.reward.maker);
 
         self.collateral = self.collateral.add(Fixed6Lib.from(self.position.abs()).mul(valueDelta));
         self.reward = self.reward.add(self.position.abs().mul(UFixed6Lib.from(rewardDelta)));

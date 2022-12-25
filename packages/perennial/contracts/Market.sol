@@ -71,7 +71,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
     Position private _position;
 
     /// @dev Mapping of the historical version data
-    mapping(uint256 => Version) _versions;
+    mapping(uint256 => StoredVersionStorage) _versions;
 
     uint256 public latestVersion;
 
@@ -163,7 +163,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
     }
 
     function versions(uint256 oracleVersion) external view returns (Version memory) {
-        return _versions[oracleVersion];
+        return _versions[oracleVersion].read();
     }
 
     function position() external view returns (Position memory) {
@@ -271,7 +271,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         // Load market state
         context.currentOracleVersion = _sync(context.marketParameter);
         context.latestVersion = latestVersion;
-        context.version = _versions[context.latestVersion + 1];
+        context.version = _versions[context.latestVersion + 1].read();
         context.position = _position;
         context.fee = _fee;
 
@@ -290,7 +290,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
 
         // Save market state
         latestVersion = context.latestVersion;
-        _versions[context.latestVersion + 1] = context.version;
+        _versions[context.latestVersion + 1].store(context.version);
         _position = context.position;
         _fee = context.fee;
 
@@ -328,8 +328,8 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         toOracleVersion = context.latestAccountVersion + 1 == context.currentOracleVersion.version ?
             context.currentOracleVersion :
             _oracleVersionAt(context.marketParameter, context.latestAccountVersion + 1);
-        fromVersion = _versions[context.latestAccountVersion];
-        toVersion = _versions[context.latestAccountVersion + 1];
+        fromVersion = _versions[context.latestAccountVersion].read();
+        toVersion = _versions[context.latestAccountVersion + 1].read();
         _settlePeriodAccount(context, toOracleVersion, fromVersion, toVersion);
 
         // settle account b->c if necessary
@@ -357,7 +357,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
             context.fee.update(fundingFee, context.protocolParameter);
             context.position.settle();
             context.latestVersion = toOracleVersion.version;
-            _versions[toOracleVersion.version] = context.version;
+            _versions[toOracleVersion.version].store(context.version);
         }
     }
 

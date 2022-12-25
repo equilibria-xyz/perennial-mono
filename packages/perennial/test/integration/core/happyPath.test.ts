@@ -1,9 +1,9 @@
 import { expect } from 'chai'
 import 'hardhat'
-import { constants, utils } from 'ethers'
+import { constants } from 'ethers'
 
 import { InstanceVars, deployProtocol, createMarket, INITIAL_VERSION } from '../helpers/setupHelpers'
-import { createPayoffDefinition, expectPositionEq } from '../../../../common/testutil/types'
+import { expectPositionEq } from '../../../../common/testutil/types'
 import { Market__factory } from '../../../types/generated'
 import { parse6decimal } from '../../../util/number'
 
@@ -80,10 +80,10 @@ describe.only('Happy Path', () => {
       _takerNext: 0,
     })
     const version = await market.versions(INITIAL_VERSION)
-    expect(version._makerValue).to.equal(0)
-    expect(version._takerValue).to.equal(0)
-    expect(version._makerReward).to.equal(0)
-    expect(version._takerReward).to.equal(0)
+    expect(version.value.maker).to.equal(0)
+    expect(version.value.taker).to.equal(0)
+    expect(version.reward.maker).to.equal(0)
+    expect(version.reward.taker).to.equal(0)
 
     // Settle the market with a new oracle version
     await chainlink.next()
@@ -133,10 +133,10 @@ describe.only('Happy Path', () => {
       _takerNext: 0,
     })
     const version = await market.versions(INITIAL_VERSION)
-    expect(version._makerValue).to.equal(0)
-    expect(version._takerValue).to.equal(0)
-    expect(version._makerReward).to.equal(0)
-    expect(version._takerReward).to.equal(0)
+    expect(version.value.maker).to.equal(0)
+    expect(version.value.taker).to.equal(0)
+    expect(version.reward.maker).to.equal(0)
+    expect(version.reward.taker).to.equal(0)
 
     // Settle the market with a new oracle version
     await chainlink.next()
@@ -187,10 +187,10 @@ describe.only('Happy Path', () => {
       _takerNext: 0,
     })
     const version = await market.versions(INITIAL_VERSION)
-    expect(version._makerValue).to.equal(0)
-    expect(version._takerValue).to.equal(0)
-    expect(version._makerReward).to.equal(0)
-    expect(version._takerReward).to.equal(0)
+    expect(version.value.maker).to.equal(0)
+    expect(version.value.taker).to.equal(0)
+    expect(version.reward.maker).to.equal(0)
+    expect(version.reward.taker).to.equal(0)
   })
 
   it('closes multiple make positions', async () => {
@@ -224,10 +224,10 @@ describe.only('Happy Path', () => {
       _takerNext: 0,
     })
     const version = await market.versions(INITIAL_VERSION)
-    expect(version._makerValue).to.equal(0)
-    expect(version._takerValue).to.equal(0)
-    expect(version._makerReward).to.equal(0)
-    expect(version._takerReward).to.equal(0)
+    expect(version.value.maker).to.equal(0)
+    expect(version.value.taker).to.equal(0)
+    expect(version.reward.maker).to.equal(0)
+    expect(version.reward.taker).to.equal(0)
   })
 
   it('opens a take position', async () => {
@@ -259,10 +259,10 @@ describe.only('Happy Path', () => {
       _takerNext: POSITION_B,
     })
     const version = await market.versions(INITIAL_VERSION)
-    expect(version._makerValue).to.equal(0)
-    expect(version._takerValue).to.equal(0)
-    expect(version._makerReward).to.equal(0)
-    expect(version._takerReward).to.equal(0)
+    expect(version.value.maker).to.equal(0)
+    expect(version.value.taker).to.equal(0)
+    expect(version.reward.maker).to.equal(0)
+    expect(version.reward.taker).to.equal(0)
 
     // One round
     await chainlink.next()
@@ -316,10 +316,10 @@ describe.only('Happy Path', () => {
       _takerNext: POSITION_B,
     })
     const version = await market.versions(INITIAL_VERSION)
-    expect(version._makerValue).to.equal(0)
-    expect(version._takerValue).to.equal(0)
-    expect(version._makerReward).to.equal(0)
-    expect(version._takerReward).to.equal(0)
+    expect(version.value.maker).to.equal(0)
+    expect(version.value.taker).to.equal(0)
+    expect(version.reward.maker).to.equal(0)
+    expect(version.reward.taker).to.equal(0)
 
     // One round
     await chainlink.next()
@@ -378,10 +378,10 @@ describe.only('Happy Path', () => {
       _takerNext: 0,
     })
     const version = await market.versions(INITIAL_VERSION)
-    expect(version._makerValue).to.equal(0)
-    expect(version._takerValue).to.equal(0)
-    expect(version._makerReward).to.equal(0)
-    expect(version._takerReward).to.equal(0)
+    expect(version.value.maker).to.equal(0)
+    expect(version.value.taker).to.equal(0)
+    expect(version.reward.maker).to.equal(0)
+    expect(version.reward.taker).to.equal(0)
   })
 
   it('closes multiple take positions', async () => {
@@ -421,10 +421,10 @@ describe.only('Happy Path', () => {
       _takerNext: 0,
     })
     const version = await market.versions(INITIAL_VERSION)
-    expect(version._makerValue).to.equal(0)
-    expect(version._takerValue).to.equal(0)
-    expect(version._makerReward).to.equal(0)
-    expect(version._takerReward).to.equal(0)
+    expect(version.value.maker).to.equal(0)
+    expect(version.value.taker).to.equal(0)
+    expect(version.reward.maker).to.equal(0)
+    expect(version.reward.taker).to.equal(0)
   })
 
   it('settle no op (gas test)', async () => {
@@ -517,9 +517,9 @@ describe.only('Happy Path', () => {
       _takerNext: POSITION.div(2),
     })
     const version = await market.versions(INITIAL_VERSION + 4)
-    expect(version._makerValue).to.equal('-357225572122')
-    expect(version._takerValue).to.equal('367444018181')
-    expect(version._makerReward).to.equal('60683636363')
-    expect(version._takerReward).to.equal('606836363635')
+    expect(version.value.maker).to.equal('-357225572122')
+    expect(version.value.taker).to.equal('367444018181')
+    expect(version.reward.maker).to.equal('60683636363')
+    expect(version.reward.taker).to.equal('606836363635')
   })
 })
