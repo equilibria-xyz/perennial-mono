@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.13;
 
-import "./number/UFixed6.sol";
-import "@equilibria/root/number/types/UFixed18.sol";
-import "@equilibria/root/curve/types/JumpRateUtilizationCurve.sol";
+import "./root/UFixed6.sol";
+import "./root/JumpRateUtilizationCurve6.sol";
 import "../interfaces/IPayoffProvider.sol";
 import "../interfaces/IOracleProvider.sol";
 import "./Accumulator.sol";
@@ -19,7 +18,7 @@ struct MarketParameter {
     UFixed6 makerLimit;  // <= 18.45tn
     bool closed;
     Accumulator rewardRate; //TODO: better to represent as non-negative accumulator?
-    JumpRateUtilizationCurve utilizationCurve;
+    JumpRateUtilizationCurve6 utilizationCurve;
     IOracleProvider oracle;
     Payoff payoff;
 }
@@ -69,11 +68,11 @@ library MarketParameterStorageLib {
                 Fixed6.wrap(int256(value.rewardRateMaker)),
                 Fixed6.wrap(int256(value.rewardRateTaker))
             ),
-            JumpRateUtilizationCurve(
-                PackedFixed18.wrap(int128(value.utilizationCurveMinRate) * 1e12),
-                PackedFixed18.wrap(int128(value.utilizationCurveMaxRate) * 1e12),
-                PackedFixed18.wrap(int128(value.utilizationCurveTargetRate) * 1e12),
-                PackedUFixed18.wrap(uint128(value.utilizationCurveTargetUtilization) * 1e12)
+            JumpRateUtilizationCurve6(
+                Fixed6.wrap(int128(value.utilizationCurveMinRate)),
+                Fixed6.wrap(int128(value.utilizationCurveMaxRate)),
+                Fixed6.wrap(int128(value.utilizationCurveTargetRate)),
+                UFixed6.wrap(uint128(value.utilizationCurveTargetUtilization))
             ),
             IOracleProvider(value.oracle),
             Payoff(IPayoffProvider(value.payoffProvider), value.payoffShort)
@@ -98,10 +97,10 @@ library MarketParameterStorageLib {
             closed: parameter.closed,
             rewardRateMaker: int32(Fixed6.unwrap(parameter.rewardRate.maker)),
             rewardRateTaker: int32(Fixed6.unwrap(parameter.rewardRate.taker)),
-            utilizationCurveMinRate: int32(PackedFixed18.unwrap(parameter.utilizationCurve.minRate) / 1e12),
-            utilizationCurveMaxRate: int32(PackedFixed18.unwrap(parameter.utilizationCurve.maxRate) / 1e12),
-            utilizationCurveTargetRate: int32(PackedFixed18.unwrap(parameter.utilizationCurve.targetRate) / 1e12),
-            utilizationCurveTargetUtilization: uint24(PackedUFixed18.unwrap(parameter.utilizationCurve.targetUtilization) / 1e12),
+            utilizationCurveMinRate: int32(Fixed6.unwrap(parameter.utilizationCurve.minRate)),
+            utilizationCurveMaxRate: int32(Fixed6.unwrap(parameter.utilizationCurve.maxRate)),
+            utilizationCurveTargetRate: int32(Fixed6.unwrap(parameter.utilizationCurve.targetRate)),
+            utilizationCurveTargetUtilization: uint24(UFixed6.unwrap(parameter.utilizationCurve.targetUtilization)),
             oracle: address(parameter.oracle),
             payoffProvider: address(parameter.payoff.provider),
             payoffShort: parameter.payoff.short,

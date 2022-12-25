@@ -33,9 +33,9 @@ describe.only('Happy Path', () => {
       closed: true,
       utilizationCurve: {
         minRate: 0,
-        maxRate: utils.parseEther('5.00'),
-        targetRate: utils.parseEther('0.80'),
-        targetUtilization: utils.parseEther('0.80'),
+        maxRate: parse6decimal('5.00'),
+        targetRate: parse6decimal('0.80'),
+        targetUtilization: parse6decimal('0.80'),
       },
       rewardRate: {
         maker: 0,
@@ -465,9 +465,9 @@ describe.only('Happy Path', () => {
       closed: false,
       utilizationCurve: {
         minRate: 0,
-        maxRate: utils.parseEther('5.00'),
-        targetRate: utils.parseEther('0.80'),
-        targetUtilization: utils.parseEther('0.80'),
+        maxRate: parse6decimal('5.00'),
+        targetRate: parse6decimal('0.80'),
+        targetUtilization: parse6decimal('0.80'),
       },
       rewardRate: {
         maker: incentizesOn ? parse6decimal('0.01') : 0,

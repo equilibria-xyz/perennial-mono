@@ -7,8 +7,6 @@ import "./UFixed6.sol";
 /// @dev Fixed6 type
 type Fixed6 is int256;
 using Fixed6Lib for Fixed6 global;
-type Fixed6Storage is bytes32;
-using Fixed6StorageLib for Fixed6Storage global;
 
 /**
  * @title Fixed6Lib
@@ -272,19 +270,5 @@ library Fixed6Lib {
      */
     function abs(Fixed6 a) internal pure returns (UFixed6) {
         return UFixed6.wrap(SignedMath.abs(Fixed6.unwrap(a)));
-    }
-}
-
-library Fixed6StorageLib {
-    function read(Fixed6Storage self) internal view returns (Fixed6 value) {
-        assembly ("memory-safe") {
-            value := sload(self)
-        }
-    }
-
-    function store(Fixed6Storage self, Fixed6 value) internal {
-        assembly ("memory-safe") {
-            sstore(self, value)
-        }
     }
 }

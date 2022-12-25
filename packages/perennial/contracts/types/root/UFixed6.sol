@@ -7,8 +7,6 @@ import "./Fixed6.sol";
 /// @dev UFixed6 type
 type UFixed6 is uint256;
 using UFixed6Lib for UFixed6 global;
-type UFixed6Storage is bytes32;
-using UFixed6StorageLib for UFixed6Storage global;
 
 /**
  * @title UFixed6Lib
@@ -232,19 +230,5 @@ library UFixed6Lib {
      */
     function truncate(UFixed6 a) internal pure returns (uint256) {
         return UFixed6.unwrap(a) / BASE;
-    }
-}
-
-library UFixed6StorageLib {
-    function read(UFixed6Storage self) internal view returns (UFixed6 value) {
-        assembly ("memory-safe") {
-            value := sload(self)
-        }
-    }
-
-    function store(UFixed6Storage self, UFixed6 value) internal {
-        assembly ("memory-safe") {
-            sstore(self, value)
-        }
     }
 }

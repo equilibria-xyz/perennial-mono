@@ -19,8 +19,7 @@ contract Factory is IFactory, UInitializable, UOwnable {
     function marketBeacon() public view returns (IBeacon) { return IBeacon(_marketBeacon.read()); }
 
     /// @dev Fee on maintenance for liquidation
-    UFixed6Storage private constant _liquidationFee = UFixed6Storage.wrap(keccak256("equilibria.perennial.Factory.liquidationFee"));
-    function liquidationFee() public view returns (UFixed6) { return _liquidationFee.read(); }
+    UFixed6 public liquidationFee;
 
     /// @dev Protocol pauser address. address(0) defaults to owner(0)
     AddressStorage private constant _treasury = AddressStorage.wrap(keccak256("equilibria.perennial.Factory.treasury"));
@@ -112,7 +111,7 @@ contract Factory is IFactory, UInitializable, UOwnable {
     function updateLiquidationFee(UFixed6 newLiquidationFee) public onlyOwner {
         if (newLiquidationFee.gt(UFixed6Lib.ONE)) revert FactoryInvalidLiquidationFeeError();
 
-        _liquidationFee.store(newLiquidationFee);
+        liquidationFee = newLiquidationFee;
         emit LiquidationFeeUpdated(newLiquidationFee);
     }
 

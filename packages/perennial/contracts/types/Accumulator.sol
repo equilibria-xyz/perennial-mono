@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.13;
 
-import "./number/Fixed6.sol";
+import "./root/Fixed6.sol";
 
 /// @dev Accumulator type
 struct Accumulator {

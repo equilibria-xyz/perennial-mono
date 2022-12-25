@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.17;
 
-import "@equilibria/root/curve/types/JumpRateUtilizationCurve.sol";
-import "./number/UFixed6.sol";
+import "./root/UFixed6.sol";
 import "./Position.sol";
 import "./Accumulator.sol";
 import "./OracleVersion.sol";
@@ -150,10 +149,8 @@ library VersionLib {
 
         UFixed6 takerNotional = Fixed6Lib.from(position.taker()).mul(fromOracleVersion.price).abs();
         UFixed6 socializedNotional = takerNotional.mul(position.socializationFactor());
-        Fixed18 annualizedRate =
-            marketParameter.utilizationCurve.compute(UFixed18.wrap(UFixed6.unwrap(position.utilization()) * 1e12)); //TODO: cleanup curve with UFixed6
 
-        Fixed6 fundingAccumulated = Fixed6.wrap(Fixed18.unwrap(annualizedRate) / 1e12)                 // yearly funding rate
+        Fixed6 fundingAccumulated = marketParameter.utilizationCurve.compute(position.utilization())     // yearly funding rate
             .mul(Fixed6Lib.from(int256(toOracleVersion.timestamp - fromOracleVersion.timestamp)))        // multiply by seconds in period
             .div(Fixed6Lib.from(365 days))                                                               // divide by seconds in year (funding rate for period)
             .mul(Fixed6Lib.from(socializedNotional));                                                    // multiply by socialized notion (funding for period)

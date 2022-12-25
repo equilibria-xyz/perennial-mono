@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.13;
 
-import "../types/number/UFixed6.sol";
+import "../types/root/UFixed6.sol";
 import "@equilibria/root/token/types/Token18.sol";
 import "@equilibria/root/curve/types/JumpRateUtilizationCurve.sol";
 import "./IOracleProvider.sol";

@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.13;
 
-import "./number/UFixed6.sol";
-import "@equilibria/root/curve/types/JumpRateUtilizationCurve.sol";
+import "./root/UFixed6.sol";
 
 /// @dev ProtocolParameter type
 struct ProtocolParameter {

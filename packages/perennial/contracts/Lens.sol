@@ -185,8 +185,8 @@ contract Lens is ILens {
      * @return Market current funding rate
      */
     function rate(IMarket market) public settle(market) returns (Fixed6) {
-        UFixed18 utilization_ = UFixed18.wrap(UFixed6.unwrap(_latestPosition(market).utilization()) * 1e12);
-        Fixed6 annualRate_ = Fixed6.wrap(Fixed18.unwrap(market.parameter().utilizationCurve.compute(utilization_)) / 1e12);
+        UFixed6 utilization_ = _latestPosition(market).utilization();
+        Fixed6 annualRate_ = market.parameter().utilizationCurve.compute(utilization_);
         return annualRate_.div(Fixed6Lib.from(365 days));
     }
 
@@ -196,8 +196,8 @@ contract Lens is ILens {
      * @return Market current funding extrapolated to a daily rate
      */
     function dailyRate(IMarket market) public settle(market) returns (Fixed6) {
-        UFixed18 utilization_ = UFixed18.wrap(UFixed6.unwrap(_latestPosition(market).utilization()) * 1e12);
-        Fixed6 annualRate_ = Fixed6.wrap(Fixed18.unwrap(market.parameter().utilizationCurve.compute(utilization_)) / 1e12);
+        UFixed6 utilization_ = _latestPosition(market).utilization();
+        Fixed6 annualRate_ = market.parameter().utilizationCurve.compute(utilization_);
         return annualRate_.div(Fixed6Lib.from(365));
     }
 
