@@ -218,7 +218,7 @@ contract Lens is ILens {
     function openInterest(IMarket market) public settle(market) returns (UFixed6, UFixed6) {
         Position memory _position = _latestPosition(market);
         UFixed6 _price = _latestVersion(market).price.abs();
-        return (_position.maker().mul(_price), _position.taker().mul(_price));
+        return (_position.maker.mul(_price), _position.taker.mul(_price));
     }
 
     /**
@@ -336,15 +336,15 @@ contract Lens is ILens {
      * @return User's exposure (openInterest * utilization) after settle
      */
     function exposure(address account, IMarket market) public settleAccount(account, market) returns (Fixed6) {
-        Position memory _pos = position(market);
-        if (_pos.maker().isZero()) { return Fixed6Lib.ZERO; }
+        Position memory _position = position(market);
+        if (_position.maker.isZero()) { return Fixed6Lib.ZERO; }
 
         Fixed6 _openInterest = openInterest(account, market);
         if (_openInterest.sign() == 1) {
             return _openInterest; // Taker exposure is always 100% of openInterest
         }
 
-        UFixed6 utilization = _pos.utilization();
+        UFixed6 utilization = _position.utilization();
         return Fixed6Lib.from(utilization).mul(_openInterest); // Maker exposure is openInterest * utilization
     }
 

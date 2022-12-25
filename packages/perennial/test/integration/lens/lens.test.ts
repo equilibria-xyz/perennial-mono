@@ -40,10 +40,10 @@ describe('Lens', () => {
     let marketSnapshot = (await lens.callStatic['snapshots(address[])']([market.address]))[0]
     let globalPosition = marketSnapshot.position
     expectPositionEq(globalPosition, {
-      _maker: 0,
-      _taker: 0,
-      _makerNext: POSITION,
-      _takerNext: POSITION,
+      maker: 0,
+      taker: 0,
+      makerNext: POSITION,
+      takerNext: POSITION,
     })
     expect(marketSnapshot.latestVersion.price).to.equal('11388297509860897871140900')
     expect(marketSnapshot.rate).to.equal(parse6decimal('5.00').div(SECONDS_IN_YEAR))
@@ -71,10 +71,10 @@ describe('Lens', () => {
 
     // Pre -> Position
     expectPositionEq(globalPosition, {
-      _maker: POSITION,
-      _taker: POSITION,
-      _makerNext: POSITION,
-      _takerNext: POSITION,
+      maker: POSITION,
+      taker: POSITION,
+      makerNext: POSITION,
+      takerNext: POSITION,
     })
     expect(userSnapshot.position).to.equal(POSITION.mul(-1))
 

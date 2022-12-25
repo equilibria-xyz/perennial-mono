@@ -60,15 +60,15 @@ library VersionLib {
         positionFee = makerProtocolFee.add(takerProtocolFee);
 
         // If there are makers to distribute the taker's position fee to, distribute. Otherwise give it to the protocol
-        if (!position.maker().isZero()) {
-            self.makerValue.increment(Fixed6Lib.from(takerFee), position.maker());
+        if (!position.maker.isZero()) {
+            self.makerValue.increment(Fixed6Lib.from(takerFee), position.maker);
         } else {
             positionFee = protocolParameter.protocolFee.add(takerFee);
         }
 
         // If there are takers to distribute the maker's position fee to, distribute. Otherwise give it to the protocol
-        if (!position.taker().isZero()) {
-            self.takerValue.increment(Fixed6Lib.from(makerFee), position.taker());
+        if (!position.taker.isZero()) {
+            self.takerValue.increment(Fixed6Lib.from(makerFee), position.taker);
         } else {
             positionFee = protocolParameter.protocolFee.add(makerFee);
         }
@@ -113,10 +113,10 @@ library VersionLib {
         MarketParameter memory marketParameter
     ) private pure returns (UFixed6 fundingFeeAmount) {
         if (marketParameter.closed) return UFixed6Lib.ZERO;
-        if (position.taker().isZero()) return UFixed6Lib.ZERO;
-        if (position.maker().isZero()) return UFixed6Lib.ZERO;
+        if (position.taker.isZero()) return UFixed6Lib.ZERO;
+        if (position.maker.isZero()) return UFixed6Lib.ZERO;
 
-        UFixed6 takerNotional = Fixed6Lib.from(position.taker()).mul(fromOracleVersion.price).abs();
+        UFixed6 takerNotional = Fixed6Lib.from(position.taker).mul(fromOracleVersion.price).abs();
         UFixed6 socializedNotional = takerNotional.mul(position.socializationFactor());
 
         Fixed6 fundingAccumulated = marketParameter.utilizationCurve.compute(position.utilization())     // yearly funding rate
@@ -133,9 +133,9 @@ library VersionLib {
 
         bool makerPaysFunding = fundingAccumulated.sign() < 0;
         self.makerValue.increment(
-            makerPaysFunding ? fundingAccumulated : fundingAccumulatedWithoutFee, position.maker());
+            makerPaysFunding ? fundingAccumulated : fundingAccumulatedWithoutFee, position.maker);
         self.takerValue.decrement(
-            makerPaysFunding ? fundingAccumulatedWithoutFee : fundingAccumulated, position.taker());
+            makerPaysFunding ? fundingAccumulatedWithoutFee : fundingAccumulated, position.taker);
     }
 
     /**
@@ -149,15 +149,15 @@ library VersionLib {
         MarketParameter memory marketParameter
     ) private pure {
         if (marketParameter.closed) return;
-        if (position.taker().isZero()) return;
-        if (position.maker().isZero()) return;
+        if (position.taker.isZero()) return;
+        if (position.maker.isZero()) return;
 
         Fixed6 totalTakerDelta =
-            toOracleVersion.price.sub(fromOracleVersion.price).mul(Fixed6Lib.from(position.taker()));
+            toOracleVersion.price.sub(fromOracleVersion.price).mul(Fixed6Lib.from(position.taker));
         Fixed6 socializedTakerDelta = totalTakerDelta.mul(Fixed6Lib.from(position.socializationFactor()));
 
-        self.makerValue.decrement(socializedTakerDelta, position.maker());
-        self.takerValue.increment(socializedTakerDelta, position.taker());
+        self.makerValue.decrement(socializedTakerDelta, position.maker);
+        self.takerValue.increment(socializedTakerDelta, position.taker);
     }
 
     /**
@@ -173,10 +173,10 @@ library VersionLib {
     ) private pure {
         UFixed6 elapsed = UFixed6Lib.from(toOracleVersion.timestamp - fromOracleVersion.timestamp);
 
-        if (!position.maker().isZero())
-            self.makerReward.increment(elapsed.mul(marketParameter.takerRewardRate), position.maker());
-        if (!position.taker().isZero())
-            self.takerReward.increment(elapsed.mul(marketParameter.makerRewardRate), position.taker());
+        if (!position.maker.isZero())
+            self.makerReward.increment(elapsed.mul(marketParameter.takerRewardRate), position.maker);
+        if (!position.taker.isZero())
+            self.takerReward.increment(elapsed.mul(marketParameter.makerRewardRate), position.taker);
     }
 }
 

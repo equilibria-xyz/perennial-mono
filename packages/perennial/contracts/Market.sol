@@ -68,7 +68,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
     /// @dev Protocol and market fees collected, but not yet claimed
     Fee private _fee;
 
-    Position private _position;
+    StoredPositionStorage private _position;
 
     /// @dev Mapping of the historical version data
     mapping(uint256 => StoredVersionStorage) _versions;
@@ -167,7 +167,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
     }
 
     function position() external view returns (Position memory) {
-        return _position;
+        return _position.read();
     }
 
     function fee() external view returns (Fee memory) {
@@ -272,7 +272,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         context.currentOracleVersion = _sync(context.marketParameter);
         context.latestVersion = latestVersion;
         context.version = _versions[context.latestVersion + 1].read();
-        context.position = _position;
+        context.position = _position.read();
         context.fee = _fee;
 
         // Load account state
@@ -291,7 +291,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         // Save market state
         latestVersion = context.latestVersion;
         _versions[context.latestVersion + 1].store(context.version);
-        _position = context.position;
+        _position.store(context.position);
         _fee = context.fee;
 
         // Load account state
@@ -378,7 +378,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         if (!context.marketParameter.closed && context.position.socializationFactorNext().lt(UFixed6Lib.ONE))
             revert MarketInsufficientLiquidityError();
 
-        if (context.position.makerNext().gt(context.marketParameter.makerLimit))
+        if (context.position.makerNext.gt(context.marketParameter.makerLimit))
             revert MarketMakerOverLimitError();
     }
 

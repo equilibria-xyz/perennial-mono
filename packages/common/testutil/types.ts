@@ -2,15 +2,10 @@ import { BigNumberish } from 'ethers'
 import { expect } from 'chai'
 
 export interface Position {
-  _maker: BigNumberish
-  _taker: BigNumberish
-  _makerNext: BigNumberish
-  _takerNext: BigNumberish
-}
-
-export interface Accumulator {
-  _maker: BigNumberish
-  _taker: BigNumberish
+  maker: BigNumberish
+  taker: BigNumberish
+  makerNext: BigNumberish
+  takerNext: BigNumberish
 }
 
 export interface ProgramInfo {
@@ -24,16 +19,11 @@ export interface ProgramInfo {
   duration: BigNumberish
 }
 
-export function expectAccumulatorEq(a: Accumulator, b: Accumulator): void {
-  expect(a._maker).to.equal(b._maker)
-  expect(a._taker).to.equal(b._taker)
-}
-
 export function expectPositionEq(a: Position, b: Position): void {
-  expect(a._maker).to.equal(b._maker)
-  expect(a._taker).to.equal(b._taker)
-  expect(a._makerNext).to.equal(b._makerNext)
-  expect(a._takerNext).to.equal(b._takerNext)
+  expect(a.maker).to.equal(b.maker)
+  expect(a.taker).to.equal(b.taker)
+  expect(a.makerNext).to.equal(b.makerNext)
+  expect(a.takerNext).to.equal(b.takerNext)
 }
 
 export function expectProgramInfoEq(a: ProgramInfo, b: ProgramInfo): void {

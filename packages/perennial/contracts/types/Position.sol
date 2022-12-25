@@ -6,16 +6,23 @@ import "./root/UFixed6.sol";
 /// @dev Position type
 struct Position {
     /// @dev Quantity of the maker position
-    uint64 _maker; // 6 decimals
+    UFixed6 maker;
     /// @dev Quantity of the taker position
-    uint64 _taker; // 6 decimals
-
-    /// @dev Quantity of the maker position
-    uint64 _makerNext; // 6 decimals
-    /// @dev Quantity of the taker position
-    uint64 _takerNext; // 6 decimals
+    UFixed6 taker;
+    /// @dev Quantity of the next maker position
+    UFixed6 makerNext;
+    /// @dev Quantity of the next taker position
+    UFixed6 takerNext;
 }
 using PositionLib for Position global;
+struct StoredPosition {
+    uint64 _maker;
+    uint64 _taker;
+    uint64 _makerNext;
+    uint64 _takerNext;
+}
+struct StoredPositionStorage { StoredPosition value; }
+using StoredPositionStorageLib for StoredPositionStorage global;
 
 /**
  * @title PositionLib
@@ -24,30 +31,14 @@ using PositionLib for Position global;
  *      denominated as a unit of the product's payoff function.
  */
 library PositionLib {
-    function maker(Position memory self) internal pure returns (UFixed6) {
-        return UFixed6.wrap(uint256(self._maker));
-    }
-
-    function taker(Position memory self) internal pure returns (UFixed6) {
-        return UFixed6.wrap(uint256(self._taker));
-    }
-
-    function makerNext(Position memory self) internal pure returns (UFixed6) {
-        return UFixed6.wrap(uint256(self._makerNext));
-    }
-
-    function takerNext(Position memory self) internal pure returns (UFixed6) {
-        return UFixed6.wrap(uint256(self._takerNext));
-    }
-
     function update(Position memory self, Fixed6 makerAmount, Fixed6 takerAmount) internal pure {
-        self._makerNext = uint64(int64(self._makerNext) + int64(Fixed6.unwrap(makerAmount)));
-        self._takerNext = uint64(int64(self._takerNext) + int64(Fixed6.unwrap(takerAmount)));
+        self.makerNext = UFixed6Lib.from(Fixed6Lib.from(self.makerNext).add(makerAmount));
+        self.takerNext = UFixed6Lib.from(Fixed6Lib.from(self.takerNext).add(takerAmount));
     }
 
     function settle(Position memory self) internal pure {
-        self._maker = self._makerNext;
-        self._taker = self._takerNext;
+        self.maker = self.makerNext;
+        self.taker = self.takerNext;
     }
 
     /**
@@ -56,7 +47,7 @@ library PositionLib {
      * @return utilization ratio
      */
     function utilization(Position memory self) internal pure returns (UFixed6) {
-        return self.taker().unsafeDiv(self.maker());
+        return self.taker.unsafeDiv(self.maker);
     }
 
     /**
@@ -68,14 +59,35 @@ library PositionLib {
      * @return Socialization factor
      */
     function socializationFactor(Position memory self) internal pure returns (UFixed6) {
-        return _socializationFactor(maker(self), taker(self));
+        return _socializationFactor(self.maker, self.taker);
     }
 
     function socializationFactorNext(Position memory self) internal pure returns (UFixed6) {
-        return _socializationFactor(makerNext(self), takerNext(self));
+        return _socializationFactor(self.makerNext, self.takerNext);
     }
 
     function _socializationFactor(UFixed6 makerAmount, UFixed6 takerAmount) private pure returns (UFixed6) {
         return takerAmount.isZero() ? UFixed6Lib.ONE : UFixed6Lib.min(UFixed6Lib.ONE, makerAmount.div(takerAmount));
+    }
+}
+
+library StoredPositionStorageLib {
+    function read(StoredPositionStorage storage self) internal view returns (Position memory) {
+        StoredPosition memory storedValue =  self.value;
+        return Position(
+            UFixed6.wrap(uint256(storedValue._maker)),
+            UFixed6.wrap(uint256(storedValue._taker)),
+            UFixed6.wrap(uint256(storedValue._makerNext)),
+            UFixed6.wrap(uint256(storedValue._takerNext))
+        );
+    }
+
+    function store(StoredPositionStorage storage self, Position memory newValue) internal {
+        self.value = StoredPosition(
+            uint64(UFixed6.unwrap(newValue.maker)),
+            uint64(UFixed6.unwrap(newValue.taker)),
+            uint64(UFixed6.unwrap(newValue.makerNext)),
+            uint64(UFixed6.unwrap(newValue.takerNext))
+        );
     }
 }

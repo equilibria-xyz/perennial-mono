@@ -72,10 +72,10 @@ describe.only('Happy Path', () => {
     // Check global state
     expect(await market.latestVersion()).to.equal(INITIAL_VERSION)
     expectPositionEq(await market.position(), {
-      _maker: 0,
-      _taker: 0,
-      _makerNext: POSITION,
-      _takerNext: 0,
+      maker: 0,
+      taker: 0,
+      makerNext: POSITION,
+      takerNext: 0,
     })
     const version = await market.versions(INITIAL_VERSION)
     expect(version.makerValue._value).to.equal(0)
@@ -90,10 +90,10 @@ describe.only('Happy Path', () => {
     // Check global post-settlement state
     expect(await market.latestVersion()).to.equal(INITIAL_VERSION + 1)
     expectPositionEq(await market.position(), {
-      _maker: POSITION,
-      _taker: 0,
-      _makerNext: POSITION,
-      _takerNext: 0,
+      maker: POSITION,
+      taker: 0,
+      makerNext: POSITION,
+      takerNext: 0,
     })
 
     // Settle user and check state
@@ -125,10 +125,10 @@ describe.only('Happy Path', () => {
     // Check global state
     expect(await market.latestVersion()).to.equal(INITIAL_VERSION)
     expectPositionEq(await market.position(), {
-      _maker: 0,
-      _taker: 0,
-      _makerNext: POSITION,
-      _takerNext: 0,
+      maker: 0,
+      taker: 0,
+      makerNext: POSITION,
+      takerNext: 0,
     })
     const version = await market.versions(INITIAL_VERSION)
     expect(version.makerValue._value).to.equal(0)
@@ -143,10 +143,10 @@ describe.only('Happy Path', () => {
     // Check global post-settlement state
     expect(await market.latestVersion()).to.equal(INITIAL_VERSION + 1)
     expectPositionEq(await market.position(), {
-      _maker: POSITION,
-      _taker: 0,
-      _makerNext: POSITION,
-      _takerNext: 0,
+      maker: POSITION,
+      taker: 0,
+      makerNext: POSITION,
+      takerNext: 0,
     })
 
     // Settle user and check state
@@ -179,10 +179,10 @@ describe.only('Happy Path', () => {
     // Global State
     expect(await market.latestVersion()).to.equal(INITIAL_VERSION)
     expectPositionEq(await market.position(), {
-      _maker: 0,
-      _taker: 0,
-      _makerNext: 0,
-      _takerNext: 0,
+      maker: 0,
+      taker: 0,
+      makerNext: 0,
+      takerNext: 0,
     })
     const version = await market.versions(INITIAL_VERSION)
     expect(version.makerValue._value).to.equal(0)
@@ -216,10 +216,10 @@ describe.only('Happy Path', () => {
     // Global State
     expect(await market.latestVersion()).to.equal(INITIAL_VERSION)
     expectPositionEq(await market.position(), {
-      _maker: 0,
-      _taker: 0,
-      _makerNext: 0,
-      _takerNext: 0,
+      maker: 0,
+      taker: 0,
+      makerNext: 0,
+      takerNext: 0,
     })
     const version = await market.versions(INITIAL_VERSION)
     expect(version.makerValue._value).to.equal(0)
@@ -251,10 +251,10 @@ describe.only('Happy Path', () => {
     // Global State
     expect(await market.latestVersion()).to.equal(INITIAL_VERSION)
     expectPositionEq(await market.position(), {
-      _maker: 0,
-      _taker: 0,
-      _makerNext: POSITION,
-      _takerNext: POSITION_B,
+      maker: 0,
+      taker: 0,
+      makerNext: POSITION,
+      takerNext: POSITION_B,
     })
     const version = await market.versions(INITIAL_VERSION)
     expect(version.makerValue._value).to.equal(0)
@@ -272,10 +272,10 @@ describe.only('Happy Path', () => {
 
     expect(await market.latestVersion()).to.equal(INITIAL_VERSION + 2)
     expectPositionEq(await market.position(), {
-      _maker: POSITION,
-      _taker: POSITION_B,
-      _makerNext: POSITION,
-      _takerNext: POSITION_B,
+      maker: POSITION,
+      taker: POSITION_B,
+      makerNext: POSITION,
+      takerNext: POSITION_B,
     })
     await market.settle(userB.address)
     expect((await market.accounts(userB.address)).position).to.equal(POSITION_B)
@@ -308,10 +308,10 @@ describe.only('Happy Path', () => {
     // Global State
     expect(await market.latestVersion()).to.equal(INITIAL_VERSION)
     expectPositionEq(await market.position(), {
-      _maker: 0,
-      _taker: 0,
-      _makerNext: POSITION,
-      _takerNext: POSITION_B,
+      maker: 0,
+      taker: 0,
+      makerNext: POSITION,
+      takerNext: POSITION_B,
     })
     const version = await market.versions(INITIAL_VERSION)
     expect(version.makerValue._value).to.equal(0)
@@ -329,10 +329,10 @@ describe.only('Happy Path', () => {
 
     expect(await market.latestVersion()).to.equal(INITIAL_VERSION + 2)
     expectPositionEq(await market.position(), {
-      _maker: POSITION,
-      _taker: POSITION_B,
-      _makerNext: POSITION,
-      _takerNext: POSITION_B,
+      maker: POSITION,
+      taker: POSITION_B,
+      makerNext: POSITION,
+      takerNext: POSITION_B,
     })
     await market.settle(userB.address)
     expect((await market.accounts(userB.address)).position).to.equal(POSITION_B)
@@ -370,10 +370,10 @@ describe.only('Happy Path', () => {
     // Global State
     expect(await market.latestVersion()).to.equal(INITIAL_VERSION)
     expectPositionEq(await market.position(), {
-      _maker: 0,
-      _taker: 0,
-      _makerNext: POSITION,
-      _takerNext: 0,
+      maker: 0,
+      taker: 0,
+      makerNext: POSITION,
+      takerNext: 0,
     })
     const version = await market.versions(INITIAL_VERSION)
     expect(version.makerValue._value).to.equal(0)
@@ -413,10 +413,10 @@ describe.only('Happy Path', () => {
     // Global State
     expect(await market.latestVersion()).to.equal(INITIAL_VERSION)
     expectPositionEq(await market.position(), {
-      _maker: 0,
-      _taker: 0,
-      _makerNext: POSITION,
-      _takerNext: 0,
+      maker: 0,
+      taker: 0,
+      makerNext: POSITION,
+      takerNext: 0,
     })
     const version = await market.versions(INITIAL_VERSION)
     expect(version.makerValue._value).to.equal(0)
@@ -507,10 +507,10 @@ describe.only('Happy Path', () => {
     // Check global state
     expect(await market.latestVersion()).to.equal(INITIAL_VERSION + 4)
     expectPositionEq(await market.position(), {
-      _maker: POSITION.div(2),
-      _taker: POSITION.div(2),
-      _makerNext: POSITION,
-      _takerNext: POSITION.div(2),
+      maker: POSITION.div(2),
+      taker: POSITION.div(2),
+      makerNext: POSITION,
+      takerNext: POSITION.div(2),
     })
     const version = await market.versions(INITIAL_VERSION + 4)
     expect(version.makerValue._value).to.equal('-357225572122')
