@@ -10,10 +10,10 @@ import "./interfaces/IFactory.sol";
  * @notice Manages creating new markets and global protocol parameters.
  */
 contract Factory is IFactory, UOwnable {
-    StoredProtocolParameterStorage private _parameter;
-
     /// @dev Market implementation address
-    address public implementation;
+    address public immutable implementation;
+
+    StoredProtocolParameterStorage private _parameter;
 
     /// @dev Protocol pauser address. address(0) defaults to owner(0)
     address private _treasury;
@@ -21,20 +21,17 @@ contract Factory is IFactory, UOwnable {
     /// @dev Protocol pauser address. address(0) defaults to owner(0)
     address private _pauser;
 
+    constructor(address implementation_) {
+        implementation = implementation_;
+    }
+
     /**
      * @notice Initializes the contract state
      * @dev Must be called atomically as part of the upgradeable proxy deployment to
      *      avoid front-running
-     * @param implementation_ Market implementation address
      */
-    function initialize(address implementation_) external initializer(1) {
+    function initialize() external initializer(1) {
         __UOwnable__initialize();
-        updateImplementation(implementation_);
-    }
-
-    function updateImplementation(address newImplementation) public onlyOwner {
-        implementation = newImplementation;
-        emit ImplementationUpdated(newImplementation);
     }
 
     function updateParameter(ProtocolParameter memory newParameter) public onlyOwner {

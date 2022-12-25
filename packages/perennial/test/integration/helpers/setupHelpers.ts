@@ -84,7 +84,9 @@ export async function deployProtocol(): Promise<InstanceVars> {
   // Deploy protocol contracts
   const proxyAdmin = await new ProxyAdmin__factory(owner).deploy()
 
-  const controllerImpl = await new Factory__factory(owner).deploy()
+  const marketImpl = await new Market__factory(owner).deploy()
+
+  const controllerImpl = await new Factory__factory(owner).deploy(marketImpl.address)
 
   const controllerProxy = await new TransparentUpgradeableProxy__factory(owner).deploy(
     controllerImpl.address,
@@ -94,10 +96,8 @@ export async function deployProtocol(): Promise<InstanceVars> {
 
   const controller = await new Factory__factory(owner).attach(controllerProxy.address)
 
-  const marketImpl = await new Market__factory(owner).deploy()
-
   // Init
-  await controller.initialize(marketImpl.address)
+  await controller.initialize()
 
   // Params
   await controller.updatePauser(pauser.address)

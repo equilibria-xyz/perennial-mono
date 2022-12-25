@@ -7,7 +7,6 @@ import "./IMarket.sol";
 import "../types/ProtocolParameter.sol";
 
 interface IFactory is IBeacon {
-    event ImplementationUpdated(address newImplementation);
     event ParameterUpdated(ProtocolParameter newParameter);
     event TreasuryUpdated(address newTreasury);
     event PauserUpdated(address newPauser);
@@ -20,8 +19,7 @@ interface IFactory is IBeacon {
     function parameter() external view returns (ProtocolParameter memory);
     function treasury() external view returns (address);
     function pauser() external view returns (address);
-    function initialize(address implementation_) external;
-    function updateImplementation(address newImplementation) external;
+    function initialize() external;
     function updateParameter(ProtocolParameter memory newParameter) external;
     function updateTreasury(address newTreasury) external;
     function updatePauser(address newPauser) external;
