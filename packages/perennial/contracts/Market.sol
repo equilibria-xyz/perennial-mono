@@ -184,10 +184,9 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         _update(context, account, context.account.position.mul(Fixed6Lib.NEG_ONE), Fixed6Lib.ZERO, true);
 
         // handle liquidation fee
-        UFixed6 liquidationFee = factory.liquidationFee(); // TODO: external call
         UFixed6 liquidationReward = UFixed6Lib.min(
             context.account.collateral.max(Fixed6Lib.ZERO).abs(),
-            maintenance.mul(liquidationFee)
+            maintenance.mul(context.protocolParameter.liquidationFee)
         );
         context.account.update(
             Fixed6Lib.ZERO, //TODO: all the position stuff is not needed here so might be a gas efficiency check here

@@ -109,10 +109,10 @@ export async function deployProtocol(): Promise<InstanceVars> {
   await controller.updateParameter({
     protocolFee: parse6decimal('0.50'),
     minFundingFee: parse6decimal('0.10'),
+    liquidationFee: parse6decimal('0.50'),
     minCollateral: parse6decimal('500'),
     paused: false,
   })
-  await controller.updateLiquidationFee(parse6decimal('0.50'))
 
   // Set state
   const dsuHolder = await impersonate.impersonateWithBalance(DSU_HOLDER, utils.parseEther('10'))

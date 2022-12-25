@@ -9,19 +9,16 @@ import "../types/ProtocolParameter.sol";
 interface IFactory {
     event MarketBeaconUpdated(IBeacon newMarketBeacon);
     event ParameterUpdated(ProtocolParameter newParameter);
-    event LiquidationFeeUpdated(UFixed6 newLiquidationFee);
     event TreasuryUpdated(address newTreasury);
     event PauserUpdated(address newPauser);
     event MarketCreated(IMarket indexed market, IMarket.MarketDefinition definition, MarketParameter marketParameter);
 
     error FactoryNotPauserError();
     error FactoryPausedError();
-    error FactoryInvalidLiquidationFeeError();
     error FactoryNotContractAddressError();
 
     function marketBeacon() external view returns (IBeacon);
     function parameter() external view returns (ProtocolParameter memory);
-    function liquidationFee() external view returns (UFixed6);
     function treasury() external view returns (address);
     function pauser() external view returns (address);
     function initialize(IBeacon marketBeacon_) external;
@@ -29,7 +26,6 @@ interface IFactory {
     function createMarket(IMarket.MarketDefinition calldata definition, MarketParameter calldata marketParameter) external returns (IMarket);
     function updateMarketBeacon(IBeacon newMarketBeacon) external;
     function updateParameter(ProtocolParameter memory newParameter) external;
-    function updateLiquidationFee(UFixed6 newLiquidationFee) external;
     function updatePauser(address newPauser) external;
     function updatePaused(bool newPaused) external;
 }

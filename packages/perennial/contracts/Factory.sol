@@ -18,9 +18,6 @@ contract Factory is IFactory, UInitializable, UOwnable {
     AddressStorage private constant _marketBeacon = AddressStorage.wrap(keccak256("equilibria.perennial.Factory.marketBeacon"));
     function marketBeacon() public view returns (IBeacon) { return IBeacon(_marketBeacon.read()); }
 
-    /// @dev Fee on maintenance for liquidation
-    UFixed6 public liquidationFee;
-
     /// @dev Protocol pauser address. address(0) defaults to owner(0)
     AddressStorage private constant _treasury = AddressStorage.wrap(keccak256("equilibria.perennial.Factory.treasury"));
     function treasury() public view returns (address) {
@@ -102,17 +99,6 @@ contract Factory is IFactory, UInitializable, UOwnable {
     function updateParameter(ProtocolParameter memory newParameter) public onlyOwner {
         _parameter.store(newParameter);
         emit ParameterUpdated(newParameter);
-    }
-
-    /**
-     * @notice Updates the liquidation fee
-     * @param newLiquidationFee New liquidation fee
-     */
-    function updateLiquidationFee(UFixed6 newLiquidationFee) public onlyOwner {
-        if (newLiquidationFee.gt(UFixed6Lib.ONE)) revert FactoryInvalidLiquidationFeeError();
-
-        liquidationFee = newLiquidationFee;
-        emit LiquidationFeeUpdated(newLiquidationFee);
     }
 
     /**
