@@ -80,8 +80,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
 
     mapping(address => uint256) public latestVersions;
 
-    MarketParameterStorage private constant _parameter = MarketParameterStorage.wrap(keccak256("equilibria.perennial.Market.parameter"));
-    function parameter() public view returns (MarketParameter memory) { return _parameter.read(); }
+    StoredMarketParameterStorage private _parameter;
 
     /**
      * @notice Initializes the contract state
@@ -175,6 +174,10 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         return _fee;
     }
 
+    function parameter() external view returns (MarketParameter memory) {
+        return _parameter.read();
+    }
+
     function _liquidate(CurrentContext memory context, address account) private {
         // before
         UFixed6 maintenance = context.account.maintenance(context.currentOracleVersion, context.marketParameter.maintenance);
@@ -263,7 +266,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         context.protocolParameter = factory.parameter();
 
         // Load market parameters
-        context.marketParameter = parameter();
+        context.marketParameter = _parameter.read();
 
         // Load market state
         context.currentOracleVersion = _sync(context.marketParameter);

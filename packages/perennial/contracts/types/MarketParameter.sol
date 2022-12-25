@@ -22,7 +22,7 @@ struct MarketParameter {
     IOracleProvider oracle;
     Payoff payoff;
 }
-struct PackedMarketParameter {
+struct StoredMarketParameter {
     /* slot 1 */
     address oracle;
     uint24 maintenance; // <= 1677%
@@ -46,16 +46,14 @@ struct PackedMarketParameter {
     bool closed;
     bytes10 __unallocated0__;
 }
-type MarketParameterStorage is bytes32;
-using MarketParameterStorageLib for MarketParameterStorage global;
+struct StoredMarketParameterStorage { StoredMarketParameter value; }
+using StoredMarketParameterStorageLib for StoredMarketParameterStorage global;
 
-library MarketParameterStorageLib {
-    struct MarketParameterStoragePointer { PackedMarketParameter value; }
+library StoredMarketParameterStorageLib {
+    error StoredMarketParameterStorageOverflowError();
 
-    error MarketParameterStorageOverflowError();
-
-    function read(MarketParameterStorage self) internal view returns (MarketParameter memory) {
-        PackedMarketParameter memory value = _pointer(self).value;
+    function read(StoredMarketParameterStorage storage self) internal view returns (MarketParameter memory) {
+        StoredMarketParameter memory value = self.value;
         return MarketParameter(
             UFixed6.wrap(uint256(value.maintenance)),
             UFixed6.wrap(uint256(value.fundingFee)),
@@ -79,15 +77,15 @@ library MarketParameterStorageLib {
         );
     }
 
-    function store(MarketParameterStorage self, MarketParameter memory parameter) internal {
+    function store(StoredMarketParameterStorage storage self, MarketParameter memory parameter) internal {
         //TODO: check mod for precision
-        if (parameter.maintenance.gt(UFixed6Lib.ONE)) revert MarketParameterStorageOverflowError();
-        if (parameter.fundingFee.gt(UFixed6Lib.ONE)) revert MarketParameterStorageOverflowError();
-        if (parameter.makerFee.gt(UFixed6Lib.ONE)) revert MarketParameterStorageOverflowError();
-        if (parameter.takerFee.gt(UFixed6Lib.ONE)) revert MarketParameterStorageOverflowError();
-        if (parameter.positionFee.gt(UFixed6Lib.ONE)) revert MarketParameterStorageOverflowError();
+        if (parameter.maintenance.gt(UFixed6Lib.ONE)) revert StoredMarketParameterStorageOverflowError();
+        if (parameter.fundingFee.gt(UFixed6Lib.ONE)) revert StoredMarketParameterStorageOverflowError();
+        if (parameter.makerFee.gt(UFixed6Lib.ONE)) revert StoredMarketParameterStorageOverflowError();
+        if (parameter.takerFee.gt(UFixed6Lib.ONE)) revert StoredMarketParameterStorageOverflowError();
+        if (parameter.positionFee.gt(UFixed6Lib.ONE)) revert StoredMarketParameterStorageOverflowError();
 
-        _pointer(self).value = PackedMarketParameter({
+        self.value = StoredMarketParameter({
             maintenance: uint24(UFixed6.unwrap(parameter.maintenance)),
             fundingFee: uint24(UFixed6.unwrap(parameter.fundingFee)),
             makerFee: uint24(UFixed6.unwrap(parameter.makerFee)),
@@ -106,9 +104,5 @@ library MarketParameterStorageLib {
             payoffShort: parameter.payoff.short,
             __unallocated0__: bytes10(0x00000000000000000000)
         });
-    }
-
-    function _pointer(MarketParameterStorage self) private pure returns (MarketParameterStoragePointer storage pointer) {
-        assembly ("memory-safe") { pointer.slot := self }
     }
 }
