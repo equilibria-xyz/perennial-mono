@@ -24,8 +24,8 @@ struct StoredPosition {
     uint56 _makerNext;
     uint56 _takerNext;
 }
-struct StoredPositionStorage { StoredPosition value; }
-using StoredPositionStorageLib for StoredPositionStorage global;
+struct PositionStorage { StoredPosition value; }
+using PositionStorageLib for PositionStorage global;
 
 /**
  * @title PositionLib
@@ -75,8 +75,8 @@ library PositionLib {
     }
 }
 
-library StoredPositionStorageLib {
-    function read(StoredPositionStorage storage self) internal view returns (Position memory) {
+library PositionStorageLib {
+    function read(PositionStorage storage self) internal view returns (Position memory) {
         StoredPosition memory storedValue =  self.value;
         return Position(
             uint256(storedValue._latestVersion),
@@ -87,7 +87,7 @@ library StoredPositionStorageLib {
         );
     }
 
-    function store(StoredPositionStorage storage self, Position memory newValue) internal {
+    function store(PositionStorage storage self, Position memory newValue) internal {
         self.value = StoredPosition(
             uint32(newValue.latestVersion),
             uint56(UFixed6.unwrap(newValue.maker)),

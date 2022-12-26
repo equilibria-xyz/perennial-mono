@@ -13,7 +13,7 @@ contract Factory is IFactory, UOwnable {
     /// @dev Market implementation address
     address public immutable implementation;
 
-    StoredProtocolParameterStorage private _parameter;
+    ProtocolParameterStorage private _parameter;
 
     /// @dev Protocol pauser address. address(0) defaults to owner(0)
     address private _treasury;

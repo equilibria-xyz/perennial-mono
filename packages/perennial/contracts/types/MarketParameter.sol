@@ -46,13 +46,13 @@ struct StoredMarketParameter {
     bool closed;
     bytes10 __unallocated0__;
 }
-struct StoredMarketParameterStorage { StoredMarketParameter value; }
-using StoredMarketParameterStorageLib for StoredMarketParameterStorage global;
+struct MarketParameterStorage { StoredMarketParameter value; }
+using MarketParameterStorageLib for MarketParameterStorage global;
 
-library StoredMarketParameterStorageLib {
-    error StoredMarketParameterStorageOverflowError();
+library MarketParameterStorageLib {
+    error MarketParameterStorageOverflowError();
 
-    function read(StoredMarketParameterStorage storage self) internal view returns (MarketParameter memory) {
+    function read(MarketParameterStorage storage self) internal view returns (MarketParameter memory) {
         StoredMarketParameter memory value = self.value;
         return MarketParameter(
             UFixed6.wrap(uint256(value.maintenance)),
@@ -75,13 +75,13 @@ library StoredMarketParameterStorageLib {
         );
     }
 
-    function store(StoredMarketParameterStorage storage self, MarketParameter memory parameter) internal {
+    function store(MarketParameterStorage storage self, MarketParameter memory parameter) internal {
         //TODO: check mod for precision
-        if (parameter.maintenance.gt(UFixed6Lib.ONE)) revert StoredMarketParameterStorageOverflowError();
-        if (parameter.fundingFee.gt(UFixed6Lib.ONE)) revert StoredMarketParameterStorageOverflowError();
-        if (parameter.makerFee.gt(UFixed6Lib.ONE)) revert StoredMarketParameterStorageOverflowError();
-        if (parameter.takerFee.gt(UFixed6Lib.ONE)) revert StoredMarketParameterStorageOverflowError();
-        if (parameter.positionFee.gt(UFixed6Lib.ONE)) revert StoredMarketParameterStorageOverflowError();
+        if (parameter.maintenance.gt(UFixed6Lib.ONE)) revert MarketParameterStorageOverflowError();
+        if (parameter.fundingFee.gt(UFixed6Lib.ONE)) revert MarketParameterStorageOverflowError();
+        if (parameter.makerFee.gt(UFixed6Lib.ONE)) revert MarketParameterStorageOverflowError();
+        if (parameter.takerFee.gt(UFixed6Lib.ONE)) revert MarketParameterStorageOverflowError();
+        if (parameter.positionFee.gt(UFixed6Lib.ONE)) revert MarketParameterStorageOverflowError();
 
         self.value = StoredMarketParameter({
             maintenance: uint24(UFixed6.unwrap(parameter.maintenance)),

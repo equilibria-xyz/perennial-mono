@@ -15,8 +15,8 @@ struct StoredFee {
     uint64 _protocol;
     uint64 _market;
 }
-struct StoredFeeStorage { StoredFee value; }
-using StoredFeeStorageLib for StoredFeeStorage global;
+struct FeeStorage { StoredFee value; }
+using FeeStorageLib for FeeStorage global;
 
 /**
  * @title FeeLib
@@ -31,8 +31,8 @@ library FeeLib {
     }
 }
 
-library StoredFeeStorageLib {
-    function read(StoredFeeStorage storage self) internal view returns (Fee memory) {
+library FeeStorageLib {
+    function read(FeeStorage storage self) internal view returns (Fee memory) {
         StoredFee memory storedValue =  self.value;
         return Fee(
             UFixed6.wrap(uint256(storedValue._protocol)),
@@ -40,7 +40,7 @@ library StoredFeeStorageLib {
         );
     }
 
-    function store(StoredFeeStorage storage self, Fee memory newValue) internal {
+    function store(FeeStorage storage self, Fee memory newValue) internal {
         self.value = StoredFee(
             uint64(UFixed6.unwrap(newValue.protocol)),
             uint64(UFixed6.unwrap(newValue.market))

@@ -20,8 +20,8 @@ struct StoredAccount {
     int56 _collateral;              // <= 36b
     uint56 _liquidationAndReward;   // <= 36b
 }
-struct StoredAccountStorage { StoredAccount value; }
-using StoredAccountStorageLib for StoredAccountStorage global;
+struct AccountStorage { StoredAccount value; }
+using AccountStorageLib for AccountStorage global;
 
 /**
  * @title AccountLib
@@ -128,10 +128,10 @@ library AccountLib {
     }
 }
 
-library StoredAccountStorageLib {
+library AccountStorageLib {
     uint64 constant LIQUIDATION_MASK = uint64(1 << 55);
 
-    function read(StoredAccountStorage storage self) internal view returns (Account memory) {
+    function read(AccountStorage storage self) internal view returns (Account memory) {
         StoredAccount memory storedValue =  self.value;
         return Account(
             uint256(storedValue._latestVersion),
@@ -143,7 +143,7 @@ library StoredAccountStorageLib {
         );
     }
 
-    function store(StoredAccountStorage storage self, Account memory newValue) internal {
+    function store(AccountStorage storage self, Account memory newValue) internal {
         self.value = StoredAccount(
             uint32(newValue.latestVersion),
             int56(Fixed6.unwrap(newValue.position)),

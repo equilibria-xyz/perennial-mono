@@ -23,8 +23,8 @@ struct StoredVersion {
     uint64 _makerReward;
     uint64 _takerReward;
 }
-struct StoredVersionStorage { StoredVersion value; }
-using StoredVersionStorageLib for StoredVersionStorage global;
+struct VersionStorage { StoredVersion value; }
+using VersionStorageLib for VersionStorage global;
 
 /**
  * @title VersionLib
@@ -180,8 +180,8 @@ library VersionLib {
     }
 }
 
-library StoredVersionStorageLib {
-    function read(StoredVersionStorage storage self) internal view returns (Version memory) {
+library VersionStorageLib {
+    function read(VersionStorage storage self) internal view returns (Version memory) {
         StoredVersion memory storedValue =  self.value;
         return Version(
             Accumulator6(Fixed6.wrap(int256(storedValue._makerValue))),
@@ -191,7 +191,7 @@ library StoredVersionStorageLib {
         );
     }
 
-    function store(StoredVersionStorage storage self, Version memory newValue) internal {
+    function store(VersionStorage storage self, Version memory newValue) internal {
         self.value = StoredVersion(
             int64(Fixed6.unwrap(newValue.makerValue._value)),
             int64(Fixed6.unwrap(newValue.takerValue._value)),

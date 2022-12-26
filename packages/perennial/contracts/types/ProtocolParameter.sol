@@ -20,13 +20,13 @@ struct StoredProtocolParameter {
 
     bytes16 __unallocated__;
 }
-struct StoredProtocolParameterStorage { StoredProtocolParameter value; }
-using StoredProtocolParameterStorageLib for StoredProtocolParameterStorage global;
+struct ProtocolParameterStorage { StoredProtocolParameter value; }
+using ProtocolParameterStorageLib for ProtocolParameterStorage global;
 
-library StoredProtocolParameterStorageLib {
-    error StoredProtocolParameterStorageOverflowError();
+library ProtocolParameterStorageLib {
+    error ProtocolParameterStorageOverflowError();
 
-    function read(StoredProtocolParameterStorage storage self) internal view returns (ProtocolParameter memory) {
+    function read(ProtocolParameterStorage storage self) internal view returns (ProtocolParameter memory) {
         StoredProtocolParameter memory value = self.value;
         return ProtocolParameter(
             UFixed6.wrap(uint256(value.protocolFee)),
@@ -37,12 +37,12 @@ library StoredProtocolParameterStorageLib {
         );
     }
 
-    function store(StoredProtocolParameterStorage storage self, ProtocolParameter memory parameter) internal {
+    function store(ProtocolParameterStorage storage self, ProtocolParameter memory parameter) internal {
         //TODO: check mod for precision
-        if (parameter.protocolFee.gt(UFixed6Lib.ONE)) revert StoredProtocolParameterStorageOverflowError();
-        if (parameter.minFundingFee.gt(UFixed6Lib.ONE)) revert StoredProtocolParameterStorageOverflowError();
-        if (parameter.liquidationFee.gt(UFixed6Lib.ONE)) revert StoredProtocolParameterStorageOverflowError();
-        if (parameter.minCollateral.gt(UFixed6Lib.from(281_474_976))) revert StoredProtocolParameterStorageOverflowError();
+        if (parameter.protocolFee.gt(UFixed6Lib.ONE)) revert ProtocolParameterStorageOverflowError();
+        if (parameter.minFundingFee.gt(UFixed6Lib.ONE)) revert ProtocolParameterStorageOverflowError();
+        if (parameter.liquidationFee.gt(UFixed6Lib.ONE)) revert ProtocolParameterStorageOverflowError();
+        if (parameter.minCollateral.gt(UFixed6Lib.from(281_474_976))) revert ProtocolParameterStorageOverflowError();
 
         self.value = StoredProtocolParameter(
             uint24(UFixed6.unwrap(parameter.protocolFee)),

@@ -62,17 +62,17 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
     address public treasury;
 
     /// @dev Protocol and market fees collected, but not yet claimed
-    StoredFeeStorage private _fee;
+    FeeStorage private _fee;
 
-    StoredPositionStorage private _position;
+    PositionStorage private _position;
 
     /// @dev Mapping of the historical version data
-    mapping(uint256 => StoredVersionStorage) _versions;
+    mapping(uint256 => VersionStorage) _versions;
 
     /// @dev The individual state for each account
-    mapping(address => StoredAccountStorage) private _accounts;
+    mapping(address => AccountStorage) private _accounts;
 
-    StoredMarketParameterStorage private _parameter;
+    MarketParameterStorage private _parameter;
 
     /**
      * @notice Initializes the contract state
