@@ -26,8 +26,6 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         MarketParameter marketParameter;
 
         /* Current Global State */
-        uint256 latestVersion;
-
         OracleVersion currentOracleVersion;
 
         Version version;
@@ -70,8 +68,6 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
 
     /// @dev Mapping of the historical version data
     mapping(uint256 => StoredVersionStorage) _versions;
-
-    uint256 public latestVersion;
 
     /// @dev The individual state for each account
     mapping(address => StoredAccountStorage) private _accounts;
@@ -265,11 +261,10 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         context.marketParameter = _parameter.read();
 
         // Load market state
-        context.currentOracleVersion = _sync(context.marketParameter);
-        context.latestVersion = latestVersion;
-        context.version = _versions[context.latestVersion + 1].read();
         context.position = _position.read();
         context.fee = _fee;
+        context.currentOracleVersion = _sync(context.marketParameter);
+        context.version = _versions[context.position.latestVersion + 1].read();
 
         // Load account state
         context.account = _accounts[account].read();
@@ -284,10 +279,9 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         _startGas(context, "_saveContext: %s");
 
         // Save market state
-        latestVersion = context.latestVersion;
-        _versions[context.latestVersion + 1].store(context.version);
         _position.store(context.position);
         _fee = context.fee;
+        _versions[context.position.latestVersion + 1].store(context.version);
 
         // Load account state
         _accounts[account].store(context.account);
@@ -305,12 +299,12 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         Version memory toVersion;
 
         // settle market a->b if necessary
-        fromOracleVersion = context.latestVersion == context.currentOracleVersion.version ? // TODO: make a lazy loader here
+        fromOracleVersion = context.position.latestVersion == context.currentOracleVersion.version ? // TODO: make a lazy loader here
             context.currentOracleVersion :
-            _oracleVersionAt(context.marketParameter, context.latestVersion);
-        toOracleVersion = context.latestVersion + 1 == context.currentOracleVersion.version ?
+            _oracleVersionAt(context.marketParameter, context.position.latestVersion);
+        toOracleVersion = context.position.latestVersion + 1 == context.currentOracleVersion.version ?
             context.currentOracleVersion :
-            _oracleVersionAt(context.marketParameter, context.latestVersion + 1);
+            _oracleVersionAt(context.marketParameter, context.position.latestVersion + 1);
         _settlePeriod(context, fromOracleVersion, toOracleVersion);
 
         // settle market b->c if necessary
@@ -340,7 +334,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         OracleVersion memory fromOracleVersion,
         OracleVersion memory toOracleVersion
     ) private {
-        if (context.currentOracleVersion.version > context.latestVersion) {
+        if (context.currentOracleVersion.version > context.position.latestVersion) {
             UFixed6 fundingFee = context.version.accumulate(
                 context.position,
                 fromOracleVersion,
@@ -349,8 +343,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
                 context.marketParameter
             );
             context.fee.update(fundingFee, context.protocolParameter);
-            context.position.settle();
-            context.latestVersion = toOracleVersion.version;
+            context.position.settle(toOracleVersion);
             _versions[toOracleVersion.version].store(context.version);
         }
     }

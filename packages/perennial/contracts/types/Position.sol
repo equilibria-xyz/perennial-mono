@@ -2,9 +2,11 @@
 pragma solidity ^0.8.13;
 
 import "./root/UFixed6.sol";
+import "./OracleVersion.sol";
 
 /// @dev Position type
 struct Position {
+    uint256 latestVersion;
     /// @dev Quantity of the maker position
     UFixed6 maker;
     /// @dev Quantity of the taker position
@@ -16,10 +18,11 @@ struct Position {
 }
 using PositionLib for Position global;
 struct StoredPosition {
-    uint64 _maker;
-    uint64 _taker;
-    uint64 _makerNext;
-    uint64 _takerNext;
+    uint32 _latestVersion;
+    uint56 _maker;
+    uint56 _taker;
+    uint56 _makerNext;
+    uint56 _takerNext;
 }
 struct StoredPositionStorage { StoredPosition value; }
 using StoredPositionStorageLib for StoredPositionStorage global;
@@ -36,7 +39,8 @@ library PositionLib {
         self.takerNext = UFixed6Lib.from(Fixed6Lib.from(self.takerNext).add(takerAmount));
     }
 
-    function settle(Position memory self) internal pure {
+    function settle(Position memory self, OracleVersion memory toOracleVersion) internal pure {
+        self.latestVersion = toOracleVersion.version;
         self.maker = self.makerNext;
         self.taker = self.takerNext;
     }
@@ -75,6 +79,7 @@ library StoredPositionStorageLib {
     function read(StoredPositionStorage storage self) internal view returns (Position memory) {
         StoredPosition memory storedValue =  self.value;
         return Position(
+            uint256(storedValue._latestVersion),
             UFixed6.wrap(uint256(storedValue._maker)),
             UFixed6.wrap(uint256(storedValue._taker)),
             UFixed6.wrap(uint256(storedValue._makerNext)),
@@ -84,10 +89,11 @@ library StoredPositionStorageLib {
 
     function store(StoredPositionStorage storage self, Position memory newValue) internal {
         self.value = StoredPosition(
-            uint64(UFixed6.unwrap(newValue.maker)),
-            uint64(UFixed6.unwrap(newValue.taker)),
-            uint64(UFixed6.unwrap(newValue.makerNext)),
-            uint64(UFixed6.unwrap(newValue.takerNext))
+            uint32(newValue.latestVersion),
+            uint56(UFixed6.unwrap(newValue.maker)),
+            uint56(UFixed6.unwrap(newValue.taker)),
+            uint56(UFixed6.unwrap(newValue.makerNext)),
+            uint56(UFixed6.unwrap(newValue.takerNext))
         );
     }
 }

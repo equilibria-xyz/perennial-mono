@@ -49,7 +49,6 @@ interface IMarket {
     function token() external view returns (Token18);
     function reward() external view returns (Token18);
     function treasury() external view returns (address);
-    function latestVersion() external view returns (uint256);
     function accounts(address account) external view returns (Account memory);
     function versions(uint256 oracleVersion) external view returns (Version memory);
     function position() external view returns (Position memory);

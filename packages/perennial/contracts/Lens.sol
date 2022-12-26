@@ -395,7 +395,8 @@ contract Lens is ILens {
      */
     function _latestVersion(IMarket market) private view returns (OracleVersion memory oracleVersion) {
         MarketParameter memory marketParameter = market.parameter();
-        oracleVersion = marketParameter.oracle.atVersion(market.latestVersion());
+        Position memory _position = market.position();
+        oracleVersion = marketParameter.oracle.atVersion(_position.latestVersion);
         marketParameter.payoff.transform(oracleVersion);
     }
 
