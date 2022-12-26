@@ -89,8 +89,8 @@ describe('Closed Market', () => {
 
     const userCollateralBefore = (await market.accounts(user.address)).collateral
     const userBCollateralBefore = (await market.accounts(userB.address)).collateral
-    const feesABefore = (await market.fee())._protocol
-    const feesBBefore = (await market.fee())._market
+    const feesABefore = (await market.fee()).protocol
+    const feesBBefore = (await market.fee()).market
 
     await chainlink.nextWithPriceModification(price => price.mul(4))
     await chainlink.nextWithPriceModification(price => price.mul(4))
@@ -99,8 +99,8 @@ describe('Closed Market', () => {
 
     expect((await market.accounts(user.address)).collateral).to.equal(userCollateralBefore)
     expect((await market.accounts(userB.address)).collateral).to.equal(userBCollateralBefore)
-    expect((await market.fee())._protocol).to.equal(feesABefore)
-    expect((await market.fee())._market).to.equal(feesBBefore)
+    expect((await market.fee()).protocol).to.equal(feesABefore)
+    expect((await market.fee()).market).to.equal(feesBBefore)
   })
 
   it('handles closing during liquidations', async () => {
@@ -126,8 +126,8 @@ describe('Closed Market', () => {
     expect((await market.accounts(user.address)).liquidation).to.be.false
     const userCollateralBefore = (await market.accounts(user.address)).collateral
     const userBCollateralBefore = (await market.accounts(userB.address)).collateral
-    const feesABefore = (await market.fee())._protocol
-    const feesBBefore = (await market.fee())._market
+    const feesABefore = (await market.fee()).protocol
+    const feesBBefore = (await market.fee()).market
 
     await chainlink.nextWithPriceModification(price => price.mul(4))
     await chainlink.nextWithPriceModification(price => price.mul(4))
@@ -136,7 +136,7 @@ describe('Closed Market', () => {
 
     expect((await market.accounts(user.address)).collateral).to.equal(userCollateralBefore)
     expect((await market.accounts(userB.address)).collateral).to.equal(userBCollateralBefore)
-    expect((await market.fee())._protocol).to.equal(feesABefore)
-    expect((await market.fee())._market).to.equal(feesBBefore)
+    expect((await market.fee()).protocol).to.equal(feesABefore)
+    expect((await market.fee()).market).to.equal(feesBBefore)
   })
 })

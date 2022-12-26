@@ -138,8 +138,8 @@ contract Lens is ILens {
     function collateral(IMarket market) public settle(market) returns (Fixed6) {
         Fee memory fee = market.fee();
         return Fixed6.wrap(int256(UFixed18.unwrap(market.token().balanceOf(address(market))) / 1e12))
-            .sub(Fixed6Lib.from(fee.protocol()))
-            .sub(Fixed6Lib.from(fee.market()));
+            .sub(Fixed6Lib.from(fee.protocol))
+            .sub(Fixed6Lib.from(fee.market));
     }
 
     /**

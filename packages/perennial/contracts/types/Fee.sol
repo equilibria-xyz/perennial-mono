@@ -7,11 +7,16 @@ import "./ProtocolParameter.sol";
 
 /// @dev Fee type
 struct Fee {
-    uint64 _protocol; // 6 decimals
-
-    uint64 _market; // 6 decimals
+    UFixed6 protocol;
+    UFixed6 market;
 }
 using FeeLib for Fee global;
+struct StoredFee {
+    uint64 _protocol;
+    uint64 _market;
+}
+struct StoredFeeStorage { StoredFee value; }
+using StoredFeeStorageLib for StoredFeeStorage global;
 
 /**
  * @title FeeLib
@@ -21,15 +26,24 @@ library FeeLib {
     function update(Fee memory self, UFixed6 amount, ProtocolParameter memory protocolParameter) internal pure {
         UFixed6 protocolAmount = amount.mul(protocolParameter.protocolFee);
         UFixed6 marketAmount = amount.sub(protocolAmount);
-        self._protocol = uint64(UFixed6.unwrap(protocol(self).add(protocolAmount)));
-        self._market = uint64(UFixed6.unwrap(market(self).add(marketAmount)));
+        self.protocol = self.protocol.add(protocolAmount);
+        self.market = self.market.add(marketAmount);
+    }
+}
+
+library StoredFeeStorageLib {
+    function read(StoredFeeStorage storage self) internal view returns (Fee memory) {
+        StoredFee memory storedValue =  self.value;
+        return Fee(
+            UFixed6.wrap(uint256(storedValue._protocol)),
+            UFixed6.wrap(uint256(storedValue._market))
+        );
     }
 
-    function protocol(Fee memory self) internal pure returns (UFixed6) {
-        return UFixed6.wrap(uint256(self._protocol));
-    }
-
-    function market(Fee memory self) internal pure returns (UFixed6) {
-        return UFixed6.wrap(uint256(self._market));
+    function store(StoredFeeStorage storage self, Fee memory newValue) internal {
+        self.value = StoredFee(
+            uint64(UFixed6.unwrap(newValue.protocol)),
+            uint64(UFixed6.unwrap(newValue.market))
+        );
     }
 }

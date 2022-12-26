@@ -62,7 +62,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
     address public treasury;
 
     /// @dev Protocol and market fees collected, but not yet claimed
-    Fee private _fee;
+    StoredFeeStorage private _fee;
 
     StoredPositionStorage private _position;
 
@@ -129,23 +129,23 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
     }
 
     function claimFee() external {
-        Fee memory newFee = _fee;
+        Fee memory newFee = _fee.read();
 
         if (msg.sender == treasury) {
-            UFixed6 feeAmount = newFee.market();
-            newFee._market = 0;
+            UFixed6 feeAmount = newFee.market;
+            newFee.market = UFixed6Lib.ZERO;
             token.push(msg.sender, UFixed18.wrap(UFixed6.unwrap(feeAmount) * 1e12));
             emit FeeClaimed(msg.sender, feeAmount);
         }
 
         if (msg.sender == factory.treasury()) {
-            UFixed6 feeAmount = newFee.protocol();
-            newFee._protocol = 0;
+            UFixed6 feeAmount = newFee.protocol;
+            newFee.protocol = UFixed6Lib.ZERO;
             token.push(msg.sender, UFixed18.wrap(UFixed6.unwrap(feeAmount) * 1e12));
             emit FeeClaimed(msg.sender, feeAmount);
         }
 
-        _fee = newFee;
+        _fee.store(newFee);
     }
 
     //TODO: claim reward
@@ -163,7 +163,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
     }
 
     function fee() external view returns (Fee memory) {
-        return _fee;
+        return _fee.read();
     }
 
     function parameter() external view returns (MarketParameter memory) {
@@ -262,7 +262,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
 
         // Load market state
         context.position = _position.read();
-        context.fee = _fee;
+        context.fee = _fee.read();
         context.currentOracleVersion = _sync(context.marketParameter);
         context.version = _versions[context.position.latestVersion + 1].read();
 
@@ -280,7 +280,7 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
 
         // Save market state
         _position.store(context.position);
-        _fee = context.fee;
+        _fee.store(context.fee);
         _versions[context.position.latestVersion + 1].store(context.version);
 
         // Load account state

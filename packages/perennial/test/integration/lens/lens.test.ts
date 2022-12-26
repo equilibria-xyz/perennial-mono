@@ -109,8 +109,8 @@ describe('Lens', () => {
 
     // Fees before any positions are changed
     let fees = await lens.callStatic.fees(market.address)
-    expect(fees._protocol).to.equal(0)
-    expect(fees._market).to.equal(0)
+    expect(fees.protocol).to.equal(0)
+    expect(fees.market).to.equal(0)
 
     // Big price change
     await chainlink.nextWithPriceModification(price => price.mul(2))
@@ -131,8 +131,8 @@ describe('Lens', () => {
 
     // Fees are updated
     fees = await lens.callStatic.fees(market.address)
-    expect(fees._protocol).to.equal('4127179883640059')
-    expect(fees._market).to.equal('12381539650920179')
+    expect(fees.protocol).to.equal('4127179883640059')
+    expect(fees.market).to.equal('12381539650920179')
 
     await chainlink.next()
     await market.settle(constants.AddressZero)
