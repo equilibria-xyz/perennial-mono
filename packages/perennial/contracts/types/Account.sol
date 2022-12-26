@@ -5,18 +5,20 @@ import "./Version.sol";
 
 /// @dev Account type
 struct Account {
-    Fixed6 position; // 6 decimals
-    Fixed6 next; // 6 decimals
-    Fixed6 collateral; // 6 decimals
-    UFixed6 reward; // 6 decimals
+    uint256 latestVersion;
+    Fixed6 position;
+    Fixed6 next;
+    Fixed6 collateral;
+    UFixed6 reward;
     bool liquidation;
 }
 using AccountLib for Account global;
 struct StoredAccount {
-    int64 _position; // 6 decimals
-    int64 _next; // 6 decimals
-    int64 _collateral; // 6 decimals
-    uint64 _liquidationAndReward; // 6 decimals
+    uint32 _latestVersion;          // <= 4.29b
+    int56 _position;                // <= 36b
+    int56 _next;                    // <= 36b
+    int56 _collateral;              // <= 36b
+    uint56 _liquidationAndReward;   // <= 36b
 }
 struct StoredAccountStorage { StoredAccount value; }
 using StoredAccountStorageLib for StoredAccountStorage global;
@@ -64,7 +66,12 @@ library AccountLib {
      * @notice Settled the account's position to oracle version `toOracleVersion`
      * @param self The struct to operate on
      */
-    function accumulate(Account memory self, Version memory fromVersion, Version memory toVersion) internal pure {
+    function accumulate(
+        Account memory self,
+        OracleVersion memory toOracleVersion,
+        Version memory fromVersion,
+        Version memory toVersion
+    ) internal pure {
         Fixed6 valueDelta = (self.position.sign() == 1)
             ? toVersion.takerValue.accumulated(fromVersion.takerValue)
             : toVersion.makerValue.accumulated(fromVersion.makerValue);
@@ -72,6 +79,7 @@ library AccountLib {
             ? toVersion.takerReward.accumulated(fromVersion.takerReward)
             : toVersion.makerReward.accumulated(fromVersion.makerReward);
 
+        self.latestVersion = toOracleVersion.version;
         self.collateral = self.collateral.add(Fixed6Lib.from(self.position.abs()).mul(valueDelta));
         self.reward = self.reward.add(self.position.abs().mul(rewardDelta));
         self.position = self.next;
@@ -121,11 +129,12 @@ library AccountLib {
 }
 
 library StoredAccountStorageLib {
-    uint64 constant LIQUIDATION_MASK = uint64(1 << 63);
+    uint64 constant LIQUIDATION_MASK = uint64(1 << 55);
 
     function read(StoredAccountStorage storage self) internal view returns (Account memory) {
         StoredAccount memory storedValue =  self.value;
         return Account(
+            uint256(storedValue._latestVersion),
             Fixed6.wrap(int256(storedValue._position)),
             Fixed6.wrap(int256(storedValue._next)),
             Fixed6.wrap(int256(storedValue._collateral)),
@@ -135,12 +144,12 @@ library StoredAccountStorageLib {
     }
 
     function store(StoredAccountStorage storage self, Account memory newValue) internal {
-        //TODO: validation on bounds
         self.value = StoredAccount(
-            int64(Fixed6.unwrap(newValue.position)),
-            int64(Fixed6.unwrap(newValue.next)),
-            int64(Fixed6.unwrap(newValue.collateral)),
-            uint64((UFixed6.unwrap(newValue.reward)) | (uint64(newValue.liquidation ? 1 : 0) << 63))
+            uint32(newValue.latestVersion),
+            int56(Fixed6.unwrap(newValue.position)),
+            int56(Fixed6.unwrap(newValue.next)),
+            int56(Fixed6.unwrap(newValue.collateral)),
+            uint56((UFixed6.unwrap(newValue.reward)) | (uint56(newValue.liquidation ? 1 : 0) << 55))
         );
     }
 }

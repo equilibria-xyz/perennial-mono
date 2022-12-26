@@ -37,8 +37,6 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         Fee fee;
 
         /* Current Account State */
-        uint256 latestAccountVersion;
-
         Account account;
 
         /* Debugging */
@@ -77,8 +75,6 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
 
     /// @dev The individual state for each account
     mapping(address => StoredAccountStorage) private _accounts;
-
-    mapping(address => uint256) public latestVersions;
 
     StoredMarketParameterStorage private _parameter;
 
@@ -276,7 +272,6 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         context.fee = _fee;
 
         // Load account state
-        context.latestAccountVersion = latestVersions[account];
         context.account = _accounts[account].read();
 
         // after
@@ -295,7 +290,6 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         _fee = context.fee;
 
         // Load account state
-        latestVersions[account] = context.latestAccountVersion;
         _accounts[account].store(context.account);
 
         _endGas(context);
@@ -325,11 +319,11 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         _settlePeriod(context, fromOracleVersion, toOracleVersion);
 
         // settle account a->b if necessary
-        toOracleVersion = context.latestAccountVersion + 1 == context.currentOracleVersion.version ?
+        toOracleVersion = context.account.latestVersion + 1 == context.currentOracleVersion.version ?
             context.currentOracleVersion :
-            _oracleVersionAt(context.marketParameter, context.latestAccountVersion + 1);
-        fromVersion = _versions[context.latestAccountVersion].read();
-        toVersion = _versions[context.latestAccountVersion + 1].read();
+            _oracleVersionAt(context.marketParameter, context.account.latestVersion + 1);
+        fromVersion = _versions[context.account.latestVersion].read();
+        toVersion = _versions[context.account.latestVersion + 1].read();
         _settlePeriodAccount(context, toOracleVersion, fromVersion, toVersion);
 
         // settle account b->c if necessary
@@ -367,10 +361,9 @@ contract Market is IMarket, UInitializable, UOwnable, UReentrancyGuard {
         Version memory fromVersion,
         Version memory toVersion
     ) private pure {
-        if (context.currentOracleVersion.version > context.latestAccountVersion) {
-            context.account.accumulate(fromVersion, toVersion);
+        if (context.currentOracleVersion.version > context.account.latestVersion) {
+            context.account.accumulate(toOracleVersion, fromVersion, toVersion);
             context.account.liquidation = false;
-            context.latestAccountVersion = toOracleVersion.version;
         }
     }
 
