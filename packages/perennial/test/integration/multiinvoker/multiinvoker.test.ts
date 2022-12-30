@@ -66,8 +66,8 @@ describe('MultiInvoker', () => {
       position = utils.parseEther('0.001')
       amount = utils.parseEther('10000')
       programs = [PROGRAM_ID.toNumber()]
-      actions = buildInvokerActions(user.address, product.address, position, amount, programs)
-      partialActions = buildInvokerActions(user.address, product.address, position.div(2), amount.div(2), programs)
+      actions = buildInvokerActions(user.address, product.address, '', position, amount, programs)
+      partialActions = buildInvokerActions(user.address, product.address, '', position.div(2), amount.div(2), programs)
     })
 
     it('does nothing on NOOP', async () => {

@@ -2,6 +2,7 @@
 pragma solidity 0.8.15;
 
 import "@equilibria/root/control/unstructured/UInitializable.sol";
+import "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
 import "../interfaces/IMultiInvoker.sol";
 
@@ -109,12 +110,22 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
             } else if (invocation.action == PerennialAction.WRAP_AND_DEPOSIT) {
                 (address account, IProduct product, UFixed18 amount) = abi.decode(invocation.args, (address, IProduct, UFixed18));
                 wrapAndDeposit(account, product, amount);
-            }
 
             // Withdraw DSU from `msg.sender`s `product` collateral account, unwrap into USDC, and return the USDC to `receiver`
-            else if (invocation.action == PerennialAction.WITHDRAW_AND_UNWRAP) {
+            } else if (invocation.action == PerennialAction.WITHDRAW_AND_UNWRAP) {
                 (address receiver, IProduct product, UFixed18 amount) = abi.decode(invocation.args, (address, IProduct, UFixed18));
                 withdrawAndUnwrap(receiver, product, amount);
+
+            // Deposit from `msg.sender` into `account`s vault account
+            } else if (invocation.action == PerennialAction.DEPOSIT_TO_VAULT) {
+                (address account, IERC4626 vault, UFixed18 amount) = abi.decode(invocation.args, (address, IERC4626, UFixed18));
+                DSU.pull(msg.sender, amount);
+                vault.deposit(UFixed18.unwrap(amount), account);
+
+            // Withdraw from `msg.sender`s `vault` account to `receiver`
+            } else if (invocation.action == PerennialAction.WITHDRAW_FROM_VAULT) {
+                (address receiver, IERC4626 vault, UFixed18 amount) = abi.decode(invocation.args, (address, IERC4626, UFixed18));
+                vault.withdraw(UFixed18.unwrap(amount), receiver, msg.sender);
             }
         }
     }

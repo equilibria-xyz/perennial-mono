@@ -8,6 +8,7 @@ import {
   ICollateral,
   IController,
   IERC20,
+  IERC4626,
   MultiInvoker,
   MultiInvoker__factory,
   IProduct,
@@ -27,6 +28,7 @@ describe('MultiInvoker', () => {
   let usdc: FakeContract<IERC20>
   let dsu: FakeContract<IERC20>
   let product: FakeContract<IProduct>
+  let vault: FakeContract<IERC4626>
   let collateral: FakeContract<ICollateral>
   let controller: FakeContract<IController>
   let batcher: FakeContract<Batcher>
@@ -44,6 +46,7 @@ describe('MultiInvoker', () => {
     controller = await smock.fake<IController>('IController')
     incentivizer = await smock.fake<IIncentivizer>('IIncentivizer')
     product = await smock.fake<IProduct>('IProduct')
+    vault = await smock.fake<IERC4626>('IERC4626')
     reserve = await smock.fake<IEmptySetReserve>('IEmptySetReserve')
 
     controller.collateral.returns(collateral.address)
@@ -98,7 +101,7 @@ describe('MultiInvoker', () => {
     const programs = [1, 2, 3]
 
     beforeEach(() => {
-      actions = buildInvokerActions(user.address, product.address, position, amount, programs)
+      actions = buildInvokerActions(user.address, product.address, vault.address, position, amount, programs)
       dsu.transferFrom.whenCalledWith(user.address, multiInvoker.address, amount).returns(true)
       usdc.transferFrom.whenCalledWith(user.address, multiInvoker.address, usdcAmount).returns(true)
       usdc.transfer.whenCalledWith(user.address, usdcAmount).returns(true)
@@ -208,6 +211,19 @@ describe('MultiInvoker', () => {
 
       expect(reserve.redeem).to.have.been.calledWith(amount)
       expect(usdc.transfer).to.have.been.calledWith(user.address, usdcAmount)
+    })
+
+    it('deposits to vault on DEPOSIT_TO_VAULT action', async () => {
+      await expect(multiInvoker.connect(user).invoke([actions.DEPOSIT_TO_VAULT])).to.not.be.reverted
+
+      expect(dsu.transferFrom).to.have.been.calledWith(user.address, multiInvoker.address, amount)
+      expect(vault.deposit).to.have.been.calledWith(amount, user.address)
+    })
+
+    it('withdraws from vault on WITHDRAW_FROM_VAULT action', async () => {
+      await expect(multiInvoker.connect(user).invoke([actions.WITHDRAW_FROM_VAULT])).to.not.be.reverted
+
+      expect(vault.withdraw).to.have.been.calledWith(amount, user.address, user.address)
     })
 
     it('performs a multi invoke', async () => {

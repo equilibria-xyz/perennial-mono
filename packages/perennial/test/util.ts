@@ -14,10 +14,13 @@ export type InvokerAction =
   | 'UNWRAP'
   | 'WRAP_AND_DEPOSIT'
   | 'WITHDRAW_AND_UNWRAP'
+  | 'DEPOSIT_TO_VAULT'
+  | 'WITHDRAW_FROM_VAULT'
 
 export const buildInvokerActions = (
   userAddress: string,
   productAddress: string,
+  vaultAddress: string,
   position: BigNumberish,
   amount: BigNumberish,
   programs: number[],
@@ -70,6 +73,14 @@ export const buildInvokerActions = (
     WITHDRAW_AND_UNWRAP: {
       action: 11,
       args: utils.defaultAbiCoder.encode(['address', 'address', 'uint'], [userAddress, productAddress, amount]),
+    },
+    DEPOSIT_TO_VAULT: {
+      action: 12,
+      args: utils.defaultAbiCoder.encode(['address', 'address', 'uint'], [userAddress, vaultAddress, amount]),
+    },
+    WITHDRAW_FROM_VAULT: {
+      action: 13,
+      args: utils.defaultAbiCoder.encode(['address', 'address', 'uint'], [userAddress, vaultAddress, amount]),
     },
   }
 }
