@@ -211,6 +211,15 @@ describe('ChainlinkOracle', () => {
         expect(atVersion.timestamp).to.equal(TIMESTAMP_START + HOUR)
         expect(atVersion.version).to.equal(426)
       })
+
+      it('reverts on invalid round', async () => {
+        const roundId = buildChainlinkRoundId(2, 0)
+        await registry.mock.latestRoundData
+          .withArgs(eth.address, usd.address)
+          .returns(roundId, ethers.BigNumber.from(133300000000), TIMESTAMP_START, TIMESTAMP_START + HOUR, roundId)
+
+        await expect(oracle.connect(user).sync()).to.be.revertedWithCustomError(oracle, 'InvalidOracleRound')
+      })
     })
   })
 

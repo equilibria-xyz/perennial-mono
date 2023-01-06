@@ -265,11 +265,16 @@ describe('ChainlinkFeedOracle', () => {
           .whenCalledWith()
           .returns([roundId, ethers.BigNumber.from(133300000000), TIMESTAMP_START, TIMESTAMP_START + HOUR, roundId])
 
-        aggregatorProxy.getRoundData
-          .whenCalledWith(roundId)
+        await expect(oracle.connect(user).sync()).to.be.revertedWithCustomError(oracle, 'UnableToSyncError')
+      })
+
+      it('reverts on invalid round', async () => {
+        const roundId = buildChainlinkRoundId(INITIAL_PHASE + 1, 0)
+        aggregatorProxy.latestRoundData
+          .whenCalledWith()
           .returns([roundId, ethers.BigNumber.from(133300000000), TIMESTAMP_START, TIMESTAMP_START + HOUR, roundId])
 
-        await expect(oracle.connect(user).sync()).to.be.revertedWithCustomError(oracle, 'UnableToSyncError')
+        await expect(oracle.connect(user).sync()).to.be.revertedWithCustomError(oracle, 'InvalidOracleRound')
       })
     })
   })
