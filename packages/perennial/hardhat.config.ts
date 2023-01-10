@@ -46,6 +46,8 @@ const config = defaultConfig({
   externalDeployments: {
     kovan: [`${eqPerennialOracleDir}/deployments/kovan`],
     goerli: [`${eqPerennialOracleDir}/deployments/goerli`],
+    arbitrumGoerli: [`${eqPerennialOracleDir}/deployments/arbitrumGoerli`],
+    optimismGoerli: [`${eqPerennialOracleDir}/deployments/optimismGoerli`],
     mainnet: [`${eqPerennialOracleDir}/deployments/mainnet`],
     hardhat: [`${eqPerennialOracleDir}/deployments/mainnet`],
     localhost: [`${eqPerennialOracleDir}/deployments/localhost`],
@@ -62,6 +64,8 @@ const config = defaultConfig({
     '@equilibria/perennial-oracle/contracts/test/PassthroughDataFeed.sol',
     '@equilibria/perennial-oracle/contracts/test/PassthroughChainlinkFeed.sol',
     '@equilibria/emptyset-batcher/batcher/Batcher.sol',
+    '@equilibria/root/control/unstructured/CrossChainOwner/UCrossChainOwner_Arbitrum.sol',
+    '@equilibria/root/control/unstructured/CrossChainOwner/UCrossChainOwner_Optimism.sol',
   ],
 })
 
