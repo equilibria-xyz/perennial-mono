@@ -62,6 +62,8 @@ library ChainlinkAggregatorLib {
         AggregatorV2V3Interface agg = AggregatorV2V3Interface(proxy.phaseAggregators(phaseId));
 
         (uint80 aggRoundId,,,uint256 updatedAt,) = agg.latestRoundData();
+        // If the aggregator round ID is 0, this is an empty phase
+        if (aggRoundId == 0) return 0;
 
         // If the latest round for the aggregator is after maxTimestamp, walk back until we find the
         // correct round
