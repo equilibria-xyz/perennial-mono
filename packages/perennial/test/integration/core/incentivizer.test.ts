@@ -2,7 +2,14 @@ import 'hardhat'
 import { expect } from 'chai'
 import { BigNumber, utils } from 'ethers'
 
-import { InstanceVars, deployProtocol, createProduct, depositTo, createIncentiveProgram } from '../helpers/setupHelpers'
+import {
+  InstanceVars,
+  deployProtocol,
+  createProduct,
+  depositTo,
+  createIncentiveProgram,
+  INITIAL_VERSION,
+} from '../helpers/setupHelpers'
 import { expectProgramInfoEq } from '../../../../common/testutil/types'
 import { currentBlockTimestamp } from '../../../../common/testutil/time'
 import { time } from '../../../../common/testutil'
@@ -116,15 +123,13 @@ describe('Incentivizer', () => {
 
     const product = await createProduct(instanceVars)
 
-    await time.increase(-YEAR)
     const PROGRAM_ID = await createIncentiveProgram(instanceVars, product)
-    await time.increase(YEAR)
 
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
     await expect(product.connect(user).openMake(utils.parseEther('0.0001')))
       .to.emit(incentivizer, 'ProgramStarted')
-      .withArgs(product.address, PROGRAM_ID, 2472)
+      .withArgs(product.address, PROGRAM_ID, INITIAL_VERSION)
     await product.connect(userB).openTake(utils.parseEther('0.00005'))
 
     expect(await incentivizer.available(product.address, PROGRAM_ID)).to.equal(utils.parseEther('10000'))
@@ -152,9 +157,7 @@ describe('Incentivizer', () => {
 
     const product = await createProduct(instanceVars)
 
-    await time.increase(-YEAR)
     const PROGRAM_ID = await createIncentiveProgram(instanceVars, product)
-    await time.increase(YEAR)
 
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
@@ -171,12 +174,12 @@ describe('Incentivizer', () => {
     await chainlink.next()
     await product.settle()
 
-    await chainlink.nextWithTimestampModification(ts => ts.add(YEAR))
+    await chainlink.nextWithTimestampModification(ts => ts.add(2 * YEAR))
     await expect(product.settle())
       .to.emit(incentiveToken, 'Transfer')
       .withArgs(incentivizer.address, treasuryA.address, '9999662208504801097393') // Refund Amount
       .to.emit(incentivizer, 'ProgramComplete')
-      .withArgs(product.address, PROGRAM_ID, 2475)
+      .withArgs(product.address, PROGRAM_ID, INITIAL_VERSION + 3)
 
     await product.settleAccount(user.address)
     expect(await incentivizer.unclaimed(product.address, user.address, PROGRAM_ID)).to.equal('188786008230451956')
@@ -199,9 +202,7 @@ describe('Incentivizer', () => {
 
     const product = await createProduct(instanceVars)
 
-    await time.increase(-YEAR)
     const PROGRAM_ID = await createIncentiveProgram(instanceVars, product)
-    await time.increase(YEAR)
 
     await depositTo(instanceVars, user, product, utils.parseEther('1000'))
     await depositTo(instanceVars, userB, product, utils.parseEther('1000'))
@@ -222,7 +223,7 @@ describe('Incentivizer', () => {
       .to.emit(incentiveToken, 'Transfer')
       .withArgs(incentivizer.address, treasuryA.address, '9999662208504801097393') // Refund Amount
       .to.emit(incentivizer, 'ProgramComplete')
-      .withArgs(product.address, PROGRAM_ID, 2475)
+      .withArgs(product.address, PROGRAM_ID, INITIAL_VERSION + 3)
 
     await product.settleAccount(user.address)
     expect(await incentivizer.unclaimed(product.address, user.address, PROGRAM_ID)).to.equal('188786008230451956')
@@ -248,7 +249,6 @@ describe('Incentivizer', () => {
 
     beforeEach(async () => {
       instanceVars.controller.updateIncentivizationFee(utils.parseEther('0.25'))
-      await time.increase(-YEAR)
       product0 = await createProduct(instanceVars)
       product1 = await createProduct(instanceVars)
       program0 = await createIncentiveProgram(instanceVars, product0)
@@ -256,7 +256,6 @@ describe('Incentivizer', () => {
         maker: utils.parseEther('4000'),
         taker: utils.parseEther('1000'),
       })
-      await time.increase(YEAR)
     })
 
     it('correctly syncs', async () => {

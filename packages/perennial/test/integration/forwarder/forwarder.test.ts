@@ -12,10 +12,11 @@ describe('Forwarder', () => {
   })
 
   it('deposits the USDC amount wrapped as DSU to the product account', async () => {
-    const { user, userB, collateral, forwarder, dsu, usdc, usdcHolder } = instanceVars
+    const { user, userB, collateral, forwarder, dsu, usdc, usdcHolder, dsuHolder, batcher } = instanceVars
 
     const product = await createProduct(instanceVars)
-
+    // TODO(arjun): Remove this once new batcher has loaned from Reserve
+    await dsu.connect(dsuHolder).transfer(batcher.address, utils.parseEther('100000'))
     await usdc.connect(usdcHolder).transfer(user.address, 10e12)
 
     await usdc.connect(user).approve(forwarder.address, 10e12)
