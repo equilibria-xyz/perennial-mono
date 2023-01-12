@@ -48,7 +48,7 @@ library ChainlinkAggregatorLib {
 
 
     /**
-     * @notice Returns the first round ID for a specific phase ID
+     * @notice Returns the round count for the specified phase ID
      * @param self Chainlink Feed Aggregator to operate on
      * @param phaseId The specific phase to fetch data for
      * @param startingRoundId starting roundId for the aggregator proxy
