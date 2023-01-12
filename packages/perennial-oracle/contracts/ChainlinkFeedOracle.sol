@@ -13,6 +13,8 @@ import "./types/ChainlinkAggregator.sol";
  *      This implementation only support non-negative prices.
  */
 contract ChainlinkFeedOracle is IOracleProvider {
+    error UnableToSyncError();
+
     /// @dev Chainlink feed aggregator address
     ChainlinkAggregator public immutable aggregator;
 
@@ -53,16 +55,26 @@ contract ChainlinkFeedOracle is IOracleProvider {
      *      Phase updates should be detected using off-chain mechanism and should trigger a `sync` call
      *      This is feasible in the short term due to how infrequent phase updates are, but phase update
      *      and roundCount detection should eventually be implemented at the contract level.
+     *      Reverts if there is more than 1 phase to update in a single sync because we currently cannot
+     *      determine the startingRoundId for the intermediary phase.
      * @return The current oracle version after sync
      */
     function sync() external returns (OracleVersion memory) {
         // Fetch latest round
         ChainlinkRound memory round = aggregator.getLatestRound();
 
+        // If there is more than 1 phase to update, revert
+        if (round.phaseId() - _latestPhaseId() > 1) {
+            revert UnableToSyncError();
+        }
+
         // Update phase annotation when new phase detected
         while (round.phaseId() > _latestPhaseId()) {
+            // Get the round count for the latest phase
             uint256 phaseRoundCount = aggregator.getRoundCount(
                 _latestPhaseId(), _phases[_latestPhaseId()].startingRoundId, round.timestamp);
+
+            // The starting version for the next phase is startingVersionForLatestPhase + roundCount
             _phases.push(
                 Phase(
                     uint128(phaseRoundCount) + _phases[_latestPhaseId()].startingVersion,
