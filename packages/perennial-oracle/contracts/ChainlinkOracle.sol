@@ -61,6 +61,9 @@ contract ChainlinkOracle is IOracleProvider {
         // Fetch latest round
         ChainlinkRound memory round = registry.getLatestRound(base, quote);
 
+        // Revert if the round id is 0
+        if (uint64(round.roundId) == 0) revert InvalidOracleRound();
+
         // Update phase annotation when new phase detected
         while (round.phaseId() > _latestPhaseId()) {
             _phases.push(

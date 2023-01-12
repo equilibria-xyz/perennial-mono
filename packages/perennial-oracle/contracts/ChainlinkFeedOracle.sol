@@ -63,6 +63,9 @@ contract ChainlinkFeedOracle is IOracleProvider {
         // Fetch latest round
         ChainlinkRound memory round = aggregator.getLatestRound();
 
+        // Revert if the round id is 0
+        if (uint64(round.roundId) == 0) revert InvalidOracleRound();
+
         // If there is more than 1 phase to update, revert
         if (round.phaseId() - _latestPhaseId() > 1) {
             revert UnableToSyncError();
