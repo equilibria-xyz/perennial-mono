@@ -2,7 +2,6 @@ import { appendFile } from 'fs/promises'
 import '@nomiclabs/hardhat-ethers'
 import { task } from 'hardhat/config'
 import { HardhatRuntimeEnvironment, TaskArguments } from 'hardhat/types'
-import { AggregatorProxyInterface__factory, AggregatorV2V3Interface__factory } from '../types/generated'
 
 function chunk<T>(arr: T[], size: number): T[][] {
   return Array.from({ length: Math.ceil(arr.length / size) }, (_: T, i: number) => arr.slice(i * size, i * size + size))
@@ -15,11 +14,10 @@ export default task('enumerateChainlinkRounds', 'Enumerates all of the Rounds fo
   .setAction(async (args: TaskArguments, HRE: HardhatRuntimeEnvironment) => {
     const { ethers } = HRE
     const { BigNumber } = ethers
-    const [signer] = await ethers.getSigners()
-    const proxy = await AggregatorProxyInterface__factory.connect(args.feed, signer)
-    const aggregator = AggregatorV2V3Interface__factory.connect(
+    const proxy = await ethers.getContractAt('AggregatorProxyInterface', args.feed)
+    const aggregator = await ethers.getContractAt(
+      'AggregatorV2V3Interface',
       await proxy.phaseAggregators(BigNumber.from(args.phase)),
-      signer,
     )
 
     const latestRound = await aggregator.callStatic.latestRoundData()

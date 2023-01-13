@@ -1,9 +1,17 @@
 import '@nomiclabs/hardhat-ethers'
 import { task } from 'hardhat/config'
 import { HardhatRuntimeEnvironment, TaskArguments } from 'hardhat/types'
-import { IOracleProvider, IOracleProvider__factory } from '../types/generated'
+import { BigNumber } from 'ethers'
 
-function asString(oracleVersion: IOracleProvider.OracleVersionStructOutput) {
+// Because of a circular dependency with Hardhat and Typechain, we need to re-declare this struct instead
+// of importing from generated typechain types.
+type OracleVersionStruct = {
+  version: BigNumber
+  timestamp: BigNumber
+  price: BigNumber
+}
+
+function asString(oracleVersion: OracleVersionStruct) {
   return JSON.stringify(
     {
       price: oracleVersion.price.toString(),
@@ -15,7 +23,7 @@ function asString(oracleVersion: IOracleProvider.OracleVersionStructOutput) {
   )
 }
 
-function equal(a: IOracleProvider.OracleVersionStructOutput, b: IOracleProvider.OracleVersionStructOutput) {
+function equal(a: OracleVersionStruct, b: OracleVersionStruct) {
   return a.timestamp.eq(b.timestamp) && a.price.eq(b.price) && a.version.eq(b.version)
 }
 
@@ -24,9 +32,8 @@ export default task('compareOracleVersions', 'Compares all versions for two orac
   .addPositionalParam('b', 'Oracle 2 to query')
   .setAction(async (args: TaskArguments, HRE: HardhatRuntimeEnvironment) => {
     const { ethers } = HRE
-    const [signer] = await ethers.getSigners()
-    const oracle1 = await IOracleProvider__factory.connect(args.a, signer)
-    const oracle2 = await IOracleProvider__factory.connect(args.b, signer)
+    const oracle1 = await ethers.getContractAt('IOracleProvider', args.a)
+    const oracle2 = await await ethers.getContractAt('IOracleProvider', args.b)
 
     const oracle1Latest = await oracle1.callStatic.currentVersion()
     const oracle2Latest = await oracle2.callStatic.currentVersion()

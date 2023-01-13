@@ -4,5 +4,5 @@
     "outDir": "dist"
   },
   "files": ["hardhat.config.ts"],
-  "include": ["deploy", "test", "types", "util"]
+  "include": ["deploy", "test", "types", "util", "tasks"]
 }
