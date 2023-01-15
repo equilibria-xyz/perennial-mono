@@ -60,10 +60,8 @@ describe('MultiInvoker', () => {
     let programs: number[]
 
     beforeEach(async () => {
-      const { user, dsu, usdc, usdcHolder, multiInvoker, batcher, dsuHolder } = instanceVars
+      const { user, dsu, usdc, usdcHolder, multiInvoker } = instanceVars
 
-      // TODO(arjun): Remove this once new batcher has loaned from Reserve
-      await dsu.connect(dsuHolder).transfer(batcher.address, utils.parseEther('100000'))
       await usdc.connect(usdcHolder).transfer(user.address, 1_000_000e6)
       await usdc.connect(user).approve(multiInvoker.address, constants.MaxUint256)
       await dsu.connect(user).approve(multiInvoker.address, constants.MaxUint256)
