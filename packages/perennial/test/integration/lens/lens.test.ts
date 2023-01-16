@@ -2,7 +2,14 @@ import { expect } from 'chai'
 import 'hardhat'
 import { utils } from 'ethers'
 
-import { InstanceVars, deployProtocol, createProduct, depositTo, createIncentiveProgram } from '../helpers/setupHelpers'
+import {
+  InstanceVars,
+  deployProtocol,
+  createProduct,
+  depositTo,
+  createIncentiveProgram,
+  INITIAL_VERSION,
+} from '../helpers/setupHelpers'
 import { time } from '../../../../common/testutil'
 import { expectPositionEq, expectPrePositionEq } from '../../../../common/testutil/types'
 
@@ -58,7 +65,7 @@ describe('Lens', () => {
     expectPrePositionEq(globalPre, {
       openPosition: { maker: POSITION, taker: POSITION },
       closePosition: { maker: 0, taker: 0 },
-      oracleVersion: 2472,
+      oracleVersion: INITIAL_VERSION,
     })
     expectPositionEq(globalPosition, { maker: 0, taker: 0 })
     expect(productSnapshot.latestVersion.price).to.equal('11388297509860897871140900')
@@ -75,7 +82,7 @@ describe('Lens', () => {
     expectPrePositionEq(userPre, {
       openPosition: { maker: POSITION, taker: 0 },
       closePosition: { maker: 0, taker: 0 },
-      oracleVersion: 2472,
+      oracleVersion: INITIAL_VERSION,
     })
     expectPositionEq(userPosition, { maker: 0, taker: 0 })
     expect(userSnapshot.maintenance).to.equal('341648925295826936134')
@@ -208,7 +215,7 @@ describe('Lens', () => {
     )
     expect(incentiveRewards.tokens[0].toLowerCase()).to.equal(incentiveToken.address.toLowerCase())
     expect(incentiveRewards.amounts[0]).to.equal('188786008230451956')
-    const prices = await lens.callStatic.atVersions(product.address, [2472, 2475])
+    const prices = await lens.callStatic.atVersions(product.address, [INITIAL_VERSION, INITIAL_VERSION + 3])
     expect(prices[0].price).to.equal('11388297509860897871140900')
     expect(prices[1].price).to.equal('11628475351618010828602500')
   })
