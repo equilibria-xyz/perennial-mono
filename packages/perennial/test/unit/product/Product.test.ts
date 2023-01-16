@@ -185,6 +185,11 @@ describe('Product', () => {
         .to.emit(product, 'JumpRateUtilizationCurveUpdated')
         .withArgs(newCurve, 0)
 
+      const newOracle = await deployMockContract(owner, IOracleProvider__factory.abi)
+      await expect(product.updateOracle(newOracle.address))
+        .to.emit(product, 'OracleUpdated')
+        .withArgs(newOracle.address, 0)
+
       expect(product.settle).to.have.callCount(7)
 
       expect(await product['maintenance()']()).to.equal(utils.parseEther('0.1'))
@@ -199,6 +204,8 @@ describe('Product', () => {
       expect(curve.maxRate).to.equal(utils.parseEther('0.20'))
       expect(curve.targetRate).to.equal(utils.parseEther('0.30'))
       expect(curve.targetUtilization).to.equal(utils.parseEther('0.4'))
+
+      expect(await product.oracle()).to.equal(newOracle.address)
     })
 
     describe('pending fee updates', () => {
@@ -323,24 +330,27 @@ describe('Product', () => {
       await expect(product.connect(user).updateMakerLimit(utils.parseEther('0.5')))
         .to.be.be.revertedWithCustomError(product, 'NotOwnerError')
         .withArgs(1)
+      await expect(product.connect(user).updateOracle(user.address))
+        .to.be.revertedWithCustomError(product, 'NotOwnerError')
+        .withArgs(1)
     })
 
     it('reverts if fees are too high', async () => {
       await expect(product.updateFundingFee(utils.parseEther('1.01'))).to.be.be.revertedWithCustomError(
         product,
-        'ParamProviderInvalidFundingFee',
+        'ParamProviderInvalidParamValue',
       )
       await expect(product.updateMakerFee(utils.parseEther('1.01'))).to.be.be.revertedWithCustomError(
         product,
-        'ParamProviderInvalidMakerFee',
+        'ParamProviderInvalidParamValue',
       )
       await expect(product.updateTakerFee(utils.parseEther('1.01'))).to.be.be.revertedWithCustomError(
         product,
-        'ParamProviderInvalidTakerFee',
+        'ParamProviderInvalidParamValue',
       )
       await expect(product.updatePositionFee(utils.parseEther('1.01'))).to.be.be.revertedWithCustomError(
         product,
-        'ParamProviderInvalidPositionFee',
+        'ParamProviderInvalidParamValue',
       )
     })
   })

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.15;
+pragma solidity ^0.8.15;
 
 import "@equilibria/root/control/unstructured/UInitializable.sol";
 
@@ -13,7 +13,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
     Token18 public immutable DSU; // solhint-disable-line var-name-mixedcase
 
     /// @dev Batcher address
-    Batcher public immutable batcher;
+    IBatcher public immutable batcher;
 
     /// @dev Controller address
     IController public immutable controller;
@@ -29,15 +29,16 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
      * @dev Called at implementation instantiate and constant for that implementation.
      * @param usdc_ USDC stablecoin address
      * @param batcher_ Protocol Batcher address
+     * @param reserve_ EmptySet Reserve address
      * @param controller_ Protocol Controller address
      */
-    constructor(Token6 usdc_, Batcher batcher_, IController controller_) {
+    constructor(Token6 usdc_, IBatcher batcher_, IEmptySetReserve reserve_, IController controller_) {
         USDC = usdc_;
         batcher = batcher_;
         controller = controller_;
         collateral = controller.collateral();
         DSU = collateral.token();
-        reserve = batcher.RESERVE();
+        reserve = reserve_;
     }
 
     /**
@@ -45,10 +46,15 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
      * @dev Must be called atomically as part of the upgradeable proxy deployment to
      *      avoid front-running
      */
-    function initialize() external initializer(1) {
+    function initialize() external initializer(2) {
+        if (address(batcher) != address(0)) {
+            DSU.approve(address(batcher));
+            USDC.approve(address(batcher));
+        }
+
         DSU.approve(address(collateral));
+
         DSU.approve(address(reserve));
-        USDC.approve(address(batcher));
         USDC.approve(address(reserve));
     }
 
@@ -192,8 +198,8 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
      * @param amount Amount of USDC to wrap
      */
     function _wrap(address receiver, UFixed18 amount) private {
-        // If the batcher doesn't have enough for this wrap, go directly to the reserve
-        if (amount.gt(DSU.balanceOf(address(batcher)))) {
+        // If the batcher is 0 or  doesn't have enough for this wrap, go directly to the reserve
+        if (address(batcher) == address(0) || amount.gt(DSU.balanceOf(address(batcher)))) {
             reserve.mint(amount);
             if (receiver != address(this)) DSU.push(receiver, amount);
         } else {
@@ -208,11 +214,13 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
      * @param amount Amount of DSU to unwrap
      */
     function _unwrap(address receiver, UFixed18 amount) private {
-        // Unwrap the DSU into USDC and return to the receiver
-        // The current batcher does not have UNWRAP functionality yet, so just go directly to the reserve
-        reserve.redeem(amount);
-
-        // Push the amount to the receiver
-        USDC.push(receiver, amount);
+        // If the batcher is 0 or doesn't have enough for this unwrap, go directly to the reserve
+        if (address(batcher) == address(0) || amount.gt(USDC.balanceOf(address(batcher)))) {
+            reserve.redeem(amount);
+            if (receiver != address(this)) USDC.push(receiver, amount);
+        } else {
+            // Unwrap the DSU into USDC and return to the receiver
+            batcher.unwrap(amount, receiver);
+        }
     }
 }

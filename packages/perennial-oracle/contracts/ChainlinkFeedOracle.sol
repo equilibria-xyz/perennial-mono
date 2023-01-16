@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.15;
 
-import "@chainlink/contracts/src/v0.8/interfaces/FeedRegistryInterface.sol";
 import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "./interfaces/IOracleProvider.sol";
-import "./types/ChainlinkRegistry.sol";
+import "./types/ChainlinkAggregator.sol";
 
 /**
  * @title ChainlinkOracle
@@ -13,15 +12,11 @@ import "./types/ChainlinkRegistry.sol";
  *      ChainlinkOracle instance if their payoff functions are based on the same underlying oracle.
  *      This implementation only support non-negative prices.
  */
-contract ChainlinkOracle is IOracleProvider {
-    /// @dev Chainlink registry feed address
-    ChainlinkRegistry public immutable registry;
+contract ChainlinkFeedOracle is IOracleProvider {
+    error UnableToSyncError();
 
-    /// @dev Base token address for the Chainlink oracle
-    address public immutable base;
-
-    /// @dev Quote token address for the Chainlink oracle
-    address public immutable quote;
+    /// @dev Chainlink feed aggregator address
+    ChainlinkAggregator public immutable aggregator;
 
     /// @dev Decimal offset used to normalize chainlink price to 18 decimals
     int256 private immutable _decimalOffset;
@@ -36,41 +31,57 @@ contract ChainlinkOracle is IOracleProvider {
 
     /**
      * @notice Initializes the contract state
-     * @param registry_ Chainlink price feed registry
-     * @param base_ base currency for feed
-     * @param quote_ quote currency for feed
+     * @param aggregator_ Chainlink price feed aggregator
      */
-    constructor(ChainlinkRegistry registry_, address base_, address quote_) {
-        registry = registry_;
-        base = base_;
-        quote = quote_;
+    constructor(ChainlinkAggregator aggregator_) {
+        aggregator = aggregator_;
 
-        // phaseId is 1-indexed, skip index 0
-        _phases.push(Phase(uint128(0), uint128(0)));
-        // phaseId is 1-indexed, first phase starts as version 0
-        _phases.push(Phase(uint128(0), uint128(registry_.getStartingRoundId(base_, quote_, 1))));
+        _decimalOffset = SafeCast.toInt256(10 ** aggregator.decimals());
 
-        _decimalOffset = SafeCast.toInt256(10 ** registry_.decimals(base, quote));
+        ChainlinkRound memory firstSeenRound = aggregator.getLatestRound();
+
+        // Load the phases array with empty phase values. these phases will be invalid if requested
+        while (firstSeenRound.phaseId() > _phases.length) {
+            _phases.push(Phase(uint128(0), uint128(0)));
+        }
+
+        // first seen round starts as version 0 at current phase
+        _phases.push(Phase(uint128(0), uint128(firstSeenRound.roundId)));
     }
 
     /**
      * @notice Checks for a new price and updates the internal phase annotation state accordingly
+     * @dev `sync` is expected to be called soon after a phase update occurs in the underlying proxy.
+     *      Phase updates should be detected using off-chain mechanism and should trigger a `sync` call
+     *      This is feasible in the short term due to how infrequent phase updates are, but phase update
+     *      and roundCount detection should eventually be implemented at the contract level.
+     *      Reverts if there is more than 1 phase to update in a single sync because we currently cannot
+     *      determine the startingRoundId for the intermediary phase.
      * @return The current oracle version after sync
      */
     function sync() external returns (OracleVersion memory) {
         // Fetch latest round
-        ChainlinkRound memory round = registry.getLatestRound(base, quote);
+        ChainlinkRound memory round = aggregator.getLatestRound();
 
         // Revert if the round id is 0
         if (uint64(round.roundId) == 0) revert InvalidOracleRound();
 
+        // If there is more than 1 phase to update, revert
+        if (round.phaseId() - _latestPhaseId() > 1) {
+            revert UnableToSyncError();
+        }
+
         // Update phase annotation when new phase detected
         while (round.phaseId() > _latestPhaseId()) {
+            // Get the round count for the latest phase
+            uint256 phaseRoundCount = aggregator.getRoundCount(
+                _latestPhaseId(), _phases[_latestPhaseId()].startingRoundId, round.timestamp);
+
+            // The starting version for the next phase is startingVersionForLatestPhase + roundCount
             _phases.push(
                 Phase(
-                    uint128(registry.getRoundCount(base, quote, _latestPhaseId())) +
-                        _phases[_phases.length - 1].startingVersion,
-                    uint128(registry.getStartingRoundId(base, quote, _latestPhaseId() +  1))
+                    uint128(phaseRoundCount) + _phases[_latestPhaseId()].startingVersion,
+                    uint128(round.roundId)
                 )
             );
         }
@@ -84,7 +95,7 @@ contract ChainlinkOracle is IOracleProvider {
      * @return oracleVersion Current oracle version
      */
     function currentVersion() public view returns (OracleVersion memory oracleVersion) {
-        return _buildOracleVersion(registry.getLatestRound(base, quote));
+        return _buildOracleVersion(aggregator.getLatestRound());
     }
 
     /**
@@ -93,7 +104,7 @@ contract ChainlinkOracle is IOracleProvider {
      * @return oracleVersion Oracle version at version `version`
      */
     function atVersion(uint256 version) public view returns (OracleVersion memory oracleVersion) {
-        return _buildOracleVersion(registry.getRound(base, quote, _versionToRoundId(version)), version);
+        return _buildOracleVersion(aggregator.getRound(_versionToRoundId(version)), version);
     }
 
     /**
