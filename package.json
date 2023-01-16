@@ -20,6 +20,7 @@
     "deploy:fork:mainnet": "concurrently \"yarn workspace @equilibria/perennial run node:fork:mainnet --no-deploy > /dev/null\" \"./scripts/deploy_mainnet_fork.sh\""
   },
   "devDependencies": {
+    "@chainlink/contracts": "0.5.1",
     "@codechecks/client": "^0.1.10",
     "@defi-wonderland/smock": "^2.3.4",
     "@equilibria/root": "0.2.0",
