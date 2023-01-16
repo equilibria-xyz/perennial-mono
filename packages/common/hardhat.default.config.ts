@@ -104,7 +104,6 @@ export default function defaultConfig({
         },
         chainId: getChainId('hardhat'),
         allowUnlimitedContractSize: true,
-        accounts: PRIVATE_KEY_TESTNET ? [{ privateKey: PRIVATE_KEY_TESTNET, balance: (10e18).toString() }] : undefined,
         mining: NODE_INTERVAL_MINING
           ? {
               interval: NODE_INTERVAL_MINING,
