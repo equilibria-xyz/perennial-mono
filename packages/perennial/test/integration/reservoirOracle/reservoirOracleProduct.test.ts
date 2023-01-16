@@ -13,7 +13,7 @@ import {
 } from '../../../types/generated'
 import { deployments } from 'hardhat'
 
-const VERSION_OFFSET = BigNumber.from('73786976294838209800')
+const VERSION_OFFSET = BigNumber.from('92233720368547761313')
 const INITIAL_VERSION = BigNumber.from(1)
 const PRODUCT_INFO = {
   name: 'Squeeth',

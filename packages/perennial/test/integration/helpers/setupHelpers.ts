@@ -44,7 +44,7 @@ const { config, deployments, ethers } = HRE
 
 export const INITIAL_PHASE_ID = 1
 export const INITIAL_AGGREGATOR_ROUND_ID = 10000
-export const INITIAL_VERSION = 2472 // registry's phase 1 starts at aggregatorRoundID 7528
+export const INITIAL_VERSION = INITIAL_AGGREGATOR_ROUND_ID - 7528 // registry's phase 1 starts at aggregatorRoundID 7528
 export const DSU_HOLDER = '0x0B663CeaCEF01f2f88EB7451C70Aa069f19dB997'
 export const USDC_HOLDER = '0x0A59649758aa4d66E25f08Dd01271e891fe52199'
 
@@ -194,7 +194,7 @@ export async function deployProtocol(): Promise<InstanceVars> {
     dsuHolder,
     chainlink,
     chainlinkOracle,
-    contractPayoffProvider: contractPayoffProvider,
+    contractPayoffProvider,
     dsu,
     usdc,
     usdcHolder,
@@ -270,17 +270,22 @@ export async function createIncentiveProgram(
   }
   await incentiveToken.mint(programOwner.address, amount.maker.add(amount.taker))
   await incentiveToken.connect(programOwner).approve(incentivizer.address, amount.maker.add(amount.taker))
+
+  const latestVersion = await product['latestVersion()']()
+  const oracleVersion = await product.atVersion(latestVersion)
   const programInfo = {
     coordinatorId,
     token: incentiveToken.address,
     amount,
-    start: (await time.currentBlockTimestamp()) + 60 * 60,
+    start: oracleVersion.timestamp.add(10),
     duration: 60 * 60 * 24 * 30 * 12 * 1.5,
   }
-  const returnValue = await incentivizer.connect(programOwner).callStatic.create(product.address, programInfo)
 
+  const timestampDiference = (await time.currentBlockTimestamp()) - oracleVersion.timestamp.toNumber()
+  await time.increase(-1 * (timestampDiference + 10))
+  const returnValue = await incentivizer.connect(programOwner).callStatic.create(product.address, programInfo)
   await incentivizer.connect(programOwner).create(product.address, programInfo)
-  await time.increase(60 * 60 + 1)
+  await time.increase(timestampDiference + 10)
   return returnValue
 }
 
