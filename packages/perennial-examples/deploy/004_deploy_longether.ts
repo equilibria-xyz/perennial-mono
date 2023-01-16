@@ -11,7 +11,7 @@ const EXAMPLE_COORDINATOR_ID = 1
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const coordinatorID = process.env.COORDINATOR_ID ? parseInt(process.env.COORDINATOR_ID) : EXAMPLE_COORDINATOR_ID
   const { deployments, getNamedAccounts, ethers } = hre
-  const { get, getOrNull } = deployments
+  const { get } = deployments
   const { deployer } = await getNamedAccounts()
   const deployerSigner: SignerWithAddress = await ethers.getSigner(deployer)
 
@@ -25,26 +25,21 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     return
   }
 
-  const oracle = await getOrNull('ReservoirFeedOracle_BAYC')
-  if (oracle == null) {
-    console.log('ReservoirFeedOracle_BAYC deployment not found... skipping')
-    return
-  }
-
   const productInfo: IProduct.ProductInfoStruct = {
-    name: 'Short Floor BAYC',
-    symbol: 'sfBAYC',
-    payoffDefinition: createPayoffDefinition({ short: true }),
-    oracle: oracle.address,
-    maintenance: ethers.utils.parseEther('0.30'),
-    fundingFee: ethers.utils.parseEther('0.10'),
+    name: 'Ether',
+    symbol: 'ETH',
+    payoffDefinition: createPayoffDefinition(),
+    oracle: (await get('ChainlinkOracle_ETH')).address,
+    maintenance: ethers.utils.parseEther('0.10'),
+    fundingFee: 0,
     makerFee: 0,
     takerFee: 0,
-    makerLimit: ethers.utils.parseEther('2500'),
+    positionFee: 0,
+    makerLimit: ethers.utils.parseEther('1800'),
     utilizationCurve: {
-      minRate: ethers.utils.parseEther('0.04'),
-      maxRate: ethers.utils.parseEther('16.25'),
-      targetRate: ethers.utils.parseEther('1.56'),
+      minRate: ethers.utils.parseEther('0.00'),
+      maxRate: ethers.utils.parseEther('0.80'),
+      targetRate: ethers.utils.parseEther('0.06'),
       targetUtilization: ethers.utils.parseEther('0.80'),
     },
   }
@@ -53,4 +48,4 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 }
 
 export default func
-func.tags = ['FloorBAYC']
+func.tags = ['LongEther']

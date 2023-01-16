@@ -7,15 +7,15 @@ import {
   Collateral__factory,
   Controller,
   Controller__factory,
-  IERC20__factory,
   Incentivizer,
   Incentivizer__factory,
   ProxyAdmin,
   ProxyAdmin__factory,
+  UCrossChainOwner__factory,
 } from '../types/generated'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
+import { isArbitrum, isEthereum, isOptimism, isTestnet } from '../../common/testutil/network'
 
-const TIMELOCK_MIN_DELAY = 2 * 24 * 60 * 60
 const ROOT_CONTROLLER_ID = 0
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
@@ -28,16 +28,13 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const networkName = getNetworkName()
   const dsuAddress = (await getOrNull('DSU'))?.address || (await get('TestnetDSU')).address
   const usdcAddress = (await getOrNull('USDC'))?.address || (await get('TestnetUSDC')).address
-  const batcherAddress = (await getOrNull('Batcher'))?.address || (await get('TestnetBatcher')).address
   const multisigAddress = getMultisigAddress(networkName) || deployer
   const deployerSigner: SignerWithAddress = await ethers.getSigner(deployer)
+  const TIMELOCK_MIN_DELAY = isTestnet(networkName) ? 60 : 2 * 24 * 60 * 60
 
   console.log('using DSU address: ' + dsuAddress)
   console.log('using USDC address: ' + usdcAddress)
-  console.log('using Batcher address: ' + batcherAddress)
   console.log('using Multisig address: ' + multisigAddress)
-
-  const dsu = await IERC20__factory.connect(dsuAddress, deployerSigner)
 
   // IMPLEMENTATIONS
 
@@ -74,15 +71,35 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     autoMine: true,
   })
 
-  // TIMELOCK
+  // TIMELOCK OR CROSSCHAINOWNER
 
-  const timelockController: Deployment = await deploy('TimelockController', {
-    from: deployer,
-    args: [TIMELOCK_MIN_DELAY, [multisigAddress], [ethers.constants.AddressZero]],
-    skipIfAlreadyDeployed: true,
-    log: true,
-    autoMine: true,
-  })
+  // If this is mainnet, deploy a Timelock as ProxyAdmin owner
+  if (isEthereum(networkName)) {
+    await deploy('TimelockController', {
+      from: deployer,
+      args: [TIMELOCK_MIN_DELAY, [multisigAddress], [ethers.constants.AddressZero]],
+      skipIfAlreadyDeployed: true,
+      log: true,
+      autoMine: true,
+    })
+    // Else deploy UCrossChain owners
+  } else if (isArbitrum(networkName)) {
+    await deploy('UCrossChainOwner', {
+      contract: 'UCrossChainOwner_Arbitrum',
+      from: deployer,
+      skipIfAlreadyDeployed: true,
+      log: true,
+      autoMine: true,
+    })
+  } else if (isOptimism(networkName)) {
+    await deploy('UCrossChainOwner', {
+      contract: 'UCrossChainOwner_Optimism',
+      from: deployer,
+      skipIfAlreadyDeployed: true,
+      log: true,
+      autoMine: true,
+    })
+  }
 
   // PROXY OWNERS
 
@@ -164,21 +181,42 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     process.stdout.write('complete.\n')
   }
 
-  // TRANSFER OWNERSHIP
+  const crossChainOwner = await getOrNull('UCrossChainOwner')
+  if (crossChainOwner) {
+    const crosschainOwner = await UCrossChainOwner__factory.connect(
+      (
+        await get('UCrossChainOwner')
+      ).address,
+      deployerSigner,
+    )
 
-  if ((await proxyAdmin.owner()) === timelockController.address) {
-    console.log(`proxyAdmin owner already set to ${timelockController.address}`)
+    if ((await crosschainOwner.owner()) === deployerSigner.address) {
+      console.log('CrossChain Owner already initialized.')
+    } else {
+      process.stdout.write('Initializing CrossChain Owner ')
+      await (await crosschainOwner.initialize()).wait(2)
+      process.stdout.write('complete.\n')
+    }
+  }
+
+  // TRANSFER OWNERSHIP
+  const ownerAddress = isEthereum(networkName)
+    ? (await get('TimelockController')).address
+    : (await get('UCrossChainOwner')).address
+
+  if ((await proxyAdmin.owner()) === ownerAddress) {
+    console.log(`proxyAdmin owner already set to ${ownerAddress}`)
   } else {
-    process.stdout.write(`transferring proxyAdmin owner to ${timelockController.address}... `)
-    await (await proxyAdmin.transferOwnership(timelockController.address)).wait(2)
+    process.stdout.write(`transferring proxyAdmin owner to ${ownerAddress}... `)
+    await (await proxyAdmin.transferOwnership(ownerAddress)).wait(2)
     process.stdout.write('complete.\n')
   }
 
-  if ((await controller.coordinators(ROOT_CONTROLLER_ID)).pendingOwner === timelockController.address) {
-    console.log(`root controller pending owner already set to ${timelockController.address}`)
+  if ((await controller.coordinators(ROOT_CONTROLLER_ID)).pendingOwner === ownerAddress) {
+    console.log(`root controller pending owner already set to ${ownerAddress}`)
   } else {
-    process.stdout.write(`transferring root controller pending owner to ${timelockController.address}... `)
-    await (await controller.updateCoordinatorPendingOwner(ROOT_CONTROLLER_ID, timelockController.address)).wait(2)
+    process.stdout.write(`transferring root controller pending owner to ${ownerAddress}... `)
+    await (await controller.updateCoordinatorPendingOwner(ROOT_CONTROLLER_ID, ownerAddress)).wait(2)
     process.stdout.write('complete.\n')
   }
 }
