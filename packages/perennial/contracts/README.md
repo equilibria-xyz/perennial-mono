@@ -3,7 +3,9 @@
 # Rollup Optimizations
 
 
-# External user-facing functions
+# "External" (user-facing functions)
+
+`we can add custom fallbacks for parsing highly packed / cached inputs for functions to reduce gas on rollups without touching the core logic of the contracts (aside from marking functions in question as public > external)`
 
 1) forwarder/Forwarder.sol
 
@@ -14,8 +16,6 @@
         UFixed18 amount
     ) external {}
 ```
-!! LEAVE FN UNTOUCHED, PARSE ENCODED INPUTS IN FALLBACK !!!
-   - this allows for normal interactin with the protocol without changing core code
   
 `account` - 
   - mapping(small uint => account) registry 
