@@ -14,7 +14,9 @@
         UFixed18 amount
     ) external {}
 ```
-
+!! LEAVE FN UNTOUCHED, PARSE ENCODED INPUTS IN FALLBACK !!!
+   - this allows for normal interactin with the protocol without changing core code
+  
 `account` - 
   - mapping(small uint => account) registry 
   - concerns: 
@@ -33,6 +35,12 @@
 
 Definite improvements:
   - if forwarder is not being inherited (only 1 fn selector), use a fallback with hardcoded selector "wrapAndDeposit(address,address,uint256)"
+   ```
+   fallback (bytes calldata input) external {
+      // parse input
+      // call wrapAndDeposit normally
+   }
+   ```
   - custom encoding/decoding for amount
   
 Result of definite improvements: calldata ~ < 1/2 size
