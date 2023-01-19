@@ -33,10 +33,14 @@ export default task('compareOracleVersions', 'Compares all versions for two orac
   .setAction(async (args: TaskArguments, HRE: HardhatRuntimeEnvironment) => {
     const { ethers } = HRE
     const oracle1 = await ethers.getContractAt('IOracleProvider', args.a)
-    const oracle2 = await await ethers.getContractAt('IOracleProvider', args.b)
+    const oracle2 = await ethers.getContractAt('IOracleProvider', args.b)
 
-    const oracle1Latest = await oracle1.callStatic.currentVersion()
-    const oracle2Latest = await oracle2.callStatic.currentVersion()
+    const oracle1Latest = await oracle1.callStatic.sync()
+    const oracle2Latest = await oracle2.callStatic.sync()
+    if (oracle1Latest.version.toNumber() !== oracle2Latest.version.toNumber()) {
+      console.log('Found difference:')
+      console.log(asString(oracle1Latest), asString(oracle2Latest))
+    }
     const maxVersion = Math.max(oracle1Latest.version.toNumber(), oracle2Latest.version.toNumber())
 
     console.log(`Starting at Oracle Version: ${maxVersion}`)
