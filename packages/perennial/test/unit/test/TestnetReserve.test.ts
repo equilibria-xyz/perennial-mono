@@ -59,4 +59,16 @@ describe('TestnetReserve', () => {
         .withArgs(user.address, utils.parseEther('10'), 10e6)
     })
   })
+
+  describe('#debt', () => {
+    it('returns 0', async () => {
+      expect(await reserve.debt(user.address)).to.equal(0)
+    })
+  })
+
+  describe('#repay', () => {
+    it('no-ops', async () => {
+      await expect(reserve.repay(user.address, 0)).to.not.be.reverted
+    })
+  })
 })
