@@ -4,6 +4,9 @@ pragma solidity ^0.8.13;
 import "@equilibria/root/number/types/Fixed18.sol";
 
 interface IOracleProvider {
+    /// @dev Error for invalid oracle round
+    error InvalidOracleRound();
+
     /// @dev A singular oracle version with its corresponding data
     struct OracleVersion {
         /// @dev The iterative version

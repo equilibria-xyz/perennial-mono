@@ -64,16 +64,24 @@ describe('MultiInvoker', () => {
     )
 
     dsu.allowance.whenCalledWith(multiInvoker.address, collateral.address).returns(0)
+    dsu.approve.whenCalledWith(collateral.address, 0).returns(true)
     dsu.approve.whenCalledWith(collateral.address, ethers.constants.MaxUint256).returns(true)
+
     dsu.allowance.whenCalledWith(multiInvoker.address, batcher.address).returns(0)
+    dsu.approve.whenCalledWith(batcher.address, 0).returns(true)
     dsu.approve.whenCalledWith(batcher.address, ethers.constants.MaxUint256).returns(true)
+
     dsu.allowance.whenCalledWith(multiInvoker.address, reserve.address).returns(0)
+    dsu.approve.whenCalledWith(reserve.address, 0).returns(true)
     dsu.approve.whenCalledWith(reserve.address, ethers.constants.MaxUint256).returns(true)
     dsu.balanceOf.whenCalledWith(batcher.address).returns(constants.MaxUint256)
 
     usdc.allowance.whenCalledWith(multiInvoker.address, batcher.address).returns(0)
+    usdc.approve.whenCalledWith(batcher.address, 0).returns(true)
     usdc.approve.whenCalledWith(batcher.address, ethers.constants.MaxUint256).returns(true)
+
     usdc.allowance.whenCalledWith(multiInvoker.address, reserve.address).returns(0)
+    usdc.approve.whenCalledWith(reserve.address, 0).returns(true)
     usdc.approve.whenCalledWith(reserve.address, ethers.constants.MaxUint256).returns(true)
     usdc.balanceOf.whenCalledWith(batcher.address).returns(1_000_000e6)
 

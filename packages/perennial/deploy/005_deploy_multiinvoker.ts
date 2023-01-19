@@ -2,7 +2,7 @@ import { HardhatRuntimeEnvironment } from 'hardhat/types'
 import { DeployFunction } from 'hardhat-deploy/types'
 import { Deployment } from 'hardhat-deploy/dist/types'
 import { getMultisigAddress } from '../../common/testutil/constants'
-import { IERC20__factory, MultiInvoker__factory } from '../types/generated'
+import { Controller__factory, IERC20__factory, MultiInvoker__factory } from '../types/generated'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
@@ -60,6 +60,17 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   } else {
     process.stdout.write('initializing MultiInvoker... ')
     await (await multiInvoker.initialize()).wait(2)
+    process.stdout.write('complete.\n')
+  }
+
+  const controller = await new Controller__factory(deployerSigner).attach(controllerAddress)
+
+  // Set MultiInvoker on Controller
+  if ((await controller.multiInvoker()) === multiInvoker.address) {
+    console.log('MultiInvoker already set on Controller.')
+  } else {
+    process.stdout.write('Setting MultiInvoker address on Controller... ')
+    await (await controller.updateMultiInvoker(multiInvoker.address)).wait(2)
     process.stdout.write('complete.\n')
   }
 }

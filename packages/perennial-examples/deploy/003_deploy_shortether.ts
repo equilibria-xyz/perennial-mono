@@ -26,19 +26,20 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   }
 
   const productInfo: IProduct.ProductInfoStruct = {
-    name: 'Short Ether',
-    symbol: 'SETH',
+    name: 'Ether',
+    symbol: 'ETH',
     payoffDefinition: createPayoffDefinition({ short: true }),
     oracle: (await get('ChainlinkOracle_ETH')).address,
-    maintenance: ethers.utils.parseEther('0.20'),
+    maintenance: ethers.utils.parseEther('0.10'),
     fundingFee: 0,
     makerFee: 0,
     takerFee: 0,
-    makerLimit: ethers.utils.parseEther('1500'),
+    positionFee: 0,
+    makerLimit: ethers.utils.parseEther('1800'),
     utilizationCurve: {
-      minRate: ethers.utils.parseEther('0.02'),
-      maxRate: ethers.utils.parseEther('1.25'),
-      targetRate: ethers.utils.parseEther('0.25'),
+      minRate: ethers.utils.parseEther('0.00'),
+      maxRate: ethers.utils.parseEther('0.80'),
+      targetRate: ethers.utils.parseEther('0.06'),
       targetUtilization: ethers.utils.parseEther('0.80'),
     },
   }

@@ -48,13 +48,18 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
      */
     function initialize() external initializer(2) {
         if (address(batcher) != address(0)) {
+            DSU.approve(address(batcher), UFixed18Lib.ZERO);
             DSU.approve(address(batcher));
+            USDC.approve(address(batcher), UFixed18Lib.ZERO);
             USDC.approve(address(batcher));
         }
 
+        DSU.approve(address(collateral), UFixed18Lib.ZERO);
         DSU.approve(address(collateral));
 
+        DSU.approve(address(reserve), UFixed18Lib.ZERO);
         DSU.approve(address(reserve));
+        USDC.approve(address(reserve), UFixed18Lib.ZERO);
         USDC.approve(address(reserve));
     }
 

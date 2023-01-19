@@ -258,6 +258,24 @@ describe('ChainlinkFeedOracle', () => {
         expect(atVersion.timestamp).to.equal(TIMESTAMP_START + HOUR)
         expect(atVersion.version).to.equal(80)
       })
+
+      it('reverts if syncing multiple phases in a single sync call', async () => {
+        const roundId = buildChainlinkRoundId(INITIAL_PHASE + 2, 345)
+        aggregatorProxy.latestRoundData
+          .whenCalledWith()
+          .returns([roundId, ethers.BigNumber.from(133300000000), TIMESTAMP_START, TIMESTAMP_START + HOUR, roundId])
+
+        await expect(oracle.connect(user).sync()).to.be.revertedWithCustomError(oracle, 'UnableToSyncError')
+      })
+
+      it('reverts on invalid round', async () => {
+        const roundId = buildChainlinkRoundId(INITIAL_PHASE + 1, 0)
+        aggregatorProxy.latestRoundData
+          .whenCalledWith()
+          .returns([roundId, ethers.BigNumber.from(133300000000), TIMESTAMP_START, TIMESTAMP_START + HOUR, roundId])
+
+        await expect(oracle.connect(user).sync()).to.be.revertedWithCustomError(oracle, 'InvalidOracleRound')
+      })
     })
   })
 

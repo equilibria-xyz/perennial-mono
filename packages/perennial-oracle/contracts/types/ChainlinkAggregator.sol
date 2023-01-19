@@ -48,7 +48,7 @@ library ChainlinkAggregatorLib {
 
 
     /**
-     * @notice Returns the first round ID for a specific phase ID
+     * @notice Returns the round count for the specified phase ID
      * @param self Chainlink Feed Aggregator to operate on
      * @param phaseId The specific phase to fetch data for
      * @param startingRoundId starting roundId for the aggregator proxy
@@ -62,6 +62,8 @@ library ChainlinkAggregatorLib {
         AggregatorV2V3Interface agg = AggregatorV2V3Interface(proxy.phaseAggregators(phaseId));
 
         (uint80 aggRoundId,,,uint256 updatedAt,) = agg.latestRoundData();
+        // If the aggregator round ID is 0, this is an empty phase
+        if (aggRoundId == 0) return 0;
 
         // If the latest round for the aggregator is after maxTimestamp, walk back until we find the
         // correct round

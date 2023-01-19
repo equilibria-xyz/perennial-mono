@@ -78,6 +78,10 @@ library ChainlinkRegistryLib {
     internal view returns (uint256) {
         (uint80 startingRoundId, uint80 endingRoundId) =
             FeedRegistryInterface(ChainlinkRegistry.unwrap(self)).getPhaseRange(base, quote, uint16(phaseId));
+
+        // If the phase has a starting and ending roundId of 0, then there are no rounds.
+        // Convert phase rounds to aggregator rounds to check ID
+        if (uint64(startingRoundId) == 0 && uint64(endingRoundId) == 0) return 0;
         return uint256(endingRoundId - startingRoundId + 1);
     }
 }

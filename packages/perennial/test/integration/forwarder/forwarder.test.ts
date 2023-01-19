@@ -15,7 +15,6 @@ describe('Forwarder', () => {
     const { user, userB, collateral, forwarder, dsu, usdc, usdcHolder } = instanceVars
 
     const product = await createProduct(instanceVars)
-
     await usdc.connect(usdcHolder).transfer(user.address, 10e12)
 
     await usdc.connect(user).approve(forwarder.address, 10e12)
