@@ -17,6 +17,7 @@ import {
 } from '../../../types/generated'
 import { IMultiInvoker } from '../../../types/generated/contracts/interfaces/IMultiInvoker'
 import { InvokerAction, buildInvokerActions } from '../../util'
+import { loadFixture } from '@nomicfoundation/hardhat-network-helpers'
 
 const { ethers } = HRE
 use(smock.matchers)
@@ -34,8 +35,12 @@ describe('MultiInvoker', () => {
   let reserve: FakeContract<IEmptySetReserve>
   let multiInvoker: MultiInvoker
 
-  beforeEach(async () => {
+  const multiInvokerFixture = async () => {
     ;[owner, user] = await ethers.getSigners()
+  }
+
+  beforeEach(async () => {
+    await loadFixture(multiInvokerFixture)
 
     usdc = await smock.fake<IERC20>('IERC20')
     dsu = await smock.fake<IERC20>('IERC20')
@@ -111,11 +116,15 @@ describe('MultiInvoker', () => {
     const position = utils.parseEther('12')
     const programs = [1, 2, 3]
 
-    beforeEach(() => {
+    const fixture = async () => {
       actions = buildInvokerActions(user.address, product.address, position, amount, programs)
       dsu.transferFrom.whenCalledWith(user.address, multiInvoker.address, amount).returns(true)
       usdc.transferFrom.whenCalledWith(user.address, multiInvoker.address, usdcAmount).returns(true)
       usdc.transfer.whenCalledWith(user.address, usdcAmount).returns(true)
+    }
+
+    beforeEach(async () => {
+      await loadFixture(fixture)
     })
 
     it('does nothing on NOOP action', async () => {
@@ -321,11 +330,15 @@ describe('MultiInvoker', () => {
       const position = utils.parseEther('12')
       const programs = [1, 2, 3]
 
-      beforeEach(() => {
+      const fixture = async () => {
         actions = buildInvokerActions(user.address, product.address, position, amount, programs)
         dsu.transferFrom.whenCalledWith(user.address, multiInvoker.address, amount).returns(true)
         usdc.transferFrom.whenCalledWith(user.address, multiInvoker.address, usdcAmount).returns(true)
         usdc.transfer.whenCalledWith(user.address, usdcAmount).returns(true)
+      }
+
+      beforeEach(async () => {
+        await loadFixture(fixture)
       })
 
       it('wraps USDC to DSU using RESERVE on WRAP action', async () => {

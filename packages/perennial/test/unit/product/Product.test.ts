@@ -19,6 +19,7 @@ import {
   IProduct,
 } from '../../../types/generated'
 import { createPayoffDefinition, expectPositionEq, expectPrePositionEq } from '../../../../common/testutil/types'
+import { loadFixture } from '@nomicfoundation/hardhat-network-helpers'
 
 const { ethers } = HRE
 use(smock.matchers)
@@ -64,7 +65,7 @@ describe('Product', () => {
     },
   }
 
-  beforeEach(async () => {
+  const productFixture = async () => {
     ;[owner, user, userB, userC, multiInvokerMock] = await ethers.getSigners()
     oracle = await deployMockContract(owner, IOracleProvider__factory.abi)
     incentivizer = await deployMockContract(owner, Incentivizer__factory.abi)
@@ -86,6 +87,10 @@ describe('Product', () => {
     await controller.mock.coordinatorFor.withArgs(product.address).returns(1)
     await controller.mock.owner.withArgs(1).returns(owner.address)
     await controller.mock.minFundingFee.withArgs().returns(FUNDING_FEE)
+  }
+
+  beforeEach(async () => {
+    await loadFixture(productFixture)
   })
 
   describe('#initialize', async () => {
@@ -127,8 +132,12 @@ describe('Product', () => {
     describe('payoffDefinition validity', () => {
       let otherProduct: Product
 
-      beforeEach(async () => {
+      const fixture = async () => {
         otherProduct = await new Product__factory(owner).deploy()
+      }
+
+      beforeEach(async () => {
+        await loadFixture(fixture)
       })
 
       it('reverts if passthrough definition contains data', async () => {
@@ -152,8 +161,12 @@ describe('Product', () => {
   })
 
   describe('updating params', async () => {
-    beforeEach(async () => {
+    const fixture = async () => {
       await oracle.mock.sync.returns({ price: 0, timestamp: 0, version: 0 })
+    }
+
+    beforeEach(async () => {
+      await loadFixture(fixture)
     })
 
     it('correctly updates the params and calls settle for each update', async () => {
@@ -231,7 +244,7 @@ describe('Product', () => {
         version: ORACLE_VERSION + 1,
       }
 
-      beforeEach(async () => {
+      const fixture = async () => {
         await collateral.mock.settleProduct.withArgs(0).returns()
         await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_1)
         await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_1)
@@ -243,6 +256,10 @@ describe('Product', () => {
         await collateral.mock.liquidatableNext.withArgs(user.address, product.address).returns(false)
         await collateral.mock.settleAccount.withArgs(user.address, 0).returns()
         await incentivizer.mock.syncAccount.returns()
+      }
+
+      beforeEach(async () => {
+        await loadFixture(fixture)
       })
 
       it('sets pending fees if product pre position is not empty', async () => {
@@ -390,7 +407,7 @@ describe('Product', () => {
       version: ORACLE_VERSION + 3,
     }
 
-    beforeEach(async () => {
+    const fixture = async () => {
       await collateral.mock.settleProduct.withArgs(0).returns()
       await collateral.mock.settleAccount.withArgs(user.address, 0).returns()
       await collateral.mock.settleAccount.withArgs(userB.address, 0).returns()
@@ -410,6 +427,10 @@ describe('Product', () => {
       await incentivizer.mock.syncAccount.returns()
 
       await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_1)
+    }
+
+    beforeEach(async () => {
+      await loadFixture(fixture)
     })
 
     context('#openMake', async () => {
@@ -873,8 +894,12 @@ describe('Product', () => {
     })
 
     context('#closeMake', async () => {
-      beforeEach(async () => {
+      const fixture = async () => {
         await product.connect(user).openMake(POSITION)
+      }
+
+      beforeEach(async () => {
+        await loadFixture(fixture)
       })
 
       it('closes the position partially', async () => {
@@ -930,7 +955,7 @@ describe('Product', () => {
       })
 
       context('settles first', async () => {
-        beforeEach(async () => {
+        const fixture = async () => {
           await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
           await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
           await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
@@ -938,6 +963,10 @@ describe('Product', () => {
 
           await product.connect(user).settle()
           await product.connect(user).settleAccount(user.address)
+        }
+
+        beforeEach(async () => {
+          await loadFixture(fixture)
         })
 
         it('closes the position', async () => {
@@ -1281,8 +1310,12 @@ describe('Product', () => {
     })
 
     context('#openTake', async () => {
-      beforeEach(async () => {
+      const fixture = async () => {
         await product.connect(userB).openMake(POSITION.mul(2))
+      }
+
+      beforeEach(async () => {
+        await loadFixture(fixture)
       })
 
       it('opens the position', async () => {
@@ -1640,9 +1673,13 @@ describe('Product', () => {
     })
 
     context('#openTake with fee', () => {
-      beforeEach(async () => {
+      const fixture = async () => {
         await product.updateTakerFee(utils.parseEther('0.01'))
         await product.connect(userB).openMake(POSITION.mul(2))
+      }
+
+      beforeEach(async () => {
+        await loadFixture(fixture)
       })
 
       it('opens the position and settles later with fee', async () => {
@@ -1709,9 +1746,13 @@ describe('Product', () => {
     })
 
     context('#closeTake', async () => {
-      beforeEach(async () => {
+      const fixture = async () => {
         await product.connect(userB).openMake(POSITION.mul(2))
         await product.connect(user).openTake(POSITION)
+      }
+
+      beforeEach(async () => {
+        await loadFixture(fixture)
       })
 
       it('closes the position partially', async () => {
@@ -1767,7 +1808,7 @@ describe('Product', () => {
       })
 
       context('settles first', async () => {
-        beforeEach(async () => {
+        const fixture = async () => {
           await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
           await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
           await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
@@ -1775,6 +1816,10 @@ describe('Product', () => {
 
           await product.connect(user).settle()
           await product.connect(user).settleAccount(user.address)
+        }
+
+        beforeEach(async () => {
+          await loadFixture(fixture)
         })
 
         it('closes the position', async () => {
@@ -2279,7 +2324,7 @@ describe('Product', () => {
       const EXPECTED_FUNDING_FEE = EXPECTED_FUNDING / 10
       const EXPECTED_FUNDING_WITH_FEE = EXPECTED_FUNDING - EXPECTED_FUNDING_FEE // maker funding
 
-      beforeEach(async () => {
+      const fixture = async () => {
         await product.connect(user).openMake(POSITION)
         await product.connect(userB).openTake(POSITION.div(2))
 
@@ -2291,6 +2336,10 @@ describe('Product', () => {
         await product.connect(user).settle()
         await product.connect(user).settleAccount(user.address)
         await product.connect(user).settleAccount(userB.address)
+      }
+
+      beforeEach(async () => {
+        await loadFixture(fixture)
       })
 
       it('same price same rate settle', async () => {
@@ -3132,8 +3181,12 @@ describe('Product', () => {
       })
 
       describe('#closeMakeFor', async () => {
-        beforeEach(async () => {
+        const fixture = async () => {
           await product.connect(user).openMake(POSITION)
+        }
+
+        beforeEach(async () => {
+          await loadFixture(fixture)
         })
 
         it('closes the position', async () => {
@@ -3172,8 +3225,12 @@ describe('Product', () => {
       })
 
       describe('#openTakeFor', async () => {
-        beforeEach(async () => {
+        const fixture = async () => {
           await product.connect(userB).openMake(POSITION.mul(2))
+        }
+
+        beforeEach(async () => {
+          await loadFixture(fixture)
         })
 
         it('opens the position', async () => {
@@ -3199,9 +3256,13 @@ describe('Product', () => {
       })
 
       describe('#closeTakeFor', async () => {
-        beforeEach(async () => {
+        const fixture = async () => {
           await product.connect(userB).openMake(POSITION.mul(2))
           await product.connect(user).openTake(POSITION)
+        }
+
+        beforeEach(async () => {
+          await loadFixture(fixture)
         })
 
         it('closes the position', async () => {
@@ -3241,7 +3302,7 @@ describe('Product', () => {
     })
 
     context('multiple position changes before settle', async () => {
-      beforeEach(async () => {
+      const fixture = async () => {
         await product.updateUtilizationCurve({
           // Force a 0.0 rate to make tests simpler
           minRate: 0,
@@ -3249,6 +3310,10 @@ describe('Product', () => {
           targetRate: 0,
           targetUtilization: utils.parseEther('1'),
         })
+      }
+
+      beforeEach(async () => {
+        await loadFixture(fixture)
       })
 
       describe('single user, maker positions', () => {
@@ -3438,7 +3503,7 @@ describe('Product', () => {
       version: ORACLE_VERSION + 3,
     }
 
-    beforeEach(async () => {
+    const fixture = async () => {
       await collateral.mock.settleProduct.withArgs(0).returns()
       await collateral.mock.settleAccount.withArgs(user.address, 0).returns()
       await collateral.mock.settleAccount.withArgs(userB.address, 0).returns()
@@ -3460,6 +3525,10 @@ describe('Product', () => {
       await incentivizer.mock.syncAccount.returns()
 
       await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_1)
+    }
+
+    beforeEach(async () => {
+      await loadFixture(fixture)
     })
 
     context('#openMake', async () => {
@@ -3921,8 +3990,12 @@ describe('Product', () => {
     })
 
     context('#closeMake', async () => {
-      beforeEach(async () => {
+      const fixture = async () => {
         await product.connect(user).openMake(POSITION)
+      }
+
+      beforeEach(async () => {
+        await loadFixture(fixture)
       })
 
       it('closes the position partially', async () => {
@@ -3978,7 +4051,7 @@ describe('Product', () => {
       })
 
       context('settles first', async () => {
-        beforeEach(async () => {
+        const fixture = async () => {
           await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
           await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
           await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
@@ -3986,6 +4059,10 @@ describe('Product', () => {
 
           await product.connect(user).settle()
           await product.connect(user).settleAccount(user.address)
+        }
+
+        beforeEach(async () => {
+          await loadFixture(fixture)
         })
 
         it('closes the position', async () => {
@@ -4327,8 +4404,12 @@ describe('Product', () => {
     })
 
     context('#openTake', async () => {
-      beforeEach(async () => {
+      const fixture = async () => {
         await product.connect(userB).openMake(POSITION.mul(2))
+      }
+
+      beforeEach(async () => {
+        await loadFixture(fixture)
       })
 
       it('opens the position', async () => {
@@ -4695,9 +4776,13 @@ describe('Product', () => {
     })
 
     context('#openTake with fee', async () => {
-      beforeEach(async () => {
+      const fixture = async () => {
         await product.updateTakerFee(utils.parseEther('0.01'))
         await product.connect(userB).openMake(POSITION.mul(2))
+      }
+
+      beforeEach(async () => {
+        await loadFixture(fixture)
       })
 
       it('opens the position and settles later with fee', async () => {
@@ -4763,9 +4848,13 @@ describe('Product', () => {
     })
 
     context('#closeTake', async () => {
-      beforeEach(async () => {
+      const fixture = async () => {
         await product.connect(userB).openMake(POSITION.mul(2))
         await product.connect(user).openTake(POSITION)
+      }
+
+      beforeEach(async () => {
+        await loadFixture(fixture)
       })
 
       it('closes the position partially', async () => {
@@ -4821,7 +4910,7 @@ describe('Product', () => {
       })
 
       context('settles first', async () => {
-        beforeEach(async () => {
+        const fixture = async () => {
           await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
           await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
           await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
@@ -4829,6 +4918,10 @@ describe('Product', () => {
 
           await product.connect(user).settle()
           await product.connect(user).settleAccount(user.address)
+        }
+
+        beforeEach(async () => {
+          await loadFixture(fixture)
         })
 
         it('closes the position', async () => {
@@ -5333,7 +5426,7 @@ describe('Product', () => {
       const EXPECTED_FUNDING_FEE = EXPECTED_FUNDING / 10
       const EXPECTED_FUNDING_WITH_FEE = EXPECTED_FUNDING - EXPECTED_FUNDING_FEE // maker funding
 
-      beforeEach(async () => {
+      const fixture = async () => {
         await product.connect(user).openMake(POSITION)
         await product.connect(userB).openTake(POSITION.div(2))
 
@@ -5345,6 +5438,10 @@ describe('Product', () => {
         await product.connect(user).settle()
         await product.connect(user).settleAccount(user.address)
         await product.connect(user).settleAccount(userB.address)
+      }
+
+      beforeEach(async () => {
+        await loadFixture(fixture)
       })
 
       it('same price same rate settle', async () => {
@@ -6160,7 +6257,7 @@ describe('Product', () => {
     })
 
     context('multiple position changes before settle', async () => {
-      beforeEach(async () => {
+      const fixture = async () => {
         await product.updateUtilizationCurve({
           // Force a 0.0 rate to make tests simpler
           minRate: 0,
@@ -6168,6 +6265,10 @@ describe('Product', () => {
           targetRate: 0,
           targetUtilization: utils.parseEther('1'),
         })
+      }
+
+      beforeEach(async () => {
+        await loadFixture(fixture)
       })
 
       describe('single user, maker positions', () => {
@@ -6324,7 +6425,7 @@ describe('Product', () => {
 
   describe('#rate', async () => {
     const SECONDS_IN_YEAR = 60 * 60 * 24 * 365
-    beforeEach(async () => {
+    const fixture = async () => {
       await oracle.mock.sync.withArgs().returns({ timestamp: 0, price: 0, version: 0 })
       await product.updateUtilizationCurve({
         minRate: 0,
@@ -6332,6 +6433,10 @@ describe('Product', () => {
         targetRate: utils.parseEther('0.80'),
         targetUtilization: utils.parseEther('0.80'),
       })
+    }
+
+    beforeEach(async () => {
+      await loadFixture(fixture)
     })
 
     it('handles zero maker', async () => {
@@ -6370,7 +6475,7 @@ describe('Product', () => {
       version: ORACLE_VERSION,
     }
 
-    beforeEach(async () => {
+    const fixture = async () => {
       const payoffDefinitionFactory = await smock.mock<TestnetContractPayoffProvider__factory>(
         'TestnetContractPayoffProvider',
       )
@@ -6383,6 +6488,10 @@ describe('Product', () => {
       await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_1)
       await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_1)
       await oracle.mock.atVersion.withArgs(0).returns(ORACLE_VERSION_0)
+    }
+
+    beforeEach(async () => {
+      await loadFixture(fixture)
     })
 
     describe('#currentVersion', () => {
@@ -6426,7 +6535,7 @@ describe('Product', () => {
       version: ORACLE_VERSION,
     }
 
-    beforeEach(async () => {
+    const fixture = async () => {
       const payoffDefinitionFactory = await smock.mock<TestnetContractPayoffProvider__factory>(
         'TestnetContractPayoffProvider',
       )
@@ -6442,6 +6551,10 @@ describe('Product', () => {
       await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_1)
       await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_1)
       await oracle.mock.atVersion.withArgs(0).returns(ORACLE_VERSION_0)
+    }
+
+    beforeEach(async () => {
+      await loadFixture(fixture)
     })
 
     describe('#currentVersion', () => {
@@ -6484,7 +6597,7 @@ describe('Product', () => {
       version: ORACLE_VERSION,
     }
 
-    beforeEach(async () => {
+    const fixture = async () => {
       otherProduct = await new Product__factory(owner).deploy()
       PRODUCT_INFO.payoffDefinition = createPayoffDefinition()
       await otherProduct.connect(controllerSigner).initialize(PRODUCT_INFO)
@@ -6492,6 +6605,10 @@ describe('Product', () => {
       await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_1)
       await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_1)
       await oracle.mock.atVersion.withArgs(0).returns(ORACLE_VERSION_0)
+    }
+
+    beforeEach(async () => {
+      await loadFixture(fixture)
     })
 
     describe('#currentVersion', () => {
@@ -6532,7 +6649,7 @@ describe('Product', () => {
       version: ORACLE_VERSION,
     }
 
-    beforeEach(async () => {
+    const fixture = async () => {
       otherProduct = await new Product__factory(owner).deploy()
       PRODUCT_INFO.payoffDefinition = createPayoffDefinition({ short: true })
       await otherProduct.connect(controllerSigner).initialize(PRODUCT_INFO)
@@ -6540,6 +6657,10 @@ describe('Product', () => {
       await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_1)
       await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_1)
       await oracle.mock.atVersion.withArgs(0).returns(ORACLE_VERSION_0)
+    }
+
+    beforeEach(async () => {
+      await loadFixture(fixture)
     })
 
     describe('#currentVersion', () => {
