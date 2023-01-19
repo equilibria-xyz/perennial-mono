@@ -6,7 +6,7 @@ import {
   FeedRegistryInterface__factory,
   PassthroughChainlinkFeed,
   PassthroughChainlinkFeed__factory,
-} from '../../../../perennial/types/generated'
+} from '../../../types/generated'
 import { MockContract, deployMockContract } from '@ethereum-waffle/mock-contract'
 
 const { ethers } = HRE

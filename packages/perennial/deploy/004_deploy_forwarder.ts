@@ -3,7 +3,14 @@ import { DeployFunction } from 'hardhat-deploy/types'
 import { Collateral, Collateral__factory } from '../types/generated'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 
+const FORWARDER_DEPRECATED = true
+
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
+  if (FORWARDER_DEPRECATED) {
+    console.log('Forwarder marked as deprecated, skipping deploy')
+    return
+  }
+
   const { deployments, getNamedAccounts, ethers } = hre
   const { deploy, get, getOrNull } = deployments
   const { deployer } = await getNamedAccounts()

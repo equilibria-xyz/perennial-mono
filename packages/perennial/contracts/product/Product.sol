@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.15;
+pragma solidity ^0.8.15;
 
 import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@equilibria/root/control/unstructured/UReentrancyGuard.sol";
@@ -101,12 +101,10 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         // Initiate
         _controller.incentivizer().sync(currentOracleVersion);
         UFixed18 boundedFundingFee = _boundedFundingFee();
-        UFixed18 accumulatedFee;
 
         // value a->b
-        accumulatedFee = accumulatedFee.add(
-            _accumulator.accumulate(boundedFundingFee, _position, latestOracleVersion, settleOracleVersion)
-        );
+        UFixed18 accumulatedFee = _accumulator.accumulate(
+            boundedFundingFee, _position, latestOracleVersion, settleOracleVersion);
 
         // position a->b
         _position.settle(_latestVersion, settleOracleVersion);
@@ -165,16 +163,12 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
             ? currentOracleVersion // if b == c, don't re-call provider for oracle version
             : atVersion(_settleVersion);
 
-        // initialize
-        Fixed18 accumulated;
-
         // sync incentivizer before accumulator
         _controller.incentivizer().syncAccount(account, settleOracleVersion);
 
         // value a->b
-        accumulated = accumulated.add(
-            _accumulators[account].syncTo(_accumulator, _positions[account], settleOracleVersion.version).sum()
-        );
+        Fixed18 accumulated = _accumulators[account].syncTo(
+            _accumulator, _positions[account], settleOracleVersion.version).sum();
 
         // position a->b
         _positions[account].settle(settleOracleVersion);
@@ -501,6 +495,15 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         IOracleProvider.OracleVersion memory oracleVersion = _settle();
         _closed.store(newClosed);
         emit ClosedUpdated(newClosed, oracleVersion.version);
+    }
+
+    /**
+     * @notice Updates underlying product oracle
+     * @dev only callable by product owner
+     * @param newOracle new oracle address
+     */
+    function updateOracle(IOracleProvider newOracle) external onlyProductOwner {
+        _updateOracle(address(newOracle), latestVersion());
     }
 
     /// @dev Limit total maker for guarded rollouts

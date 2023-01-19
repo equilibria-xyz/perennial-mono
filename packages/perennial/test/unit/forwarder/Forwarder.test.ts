@@ -13,6 +13,7 @@ import {
   Forwarder__factory,
   IERC20Metadata,
 } from '../../../types/generated'
+import { loadFixture } from '@nomicfoundation/hardhat-network-helpers'
 
 const { ethers } = HRE
 use(smock.matchers)
@@ -28,8 +29,12 @@ describe('Forwarder', () => {
   let dsu: FakeContract<IERC20Metadata>
   let forwarder: Forwarder
 
-  beforeEach(async () => {
+  const forwarderFixture = async () => {
     ;[owner, user, account] = await ethers.getSigners()
+  }
+
+  beforeEach(async () => {
+    await loadFixture(forwarderFixture)
 
     collateral = await smock.fake<ICollateral>('ICollateral')
     product = await smock.fake<IProduct>('IProduct')
@@ -98,6 +103,10 @@ describe('Forwarder', () => {
     })
 
     it('rounds correctly', async () => {
+      usdc.transferFrom.reset()
+      batcher.wrap.reset()
+      collateral.depositTo.reset()
+
       usdc.transferFrom.whenCalledWith(user.address, forwarder.address, 1e6).returns(true)
       batcher.wrap.whenCalledWith(utils.parseEther('0.999999999999'), forwarder.address).returns()
       collateral.depositTo.whenCalledWith(account.address, product, utils.parseEther('10')).returns()
