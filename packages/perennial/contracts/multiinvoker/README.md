@@ -13,7 +13,7 @@ contract MultiInvokerRollup is MultiInvoker {
 
 ```
 
-- if lack of upgradeability is a concern for stuff like address cache max size (see @todo ) we can treat MultiInvokerRollup as a proxy instead 
+- if lack of upgradeability is a concern for stuff like address cache max size (see #4 ) we can treat MultiInvokerRollup as a proxy instead 
 
 ### 2) Replacing `invoke(Invocation[] calldata invocations)`
 - the fallback function does the multicall job of the invoke, so it would be redundant to use over calling the action fns directly 
@@ -31,11 +31,10 @@ contract MultiInvokerRollup is MultiInvoker {
 
 - the individual encoding / decoding for each arg type would go as follows 
 
-    #### 4.1) user addr caching 
-    #### 4.2) product addr caching
-    #### 4.3) uint256
-         
-    #### 4.4) uint256[]
+    #### 3.1) user addr caching 
+    #### 3.2) product addr caching
+    #### 3.3) uint256
+    #### 3.4) uint256[]
 
 ### 4) Potential upgradeability 
 Given the # of potential users and products could be near infinite, it may be a bad idea to set a cap much closer to 0 than 2^256 
