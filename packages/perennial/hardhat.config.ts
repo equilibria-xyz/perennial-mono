@@ -49,6 +49,8 @@ const config = defaultConfig({
     arbitrumGoerli: [`${eqPerennialOracleDir}/deployments/arbitrumGoerli`],
     optimismGoerli: [`${eqPerennialOracleDir}/deployments/optimismGoerli`],
     mainnet: [`${eqPerennialOracleDir}/deployments/mainnet`],
+    arbitrum: [`${eqPerennialOracleDir}/deployments/arbitrum`],
+    optimism: [`${eqPerennialOracleDir}/deployments/optimism`],
     hardhat: [`${eqPerennialOracleDir}/deployments/mainnet`],
     localhost: [`${eqPerennialOracleDir}/deployments/localhost`],
   },

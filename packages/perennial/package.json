@@ -26,6 +26,10 @@
     "deploy:fork:arbitrumGoerli": "FORK_ENABLED=true FORK_NETWORK=arbitrumGoerli hardhat deploy --network localhost",
     "node:fork:optimismGoerli": "FORK_ENABLED=true FORK_NETWORK=optimismGoerli NODE_INTERVAL_MINING=500 hardhat node",
     "deploy:fork:optimismGoerli": "FORK_ENABLED=true FORK_NETWORK=optimismGoerli hardhat deploy --network localhost",
+    "node:fork:arbitrum": "FORK_ENABLED=true FORK_NETWORK=arbitrum NODE_INTERVAL_MINING=500 hardhat node",
+    "deploy:fork:arbitrum": "FORK_ENABLED=true FORK_NETWORK=arbitrum hardhat deploy --network localhost",
+    "node:fork:optimism": "FORK_ENABLED=true FORK_NETWORK=optimism NODE_INTERVAL_MINING=500 hardhat node",
+    "deploy:fork:optimism": "FORK_ENABLED=true FORK_NETWORK=optimism hardhat deploy --network localhost",
     "node:fork:mainnet": "FORK_ENABLED=true FORK_NETWORK=mainnet NODE_INTERVAL_MINING=500 hardhat node",
     "deploy:fork:mainnet": "FORK_ENABLED=true FORK_NETWORK=mainnet hardhat deploy --network localhost",
     "prepack": "yarn clean && yarn build && find artifacts/contracts -name '*.dbg.json' -type f -delete"
