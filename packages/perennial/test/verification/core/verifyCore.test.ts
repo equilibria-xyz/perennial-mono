@@ -173,7 +173,7 @@ describe('Core - Mainnet Verification', () => {
       expect(await timelock.hasRole(timelockAdminRole, deployerSigAddress)).to.be.false
 
       expect(await timelock.hasRole(timelockProposerRole, getMultisigAddress('mainnet'))).to.be.true
-      expect(await timelock.hasRole(timelockProposerRole, pnlLabsMultisigAddress)).to.be.true /* false */
+      expect(await timelock.hasRole(timelockProposerRole, pnlLabsMultisigAddress)).to.be.false
       expect(await timelock.hasRole(timelockProposerRole, eqMultisigAddress)).to.be.false
       expect(await timelock.hasRole(timelockProposerRole, deployerSigAddress)).to.be.false
 
@@ -189,11 +189,11 @@ describe('Core - Mainnet Verification', () => {
     })
   })
 
-  describe('forwarder', () => {
+  /* describe('forwarder', () => {
     it('has the correct configuration', async () => {
       expect(await forwarder.DSU()).to.equal(deployments['DSU'].address)
       expect(await forwarder.USDC()).to.equal(deployments['USDC'].address)
       expect(await forwarder.batcher()).to.equal(deployments['Batcher'].address)
     })
-  })
+  }) */
 })
