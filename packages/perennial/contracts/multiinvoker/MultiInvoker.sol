@@ -68,6 +68,11 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
      * @param invocations The list of invocations to execute in order
      */
     function invoke(Invocation[] calldata invocations) external {
+        // ACTION TYPES
+        // 
+        // 0000 0000
+        // 
+
         for (uint256 i = 0; i < invocations.length; i++) {
             Invocation memory invocation = invocations[i];
 
@@ -136,7 +141,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
      * @param product Product to deposit funds for
      * @param amount Amount of DSU to deposit into the collateral account
      */
-    function depositTo(address account, IProduct product, UFixed18 amount) private {
+    function depositTo(address account, IProduct product, UFixed18 amount) internal {
         // Pull the token from the `msg.sender`
         DSU.pull(msg.sender, amount);
 
@@ -149,7 +154,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
      * @param receiver Address to receive the DSU
      * @param amount Amount of USDC to wrap
      */
-    function wrap(address receiver, UFixed18 amount) private {
+    function wrap(address receiver, UFixed18 amount) internal {
         // Pull USDC from the `msg.sender`
         USDC.pull(msg.sender, amount, true);
 
@@ -161,7 +166,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
      * @param receiver Address to receive the USDC
      * @param amount Amount of DSU to unwrap
      */
-    function unwrap(address receiver, UFixed18 amount) private {
+    function unwrap(address receiver, UFixed18 amount) internal {
         // Pull the token from the `msg.sender`
         DSU.pull(msg.sender, amount);
 
@@ -174,7 +179,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
      * @param product Product to deposit funds for
      * @param amount Amount of USDC to deposit into the collateral account
      */
-    function wrapAndDeposit(address account, IProduct product, UFixed18 amount) private {
+    function wrapAndDeposit(address account, IProduct product, UFixed18 amount) internal {
         // Pull USDC from the `msg.sender`
         USDC.pull(msg.sender, amount, true);
 
@@ -190,7 +195,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
      * @param product Product to withdraw funds for
      * @param amount Amount of DSU to withdraw from the collateral account
      */
-    function withdrawAndUnwrap(address receiver, IProduct product, UFixed18 amount) private {
+    function withdrawAndUnwrap(address receiver, IProduct product, UFixed18 amount) internal {
         // Withdraw the amount from the collateral account
         collateral.withdrawFrom(msg.sender, address(this), product, amount);
 
@@ -202,7 +207,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
      * @param receiver Address to receive the DSU
      * @param amount Amount of USDC to wrap
      */
-    function _wrap(address receiver, UFixed18 amount) private {
+    function _wrap(address receiver, UFixed18 amount) internal {
         // If the batcher is 0 or  doesn't have enough for this wrap, go directly to the reserve
         if (address(batcher) == address(0) || amount.gt(DSU.balanceOf(address(batcher)))) {
             reserve.mint(amount);
@@ -218,7 +223,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
      * @param receiver Address to receive the USDC
      * @param amount Amount of DSU to unwrap
      */
-    function _unwrap(address receiver, UFixed18 amount) private {
+    function _unwrap(address receiver, UFixed18 amount) internal {
         // If the batcher is 0 or doesn't have enough for this unwrap, go directly to the reserve
         if (address(batcher) == address(0) || amount.gt(USDC.balanceOf(address(batcher)))) {
             reserve.redeem(amount);
