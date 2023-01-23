@@ -1,6 +1,6 @@
 {
   "name": "@equilibria/perennial",
-  "version": "0.2.1",
+  "version": "1.2.0",
   "description": "Perennial Protocol Core",
   "files": [
     "contracts/interfaces",
@@ -35,7 +35,7 @@
   "dependencies": {
     "@chainlink/contracts": "0.5.1",
     "@equilibria/emptyset-batcher": "0.1.0",
-    "@equilibria/perennial-oracle": "0.1.0",
+    "@equilibria/perennial-oracle": "1.2.0",
     "@equilibria/root": "0.2.0",
     "@openzeppelin/contracts": "4.6.0"
   },
