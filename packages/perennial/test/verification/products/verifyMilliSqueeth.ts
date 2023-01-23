@@ -60,11 +60,11 @@ describe('Product - Milli-Squeeth - Mainnet Verification', () => {
     expect(payoffDefinition.payoffDirection).to.equal(0) // Long
     expect(payoffDefinition.data).to.equal('0x00000000000000000000560276178203095afe2b055eb06e4e9eaf4ce0b1') // Payoff Contract
 
-    expect(await mSqueeth['maintenance()']()).to.equal(utils.parseEther('0.35'))
+    expect(await mSqueeth['maintenance()']()).to.equal(utils.parseEther('0.2'))
     expect(await mSqueeth.fundingFee()).to.equal(0)
     expect(await mSqueeth.makerFee()).to.equal(0)
     expect(await mSqueeth.takerFee()).to.equal(0)
-    expect(await mSqueeth.makerLimit()).to.equal(utils.parseEther('450'))
+    expect(await mSqueeth.makerLimit()).to.equal(utils.parseEther('600'))
     expect(await mSqueeth.oracle()).to.equal(deployments['ChainlinkOracle_ETH'].address)
 
     const utilizationCurve = await mSqueeth.utilizationCurve()

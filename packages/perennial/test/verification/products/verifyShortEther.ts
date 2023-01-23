@@ -49,31 +49,29 @@ describe('Product - Short Ether - Mainnet Verification', () => {
   })
 
   it('has the correct parameters and configuration', async () => {
-    it('has the correct parameters and configuration', async () => {
-      expect(await shortEther.controller()).to.equal(controller.address)
+    expect(await shortEther.controller()).to.equal(controller.address)
 
-      expect(await shortEther.name()).to.equal('Ether')
-      expect(await shortEther.symbol()).to.equal('ETH')
-      expect(await shortEther.closed()).to.be.false
+    expect(await shortEther.name()).to.equal('Ether')
+    expect(await shortEther.symbol()).to.equal('ETH')
+    expect(await shortEther.closed()).to.be.false
 
-      const payoffDefinition = await shortEther.payoffDefinition()
-      expect(payoffDefinition.payoffType).to.equal(0) // Passthrough
-      expect(payoffDefinition.payoffDirection).to.equal(1) // Short
-      expect(payoffDefinition.data).to.equal('0x000000000000000000000000000000000000000000000000000000000000') // Unused
+    const payoffDefinition = await shortEther.payoffDefinition()
+    expect(payoffDefinition.payoffType).to.equal(0) // Passthrough
+    expect(payoffDefinition.payoffDirection).to.equal(1) // Short
+    expect(payoffDefinition.data).to.equal('0x000000000000000000000000000000000000000000000000000000000000') // Unused
 
-      expect(await shortEther['maintenance()']()).to.equal(utils.parseEther('0.2'))
-      expect(await shortEther.fundingFee()).to.equal(0)
-      expect(await shortEther.makerFee()).to.equal(0)
-      expect(await shortEther.takerFee()).to.equal(0)
-      expect(await shortEther.makerLimit()).to.equal(utils.parseEther('1200'))
-      expect(await shortEther.oracle()).to.equal(deployments['ChainlinkOracle_ETH'].address)
+    expect(await shortEther['maintenance()']()).to.equal(utils.parseEther('0.1'))
+    expect(await shortEther.fundingFee()).to.equal(0)
+    expect(await shortEther.makerFee()).to.equal(0)
+    expect(await shortEther.takerFee()).to.equal(0)
+    expect(await shortEther.makerLimit()).to.equal(utils.parseEther('1800'))
+    expect(await shortEther.oracle()).to.equal(deployments['ChainlinkOracle_ETH'].address)
 
-      const utilizationCurve = await shortEther.utilizationCurve()
-      expect(utilizationCurve.minRate).to.equal(utils.parseEther('0.02'))
-      expect(utilizationCurve.maxRate).to.equal(utils.parseEther('1.25'))
-      expect(utilizationCurve.targetRate).to.equal(utils.parseEther('0.25'))
-      expect(utilizationCurve.targetUtilization).to.equal(utils.parseEther('0.8'))
-    })
+    const utilizationCurve = await shortEther.utilizationCurve()
+    expect(utilizationCurve.minRate).to.equal(utils.parseEther('0.02'))
+    expect(utilizationCurve.maxRate).to.equal(utils.parseEther('1.25'))
+    expect(utilizationCurve.targetRate).to.equal(utils.parseEther('0.25'))
+    expect(utilizationCurve.targetUtilization).to.equal(utils.parseEther('0.8'))
   })
 
   it('opens positions', async () => {
