@@ -1,0 +1,1442 @@
+{
+  "address": "0xdb60626ff6cdc9db07d3625a93d21ddf0f8a688c",
+  "abi": [
+    {
+      "inputs": [],
+      "name": "CurveMathOutOfBoundsError",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "value",
+          "type": "uint256"
+        }
+      ],
+      "name": "Fixed18OverflowError",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "int256",
+          "name": "value",
+          "type": "int256"
+        }
+      ],
+      "name": "Fixed18PackingOverflowError",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "int256",
+          "name": "value",
+          "type": "int256"
+        }
+      ],
+      "name": "Fixed18PackingUnderflowError",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidControllerError",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "NotCollateralError",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "coordinatorId",
+          "type": "uint256"
+        }
+      ],
+      "name": "NotOwnerError",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "contract IProduct",
+          "name": "product",
+          "type": "address"
+        }
+      ],
+      "name": "NotProductError",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ParamProviderInvalidFundingFee",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ParamProviderInvalidMakerFee",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ParamProviderInvalidTakerFee",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "PausedError",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "enum PayoffDefinitionLib.PayoffType",
+          "name": "payoffType",
+          "type": "uint8"
+        },
+        {
+          "internalType": "bytes30",
+          "name": "data",
+          "type": "bytes30"
+        }
+      ],
+      "name": "PayoffDefinitionNotContract",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "enum PayoffDefinitionLib.PayoffType",
+          "name": "payoffType",
+          "type": "uint8"
+        },
+        {
+          "internalType": "enum PayoffDefinitionLib.PayoffDirection",
+          "name": "payoffDirection",
+          "type": "uint8"
+        }
+      ],
+      "name": "PayoffDefinitionUnsupportedTransform",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "PayoffProviderInvalidOracle",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "PayoffProviderInvalidPayoffDefinitionError",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ProductClosedError",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ProductDoubleSidedError",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ProductInLiquidationError",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ProductInsufficientCollateralError",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "UFixed18",
+          "name": "socializationFactor",
+          "type": "uint256"
+        }
+      ],
+      "name": "ProductInsufficientLiquidityError",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ProductInvalidOracle",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ProductMakerOverLimitError",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ProductNotOwnerError",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ProductOracleBootstrappingError",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ProductOverClosedError",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "value",
+          "type": "uint256"
+        }
+      ],
+      "name": "UFixed18PackingOverflowError",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "version",
+          "type": "uint256"
+        }
+      ],
+      "name": "UInitializableAlreadyInitializedError",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "UInitializableNotInitializingError",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "UInitializableZeroVersionError",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "UReentrancyGuardReentrantCallError",
+      "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "preVersion",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "toVersion",
+          "type": "uint256"
+        }
+      ],
+      "name": "AccountSettle",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bool",
+          "name": "newClosed",
+          "type": "bool"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "version",
+          "type": "uint256"
+        }
+      ],
+      "name": "ClosedUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "UFixed18",
+          "name": "newFundingFee",
+          "type": "uint256"
+        }
+      ],
+      "name": "FundingFeeUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "version",
+          "type": "uint256"
+        }
+      ],
+      "name": "Initialized",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "Fixed18",
+          "name": "minRate",
+          "type": "int256"
+        },
+        {
+          "indexed": false,
+          "internalType": "Fixed18",
+          "name": "maxRate",
+          "type": "int256"
+        },
+        {
+          "indexed": false,
+          "internalType": "Fixed18",
+          "name": "targetRate",
+          "type": "int256"
+        },
+        {
+          "indexed": false,
+          "internalType": "UFixed18",
+          "name": "targetUtilization",
+          "type": "uint256"
+        }
+      ],
+      "name": "JumpRateUtilizationCurveUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "UFixed18",
+          "name": "newMaintenance",
+          "type": "uint256"
+        }
+      ],
+      "name": "MaintenanceUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "version",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "UFixed18",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "MakeClosed",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "version",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "UFixed18",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "MakeOpened",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "UFixed18",
+          "name": "newMakerFee",
+          "type": "uint256"
+        }
+      ],
+      "name": "MakerFeeUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "UFixed18",
+          "name": "newMakerLimit",
+          "type": "uint256"
+        }
+      ],
+      "name": "MakerLimitUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "preVersion",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "toVersion",
+          "type": "uint256"
+        }
+      ],
+      "name": "Settle",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "version",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "UFixed18",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "TakeClosed",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "version",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "UFixed18",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "TakeOpened",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "UFixed18",
+          "name": "newTakerFee",
+          "type": "uint256"
+        }
+      ],
+      "name": "TakerFeeUpdated",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "oracleVersion",
+          "type": "uint256"
+        }
+      ],
+      "name": "atVersion",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "version",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "timestamp",
+              "type": "uint256"
+            },
+            {
+              "internalType": "Fixed18",
+              "name": "price",
+              "type": "int256"
+            }
+          ],
+          "internalType": "struct IOracleProvider.OracleVersion",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "closeAll",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "UFixed18",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "closeMake",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "UFixed18",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "closeTake",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "closed",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "controller",
+      "outputs": [
+        {
+          "internalType": "contract IController",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "currentVersion",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "version",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "timestamp",
+              "type": "uint256"
+            },
+            {
+              "internalType": "Fixed18",
+              "name": "price",
+              "type": "int256"
+            }
+          ],
+          "internalType": "struct IOracleProvider.OracleVersion",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "fundingFee",
+      "outputs": [
+        {
+          "internalType": "UFixed18",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "string",
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "symbol",
+              "type": "string"
+            },
+            {
+              "components": [
+                {
+                  "internalType": "enum PayoffDefinitionLib.PayoffType",
+                  "name": "payoffType",
+                  "type": "uint8"
+                },
+                {
+                  "internalType": "enum PayoffDefinitionLib.PayoffDirection",
+                  "name": "payoffDirection",
+                  "type": "uint8"
+                },
+                {
+                  "internalType": "bytes30",
+                  "name": "data",
+                  "type": "bytes30"
+                }
+              ],
+              "internalType": "struct PayoffDefinition",
+              "name": "payoffDefinition",
+              "type": "tuple"
+            },
+            {
+              "internalType": "contract IOracleProvider",
+              "name": "oracle",
+              "type": "address"
+            },
+            {
+              "internalType": "UFixed18",
+              "name": "maintenance",
+              "type": "uint256"
+            },
+            {
+              "internalType": "UFixed18",
+              "name": "fundingFee",
+              "type": "uint256"
+            },
+            {
+              "internalType": "UFixed18",
+              "name": "makerFee",
+              "type": "uint256"
+            },
+            {
+              "internalType": "UFixed18",
+              "name": "takerFee",
+              "type": "uint256"
+            },
+            {
+              "internalType": "UFixed18",
+              "name": "makerLimit",
+              "type": "uint256"
+            },
+            {
+              "components": [
+                {
+                  "internalType": "PackedFixed18",
+                  "name": "minRate",
+                  "type": "int128"
+                },
+                {
+                  "internalType": "PackedFixed18",
+                  "name": "maxRate",
+                  "type": "int128"
+                },
+                {
+                  "internalType": "PackedFixed18",
+                  "name": "targetRate",
+                  "type": "int128"
+                },
+                {
+                  "internalType": "PackedUFixed18",
+                  "name": "targetUtilization",
+                  "type": "uint128"
+                }
+              ],
+              "internalType": "struct JumpRateUtilizationCurve",
+              "name": "utilizationCurve",
+              "type": "tuple"
+            }
+          ],
+          "internalType": "struct IProduct.ProductInfo",
+          "name": "productInfo_",
+          "type": "tuple"
+        }
+      ],
+      "name": "initialize",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "isClosed",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "isLiquidating",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "latestVersion",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "latestVersion",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "maintenance",
+      "outputs": [
+        {
+          "internalType": "UFixed18",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "maintenance",
+      "outputs": [
+        {
+          "internalType": "UFixed18",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "maintenanceNext",
+      "outputs": [
+        {
+          "internalType": "UFixed18",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "makerFee",
+      "outputs": [
+        {
+          "internalType": "UFixed18",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "makerLimit",
+      "outputs": [
+        {
+          "internalType": "UFixed18",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "name",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "UFixed18",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "openMake",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "UFixed18",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "openTake",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "oracle",
+      "outputs": [
+        {
+          "internalType": "contract IOracleProvider",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "payoffDefinition",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "enum PayoffDefinitionLib.PayoffType",
+              "name": "payoffType",
+              "type": "uint8"
+            },
+            {
+              "internalType": "enum PayoffDefinitionLib.PayoffDirection",
+              "name": "payoffDirection",
+              "type": "uint8"
+            },
+            {
+              "internalType": "bytes30",
+              "name": "data",
+              "type": "bytes30"
+            }
+          ],
+          "internalType": "struct PayoffDefinition",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "position",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "UFixed18",
+              "name": "maker",
+              "type": "uint256"
+            },
+            {
+              "internalType": "UFixed18",
+              "name": "taker",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct Position",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "oracleVersion",
+          "type": "uint256"
+        }
+      ],
+      "name": "positionAtVersion",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "UFixed18",
+              "name": "maker",
+              "type": "uint256"
+            },
+            {
+              "internalType": "UFixed18",
+              "name": "taker",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct Position",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "pre",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "oracleVersion",
+              "type": "uint256"
+            },
+            {
+              "components": [
+                {
+                  "internalType": "UFixed18",
+                  "name": "maker",
+                  "type": "uint256"
+                },
+                {
+                  "internalType": "UFixed18",
+                  "name": "taker",
+                  "type": "uint256"
+                }
+              ],
+              "internalType": "struct Position",
+              "name": "openPosition",
+              "type": "tuple"
+            },
+            {
+              "components": [
+                {
+                  "internalType": "UFixed18",
+                  "name": "maker",
+                  "type": "uint256"
+                },
+                {
+                  "internalType": "UFixed18",
+                  "name": "taker",
+                  "type": "uint256"
+                }
+              ],
+              "internalType": "struct Position",
+              "name": "closePosition",
+              "type": "tuple"
+            }
+          ],
+          "internalType": "struct PrePosition",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "pre",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "oracleVersion",
+              "type": "uint256"
+            },
+            {
+              "components": [
+                {
+                  "internalType": "UFixed18",
+                  "name": "maker",
+                  "type": "uint256"
+                },
+                {
+                  "internalType": "UFixed18",
+                  "name": "taker",
+                  "type": "uint256"
+                }
+              ],
+              "internalType": "struct Position",
+              "name": "openPosition",
+              "type": "tuple"
+            },
+            {
+              "components": [
+                {
+                  "internalType": "UFixed18",
+                  "name": "maker",
+                  "type": "uint256"
+                },
+                {
+                  "internalType": "UFixed18",
+                  "name": "taker",
+                  "type": "uint256"
+                }
+              ],
+              "internalType": "struct Position",
+              "name": "closePosition",
+              "type": "tuple"
+            }
+          ],
+          "internalType": "struct PrePosition",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "UFixed18",
+              "name": "maker",
+              "type": "uint256"
+            },
+            {
+              "internalType": "UFixed18",
+              "name": "taker",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct Position",
+          "name": "position_",
+          "type": "tuple"
+        }
+      ],
+      "name": "rate",
+      "outputs": [
+        {
+          "internalType": "Fixed18",
+          "name": "",
+          "type": "int256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "settle",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "settleAccount",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "oracleVersion",
+          "type": "uint256"
+        }
+      ],
+      "name": "shareAtVersion",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "Fixed18",
+              "name": "maker",
+              "type": "int256"
+            },
+            {
+              "internalType": "Fixed18",
+              "name": "taker",
+              "type": "int256"
+            }
+          ],
+          "internalType": "struct Accumulator",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "symbol",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "takerFee",
+      "outputs": [
+        {
+          "internalType": "UFixed18",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bool",
+          "name": "newClosed",
+          "type": "bool"
+        }
+      ],
+      "name": "updateClosed",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "UFixed18",
+          "name": "newFundingFee",
+          "type": "uint256"
+        }
+      ],
+      "name": "updateFundingFee",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "UFixed18",
+          "name": "newMaintenance",
+          "type": "uint256"
+        }
+      ],
+      "name": "updateMaintenance",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "UFixed18",
+          "name": "newMakerFee",
+          "type": "uint256"
+        }
+      ],
+      "name": "updateMakerFee",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "UFixed18",
+          "name": "newMakerLimit",
+          "type": "uint256"
+        }
+      ],
+      "name": "updateMakerLimit",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "UFixed18",
+          "name": "newTakerFee",
+          "type": "uint256"
+        }
+      ],
+      "name": "updateTakerFee",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "PackedFixed18",
+              "name": "minRate",
+              "type": "int128"
+            },
+            {
+              "internalType": "PackedFixed18",
+              "name": "maxRate",
+              "type": "int128"
+            },
+            {
+              "internalType": "PackedFixed18",
+              "name": "targetRate",
+              "type": "int128"
+            },
+            {
+              "internalType": "PackedUFixed18",
+              "name": "targetUtilization",
+              "type": "uint128"
+            }
+          ],
+          "internalType": "struct JumpRateUtilizationCurve",
+          "name": "newUtilizationCurve",
+          "type": "tuple"
+        }
+      ],
+      "name": "updateUtilizationCurve",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "utilizationCurve",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "PackedFixed18",
+              "name": "minRate",
+              "type": "int128"
+            },
+            {
+              "internalType": "PackedFixed18",
+              "name": "maxRate",
+              "type": "int128"
+            },
+            {
+              "internalType": "PackedFixed18",
+              "name": "targetRate",
+              "type": "int128"
+            },
+            {
+              "internalType": "PackedUFixed18",
+              "name": "targetUtilization",
+              "type": "uint128"
+            }
+          ],
+          "internalType": "struct JumpRateUtilizationCurve",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "oracleVersion",
+          "type": "uint256"
+        }
+      ],
+      "name": "valueAtVersion",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "Fixed18",
+              "name": "maker",
+              "type": "int256"
+            },
+            {
+              "internalType": "Fixed18",
+              "name": "taker",
+              "type": "int256"
+            }
+          ],
+          "internalType": "struct Accumulator",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ]
+}
