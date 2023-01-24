@@ -68,9 +68,9 @@ describe('Product - Long Ether - Mainnet Verification', () => {
     expect(await longEther.oracle()).to.equal(deployments['ChainlinkOracle_ETH'].address)
 
     const utilizationCurve = await longEther.utilizationCurve()
-    expect(utilizationCurve.minRate).to.equal(utils.parseEther('0.02'))
-    expect(utilizationCurve.maxRate).to.equal(utils.parseEther('1.25'))
-    expect(utilizationCurve.targetRate).to.equal(utils.parseEther('0.25'))
+    expect(utilizationCurve.minRate).to.equal(utils.parseEther('0.00'))
+    expect(utilizationCurve.maxRate).to.equal(utils.parseEther('0.80'))
+    expect(utilizationCurve.targetRate).to.equal(utils.parseEther('0.06'))
     expect(utilizationCurve.targetUtilization).to.equal(utils.parseEther('0.8'))
   })
 

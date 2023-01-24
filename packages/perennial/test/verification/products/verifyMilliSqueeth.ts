@@ -5,6 +5,7 @@ import { Deployment } from 'hardhat-deploy/types'
 import { Controller, Controller__factory, Product, Product__factory } from '../../../types/generated'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import opensPositions from '../shared/opensPosition.shared'
+import { getMultisigAddress } from '../../../../common/testutil/constants'
 
 const { ethers } = HRE
 
@@ -68,13 +69,13 @@ describe('Product - Milli-Squeeth - Mainnet Verification', () => {
     expect(await mSqueeth.oracle()).to.equal(deployments['ChainlinkOracle_ETH'].address)
 
     const utilizationCurve = await mSqueeth.utilizationCurve()
-    expect(utilizationCurve.minRate).to.equal(utils.parseEther('0.55'))
-    expect(utilizationCurve.maxRate).to.equal(utils.parseEther('14'))
-    expect(utilizationCurve.targetRate).to.equal(utils.parseEther('.95'))
+    expect(utilizationCurve.minRate).to.equal(utils.parseEther('0.30'))
+    expect(utilizationCurve.maxRate).to.equal(utils.parseEther('12'))
+    expect(utilizationCurve.targetRate).to.equal(utils.parseEther('.70'))
     expect(utilizationCurve.targetUtilization).to.equal(utils.parseEther('0.8'))
 
     expect(await controller['owner(address)'](mSqueeth.address)).to.equal(
-      '0xA20ea565cD799e01A86548af5a2929EB7c767fC9' /* '0x609FFF64429e2A275a879e5C50e415cec842c629' */,
+      getMultisigAddress('mainnet') /* '0x609FFF64429e2A275a879e5C50e415cec842c629' */,
     )
   })
 
