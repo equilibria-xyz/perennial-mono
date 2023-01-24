@@ -1,6 +1,6 @@
 {
   "name": "@equilibria/perennial-oracle",
-  "version": "0.1.0",
+  "version": "1.2.0",
   "description": "Perennial oracle contracts",
   "files": [
     "contracts",
