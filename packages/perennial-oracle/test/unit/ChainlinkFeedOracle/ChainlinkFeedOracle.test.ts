@@ -1,5 +1,5 @@
 import { smock, FakeContract } from '@defi-wonderland/smock'
-import { utils } from 'ethers'
+import { BigNumber, BigNumberish, utils } from 'ethers'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { expect } from 'chai'
 import HRE from 'hardhat'
@@ -201,49 +201,53 @@ describe('ChainlinkFeedOracle', () => {
         expect(atVersion.version).to.equal(26)
       })
 
-      it('syncs with new phase with walkback', async () => {
+      it('syncs with new phase with search', async () => {
+        // No next round in the current phase
         const phase1NextRound = buildChainlinkRoundId(INITIAL_PHASE, INITIAL_ROUND + 25)
         aggregatorProxy.getRoundData.whenCalledWith(phase1NextRound).reverts()
 
         // This is the first seen round of the new phase
         // Phase 1 was (36 - 12 + 1) = 25 rounds long (versions 0 to 24)
-        // Phase 2 starts at version 25 which is 2 rounds before this due to walkback, so this is version 27
+        // Phase 2 starts at version 25, which is 2 rounds before 345
+        const phase2SwitchoverRound = buildChainlinkRoundId(INITIAL_PHASE + 1, 343)
         const roundId = buildChainlinkRoundId(INITIAL_PHASE + 1, 345)
+
+        // Setup the binary search logic. If the searched for round is below 343, then return TIMESTAMP_START
+        // If the round is after 343, return >> TIMESTAMP_START
+        // If the round is 343, return slightly greater than TIMESTAMP_START
+        aggregatorProxy.getRoundData.returns((args: BigNumberish[]) => {
+          const roundRequested = BigNumber.from(args[0])
+          if (roundRequested.eq(roundId)) {
+            return [
+              roundId,
+              ethers.BigNumber.from(133300000000),
+              TIMESTAMP_START + HOUR,
+              TIMESTAMP_START + HOUR,
+              roundId,
+            ]
+          } else if (roundRequested.gt(phase2SwitchoverRound)) {
+            return [roundRequested, 0, TIMESTAMP_START + 2 * HOUR, TIMESTAMP_START + 2 * HOUR, roundRequested]
+          } else if (roundRequested.lt(phase2SwitchoverRound)) {
+            return [roundRequested, 0, TIMESTAMP_START, TIMESTAMP_START, roundRequested]
+          }
+
+          return [
+            phase2SwitchoverRound,
+            ethers.BigNumber.from(133200000000),
+            TIMESTAMP_START + 1,
+            TIMESTAMP_START + 1,
+            phase2SwitchoverRound,
+          ]
+        })
+
         aggregatorProxy.latestRoundData
           .whenCalledWith()
-          .returns([roundId, ethers.BigNumber.from(133300000000), TIMESTAMP_START, TIMESTAMP_START + HOUR, roundId])
-
-        aggregatorProxy.getRoundData
-          .whenCalledWith(roundId)
-          .returns([roundId, ethers.BigNumber.from(133300000000), TIMESTAMP_START, TIMESTAMP_START + HOUR, roundId])
-
-        // Walk back in phase until crossover point
-        aggregatorProxy.getRoundData
-          .whenCalledWith(roundId.sub(1))
           .returns([
-            roundId.sub(1),
-            ethers.BigNumber.from(122200000000),
+            roundId,
+            ethers.BigNumber.from(133300000000),
             TIMESTAMP_START + HOUR,
             TIMESTAMP_START + HOUR,
-            roundId.sub(1),
-          ])
-        aggregatorProxy.getRoundData
-          .whenCalledWith(roundId.sub(2))
-          .returns([
-            roundId.sub(1),
-            ethers.BigNumber.from(122200000000),
-            TIMESTAMP_START + HOUR,
-            TIMESTAMP_START + HOUR,
-            roundId.sub(1),
-          ])
-        aggregatorProxy.getRoundData
-          .whenCalledWith(roundId.sub(3))
-          .returns([
-            roundId.sub(1),
-            ethers.BigNumber.from(122200000000),
-            TIMESTAMP_START - HOUR,
-            TIMESTAMP_START - HOUR,
-            roundId.sub(2),
+            roundId,
           ])
 
         const returnValue = await oracle.callStatic.sync()
@@ -262,15 +266,92 @@ describe('ChainlinkFeedOracle', () => {
         expect(atVersion.price).to.equal(utils.parseEther('1333'))
         expect(atVersion.timestamp).to.equal(TIMESTAMP_START + HOUR)
         expect(atVersion.version).to.equal(27)
+
+        const atVersion25 = await oracle.atVersion(25)
+        expect(atVersion25.price).to.equal(utils.parseEther('1332'))
+        expect(atVersion25.timestamp).to.equal(TIMESTAMP_START + 1)
+        expect(atVersion25.version).to.equal(25)
       })
 
-      it('reverts if syncing multiple phases in a single sync call', async () => {
-        const roundId = buildChainlinkRoundId(INITIAL_PHASE + 2, 345)
+      it('syncs with new phase that is 5 greater current phase with search', async () => {
+        const phase1NextRound = buildChainlinkRoundId(INITIAL_PHASE, INITIAL_ROUND + 25)
+        aggregatorProxy.getRoundData.whenCalledWith(phase1NextRound).reverts()
+
+        // This is the first seen round of Phase 6
+        // Phase 1 was (36 - 12 + 1) = 25 rounds long (versions 0 to 24)
+        // Phase 4 contains version 25
+        // Phase 6 starts at version 26
+        const roundId = buildChainlinkRoundId(INITIAL_PHASE + 5, 345)
+        const phase4SwitchoverRound = buildChainlinkRoundId(INITIAL_PHASE + 3, 112)
+
+        // Setup the binary search logic for phase 4
+        // Phase 2 and 5 are empty and are skipped
+        // If the round is equal to 6,345, return TIMESTAMP_START + HOUR
+        // If the round is below    4,112, return TIMESTAMP_START
+        // If the round is after    4,112, return TIMESTAMP_START + 2 * HOUR
+        // If the round is equal to 4,112, return TIMESTAMP_START + 1
+        aggregatorProxy.getRoundData.returns((args: BigNumberish[]) => {
+          const roundRequested = BigNumber.from(args[0])
+
+          if (
+            // Phases 2 and 5 are empty
+            roundRequested.eq(buildChainlinkRoundId(INITIAL_PHASE + 1, 1)) ||
+            roundRequested.eq(buildChainlinkRoundId(INITIAL_PHASE + 4, 1))
+          ) {
+            return [0, 0, 0, 0, 0]
+          } else if (roundRequested.eq(roundId)) {
+            return [
+              roundId,
+              ethers.BigNumber.from(133300000000),
+              TIMESTAMP_START + HOUR,
+              TIMESTAMP_START + HOUR,
+              roundId,
+            ]
+          } else if (roundRequested.gt(phase4SwitchoverRound)) {
+            return [roundRequested, 0, TIMESTAMP_START + 2 * HOUR, TIMESTAMP_START + 2 * HOUR, roundRequested]
+          } else if (roundRequested.lt(phase4SwitchoverRound)) {
+            return [roundRequested, 0, TIMESTAMP_START, TIMESTAMP_START, roundRequested]
+          }
+          return [
+            phase4SwitchoverRound,
+            ethers.BigNumber.from(133200000000),
+            TIMESTAMP_START + 1,
+            TIMESTAMP_START + 1,
+            phase4SwitchoverRound,
+          ]
+        })
+
         aggregatorProxy.latestRoundData
           .whenCalledWith()
-          .returns([roundId, ethers.BigNumber.from(133300000000), TIMESTAMP_START, TIMESTAMP_START + HOUR, roundId])
+          .returns([
+            roundId,
+            ethers.BigNumber.from(133300000000),
+            TIMESTAMP_START + HOUR,
+            TIMESTAMP_START + HOUR,
+            roundId,
+          ])
 
-        await expect(oracle.connect(user).sync()).to.be.revertedWithCustomError(oracle, 'UnableToSyncError')
+        const returnValue = await oracle.callStatic.sync()
+        await oracle.connect(user).sync()
+
+        expect(returnValue.price).to.equal(utils.parseEther('1333'))
+        expect(returnValue.timestamp).to.equal(TIMESTAMP_START + HOUR)
+        expect(returnValue.version).to.equal(26)
+
+        const currentVersion = await oracle.currentVersion()
+        expect(currentVersion.price).to.equal(utils.parseEther('1333'))
+        expect(currentVersion.timestamp).to.equal(TIMESTAMP_START + HOUR)
+        expect(currentVersion.version).to.equal(26)
+
+        const atVersion = await oracle.atVersion(26)
+        expect(atVersion.price).to.equal(utils.parseEther('1333'))
+        expect(atVersion.timestamp).to.equal(TIMESTAMP_START + HOUR)
+        expect(atVersion.version).to.equal(26)
+
+        const atVersion25 = await oracle.atVersion(25)
+        expect(atVersion25.price).to.equal(utils.parseEther('1332'))
+        expect(atVersion25.timestamp).to.equal(TIMESTAMP_START + 1)
+        expect(atVersion25.version).to.equal(25)
       })
 
       it('reverts on invalid round', async () => {

@@ -3,6 +3,7 @@ pragma solidity ^0.8.13;
 
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV2V3Interface.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorProxyInterface.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 import "./ChainlinkRound.sol";
 
 /// @dev ChainlinkAggregator type
@@ -79,17 +80,91 @@ library ChainlinkAggregatorLib {
             // pass
         }
 
-        // lastSyncedRound is the last round it's phase before latestRound, so we need to find where the next phase starts
+        // lastSyncedRound is the last round in it's phase before latestRound, so we need to find where the next phase starts
         // The next phase should start at the round that is closest to but after lastSyncedRound.timestamp
-        (,,,uint256 lastSyncedRoundTimestamp,) = proxy.getRoundData(uint80(lastSyncedRoundId));
-        nextPhaseStartingRoundId = latestRound.roundId;
-        uint256 updatedAt = latestRound.timestamp;
-        // Walk back in the new phase until we dip below the lastSyncedRound.timestamp
-        while (updatedAt >= lastSyncedRoundTimestamp) {
-            nextPhaseStartingRoundId--;
-            (,,,updatedAt,) = proxy.getRoundData(uint80(nextPhaseStartingRoundId));
+        ChainlinkRound memory lastSyncedRound = getRound(self, lastSyncedRoundId);
+        uint16 phaseToSearch = lastSyncedRound.phaseId() + 1;
+        while (nextPhaseStartingRoundId == 0) {
+            nextPhaseStartingRoundId = getStartingRoundId(self, phaseToSearch, lastSyncedRound.timestamp);
+            phaseToSearch += 1;
         }
 
-        return ((lastSyncedRoundId - startingRoundId) + 1, nextPhaseStartingRoundId + 1);
+        return ((lastSyncedRoundId - startingRoundId) + 1, nextPhaseStartingRoundId);
+    }
+
+    /**
+     * @notice Returns the round ID closest to but greater than targetTimestamp for the specified phase ID
+     * @param self Chainlink Feed Aggregator to operate on
+     * @param phaseId The specific phase to fetch data for
+     * @param targetTimestamp timestamp to search for
+     * @dev Assumes the phase ends at the aggregators latestRound or earlier
+     * @return The number of rounds in the phase
+     */
+    function getStartingRoundId(ChainlinkAggregator self, uint16 phaseId, uint256 targetTimestamp)
+    internal view returns (uint256) {
+        AggregatorProxyInterface proxy = AggregatorProxyInterface(ChainlinkAggregator.unwrap(self));
+
+        (,,,uint256 startTimestamp,) = proxy.getRoundData(uint80(_aggregatorRoundIdToProxyRoundId(phaseId, 1)));
+        if (startTimestamp == 0) return 0; // Empty phase
+
+        return _search(proxy, phaseId, targetTimestamp, startTimestamp, 1);
+    }
+
+    /**
+     * Searches the given chainlink proxy for a round which has a timestamp which is as close to but greater than
+     * the `targetTimestamp`
+     * @param proxy Chainlink Proxy to search within
+     * @param phaseId Phase to search for round
+     * @param targetTimestamp Minimum timestamp value for found round
+     * @param minTimestamp Starting timestamp value
+     * @param minRoundId Starting round ID
+     */
+    function _search(AggregatorProxyInterface proxy, uint16 phaseId, uint256 targetTimestamp, uint256 minTimestamp, uint256 minRoundId) private view returns (uint256) {
+        uint256 maxRoundId = minRoundId + 1000; // Start 1000 rounds away when searching for maximum
+        uint256 maxTimestamp = _tryGetProxyRoundData(proxy, phaseId, uint80(maxRoundId));
+        while (maxTimestamp < targetTimestamp) {
+            minRoundId = maxRoundId;
+            minTimestamp = maxTimestamp;
+            maxRoundId = maxRoundId * 2; // Find bounds of phase by multiplying the max round by 2
+            maxTimestamp = _tryGetProxyRoundData(proxy, phaseId, uint80(maxRoundId));
+        }
+
+        while (minRoundId + 1 < maxRoundId) {
+            uint256 midRound = Math.average(minRoundId, maxRoundId);
+            uint256 midTimestamp = _tryGetProxyRoundData(proxy, phaseId, uint80(midRound));
+            if (midTimestamp > targetTimestamp) {
+                maxTimestamp = midTimestamp;
+                maxRoundId = midRound;
+            } else {
+                minTimestamp = midTimestamp;
+                minRoundId = midRound;
+            }
+        }
+
+        // If the found timestamp is not greater than target timestamp, then the desired round does
+        // not exist in this phase
+        if (maxTimestamp <= targetTimestamp) return 0;
+
+        return _aggregatorRoundIdToProxyRoundId(phaseId, uint80(maxRoundId));
+    }
+
+    function _tryGetProxyRoundData(AggregatorProxyInterface proxy, uint16 phaseId, uint80 tryRound) private view returns (uint256) {
+        try proxy.getRoundData(uint80(_aggregatorRoundIdToProxyRoundId(phaseId, tryRound))) returns (uint80,int256,uint256,uint256 timestamp,uint80) {
+            if (timestamp > 0) return timestamp;
+        } catch  {
+            // pass
+        }
+        return type(uint256).max;
+    }
+
+    /**
+     * @notice Convert an aggregator round ID into a proxy round ID for the given phase
+     * @dev Follows the logic specified in https://docs.chain.link/data-feeds/price-feeds/historical-data#roundid-in-proxy
+     * @param phaseId phase ID for the given aggregator round
+     * @param aggregatorRoundId round id for the aggregator round
+     * @return Proxy roundId
+     */
+    function _aggregatorRoundIdToProxyRoundId(uint16 phaseId, uint80 aggregatorRoundId) private pure returns (uint256) {
+        return (uint256(phaseId) << 64) + aggregatorRoundId;
     }
 }

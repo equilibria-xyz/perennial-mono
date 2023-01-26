@@ -70,24 +70,42 @@ contract ChainlinkFeedOracle is IOracleProvider {
         // Revert if the round id is 0
         if (uint64(round.roundId) == 0) revert InvalidOracleRound();
 
-        // If there is more than 1 phase to update, revert
-        if (round.phaseId() - _latestPhaseId() > 1) {
-            revert UnableToSyncError();
-        }
-
         // Update phase annotation when new phase detected
-        while (round.phaseId() > _latestPhaseId()) {
+        if (round.phaseId() > _latestPhaseId()) {
             // Get the round count for the latest phase
             (uint256 phaseRoundCount, uint256 nextStartingRoundId) = aggregator.getPhaseSwitchoverData(
                 _phases[_latestPhaseId()].startingRoundId, lastSyncedRoundId, round);
+            uint16 nextPhase = uint16(nextStartingRoundId >> 64);
 
-            // The starting version for the next phase is startingVersionForLatestPhase + roundCount
+            // If the next phase is not immediately after the latestPhase, push empty phases
+            // These phases will be invalid if queried
+            while (nextPhase - 1 > _latestPhaseId()) {
+                _phases.push(Phase(_phases[_latestPhaseId()].startingVersion, uint128(0)));
+            }
+
+            // The starting version for the next phase is the phaseRoundCount plus startingVersion
             _phases.push(
                 Phase(
                     uint128(phaseRoundCount) + _phases[_latestPhaseId()].startingVersion,
                     uint128(nextStartingRoundId)
                 )
             );
+
+            // If the intermediary phase is not the the current round's phase, fill in the intermediary phases
+            if (nextPhase < round.phaseId()) {
+                 // After the intermediary phase is found, the phases up until round.phaseId can be skipped
+                while (round.phaseId() - 1 > _latestPhaseId()) {
+                    _phases.push(Phase(_phases[_latestPhaseId()].startingVersion, uint128(0)));
+                }
+
+                // And finally push the current phase
+                _phases.push(
+                    Phase(
+                        1 + _phases[_latestPhaseId()].startingVersion,
+                        uint128(round.roundId)
+                    )
+                );
+            }
         }
 
         lastSyncedRoundId = round.roundId;
@@ -155,7 +173,7 @@ contract ChainlinkFeedOracle is IOracleProvider {
     function _versionToPhase(uint256 version) private view returns (Phase memory phase) {
         uint256 phaseId = _latestPhaseId();
         phase = _phases[phaseId];
-        while (uint256(phase.startingVersion) > version) {
+        while (phase.startingRoundId == 0 || uint256(phase.startingVersion) > version) {
             phaseId--;
             phase = _phases[phaseId];
         }
