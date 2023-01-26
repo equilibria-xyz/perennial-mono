@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.13;
 
+import "hardhat/console.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV2V3Interface.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorProxyInterface.sol";
 import "./ChainlinkRound.sol";
@@ -48,33 +49,48 @@ library ChainlinkAggregatorLib {
 
 
     /**
-     * @notice Returns the round count for the specified phase ID
+     * @notice Returns the round count and next phase starting round for the lastSyncedRound phase
      * @param self Chainlink Feed Aggregator to operate on
-     * @param phaseId The specific phase to fetch data for
      * @param startingRoundId starting roundId for the aggregator proxy
-     * @param maxTimestamp maximum timestamp allowed for the last round of the phase
-     * @dev Assumes the phase ends at the aggregators latestRound or earlier
-     * @return The number of rounds in the phase
+     * @param lastSyncedRound last known round for the proxy
+     * @param latestRound latest round from the proxy
+     * @return roundCount The number of rounds in the phase
+     * @return nextStartingRoundId Whether or not the next round is in this phase
      */
-    function getRoundCount(ChainlinkAggregator self, uint16 phaseId, uint256 startingRoundId, uint256 maxTimestamp)
-    internal view returns (uint256) {
+    function getPhaseSwitchoverRounds(
+        ChainlinkAggregator self,
+        uint256 startingRoundId,
+        ChainlinkRound memory lastSyncedRound,
+        ChainlinkRound memory latestRound
+    ) internal view returns (uint256 roundCount, uint256 nextStartingRoundId) {
         AggregatorProxyInterface proxy = AggregatorProxyInterface(ChainlinkAggregator.unwrap(self));
-        AggregatorV2V3Interface agg = AggregatorV2V3Interface(proxy.phaseAggregators(phaseId));
 
-        (uint80 aggRoundId,,,uint256 updatedAt,) = agg.latestRoundData();
-        // If the aggregator round ID is 0, this is an empty phase
-        if (aggRoundId == 0) return 0;
-
-        // If the latest round for the aggregator is after maxTimestamp, walk back until we find the
-        // correct round
-        while (updatedAt > maxTimestamp) {
-            aggRoundId--;
-            (,,,updatedAt,) = agg.getRoundData(aggRoundId);
+        // Try to get the immediate next round in the same phase. If this errors, we know that the phase has ended
+        try proxy.getRoundData(uint80(lastSyncedRound.roundId + 1)) returns (uint80 nextRoundId,int256,uint256,uint256 nextUpdatedAt,uint80) {
+            // If the next round in this phase is before the latest round, then we can safely mark that
+            // as the end of the phase, and the latestRound as the start of the new phase
+            // Else the next round in this phase is _after_ the latest round, then the immediate
+            // next round is latestRound (the phase switchover happened at lastSyncedRound)
+            if (nextUpdatedAt < latestRound.timestamp) {
+                return ((nextRoundId - startingRoundId) + 1, latestRound.roundId);
+            } else {
+                return ((lastSyncedRound.roundId - startingRoundId) + 1, latestRound.roundId);
+            }
+        } catch  {
+            // pass
         }
 
-        // Convert the aggregator round to a proxy round
-        uint256 latestRoundId = _aggregatorRoundIdToProxyRoundId(phaseId, aggRoundId);
-        return uint256(latestRoundId - startingRoundId + 1);
+        // lastSyncedRound is the last round it's phase, so we need to find where the next phase starts
+        // The next phase should start at the round that is closest to but after lastSyncedRound.timestamp
+        uint256 nextPhaseStartingRoundId = latestRound.roundId;
+        uint256 updatedAt = latestRound.timestamp;
+        // Walk back in the new phase until we dip below the lastSyncedRound.timestamp
+        while (updatedAt >= lastSyncedRound.timestamp) {
+            nextPhaseStartingRoundId--;
+            (,,,updatedAt,) = proxy.getRoundData(uint80(nextPhaseStartingRoundId));
+        }
+
+        return ((lastSyncedRound.roundId - startingRoundId) + 1, nextPhaseStartingRoundId + 1);
     }
 
     /**
