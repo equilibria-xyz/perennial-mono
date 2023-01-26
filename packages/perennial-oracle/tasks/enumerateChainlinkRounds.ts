@@ -42,7 +42,7 @@ export default task('enumerateChainlinkRounds', 'Enumerates all of the Rounds fo
       )
       await new Promise(resolve => setTimeout(resolve, 500))
       const str = JSON.stringify(data)
-      await appendFile(args.output, ',' + str.substring(1, str.length - 1))
+      await appendFile(args.output, (index === 0 ? '' : ',') + str.substring(1, str.length - 1))
     }
 
     await appendFile(args.output, ']')

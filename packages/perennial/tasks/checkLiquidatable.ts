@@ -1,4 +1,5 @@
 import '@nomiclabs/hardhat-ethers'
+import { formatEther } from 'ethers/lib/utils'
 import { task } from 'hardhat/config'
 import { HardhatRuntimeEnvironment, TaskArguments } from 'hardhat/types'
 
@@ -19,7 +20,14 @@ export default task('checkLiquidatable', 'Checks all Product users to see if liq
       const account = users[i]
       const liquidatable = await lens.callStatic.liquidatable(account, args.product)
       if (liquidatable) {
-        console.log('Found liquidatable user:', account)
+        const snapshot = await lens.callStatic['snapshot(address,address)'](account, args.product)
+        console.log(`
+          Found liquidatable user: ${account},
+          position:
+            maker: ${formatEther(snapshot.position.maker)}
+            taker: ${formatEther(snapshot.position.taker)}
+          collateral: ${formatEther(snapshot.collateral)}
+        `)
       }
     }
     console.log('done.')
