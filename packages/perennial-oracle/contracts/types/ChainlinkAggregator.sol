@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.13;
 
-import "hardhat/console.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV2V3Interface.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorProxyInterface.sol";
 import "./ChainlinkRound.sol";
@@ -55,14 +54,14 @@ library ChainlinkAggregatorLib {
      * @param lastSyncedRound last known round for the proxy
      * @param latestRound latest round from the proxy
      * @return roundCount The number of rounds in the phase
-     * @return nextStartingRoundId Whether or not the next round is in this phase
+     * @return nextPhaseStartingRoundId The starting round ID for the next phase
      */
-    function getPhaseSwitchoverRounds(
+    function getPhaseSwitchoverData(
         ChainlinkAggregator self,
         uint256 startingRoundId,
         ChainlinkRound memory lastSyncedRound,
         ChainlinkRound memory latestRound
-    ) internal view returns (uint256 roundCount, uint256 nextStartingRoundId) {
+    ) internal view returns (uint256 roundCount, uint256 nextPhaseStartingRoundId) {
         AggregatorProxyInterface proxy = AggregatorProxyInterface(ChainlinkAggregator.unwrap(self));
 
         // Try to get the immediate next round in the same phase. If this errors, we know that the phase has ended
@@ -82,7 +81,7 @@ library ChainlinkAggregatorLib {
 
         // lastSyncedRound is the last round it's phase, so we need to find where the next phase starts
         // The next phase should start at the round that is closest to but after lastSyncedRound.timestamp
-        uint256 nextPhaseStartingRoundId = latestRound.roundId;
+        nextPhaseStartingRoundId = latestRound.roundId;
         uint256 updatedAt = latestRound.timestamp;
         // Walk back in the new phase until we dip below the lastSyncedRound.timestamp
         while (updatedAt >= lastSyncedRound.timestamp) {

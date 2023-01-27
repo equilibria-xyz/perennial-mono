@@ -77,7 +77,7 @@ contract ChainlinkFeedOracle is IOracleProvider {
         // Update phase annotation when new phase detected
         while (round.phaseId() > _latestPhaseId()) {
             // Get the round count for the latest phase
-            (uint256 phaseRoundCount, uint256 nextStartingRoundId) = aggregator.getPhaseSwitchoverRounds(
+            (uint256 phaseRoundCount, uint256 nextStartingRoundId) = aggregator.getPhaseSwitchoverData(
                 _phases[_latestPhaseId()].startingRoundId, lastSyncedRound, round);
 
             // The starting version for the next phase is startingVersionForLatestPhase + roundCount
