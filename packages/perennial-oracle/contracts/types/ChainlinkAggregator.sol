@@ -94,15 +94,4 @@ library ChainlinkAggregatorLib {
 
         return ((lastSyncedRoundId - startingRoundId) + 1, nextPhaseStartingRoundId + 1);
     }
-
-    /**
-     * @notice Convert an aggregator round ID into a proxy round ID for the given phase
-     * @dev Follows the logic specified in https://docs.chain.link/data-feeds/price-feeds/historical-data#roundid-in-proxy
-     * @param phaseId phase ID for the given aggregator round
-     * @param aggregatorRoundId round id for the aggregator round
-     * @return Proxy roundId
-     */
-    function _aggregatorRoundIdToProxyRoundId(uint16 phaseId, uint80 aggregatorRoundId) private pure returns (uint256) {
-        return (uint256(phaseId) << 64) + aggregatorRoundId;
-    }
 }
