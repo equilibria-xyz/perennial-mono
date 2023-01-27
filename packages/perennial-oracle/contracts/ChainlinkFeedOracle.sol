@@ -24,12 +24,13 @@ contract ChainlinkFeedOracle is IOracleProvider {
     /// @dev Mapping of the starting data for each underlying phase
     Phase[] private _phases;
 
+    /// @dev Last roundID seen when `sync` was called
+    uint256 private lastSyncedRoundId;
+
     struct Phase {
         uint128 startingVersion;
         uint128 startingRoundId;
     }
-
-    ChainlinkRound private lastSyncedRound;
 
     /**
      * @notice Initializes the contract state
@@ -49,7 +50,7 @@ contract ChainlinkFeedOracle is IOracleProvider {
 
         // first seen round starts as version 0 at current phase
         _phases.push(Phase(uint128(0), uint128(firstSeenRound.roundId)));
-        lastSyncedRound = firstSeenRound;
+        lastSyncedRoundId = firstSeenRound.roundId;
     }
 
     /**
@@ -78,7 +79,7 @@ contract ChainlinkFeedOracle is IOracleProvider {
         while (round.phaseId() > _latestPhaseId()) {
             // Get the round count for the latest phase
             (uint256 phaseRoundCount, uint256 nextStartingRoundId) = aggregator.getPhaseSwitchoverData(
-                _phases[_latestPhaseId()].startingRoundId, lastSyncedRound, round);
+                _phases[_latestPhaseId()].startingRoundId, lastSyncedRoundId, round);
 
             // The starting version for the next phase is startingVersionForLatestPhase + roundCount
             _phases.push(
@@ -89,7 +90,7 @@ contract ChainlinkFeedOracle is IOracleProvider {
             );
         }
 
-        lastSyncedRound = round;
+        lastSyncedRoundId = round.roundId;
 
         // Return packaged oracle version
         return _buildOracleVersion(round);

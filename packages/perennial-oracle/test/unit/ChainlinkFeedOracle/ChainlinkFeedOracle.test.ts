@@ -9,8 +9,6 @@ import {
   ChainlinkFeedOracle__factory,
   AggregatorProxyInterface,
   AggregatorProxyInterface__factory,
-  AggregatorV2V3Interface,
-  AggregatorV2V3Interface__factory,
 } from '../../../types/generated'
 import { currentBlockTimestamp } from '../../../../common/testutil/time'
 import { buildChainlinkRoundId } from '../../../util'
@@ -96,6 +94,9 @@ describe('ChainlinkFeedOracle', () => {
       beforeEach(async () => {
         const roundId = buildChainlinkRoundId(1, INITIAL_ROUND + 24)
 
+        aggregatorProxy.getRoundData
+          .whenCalledWith(roundId)
+          .returns([roundId, ethers.BigNumber.from(111100000000), TIMESTAMP_START - HOUR, TIMESTAMP_START, roundId])
         aggregatorProxy.latestRoundData
           .whenCalledWith()
           .returns([roundId, ethers.BigNumber.from(111100000000), TIMESTAMP_START - HOUR, TIMESTAMP_START, roundId])

@@ -51,7 +51,7 @@ library ChainlinkAggregatorLib {
      * @notice Returns the round count and next phase starting round for the lastSyncedRound phase
      * @param self Chainlink Feed Aggregator to operate on
      * @param startingRoundId starting roundId for the aggregator proxy
-     * @param lastSyncedRound last known round for the proxy
+     * @param lastSyncedRoundId last synced round ID for the proxy
      * @param latestRound latest round from the proxy
      * @return roundCount The number of rounds in the phase
      * @return nextPhaseStartingRoundId The starting round ID for the next phase
@@ -59,21 +59,23 @@ library ChainlinkAggregatorLib {
     function getPhaseSwitchoverData(
         ChainlinkAggregator self,
         uint256 startingRoundId,
-        ChainlinkRound memory lastSyncedRound,
+        uint256 lastSyncedRoundId,
         ChainlinkRound memory latestRound
     ) internal view returns (uint256 roundCount, uint256 nextPhaseStartingRoundId) {
         AggregatorProxyInterface proxy = AggregatorProxyInterface(ChainlinkAggregator.unwrap(self));
 
         // Try to get the immediate next round in the same phase. If this errors, we know that the phase has ended
-        try proxy.getRoundData(uint80(lastSyncedRound.roundId + 1)) returns (uint80 nextRoundId,int256,uint256,uint256 nextUpdatedAt,uint80) {
+        try proxy.getRoundData(uint80(lastSyncedRoundId + 1)) returns (uint80 nextRoundId,int256,uint256,uint256 nextUpdatedAt,uint80) {
             // If the next round in this phase is before the latest round, then we can safely mark that
             // as the end of the phase, and the latestRound as the start of the new phase
             // Else the next round in this phase is _after_ the latest round, then the immediate
             // next round is latestRound (the phase switchover happened at lastSyncedRound)
-            if (nextUpdatedAt < latestRound.timestamp) {
+            if (nextRoundId == 0 || nextUpdatedAt == 0) { // Invalid round
+                // pass
+            } else if (nextUpdatedAt < latestRound.timestamp) {
                 return ((nextRoundId - startingRoundId) + 1, latestRound.roundId);
             } else {
-                return ((lastSyncedRound.roundId - startingRoundId) + 1, latestRound.roundId);
+                return ((lastSyncedRoundId - startingRoundId) + 1, latestRound.roundId);
             }
         } catch  {
             // pass
@@ -81,15 +83,16 @@ library ChainlinkAggregatorLib {
 
         // lastSyncedRound is the last round it's phase, so we need to find where the next phase starts
         // The next phase should start at the round that is closest to but after lastSyncedRound.timestamp
+        (,,,uint256 lastSyncedRoundTimestamp,) = proxy.getRoundData(uint80(lastSyncedRoundId));
         nextPhaseStartingRoundId = latestRound.roundId;
         uint256 updatedAt = latestRound.timestamp;
         // Walk back in the new phase until we dip below the lastSyncedRound.timestamp
-        while (updatedAt >= lastSyncedRound.timestamp) {
+        while (updatedAt >= lastSyncedRoundTimestamp) {
             nextPhaseStartingRoundId--;
             (,,,updatedAt,) = proxy.getRoundData(uint80(nextPhaseStartingRoundId));
         }
 
-        return ((lastSyncedRound.roundId - startingRoundId) + 1, nextPhaseStartingRoundId + 1);
+        return ((lastSyncedRoundId - startingRoundId) + 1, nextPhaseStartingRoundId + 1);
     }
 
     /**
