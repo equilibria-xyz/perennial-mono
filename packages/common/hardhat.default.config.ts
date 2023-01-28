@@ -145,7 +145,14 @@ export default function defaultConfig({
       deployer: 0,
     },
     etherscan: {
-      apiKey: ETHERSCAN_API_KEY_MAINNET,
+      apiKey: {
+        mainnet: getEtherscanApiConfig('mainnet'),
+        optimisticEthereum: getEtherscanApiConfig('optimism'),
+        arbitrumOne: getEtherscanApiConfig('arbitrum'),
+        goerli: getEtherscanApiConfig('goerli'),
+        optimisticGoerli: getEtherscanApiConfig('optimismGoerli'),
+        arbitrumGoerli: getEtherscanApiConfig('arbitrumGoerli'),
+      },
     },
     gasReporter: {
       currency: 'USD',
