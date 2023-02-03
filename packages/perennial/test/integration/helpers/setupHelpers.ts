@@ -163,12 +163,7 @@ export async function deployProtocol(): Promise<InstanceVars> {
   await controller.updateMultiInvoker(multiInvoker.address)
 
   // Set state
-  const dsuHolder = await impersonate.impersonateWithBalance(DSU_HOLDER, utils.parseEther('10'))
-  await dsu.connect(dsuHolder).transfer(user.address, utils.parseEther('20000'))
-  await dsu.connect(dsuHolder).transfer(userB.address, utils.parseEther('20000'))
-  await dsu.connect(dsuHolder).transfer(userC.address, utils.parseEther('20000'))
-  await dsu.connect(dsuHolder).transfer(userD.address, utils.parseEther('20000'))
-  const usdcHolder = await impersonate.impersonateWithBalance(USDC_HOLDER, utils.parseEther('10'))
+  const { dsuHolder, usdcHolder } = await setupTokenHolders(dsu, [user, userB, userC, userD])
   await chainlinkOracle.sync()
 
   const lens = await new PerennialLens__factory(owner).deploy(controller.address)
@@ -298,4 +293,19 @@ export async function depositTo(
   const { dsu, collateral } = instanceVars
   await dsu.connect(user).approve(collateral.address, position)
   await collateral.connect(user).depositTo(user.address, product.address, position)
+}
+
+export async function setupTokenHolders(
+  dsu: IERC20Metadata,
+  users: SignerWithAddress[],
+): Promise<{ dsuHolder: SignerWithAddress; usdcHolder: SignerWithAddress }> {
+  const dsuHolder = await impersonate.impersonateWithBalance(DSU_HOLDER, utils.parseEther('10'))
+  await Promise.all(
+    users.map(async user => {
+      await dsu.connect(dsuHolder).transfer(user.address, utils.parseEther('20000'))
+    }),
+  )
+  const usdcHolder = await impersonate.impersonateWithBalance(USDC_HOLDER, utils.parseEther('10'))
+
+  return { dsuHolder, usdcHolder }
 }

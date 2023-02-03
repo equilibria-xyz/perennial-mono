@@ -3,6 +3,8 @@ import { dirname } from 'path'
 import defaultConfig, { OPTIMIZER_ENABLED } from '../common/hardhat.default.config'
 const eqPerennialOracleDir = dirname(require.resolve('@equilibria/perennial-oracle/package.json'))
 
+import './tasks'
+
 // This Solidity config produces small contract sizes, and is useful when
 // contracts are close to the maximum possible size. The trade off is each
 // function call will likely use extra gas.
