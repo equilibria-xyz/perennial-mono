@@ -186,7 +186,7 @@ describe('ChainlinkFeedOracle', () => {
         expect(atVersion4.version).to.equal(4)
       })
 
-      it('syncs with new phase immediate switchover', async () => {
+      it('syncs with new phase, next round in previous phase after latest round', async () => {
         // Sync up to version 3 which is in Phase 3
         aggregatorFake.latestRoundData.returns(phase3Data[3])
         aggregatorFake.getRoundData.whenCalledWith(phase3Data[4].roundId).returns([
@@ -200,7 +200,8 @@ describe('ChainlinkFeedOracle', () => {
 
         // Next round comes from phase 4.
         // We check if there is another round in phase 3
-        // There is, but it is after phase4Data[1] so we ignore it so this is version 4
+        // There is, but it is after phase4Data[1] so we ignore it and perform a walkback
+        // The walkback goes back 1 round in the new phase, so this is version 5
         aggregatorFake.latestRoundData.returns(phase4Data[1])
 
         const expectedPrice = phase4Data[1].answer.mul(10 ** 10)
@@ -209,22 +210,27 @@ describe('ChainlinkFeedOracle', () => {
 
         expect(returnValue.price).to.equal(expectedPrice)
         expect(returnValue.timestamp).to.equal(phase4Data[1].updatedAt)
-        expect(returnValue.version).to.equal(4)
+        expect(returnValue.version).to.equal(5)
 
         const currentVersion = await oracle.currentVersion()
         expect(currentVersion.price).to.equal(expectedPrice)
         expect(currentVersion.timestamp).to.equal(phase4Data[1].updatedAt)
-        expect(currentVersion.version).to.equal(4)
+        expect(currentVersion.version).to.equal(5)
 
-        const atVersion5 = await oracle.atVersion(4)
+        const atVersion5 = await oracle.atVersion(5)
         expect(atVersion5.price).to.equal(expectedPrice)
         expect(atVersion5.timestamp).to.equal(phase4Data[1].updatedAt)
-        expect(atVersion5.version).to.equal(4)
+        expect(atVersion5.version).to.equal(5)
 
-        const atVersion4 = await oracle.atVersion(3)
-        expect(atVersion4.price).to.equal(phase3Data[3].answer.mul(10 ** 10))
-        expect(atVersion4.timestamp).to.equal(phase3Data[3].updatedAt)
-        expect(atVersion4.version).to.equal(3)
+        const atVersion4 = await oracle.atVersion(4)
+        expect(atVersion4.price).to.equal(phase4Data[0].answer.mul(10 ** 10))
+        expect(atVersion4.timestamp).to.equal(phase4Data[0].updatedAt)
+        expect(atVersion4.version).to.equal(4)
+
+        const atVersion3 = await oracle.atVersion(3)
+        expect(atVersion3.price).to.equal(phase3Data[3].answer.mul(10 ** 10))
+        expect(atVersion3.timestamp).to.equal(phase3Data[3].updatedAt)
+        expect(atVersion3.version).to.equal(3)
       })
 
       it('syncs with new phase with walkback', async () => {
