@@ -1,7 +1,8 @@
 //SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.15;
 
-import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@equilibria/root/token/types/Token18.sol";
 import "./interfaces/IBalancedVault.sol";
 
@@ -9,12 +10,40 @@ import "./interfaces/IBalancedVault.sol";
  * @title BalancedVault
  * @notice ERC4626 vault that manages a 50-50 position between long-short markets of the same payoff on Perennial.
  * @dev Vault deploys and rebalances collateral between the corresponding long and short markets, while attempting to
- *      maintain `targetLeverage` with its open positions at any given time. Withdrawals are gated by ensuring that
- *      leverage never exceeds `maxLeverage`. Deposits are only gated in so much as to cap the maximum amount of assets
- *      in the vault. A `fixedFloat` amount of assets are virtually set aside from the leverage calculation to ensure a
- *      fixed lower bound of assets are always allowed to be withdrawn from the vault.
+ *      maintain `targetLeverage` with its open positions at any given time. Deposits are only gated in so much as to cap
+ *      the maximum amount of assets in the vault.
  */
-contract BalancedVault is IBalancedVault, ERC4626Upgradeable {
+contract BalancedVault is IBalancedVault, ContextUpgradeable {
+    /// @dev An `amount` of DSU in a pending state starting at some `oracleVersion`
+    struct PendingDSU {
+        UFixed18 amount;
+        uint256 oracleVersion;
+    }
+    PendingDSU private ZERO_PENDING_DSU = PendingDSU(UFixed18Lib.ZERO, 0);
+
+    /// @dev An `amount` of shares in a pending state starting at some `oracleVersion`
+    struct PendingShares {
+        uint256 amount;
+        uint256 oracleVersion;
+    }
+    PendingShares private ZERO_PENDING_SHARES = PendingShares(0, 0);
+
+    /// @dev Snapshot of the vault state at a given oracle version
+    struct Snapshot {
+        /// @dev Vault's collateral in `long` at the start of the oracle version
+        UFixed18 longCollateral;
+        /// @dev Vault's collateral in `short` at the start of the oracle version
+        UFixed18 shortCollateral;
+        /// @dev Vault's position in `long` at the start of the oracle version
+        UFixed18 longPosition;
+        /// @dev Vault's position in `short` at the start of the oracle version
+        UFixed18 shortPosition;
+        /// @dev Vault's total initiated deposits throughout the oracle version
+        UFixed18 pendingDeposits;
+        /// @dev Vault's total initiated withdrawals throughout the oracle version
+        uint256 pendingWithdrawals;
+    }
+
     UFixed18 constant private TWO = UFixed18.wrap(2e18);
 
     /// @dev The address of the Perennial controller contract
@@ -32,48 +61,58 @@ contract BalancedVault is IBalancedVault, ERC4626Upgradeable {
     /// @dev The target leverage amount for the vault
     UFixed18 public immutable targetLeverage;
 
-    /// @dev The maximum leverage amount for the vault
-    UFixed18 public immutable maxLeverage;
-
-    /// @dev The fixed amount that is "set aside" and not counted towards leverage calculations
-    UFixed18 public immutable fixedFloat;
-
     /// @dev The collateral cap for the vault
     UFixed18 public immutable maxCollateral;
 
+    IERC20Upgradeable public immutable dsu;
+
+    /// @dev Mapping of shares of the vault per user
+    mapping(address => uint256) public balanceOf;
+
+    /// @dev Total number of shares across all users
+    uint256 public totalSupply;
+
+    // TODO: Make all the below internal/private if not necessary to be public.
+
+    /// @dev Number of shares post-settlement that have not been redeemed across all users
+    uint256 public unredeemedShares;
+
+    /// @dev Amount of DSU post-settlement that have not been redeemed across all users
+    UFixed18 public unredeemedWithdrawals;
+
+    /// @dev Deposits that have not been settled, or have been settled but not yet processed by this contract
+    PendingDSU public unsettledDeposits;
+
+    /// @dev Mapping of pending (not yet converted to shares) per user
+    mapping(address => PendingDSU) public pendingDeposits;
+
+    /// @dev Withdrawals that have not been settled, or have been settled but not yet processed by this contract
+    PendingShares public unsettledWithdrawals;
+
+    /// @dev Mapping of pending (not yet withdrawn) per user
+    mapping(address => PendingShares) public pendingWithdrawals;
+
+    /// @dev Mapping of snapshots of the vault state at a given oracle version
+    mapping(uint256 => Snapshot) public snapshots;
+
+    // TODO: Initializer
     constructor(
+        IERC20Upgradeable dsu_,
         IController controller_,
         IProduct long_,
         IProduct short_,
         UFixed18 targetLeverage_,
-        UFixed18 maxLeverage_,
-        UFixed18 fixedFloat_,
         UFixed18 maxCollateral_
     ) {
-        if (targetLeverage_.gt(maxLeverage_)) revert BalancedVaultInvalidMaxLeverage();
-
         controller = controller_;
         collateral = controller.collateral();
         long = long_;
         short = short_;
         targetLeverage = targetLeverage_;
-        maxLeverage = maxLeverage_;
-        fixedFloat = fixedFloat_;
         maxCollateral = maxCollateral_;
-    }
+        dsu = dsu_;
 
-    /**
-     * @notice Initializes the contract
-     * @param dsu_ The contract address of the DSU stablecoin
-     */
-    function initialize(IERC20Upgradeable dsu_) external initializer {
-        __ERC20_init(
-            string(abi.encodePacked("Perennial Balanced Vault: ", long.name())),
-            string(abi.encodePacked("PBV-", long.symbol()))
-        );
-        __ERC4626_init(dsu_);
-
-        dsu_.approve(address(collateral), type(uint256).max);
+        dsu.approve(address(collateral), type(uint256).max);
     }
 
     /**
@@ -81,7 +120,7 @@ contract BalancedVault is IBalancedVault, ERC4626Upgradeable {
      * @dev Should be called by a keeper when the vault approaches a liquidation state on either side
      */
     function sync() external {
-        _before();
+        _before(address(0));
         _update(UFixed18Lib.ZERO);
     }
 
@@ -89,9 +128,9 @@ contract BalancedVault is IBalancedVault, ERC4626Upgradeable {
      * @notice The total amount of assets currently held by the vault
      * @return Amount of assets held by the vault
      */
-    function totalAssets() public override view returns (uint256) {
+    function totalAssets() public view returns (UFixed18) {
         (UFixed18 longCollateral, UFixed18 shortCollateral, UFixed18 idleCollateral) = _collateral();
-        return UFixed18.unwrap(longCollateral.add(shortCollateral).add(idleCollateral));
+        return longCollateral.add(shortCollateral).add(idleCollateral).sub(unredeemedWithdrawals);
     }
 
     /**
@@ -100,20 +139,12 @@ contract BalancedVault is IBalancedVault, ERC4626Upgradeable {
      * @param owner The account to withdraw for
      * @return Maximum available withdrawal amount
      */
-    function maxWithdraw(address owner) public view override returns (uint256) {
+    function maxWithdraw(address owner) public view returns (UFixed18) {
         // If we're in the middle of closing all positions due to liquidations, return 0.
-        if (!healthy()) return 0;
+        if (!healthy()) return UFixed18Lib.ZERO;
 
-        // Calculate the minimum amount of collateral we can have.
-        UFixed18 price = long.atVersion(long.latestVersion()).price.abs();
-        UFixed18 position = long.position(address(this)).maker;
-
-        // Calculate the minimum collateral for one product, which represents having a leverage of `maxLeverage`.
-        UFixed18 minimumCollateral = position.mul(price).div(maxLeverage).mul(TWO);
-        UFixed18 currentCollateral = UFixed18.wrap(totalAssets());
-        if (currentCollateral.lt(minimumCollateral)) return 0;
-
-        return Math.min(super.maxWithdraw(owner), UFixed18.unwrap(currentCollateral.sub(minimumCollateral)));
+        // TODO: Actually calculate this using pending withdrawals.
+        return UFixed18Lib.ZERO;
     }
 
     /**
@@ -122,59 +153,78 @@ contract BalancedVault is IBalancedVault, ERC4626Upgradeable {
      * @param owner The account to deposit for
      * @return Maximum available deposit amount
      */
-    function maxDeposit(address owner) public view override returns (uint256) {
-        UFixed18 currentCollateral = UFixed18.wrap(totalAssets());
+    function maxDeposit(address owner) public view returns (UFixed18) {
+        // If the vault has no assets to back the shares, we are unhealthy and should not allow deposits.
+        UFixed18 currentCollateral = totalAssets();
+        if (currentCollateral.isZero() && totalSupply > 0) return UFixed18Lib.ZERO;
+
         UFixed18 availableDeposit = currentCollateral.gt(maxCollateral) ?
             UFixed18Lib.ZERO :
             maxCollateral.sub(currentCollateral);
 
-        return Math.min(super.maxDeposit(owner), UFixed18.unwrap(availableDeposit));
+        return availableDeposit;
     }
 
     /**
-     * @notice Deposits `assets` assets into the vault, returning shares to `receiver`
+     * @notice Deposits `assets` assets into the vault, returning shares to `receiver` after the deposit settles.
      * @param assets The amount of assets to deposit
-     * @param receiver The account to receive the shares
-     * @return The amount of shares returned to `receiver`
+     * @param receiver The account to deposit on behalf of
      */
-    function deposit(uint256 assets, address receiver) public override returns (uint256) {
-        _before();
-        return super.deposit(assets, receiver);
+    function deposit(UFixed18 assets, address receiver) public {
+        if (assets.gt(maxDeposit(receiver))) revert BalancedVaultDepositMoreThanMax();
+
+        _before(receiver);
+
+        // TODO: Optimize to reduce unnecessary external calls to get version.
+        uint256 version = _version();
+        if (unsettledDeposits.amount.isZero() && unsettledDeposits.oracleVersion == 0) {
+            unsettledDeposits.amount = unsettledDeposits.amount.add(assets);
+            unsettledDeposits.oracleVersion = version;
+        }
+        if (pendingDeposits[receiver].amount.isZero() && pendingDeposits[receiver].oracleVersion == 0) {
+            pendingDeposits[receiver].amount = pendingDeposits[receiver].amount.add(assets);
+            pendingDeposits[receiver].oracleVersion = version;
+        }
+        // TODO: Update snapshots mapping.
+
+        // TODO: Maybe use Token18 methods instead.
+        SafeERC20Upgradeable.safeTransferFrom(dsu, _msgSender(), address(this), UFixed18.unwrap(assets));
+        _update(UFixed18Lib.ZERO);
     }
 
-    /**
-     * @notice Deposits `shares` worth of assets into the vault, returning shares to `receiver`
-     * @param shares The amount of shares worth of assets to deposit
-     * @param receiver The account to receive the shares
-     * @return The amount of assets taken from `receiver`
-     */
-    function mint(uint256 shares, address receiver) public override returns (uint256) {
-        _before();
-        return super.mint(shares, receiver);
+    // TODO: Allow withdrawing on behalf of others if approval is given (maybe should just extend ERC20 at that point...)
+    function prepareWithdraw(uint256 shares) public {
+        _before(_msgSender());
+        if (shares > balanceOf[_msgSender()]) revert BalancedVaultPrepareWithdrawMoreThanBalance();
+
+        // TODO: Maybe support having multiple pending withdrawals.
+        if (pendingWithdrawals[_msgSender()].amount > 0) revert BalancedVaultWithdrawPending();
+
+        UFixed18 withdrawalAmount = totalAssets().muldiv(shares, totalSupply);
+        _update(withdrawalAmount);
+
+        // TODO: Optimize to reduce unnecessary external calls to get version.
+        uint256 version = _version();
+        if (unsettledWithdrawals.amount == 0 && unsettledWithdrawals.oracleVersion == 0) {
+            unsettledWithdrawals.amount += shares;
+            unsettledDeposits.oracleVersion = version;
+        }
+        if (pendingWithdrawals[_msgSender()].amount == 0 && pendingWithdrawals[_msgSender()].oracleVersion == 0) {
+            pendingWithdrawals[_msgSender()].amount += shares;
+            pendingDeposits[_msgSender()].oracleVersion = version;
+        }
+        // TODO: Update snapshots mapping.
+        balanceOf[_msgSender()] -= shares;
     }
 
-    /**
-     * @notice Withdraws `assets` assets from the vault, returning assets to `receiver`
-     * @param assets The amount of assets to withdraw
-     * @param owner The account to withdraw for (must be sender or approved)
-     * @param receiver The account to receive the withdrawn assets
-     * @return The amount of shares taken from `receiver`
-     */
-    function withdraw(uint256 assets, address receiver, address owner) public override returns (uint256) {
-        _before();
-        return super.withdraw(assets, receiver, owner);
-    }
+    // TODO: Allow withdrawing on behalf of others if approval is given (maybe should just extend ERC20 at that point...)
+    function withdraw(UFixed18 withdrawalAmount) public {
+        _before(_msgSender());
+        if (withdrawalAmount.gt(maxWithdraw(_msgSender()))) revert BalancedVaultWithdrawMoreThanPending();
+        // TODO: Update `unredeemedWithdrawals`, `pendingWithdrawals`, and `snapshots`.
 
-    /**
-     * @notice Withdraws `shares` worth of assets into the vault, returning assets to `receiver`
-     * @param shares The amount of shares worth of assets to withdraw
-     * @param owner The account to withdraw for (must be sender or approved)
-     * @param receiver The account to receive the withdrawn assets
-     * @return The amount of assets returned to `receiver`
-     */
-    function redeem(uint256 shares, address receiver, address owner) public override returns (uint256) {
-        _before();
-        return super.redeem(shares, receiver, owner);
+        // TODO: Maybe use Token18 methods instead.
+        SafeERC20Upgradeable.safeTransfer(dsu, _msgSender(), UFixed18.unwrap(withdrawalAmount));
     }
 
     /**
@@ -189,37 +239,41 @@ contract BalancedVault is IBalancedVault, ERC4626Upgradeable {
     }
 
     /**
-     * @notice Deposits `assets` assets from `caller`, sending `shares` shares to `receiver`
-     * @param caller The account that called the deposit
-     * @param receiver The account to receive the shares
-     * @param assets The amount of assets to deposit
-     * @param shares The amount of shares to receive
-     */
-    function _deposit(address caller, address receiver, uint256 assets, uint256 shares) internal override {
-        super._deposit(caller, receiver, assets, shares);
-        _update(UFixed18Lib.ZERO);
-    }
-
-    /**
-     * @notice Withdraws `assets` assets to `receiver`, taking `shares` shares from `owner`
-     * @param caller The account that called the withdraw
-     * @param receiver The account to receive the withdrawn assets
-     * @param owner The account to withdraw for (must be caller or approved)
-     * @param assets The amount of assets to withdraw
-     * @param shares The amount of shares to be taken
-     */
-    function _withdraw(address caller, address receiver, address owner, uint256 assets, uint256 shares) internal override {
-        _update(UFixed18.wrap(assets));
-        super._withdraw(caller, receiver, owner, assets, shares);
-    }
-
-    /**
      * @notice Hook that is called before every stateful operation
-     * @dev Settles the vault's account on both the long and short product
+     * @dev Settles the vault's account on both the long and short product, along with any global or user-specific deposits/withdrawals
+     * @param user The account that called the operation, or 0 if called by a keeper.
      */
-    function _before() private {
+    function _before(address user) private {
         long.settleAccount(address(this));
         short.settleAccount(address(this));
+
+        uint256 version = _version();
+        if (unsettledDeposits.amount.gt(UFixed18Lib.ZERO) && version > unsettledDeposits.oracleVersion) {
+            // TODO: Calculate what to add to unredeemedShares.
+            unsettledDeposits = ZERO_PENDING_DSU;
+        }
+
+        if (unsettledWithdrawals.amount > 0 && version > unsettledWithdrawals.oracleVersion) {
+            // TODO: Calculate what to add to unredeemedWithdrawals.
+            unsettledWithdrawals = ZERO_PENDING_SHARES;
+        }
+
+        if (user != address(0)) {
+            if (pendingDeposits[user].amount.gt(UFixed18Lib.ZERO) && version > pendingDeposits[user].oracleVersion) {
+                // TODO: Calculate what to add to user's shares
+                // TODO: Update unredeemedShares, user's shares.
+                pendingDeposits[user] = ZERO_PENDING_DSU;
+            }
+        }
+    }
+
+    /**
+     * @notice Returns the current version of the vault's products
+     * @dev We assume that the short product's version is always equal to the long product's version
+     * @return The version of the vault's products
+     */
+    function _version() private view returns (uint256) {
+        return long.latestVersion(address(this));
     }
 
     /**
@@ -227,6 +281,8 @@ contract BalancedVault is IBalancedVault, ERC4626Upgradeable {
      * @param withdrawalAmount The amount of assets that will be withdrawn from the vault at the end of the operation
      */
     function _update(UFixed18 withdrawalAmount) private {
+        // TODO: Add flow for if there aren't enough assets to withdraw for all pending witdhrawals.
+
         // Rebalance collateral if possible
         bool rebalanced = _updateCollateral(withdrawalAmount);
 
@@ -254,7 +310,7 @@ contract BalancedVault is IBalancedVault, ERC4626Upgradeable {
      */
     function _updateCollateral(UFixed18 withdrawalAmount) private returns (bool) {
         (UFixed18 longCollateral, UFixed18 shortCollateral, ) = _collateral();
-        UFixed18 currentCollateral = UFixed18.wrap(totalAssets()).sub(withdrawalAmount);
+        UFixed18 currentCollateral = totalAssets().sub(withdrawalAmount).sub(unredeemedWithdrawals);
         UFixed18 targetCollateral = currentCollateral.div(TWO);
 
         (IProduct greaterProduct, IProduct lesserProduct) = longCollateral.gt(shortCollateral) ?
@@ -271,8 +327,8 @@ contract BalancedVault is IBalancedVault, ERC4626Upgradeable {
      */
     function _updatePosition(UFixed18 withdrawalAmount) private {
         // 1. Calculate the target position size for each product.
-        UFixed18 currentCollateral = UFixed18.wrap(totalAssets()).sub(withdrawalAmount);
-        UFixed18 currentUtilized = currentCollateral.gt(fixedFloat) ? currentCollateral.sub(fixedFloat) : UFixed18Lib.ZERO;
+        UFixed18 currentCollateral = totalAssets().sub(withdrawalAmount);
+        UFixed18 currentUtilized = currentCollateral.sub(unredeemedWithdrawals);
         UFixed18 currentPrice = long.atVersion(long.latestVersion()).price.abs();
         UFixed18 targetPosition = currentUtilized.mul(targetLeverage).div(currentPrice).div(TWO);
 
@@ -327,7 +383,7 @@ contract BalancedVault is IBalancedVault, ERC4626Upgradeable {
         return (
             collateral.collateral(address(this), long),
             collateral.collateral(address(this), short),
-            Token18.wrap(asset()).balanceOf()
+            Token18.wrap(address(dsu)).balanceOf()
         );
     }
 }
