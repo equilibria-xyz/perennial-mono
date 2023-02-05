@@ -1,10 +1,11 @@
 //SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.15;
 
-import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@equilibria/root/token/types/Token18.sol";
 import "./interfaces/IBalancedVault.sol";
+
+// TODO: Allow withdrawing on behalf of others if approval is given (maybe should just extend ERC20 at that point...)
+// TODO: block everything if liquidatable
 
 /**
  * @title BalancedVault
@@ -13,31 +14,29 @@ import "./interfaces/IBalancedVault.sol";
  *      maintain `targetLeverage` with its open positions at any given time. Deposits are only gated in so much as to cap
  *      the maximum amount of assets in the vault.
  */
-contract BalancedVault is IBalancedVault, ContextUpgradeable {
+contract BalancedVault is IBalancedVault {
     /// @dev An `amount` of DSU in a pending state starting at some `oracleVersion`
     struct PendingDSU {
         UFixed18 amount;
         uint256 oracleVersion;
     }
-    PendingDSU private ZERO_PENDING_DSU = PendingDSU(UFixed18Lib.ZERO, 0);
 
     /// @dev An `amount` of shares in a pending state starting at some `oracleVersion`
     struct PendingShares {
         uint256 amount;
         uint256 oracleVersion;
     }
-    PendingShares private ZERO_PENDING_SHARES = PendingShares(0, 0);
 
     /// @dev Snapshot of the vault state at a given oracle version
     struct Snapshot {
-        /// @dev Vault's collateral in `long` at the start of the oracle version
-        UFixed18 longCollateral;
-        /// @dev Vault's collateral in `short` at the start of the oracle version
-        UFixed18 shortCollateral;
         /// @dev Vault's position in `long` at the start of the oracle version
         UFixed18 longPosition;
         /// @dev Vault's position in `short` at the start of the oracle version
         UFixed18 shortPosition;
+        /// @dev Vault's total shares issued at the start of the oracle version
+        UFixed18 totalShares;
+        /// @dev Vault's total collateral at the start of the oracle version
+        UFixed18 totalCollateral;
         /// @dev Vault's total initiated deposits throughout the oracle version
         UFixed18 pendingDeposits;
         /// @dev Vault's total initiated withdrawals throughout the oracle version
@@ -64,7 +63,7 @@ contract BalancedVault is IBalancedVault, ContextUpgradeable {
     /// @dev The collateral cap for the vault
     UFixed18 public immutable maxCollateral;
 
-    IERC20Upgradeable public immutable dsu;
+    Token18 public immutable dsu;
 
     /// @dev Mapping of shares of the vault per user
     mapping(address => uint256) public balanceOf;
@@ -112,7 +111,7 @@ contract BalancedVault is IBalancedVault, ContextUpgradeable {
         maxCollateral = maxCollateral_;
         dsu = dsu_;
 
-        dsu.approve(address(collateral), type(uint256).max);
+        dsu.approve(address(collateral));
     }
 
     /**
@@ -177,54 +176,61 @@ contract BalancedVault is IBalancedVault, ContextUpgradeable {
 
         // TODO: Optimize to reduce unnecessary external calls to get version.
         uint256 version = _version();
-        if (unsettledDeposits.amount.isZero() && unsettledDeposits.oracleVersion == 0) {
-            unsettledDeposits.amount = unsettledDeposits.amount.add(assets);
-            unsettledDeposits.oracleVersion = version;
-        }
-        if (pendingDeposits[receiver].amount.isZero() && pendingDeposits[receiver].oracleVersion == 0) {
-            pendingDeposits[receiver].amount = pendingDeposits[receiver].amount.add(assets);
-            pendingDeposits[receiver].oracleVersion = version;
-        }
-        // TODO: Update snapshots mapping.
 
-        // TODO: Maybe use Token18 methods instead.
-        SafeERC20Upgradeable.safeTransferFrom(dsu, _msgSender(), address(this), UFixed18.unwrap(assets));
+        unsettledDeposits.amount = unsettledDeposits.amount.add(assets);
+        unsettledDeposits.oracleVersion = version;
+
+        pendingDeposits[receiver].amount = pendingDeposits[receiver].amount.add(assets);
+        pendingDeposits[receiver].oracleVersion = version;
+
+        _snapshot(version, assets, 0);
+
+        dsu.pull(msg.sender, assets);
+
         _update(UFixed18Lib.ZERO);
     }
 
-    // TODO: Allow withdrawing on behalf of others if approval is given (maybe should just extend ERC20 at that point...)
-    function prepareWithdraw(uint256 shares) public {
-        _before(_msgSender());
-        if (shares > balanceOf[_msgSender()]) revert BalancedVaultPrepareWithdrawMoreThanBalance();
+    function _snapshot(uint256 version, UFixed18 depositAmount, uint256 withdrawalAmount) private {
+        (UFixed18 pendingDeposits, UFixed18 pendingWithdrawals) =
+            (_snapshot[version].pendingDeposits, _snapshot[version].pendingWithdrawals);
 
-        // TODO: Maybe support having multiple pending withdrawals.
-        if (pendingWithdrawals[_msgSender()].amount > 0) revert BalancedVaultWithdrawPending();
+        snapshots[version] = Snapshot({
+            longPosition: long.positionAtVersion(version),
+            shortPosition: short.positionAtVersion(version),
+            totalShares: totalSupply,
+            totalCollateral: totalAssets(),
+            pendingDeposits: pendingDeposits.add(depositAmount),
+            pendingWithdrawals: pendingWithdrawals + withdrawalAmount
+        });
+    }
+
+    function withdraw(uint256 shares) public {
+        _before(_msgSender());
 
         UFixed18 withdrawalAmount = totalAssets().muldiv(shares, totalSupply);
         _update(withdrawalAmount);
 
         // TODO: Optimize to reduce unnecessary external calls to get version.
         uint256 version = _version();
-        if (unsettledWithdrawals.amount == 0 && unsettledWithdrawals.oracleVersion == 0) {
-            unsettledWithdrawals.amount += shares;
-            unsettledDeposits.oracleVersion = version;
-        }
-        if (pendingWithdrawals[_msgSender()].amount == 0 && pendingWithdrawals[_msgSender()].oracleVersion == 0) {
-            pendingWithdrawals[_msgSender()].amount += shares;
-            pendingDeposits[_msgSender()].oracleVersion = version;
-        }
-        // TODO: Update snapshots mapping.
+
+        unsettledWithdrawals.amount += shares;
+        unsettledDeposits.oracleVersion = version;
+
+        pendingWithdrawals[_msgSender()].amount += shares;
+        pendingDeposits[_msgSender()].oracleVersion = version;
+
+        _snapshot(version, UFixed18Lib.ZERO);
+
         balanceOf[_msgSender()] -= shares;
     }
 
-    // TODO: Allow withdrawing on behalf of others if approval is given (maybe should just extend ERC20 at that point...)
-    function withdraw(UFixed18 withdrawalAmount) public {
+    function claim(UFixed18 withdrawalAmount) public {
         _before(_msgSender());
+
         if (withdrawalAmount.gt(maxWithdraw(_msgSender()))) revert BalancedVaultWithdrawMoreThanPending();
         // TODO: Update `unredeemedWithdrawals`, `pendingWithdrawals`, and `snapshots`.
 
-        // TODO: Maybe use Token18 methods instead.
-        SafeERC20Upgradeable.safeTransfer(dsu, _msgSender(), UFixed18.unwrap(withdrawalAmount));
+        dsu.push(msg.sender, withdrawalAmount);
     }
 
     /**
@@ -243,28 +249,44 @@ contract BalancedVault is IBalancedVault, ContextUpgradeable {
      * @dev Settles the vault's account on both the long and short product, along with any global or user-specific deposits/withdrawals
      * @param user The account that called the operation, or 0 if called by a keeper.
      */
-    function _before(address user) private {
+    function _before(address account) private {
         long.settleAccount(address(this));
         short.settleAccount(address(this));
 
         uint256 version = _version();
+
+        // TODO: make _settleDeposits()
         if (unsettledDeposits.amount.gt(UFixed18Lib.ZERO) && version > unsettledDeposits.oracleVersion) {
             // TODO: Calculate what to add to unredeemedShares.
             unsettledDeposits = ZERO_PENDING_DSU;
         }
 
+        // TODO: make _settleWithdrawals()
         if (unsettledWithdrawals.amount > 0 && version > unsettledWithdrawals.oracleVersion) {
             // TODO: Calculate what to add to unredeemedWithdrawals.
             unsettledWithdrawals = ZERO_PENDING_SHARES;
         }
 
-        if (user != address(0)) {
-            if (pendingDeposits[user].amount.gt(UFixed18Lib.ZERO) && version > pendingDeposits[user].oracleVersion) {
-                // TODO: Calculate what to add to user's shares
-                // TODO: Update unredeemedShares, user's shares.
-                pendingDeposits[user] = ZERO_PENDING_DSU;
-            }
+        if (account != address(0)) {
+            _settleDeposits(account, version);
+            // TODO: withdrawals
         }
+    }
+
+    function _settleDeposits(address account, uint256 version) private {
+        PendingDSU pendingDeposit = pendingDeposits[account];
+        if (pendingDeposit.amount.isZero() || version == pendingDeposit.oracleVersion) return;
+
+        UFixed18 accumulatedFunding = UFixed18Lib.ZERO; //TODO
+        UFixed18 accumulatedPnl = UFixed18Lib.ZERO; //TODO
+
+        UFixed18 totalVaultCollateral = _snapshot[version].totalCollateral.add(accumulatedFunding).add(accumulatedPnl);
+        UFixed18 totalVaultShares = _snapshot[version].totalShares;
+
+        UFixed18 shareAmount = pendingDeposit.amount.mul(totalVaultCollateral).div(totalVaultShares);
+        balanceOf[account] += UFixed18.unwrap(shareAmount);
+
+        delete pendingDeposits[account];
     }
 
     /**
