@@ -15,16 +15,10 @@ import "./interfaces/IBalancedVault.sol";
  *      the maximum amount of assets in the vault.
  */
 contract BalancedVault is IBalancedVault {
-    /// @dev An `amount` of DSU in a pending state starting at some `oracleVersion`
-    struct PendingDSU {
+    /// @dev A generic holder for an `amount` that cannot be settled until `version`
+    struct PendingAmount {
         UFixed18 amount;
-        uint256 oracleVersion;
-    }
-
-    /// @dev An `amount` of shares in a pending state starting at some `oracleVersion`
-    struct PendingShares {
-        uint256 amount;
-        uint256 oracleVersion;
+        uint256 version;
     }
 
     /// @dev Snapshot of the vault state at a given oracle version
@@ -37,10 +31,6 @@ contract BalancedVault is IBalancedVault {
         UFixed18 totalShares;
         /// @dev Vault's total collateral at the start of the oracle version
         UFixed18 totalCollateral;
-        /// @dev Vault's total initiated deposits throughout the oracle version
-        UFixed18 pendingDeposits;
-        /// @dev Vault's total initiated withdrawals throughout the oracle version
-        uint256 pendingWithdrawals;
     }
 
     UFixed18 constant private TWO = UFixed18.wrap(2e18);
@@ -66,7 +56,10 @@ contract BalancedVault is IBalancedVault {
     Token18 public immutable dsu;
 
     /// @dev Mapping of shares of the vault per user
-    mapping(address => uint256) public balanceOf;
+    mapping(address => UFixed18) public balanceOf;
+
+    /// @dev Mapping of unclaimed underlying of the vault per user
+    mapping(address => UFixed18) public unclaimed;
 
     /// @dev Total number of shares across all users
     uint256 public totalSupply;
@@ -80,16 +73,16 @@ contract BalancedVault is IBalancedVault {
     UFixed18 public unredeemedWithdrawals;
 
     /// @dev Deposits that have not been settled, or have been settled but not yet processed by this contract
-    PendingDSU public unsettledDeposits;
+    PendingAmount public unsettledDeposits;
 
     /// @dev Mapping of pending (not yet converted to shares) per user
-    mapping(address => PendingDSU) public pendingDeposits;
+    mapping(address => PendingAmount) public pendingDeposits;
 
     /// @dev Withdrawals that have not been settled, or have been settled but not yet processed by this contract
-    PendingShares public unsettledWithdrawals;
+    PendingAmount public unsettledWithdrawals;
 
     /// @dev Mapping of pending (not yet withdrawn) per user
-    mapping(address => PendingShares) public pendingWithdrawals;
+    mapping(address => PendingAmount) public pendingWithdrawals;
 
     /// @dev Mapping of snapshots of the vault state at a given oracle version
     mapping(uint256 => Snapshot) public snapshots;
@@ -169,12 +162,11 @@ contract BalancedVault is IBalancedVault {
      * @param assets The amount of assets to deposit
      * @param receiver The account to deposit on behalf of
      */
-    function deposit(UFixed18 assets, address receiver) public {
+    function deposit(UFixed18 assets, address receiver) external {
         if (assets.gt(maxDeposit(receiver))) revert BalancedVaultDepositMoreThanMax();
 
         _before(receiver);
 
-        // TODO: Optimize to reduce unnecessary external calls to get version.
         uint256 version = _version();
 
         unsettledDeposits.amount = unsettledDeposits.amount.add(assets);
@@ -190,47 +182,31 @@ contract BalancedVault is IBalancedVault {
         _update(UFixed18Lib.ZERO);
     }
 
-    function _snapshot(uint256 version, UFixed18 depositAmount, uint256 withdrawalAmount) private {
-        (UFixed18 pendingDeposits, UFixed18 pendingWithdrawals) =
-            (_snapshot[version].pendingDeposits, _snapshot[version].pendingWithdrawals);
-
-        snapshots[version] = Snapshot({
-            longPosition: long.positionAtVersion(version),
-            shortPosition: short.positionAtVersion(version),
-            totalShares: totalSupply,
-            totalCollateral: totalAssets(),
-            pendingDeposits: pendingDeposits.add(depositAmount),
-            pendingWithdrawals: pendingWithdrawals + withdrawalAmount
-        });
-    }
-
-    function withdraw(uint256 shares) public {
-        _before(_msgSender());
+    function withdraw(UFixed18 shares) external {
+        _before(msg.sender);
 
         UFixed18 withdrawalAmount = totalAssets().muldiv(shares, totalSupply);
         _update(withdrawalAmount);
 
-        // TODO: Optimize to reduce unnecessary external calls to get version.
         uint256 version = _version();
 
-        unsettledWithdrawals.amount += shares;
-        unsettledDeposits.oracleVersion = version;
+        unsettledWithdrawals.amount = unsettledWithdrawals.amount.add(shares);
+        unsettledWithdrawals.oracleVersion = version;
 
-        pendingWithdrawals[_msgSender()].amount += shares;
-        pendingDeposits[_msgSender()].oracleVersion = version;
+        pendingWithdrawals[msg.sender].amount = pendingWithdrawals[msg.sender].amount.add(shares);
+        pendingWithdrawals[msg.sender].oracleVersion = version;
 
         _snapshot(version, UFixed18Lib.ZERO);
 
-        balanceOf[_msgSender()] -= shares;
+        balanceOf[msg.sender] = balanceOf[msg.sender].sub(shares);
     }
 
-    function claim(UFixed18 withdrawalAmount) public {
-        _before(_msgSender());
+    function claim() external {
+        _before(msg.sender);
 
-        if (withdrawalAmount.gt(maxWithdraw(_msgSender()))) revert BalancedVaultWithdrawMoreThanPending();
-        // TODO: Update `unredeemedWithdrawals`, `pendingWithdrawals`, and `snapshots`.
-
-        dsu.push(msg.sender, withdrawalAmount);
+        UFixed18 claimed = unclaimed[msg.sender];
+        delete unclaimed[msg.sender];
+        dsu.push(msg.sender, claimed);
     }
 
     /**
@@ -269,81 +245,54 @@ contract BalancedVault is IBalancedVault {
 
         if (account != address(0)) {
             _settleDeposits(account, version);
-            // TODO: withdrawals
+            _settleWithdrawals(account, version);
         }
     }
 
+    function _snapshot(uint256 version) private {
+        snapshots[version] = Snapshot({
+            longPosition: long.positionAtVersion(version),
+            shortPosition: short.positionAtVersion(version),
+            totalShares: totalSupply,
+            totalCollateral: totalAssets()
+        });
+    }
+
     function _settleDeposits(address account, uint256 version) private {
-        PendingDSU pendingDeposit = pendingDeposits[account];
+        PendingAmount pendingDeposit = pendingDeposits[account];
         if (pendingDeposit.amount.isZero() || version == pendingDeposit.oracleVersion) return;
 
-        Fixed18 accumulatedFunding = _accumulateFunding(version, long).add(_accumulateFunding(version, short));
-        Fixed18 accumulatedPnl = UFixed18Lib.ZERO; _accumulatePnl(version, long).add(_accumulatePnl(version, long));
-        Fixed18 accumulatedFee = UFixed18Lib.ZERO; _accumulateFees(version, long).add(_accumulateFees(version, long));
-
-        UFixed18 totalVaultCollateral = UFixed18Lib.from( //TODO: what to do if negative?
-            Fixed18Lib.from(_snapshot[version].totalCollateral)
-                .add(accumulatedFunding)
-                .add(accumulatedPnl)
-        );
+        UFixed18 totalVaultCollateral = _collateralAt(version);
         UFixed18 totalVaultShares = _snapshot[version].totalShares;
 
-        UFixed18 shareAmount = pendingDeposit.amount.mul(totalVaultCollateral).div(totalVaultShares);
+        UFixed18 shareAmount = pendingDeposit.amount.muldiv(totalVaultCollateral, totalVaultShares);
         balanceOf[account] += UFixed18.unwrap(shareAmount);
 
         delete pendingDeposits[account];
     }
 
-    function _accumulateFunding(uint256 version, IProduct product) private view returns (Fixed18) {
-        Position memory latestPosition = product.positionAtVersion(version);
-        IOracleProvider.OracleVersion memory latestOracleVersion = product.atVersion(version);
-        IOracleProvider.OracleVersion memory toOracleVersion = product.atVersion(version + 1);
-        //TODO: this may need a keeper to ensure it's in sync? it may be negligible in its error as well
-        UFixed18 fundingFee = product.fundingFee().max(controller().minFundingFee());
+    function _settleWithdrawals(address account, uint256 version) private {
+        PendingAmount pendingWithdrawal = pendingWithdrawals[account];
+        if (pendingWithdrawal.amount.isZero() || version == pendingWithdrawal.oracleVersion) return;
 
-        if (product.closed()) return (Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO), UFixed18Lib.ZERO);
-        if (latestPosition.taker.isZero()) return (Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO), UFixed18Lib.ZERO);
-        if (latestPosition.maker.isZero()) return (Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO), UFixed18Lib.ZERO);
+        UFixed18 totalVaultCollateral = _collateralAt(version);
+        UFixed18 totalVaultShares = _snapshot[version].totalShares;
 
-        uint256 elapsed = toOracleVersion.timestamp - latestOracleVersion.timestamp;
+        UFixed18 underlyingAmount = pendingDeposit.amount.muldiv(totalVaultShares, totalVaultCollateral);
+        unclaimed[account] += underlyingAmount;
 
-        UFixed18 takerNotional = Fixed18Lib.from(latestPosition.taker).mul(latestOracleVersion.price).abs();
-        UFixed18 socializedNotional = takerNotional.mul(latestPosition.socializationFactor());
-
-        //TODO: this may need a keeper to ensure it's in sync? it may be negligible in its error as well
-        Fixed18 rateAccumulated = product.rate(latestPosition).mul(Fixed18Lib.from(UFixed18Lib.from(elapsed)));
-        Fixed18 fundingAccumulated = rateAccumulated.mul(Fixed18Lib.from(socializedNotional));
-        UFixed18 accumulatedFee = fundingAccumulated.abs().mul(fundingFee);
-
-        Fixed18 fundingAccumulatedWithoutFee = Fixed18Lib.from(
-            fundingAccumulated.sign(),
-            fundingAccumulated.abs().sub(accumulatedFee)
-        );
-
-        // We only care about the maker side of the market
-        return (fundingAccumulated.sign() < 0 ? fundingAccumulated : fundingAccumulatedWithoutFee)
-            .div(Fixed18Lib.from(latestPosition.maker));
+        delete pendingWithdrawal[account];
     }
 
-    function _accumulatePnl(uint256 version, IProduct product) private view returns (Fixed18) {
-        Position memory latestPosition = product.positionAtVersion(version);
-        IOracleProvider.OracleVersion memory latestOracleVersion = product.atVersion(version);
-        IOracleProvider.OracleVersion memory toOracleVersion = product.atVersion(version + 1);
+    function _collateralAt(usint256 version) private returns (UFixed18) {
+        Fixed18 longAccumulated = long.valueAtVersion(version + 1).sub(long.valueAtVersion(version));
+        Fixed18 shortAccumulated = short.valueAtVersion(version + 1).sub(short.valueAtVersion(version));
 
-        if (product.closed()) return Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO);
-        if (latestPosition.taker.isZero()) return Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO);
-        if (latestPosition.maker.isZero()) return Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO);
+        Fixed18 accumulated = longAccumulated.mul(_snapshot[version].longPosition)
+            .add(shortAccumulated.mul(_snapshot[version].shortPosition));
 
-        Fixed18 oracleDelta = toOracleVersion.price.sub(latestOracleVersion.price);
-        Fixed18 totalTakerDelta = oracleDelta.mul(Fixed18Lib.from(latestPosition.taker));
-        Fixed18 socializedTakerDelta = totalTakerDelta.mul(Fixed18Lib.from(latestPosition.socializationFactor()));
-
-        return socializedTakerDelta.div(Fixed18Lib.from(latestPosition.maker)).mul(Fixed18Lib.NEG_ONE);
-    }
-
-    function _accumulateFees(uint256 version, IProduct product) private view returns (Fixed18) {
-        // TODO
-        return Fixed18Lib.ZERO;
+        //TODO: what to do if negative?
+        return UFixed18Lib.from(Fixed18Lib.from(_snapshot[version].totalCollateral).add(accumulated));
     }
 
     /**
