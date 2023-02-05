@@ -61,16 +61,13 @@ contract BalancedVault is IBalancedVault {
     /// @dev Mapping of unclaimed underlying of the vault per user
     mapping(address => UFixed18) public unclaimed;
 
+    /// @dev Mapping of unclaimed underlying of the vault per user
+    UFixed18 public totalUnclaimed;
+
     /// @dev Total number of shares across all users
-    uint256 public totalSupply;
+    UFixed18 public totalSupply;
 
     // TODO: Make all the below internal/private if not necessary to be public.
-
-    /// @dev Number of shares post-settlement that have not been redeemed across all users
-    uint256 public unredeemedShares;
-
-    /// @dev Amount of DSU post-settlement that have not been redeemed across all users
-    UFixed18 public unredeemedWithdrawals;
 
     /// @dev Deposits that have not been settled, or have been settled but not yet processed by this contract
     PendingAmount public unsettledDeposits;
@@ -122,7 +119,7 @@ contract BalancedVault is IBalancedVault {
      */
     function totalAssets() public view returns (UFixed18) {
         (UFixed18 longCollateral, UFixed18 shortCollateral, UFixed18 idleCollateral) = _collateral();
-        return longCollateral.add(shortCollateral).add(idleCollateral).sub(unredeemedWithdrawals);
+        return longCollateral.add(shortCollateral).add(idleCollateral).sub(totalUnclaimed);
     }
 
     /**
@@ -165,9 +162,7 @@ contract BalancedVault is IBalancedVault {
     function deposit(UFixed18 assets, address receiver) external {
         if (assets.gt(maxDeposit(receiver))) revert BalancedVaultDepositMoreThanMax();
 
-        _before(receiver);
-
-        uint256 version = _version();
+        uint256 version = _settle(receiver);
 
         unsettledDeposits.amount = unsettledDeposits.amount.add(assets);
         unsettledDeposits.oracleVersion = version;
@@ -175,20 +170,17 @@ contract BalancedVault is IBalancedVault {
         pendingDeposits[receiver].amount = pendingDeposits[receiver].amount.add(assets);
         pendingDeposits[receiver].oracleVersion = version;
 
-        _snapshot(version, assets, 0);
-
         dsu.pull(msg.sender, assets);
 
         _update(UFixed18Lib.ZERO);
     }
 
     function withdraw(UFixed18 shares) external {
-        _before(msg.sender);
+        uint256 version = _settle(msg.sender);
 
+        // TODO: ???
         UFixed18 withdrawalAmount = totalAssets().muldiv(shares, totalSupply);
         _update(withdrawalAmount);
-
-        uint256 version = _version();
 
         unsettledWithdrawals.amount = unsettledWithdrawals.amount.add(shares);
         unsettledWithdrawals.oracleVersion = version;
@@ -196,16 +188,16 @@ contract BalancedVault is IBalancedVault {
         pendingWithdrawals[msg.sender].amount = pendingWithdrawals[msg.sender].amount.add(shares);
         pendingWithdrawals[msg.sender].oracleVersion = version;
 
-        _snapshot(version, UFixed18Lib.ZERO);
-
         balanceOf[msg.sender] = balanceOf[msg.sender].sub(shares);
     }
 
     function claim() external {
-        _before(msg.sender);
+        _settle(msg.sender);
 
         UFixed18 claimed = unclaimed[msg.sender];
         delete unclaimed[msg.sender];
+        totalUnclaimed = totalUnclaimed.sub(claimed);
+
         dsu.push(msg.sender, claimed);
     }
 
@@ -224,32 +216,24 @@ contract BalancedVault is IBalancedVault {
      * @notice Hook that is called before every stateful operation
      * @dev Settles the vault's account on both the long and short product, along with any global or user-specific deposits/withdrawals
      * @param user The account that called the operation, or 0 if called by a keeper.
+     * @return The current version
      */
-    function _before(address account) private {
+    function _settle(address account) private returns (uint256 version) {
         long.settleAccount(address(this));
         short.settleAccount(address(this));
 
-        uint256 version = _version();
+        version = _version();
+        UFixed18 collateralAtVersion = _collateralAt(version);
+        UFixed18 sharesAtVersion = _snapshot[version].totalShares;
 
-        // TODO: make _settleDeposits()
-        if (unsettledDeposits.amount.gt(UFixed18Lib.ZERO) && version > unsettledDeposits.oracleVersion) {
-            // TODO: Calculate what to add to unredeemedShares.
-            unsettledDeposits = ZERO_PENDING_DSU;
-        }
-
-        // TODO: make _settleWithdrawals()
-        if (unsettledWithdrawals.amount > 0 && version > unsettledWithdrawals.oracleVersion) {
-            // TODO: Calculate what to add to unredeemedWithdrawals.
-            unsettledWithdrawals = ZERO_PENDING_SHARES;
-        }
+        _settleDeposits(version, collateralAtVersion, sharesAtVersion);
+        _settleWithdrawals(version, collateralAtVersion, sharesAtVersion);
 
         if (account != address(0)) {
-            _settleDeposits(account, version);
-            _settleWithdrawals(account, version);
+            _settleDeposits(account, version, collateralAtVersion, sharesAtVersion);
+            _settleWithdrawals(account, version, collateralAtVersion, sharesAtVersion);
         }
-    }
 
-    function _snapshot(uint256 version) private {
         snapshots[version] = Snapshot({
             longPosition: long.positionAtVersion(version),
             shortPosition: short.positionAtVersion(version),
@@ -258,28 +242,38 @@ contract BalancedVault is IBalancedVault {
         });
     }
 
-    function _settleDeposits(address account, uint256 version) private {
-        PendingAmount pendingDeposit = pendingDeposits[account];
-        if (pendingDeposit.amount.isZero() || version == pendingDeposit.oracleVersion) return;
+    function _settleDeposits(uint256 version, UFixed18 collateralAtVersion, UFixed18 sharesAtVersion) private {
+        if (unsettledDeposits.amount.isZero() || version == unsettledDeposits.oracleVersion) return;
 
-        UFixed18 totalVaultCollateral = _collateralAt(version);
-        UFixed18 totalVaultShares = _snapshot[version].totalShares;
+        UFixed18 shareAmount = pendingDeposit.amount.muldiv(collateralAtVersion, sharesAtVersion);
+        totalSupply = totalSupply.add(shareAmount);
 
-        UFixed18 shareAmount = pendingDeposit.amount.muldiv(totalVaultCollateral, totalVaultShares);
-        balanceOf[account] += UFixed18.unwrap(shareAmount);
+        delete unsettledDeposits;
+    }
+
+    function _settleDeposits(address account, uint256 version, UFixed18 collateralAtVersion, UFixed18 sharesAtVersion) private {
+        if (pendingDeposits[account].amount.isZero() || version == pendingDeposits[account].oracleVersion) return;
+
+        UFixed18 shareAmount = pendingDeposit.amount.muldiv(collateralAtVersion, sharesAtVersion);
+        balanceOf[account] = balanceOf[account].add(shareAmount);
 
         delete pendingDeposits[account];
     }
 
-    function _settleWithdrawals(address account, uint256 version) private {
-        PendingAmount pendingWithdrawal = pendingWithdrawals[account];
-        if (pendingWithdrawal.amount.isZero() || version == pendingWithdrawal.oracleVersion) return;
+    function _settleWithdrawals(uint256 version, UFixed18 collateralAtVersion, UFixed18 sharesAtVersion) private {
+        if (unsettledWithdrawals.amount.isZero() || version == unsettledWithdrawals.oracleVersion) return;
 
-        UFixed18 totalVaultCollateral = _collateralAt(version);
-        UFixed18 totalVaultShares = _snapshot[version].totalShares;
+        UFixed18 underlyingAmount = pendingDeposit.amount.muldiv(sharesAtVersion, collateralAtVersion);
+        totalUnclaimed = totalUnclaimed.add(underlyingAmount);
 
-        UFixed18 underlyingAmount = pendingDeposit.amount.muldiv(totalVaultShares, totalVaultCollateral);
-        unclaimed[account] += underlyingAmount;
+        delete unsettledWithdrawals;
+    }
+
+    function _settleWithdrawals(address account, uint256 version, UFixed18 collateralAtVersion, UFixed18 sharesAtVersion) private {
+        if (pendingWithdrawals[account].amount.isZero() || version == pendingWithdrawals[account].oracleVersion) return;
+
+        UFixed18 underlyingAmount = pendingWithdrawal.amount.muldiv(sharesAtVersion, collateralAtVersion);
+        unclaimed[account] = unclaimed[account].add(underlyingAmount);
 
         delete pendingWithdrawal[account];
     }
