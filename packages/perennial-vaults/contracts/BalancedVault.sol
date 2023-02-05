@@ -277,16 +277,73 @@ contract BalancedVault is IBalancedVault {
         PendingDSU pendingDeposit = pendingDeposits[account];
         if (pendingDeposit.amount.isZero() || version == pendingDeposit.oracleVersion) return;
 
-        UFixed18 accumulatedFunding = UFixed18Lib.ZERO; //TODO
-        UFixed18 accumulatedPnl = UFixed18Lib.ZERO; //TODO
+        Fixed18 accumulatedFunding = _accumulateFunding(version, long).add(_accumulateFunding(version, short));
+        Fixed18 accumulatedPnl = UFixed18Lib.ZERO; _accumulatePnl(version, long).add(_accumulatePnl(version, long));
+        Fixed18 accumulatedFee = UFixed18Lib.ZERO; _accumulateFees(version, long).add(_accumulateFees(version, long));
 
-        UFixed18 totalVaultCollateral = _snapshot[version].totalCollateral.add(accumulatedFunding).add(accumulatedPnl);
+        UFixed18 totalVaultCollateral = UFixed18Lib.from( //TODO: what to do if negative?
+            Fixed18Lib.from(_snapshot[version].totalCollateral)
+                .add(accumulatedFunding)
+                .add(accumulatedPnl)
+        );
         UFixed18 totalVaultShares = _snapshot[version].totalShares;
 
         UFixed18 shareAmount = pendingDeposit.amount.mul(totalVaultCollateral).div(totalVaultShares);
         balanceOf[account] += UFixed18.unwrap(shareAmount);
 
         delete pendingDeposits[account];
+    }
+
+    function _accumulateFunding(uint256 version, IProduct product) private view returns (Fixed18) {
+        Position memory latestPosition = product.positionAtVersion(version);
+        IOracleProvider.OracleVersion memory latestOracleVersion = product.atVersion(version);
+        IOracleProvider.OracleVersion memory toOracleVersion = product.atVersion(version + 1);
+        //TODO: this may need a keeper to ensure it's in sync? it may be negligible in its error as well
+        UFixed18 fundingFee = product.fundingFee().max(controller().minFundingFee());
+
+        if (product.closed()) return (Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO), UFixed18Lib.ZERO);
+        if (latestPosition.taker.isZero()) return (Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO), UFixed18Lib.ZERO);
+        if (latestPosition.maker.isZero()) return (Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO), UFixed18Lib.ZERO);
+
+        uint256 elapsed = toOracleVersion.timestamp - latestOracleVersion.timestamp;
+
+        UFixed18 takerNotional = Fixed18Lib.from(latestPosition.taker).mul(latestOracleVersion.price).abs();
+        UFixed18 socializedNotional = takerNotional.mul(latestPosition.socializationFactor());
+
+        //TODO: this may need a keeper to ensure it's in sync? it may be negligible in its error as well
+        Fixed18 rateAccumulated = product.rate(latestPosition).mul(Fixed18Lib.from(UFixed18Lib.from(elapsed)));
+        Fixed18 fundingAccumulated = rateAccumulated.mul(Fixed18Lib.from(socializedNotional));
+        UFixed18 accumulatedFee = fundingAccumulated.abs().mul(fundingFee);
+
+        Fixed18 fundingAccumulatedWithoutFee = Fixed18Lib.from(
+            fundingAccumulated.sign(),
+            fundingAccumulated.abs().sub(accumulatedFee)
+        );
+
+        // We only care about the maker side of the market
+        return (fundingAccumulated.sign() < 0 ? fundingAccumulated : fundingAccumulatedWithoutFee)
+            .div(Fixed18Lib.from(latestPosition.maker));
+    }
+
+    function _accumulatePnl(uint256 version, IProduct product) private view returns (Fixed18) {
+        Position memory latestPosition = product.positionAtVersion(version);
+        IOracleProvider.OracleVersion memory latestOracleVersion = product.atVersion(version);
+        IOracleProvider.OracleVersion memory toOracleVersion = product.atVersion(version + 1);
+
+        if (product.closed()) return Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO);
+        if (latestPosition.taker.isZero()) return Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO);
+        if (latestPosition.maker.isZero()) return Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO);
+
+        Fixed18 oracleDelta = toOracleVersion.price.sub(latestOracleVersion.price);
+        Fixed18 totalTakerDelta = oracleDelta.mul(Fixed18Lib.from(latestPosition.taker));
+        Fixed18 socializedTakerDelta = totalTakerDelta.mul(Fixed18Lib.from(latestPosition.socializationFactor()));
+
+        return socializedTakerDelta.div(Fixed18Lib.from(latestPosition.maker)).mul(Fixed18Lib.NEG_ONE);
+    }
+
+    function _accumulateFees(uint256 version, IProduct product) private view returns (Fixed18) {
+        // TODO
+        return Fixed18Lib.ZERO;
     }
 
     /**
