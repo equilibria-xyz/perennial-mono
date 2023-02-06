@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.15;
+pragma solidity ^0.8.15;
 
 import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
@@ -92,7 +92,6 @@ contract Controller is IController, UInitializable {
 
     /**
      * @notice Creates a new coordinator with `msg.sender` as the owner
-     * @dev Can only be called by the protocol owner
      * @return New coordinator ID
      */
     function createCoordinator() external returns (uint256) {

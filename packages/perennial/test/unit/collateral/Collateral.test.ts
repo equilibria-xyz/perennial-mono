@@ -1,4 +1,5 @@
 import { MockContract, deployMockContract } from '@ethereum-waffle/mock-contract'
+import { loadFixture } from '@nomicfoundation/hardhat-network-helpers'
 import { constants, utils, BigNumberish } from 'ethers'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { expect } from 'chai'
@@ -31,7 +32,7 @@ describe('Collateral', () => {
 
   let collateral: Collateral
 
-  beforeEach(async () => {
+  const collateralFixture = async () => {
     ;[owner, user, userB, treasuryA, treasuryB, notProduct, multiInvokerMock] = await ethers.getSigners()
 
     token = await deployMockContract(owner, IERC20Metadata__factory.abi)
@@ -50,6 +51,10 @@ describe('Collateral', () => {
 
     collateral = await new Collateral__factory(owner).deploy(token.address)
     await collateral.initialize(controller.address)
+  }
+
+  beforeEach(async () => {
+    await loadFixture(collateralFixture)
   })
 
   describe('#initialize', async () => {
@@ -113,9 +118,13 @@ describe('Collateral', () => {
     })
 
     describe('multiple users per product', async () => {
-      beforeEach(async () => {
+      const fixture = async () => {
         await token.mock.transferFrom.withArgs(owner.address, collateral.address, 100).returns(true)
         await collateral.connect(owner).depositTo(user.address, product.address, 100)
+      }
+
+      beforeEach(async () => {
+        await loadFixture(fixture)
       })
 
       it('adds to both totals', async () => {
@@ -233,11 +242,15 @@ describe('Collateral', () => {
         })
 
         describe('multiple users per product', async () => {
-          beforeEach(async () => {
+          const fixture = async () => {
             await token.mock.transferFrom.withArgs(owner.address, collateral.address, 100).returns(true)
             await collateral.connect(owner).depositTo(userB.address, product.address, 100)
             await token.mock.transfer.withArgs(owner.address, 80).returns(true)
             await fn(owner.address, product.address, 80)
+          }
+
+          beforeEach(async () => {
+            await loadFixture(fixture)
           })
 
           it('subtracts from both totals', async () => {
@@ -252,12 +265,16 @@ describe('Collateral', () => {
         })
 
         describe('shortfall', async () => {
-          beforeEach(async () => {
+          const fixture = async () => {
             await token.mock.transferFrom.withArgs(owner.address, collateral.address, 100).returns(true)
             await collateral.connect(owner).depositTo(userB.address, product.address, 100)
 
             await collateral.connect(productSigner).settleAccount(userB.address, -150)
             await collateral.connect(productSigner).settleAccount(user.address, 150)
+          }
+
+          beforeEach(async () => {
+            await loadFixture(fixture)
           })
 
           it('reverts if depleted', async () => {
@@ -270,7 +287,7 @@ describe('Collateral', () => {
         })
 
         describe('shortfall (multiple)', async () => {
-          beforeEach(async () => {
+          const fixture = async () => {
             await token.mock.transferFrom.withArgs(owner.address, collateral.address, 100).returns(true)
             await collateral.connect(owner).depositTo(userB.address, product.address, 100)
 
@@ -278,6 +295,10 @@ describe('Collateral', () => {
             await collateral.connect(productSigner).settleAccount(userB.address, -50)
             await collateral.connect(productSigner).settleAccount(user.address, 150)
             await collateral.connect(productSigner).settleAccount(user.address, 50)
+          }
+
+          beforeEach(async () => {
+            await loadFixture(fixture)
           })
 
           it('reverts if depleted', async () => {
@@ -349,13 +370,17 @@ describe('Collateral', () => {
   })
 
   describe('#settleProduct', async () => {
-    beforeEach(async () => {
+    const settleProductFixture = async () => {
       await token.mock.transferFrom.withArgs(owner.address, collateral.address, 100).returns(true)
       await collateral.depositTo(user.address, product.address, 100)
 
       await controller.mock['treasury()'].returns(treasuryA.address)
       await controller.mock['treasury(address)'].withArgs(product.address).returns(treasuryB.address)
       await controller.mock.protocolFee.returns(utils.parseEther('0.1'))
+    }
+
+    beforeEach(async () => {
+      await loadFixture(settleProductFixture)
     })
 
     it('settles the product fee', async () => {
@@ -385,7 +410,7 @@ describe('Collateral', () => {
   })
 
   describe('#liquidate', async () => {
-    beforeEach(async () => {
+    const liquidateFixture = async () => {
       // Setup the with 100 underlying collateral
       await token.mock.transferFrom.withArgs(owner.address, collateral.address, 100).returns(true)
       await collateral.depositTo(user.address, product.address, 100)
@@ -395,6 +420,10 @@ describe('Collateral', () => {
 
       // Mock isLiquidating calls
       await product.mock.isLiquidating.withArgs(user.address).returns(false)
+    }
+
+    beforeEach(async () => {
+      await loadFixture(liquidateFixture)
     })
 
     context('user not liquidatable', async () => {
@@ -423,6 +452,22 @@ describe('Collateral', () => {
 
         expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(50)
         expect(await collateral['collateral(address)'](product.address)).to.equal(50)
+      })
+
+      it('calculates fee on minCollateral if maintenance < minCollateral', async () => {
+        await controller.mock.minCollateral.returns(120)
+        await product.mock.maintenance.withArgs(user.address).returns(101)
+        await product.mock.closeAll.withArgs(user.address).returns()
+        await token.mock.transfer.withArgs(owner.address, 60).returns(true)
+
+        expect(await collateral.liquidatable(user.address, product.address)).to.equal(true)
+
+        await expect(collateral.liquidate(user.address, product.address))
+          .to.emit(collateral, 'Liquidation')
+          .withArgs(user.address, product.address, owner.address, 60)
+
+        expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(40)
+        expect(await collateral['collateral(address)'](product.address)).to.equal(40)
       })
 
       it('limits fee to total collateral', async () => {
@@ -465,9 +510,13 @@ describe('Collateral', () => {
   })
 
   describe('#liquidatable', async () => {
-    beforeEach(async () => {
+    const fixture = async () => {
       await token.mock.transferFrom.withArgs(owner.address, collateral.address, 100).returns(true)
       await collateral.depositTo(user.address, product.address, 100)
+    }
+
+    beforeEach(async () => {
+      await loadFixture(fixture)
     })
 
     it('returns true if below maintenance', async () => {
@@ -492,9 +541,13 @@ describe('Collateral', () => {
   })
 
   describe('#liquidatableNext', async () => {
-    beforeEach(async () => {
+    const fixture = async () => {
       await token.mock.transferFrom.withArgs(owner.address, collateral.address, 100).returns(true)
       await collateral.depositTo(user.address, product.address, 100)
+    }
+
+    beforeEach(async () => {
+      await loadFixture(fixture)
     })
 
     it('returns true', async () => {
@@ -511,8 +564,12 @@ describe('Collateral', () => {
   })
 
   describe('#resolveShortfall', async () => {
-    beforeEach(async () => {
+    const fixture = async () => {
       await collateral.connect(productSigner).settleAccount(user.address, -100)
+    }
+
+    beforeEach(async () => {
+      await loadFixture(fixture)
     })
 
     it('pays off the shortfall', async () => {
@@ -536,7 +593,7 @@ describe('Collateral', () => {
   })
 
   describe('#claimFee', async () => {
-    beforeEach(async () => {
+    const fixture = async () => {
       await token.mock.transferFrom.withArgs(owner.address, collateral.address, 100).returns(true)
       await collateral.depositTo(user.address, product.address, 100)
 
@@ -545,6 +602,10 @@ describe('Collateral', () => {
       await controller.mock.protocolFee.returns(utils.parseEther('0.1'))
 
       await collateral.connect(productSigner).settleProduct(90)
+    }
+
+    beforeEach(async () => {
+      await loadFixture(fixture)
     })
 
     it('claims fee', async () => {

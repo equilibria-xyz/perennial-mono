@@ -44,7 +44,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     fundingFee: ethers.utils.parseEther('0.10'),
     makerFee: 0,
     takerFee: 0,
-    makerLimit: ethers.utils.parseEther('2500'),
+    positionFee: 0,
+    makerLimit: ethers.utils.parseEther('600'),
     utilizationCurve: {
       minRate: ethers.utils.parseEther('0.04'),
       maxRate: ethers.utils.parseEther('16.25'),

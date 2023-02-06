@@ -23,10 +23,12 @@
     "lint": "eslint --fix --ext '.ts,.js' ./ && solhint 'contracts/**/*.sol' --fix",
     "format": "prettier -w .",
     "clean": "rm -rf cache artifacts types/generated dist deployments/localhost",
-    "node:fork:kovan": "FORK_ENABLED=true FORK_NETWORK=kovan NODE_INTERVAL_MINING=500 hardhat node",
-    "deploy:fork:kovan": "FORK_ENABLED=true FORK_NETWORK=kovan hardhat deploy --network localhost",
     "node:fork:goerli": "FORK_ENABLED=true FORK_NETWORK=goerli NODE_INTERVAL_MINING=500 hardhat node",
     "deploy:fork:goerli": "FORK_ENABLED=true FORK_NETWORK=goerli hardhat deploy --network localhost",
+    "node:fork:arbitrumGoerli": "FORK_ENABLED=true FORK_NETWORK=arbitrumGoerli NODE_INTERVAL_MINING=500 hardhat node",
+    "deploy:fork:arbitrumGoerli": "FORK_ENABLED=true FORK_NETWORK=arbitrumGoerli hardhat deploy --network localhost",
+    "node:fork:optimismGoerli": "FORK_ENABLED=true FORK_NETWORK=optimismGoerli NODE_INTERVAL_MINING=500 hardhat node",
+    "deploy:fork:optimismGoerli": "FORK_ENABLED=true FORK_NETWORK=optimismGoerli hardhat deploy --network localhost",
     "node:fork:mainnet": "FORK_ENABLED=true FORK_NETWORK=mainnet NODE_INTERVAL_MINING=500 hardhat node",
     "deploy:fork:mainnet": "FORK_ENABLED=true FORK_NETWORK=mainnet hardhat deploy --network localhost",
     "prepack": "yarn clean && yarn build && find artifacts/contracts -name '*.dbg.json' -type f -delete"
@@ -34,8 +36,8 @@
   "author": "",
   "license": "APACHE-2.0",
   "dependencies": {
-    "@equilibria/perennial": "0.2.1",
-    "@equilibria/root": "0.1.6",
+    "@equilibria/perennial": "1.2.0",
+    "@equilibria/root": "0.2.0",
     "@openzeppelin/contracts": "4.6.0"
   },
   "peerDependencies": {
