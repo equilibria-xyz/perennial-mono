@@ -2,7 +2,7 @@ import { HardhatRuntimeEnvironment } from 'hardhat/types'
 import { DeployFunction } from 'hardhat-deploy/types'
 import { Deployment } from 'hardhat-deploy/dist/types'
 import { getMultisigAddress } from '../../common/testutil/constants'
-import { IERC20__factory, MultiInvoker__factory } from '../types/generated'
+import { Controller__factory, IERC20__factory, MultiInvoker__factory } from '../types/generated'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
@@ -15,7 +15,11 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const networkName = getNetworkName()
   const dsuAddress = (await getOrNull('DSU'))?.address || (await get('TestnetDSU')).address
   const usdcAddress = (await getOrNull('USDC'))?.address || (await get('TestnetUSDC')).address
-  const batcherAddress = (await getOrNull('Batcher'))?.address || (await get('TestnetBatcher')).address
+  const batcherAddress =
+    (await getOrNull('Batcher'))?.address ||
+    (await getOrNull('TestnetBatcher'))?.address ||
+    ethers.constants.AddressZero
+  const reserveAddress = (await getOrNull('EmptysetReserve'))?.address || (await get('TestnetReserve')).address
   const controllerAddress = (await get('Controller_Proxy')).address
   const proxyAdminAddress = (await get('ProxyAdmin')).address
   const multisigAddress = getMultisigAddress(networkName) || deployer
@@ -32,7 +36,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const multiInvokerImpl: Deployment = await deploy('MultiInvoker_Impl', {
     contract: 'MultiInvoker',
-    args: [usdcAddress, batcherAddress, controllerAddress],
+    args: [usdcAddress, batcherAddress, reserveAddress, controllerAddress],
     from: deployer,
     skipIfAlreadyDeployed: true,
     log: true,
@@ -51,11 +55,22 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   // INITIALIZE
   const multiInvoker = await new MultiInvoker__factory(deployerSigner).attach((await get('MultiInvoker_Proxy')).address)
 
-  if ((await usdc.callStatic.allowance(multiInvoker.address, batcherAddress)).eq(ethers.constants.MaxUint256)) {
+  if ((await usdc.callStatic.allowance(multiInvoker.address, reserveAddress)).eq(ethers.constants.MaxUint256)) {
     console.log('MultiInvoker already initialized.')
   } else {
     process.stdout.write('initializing MultiInvoker... ')
     await (await multiInvoker.initialize()).wait(2)
+    process.stdout.write('complete.\n')
+  }
+
+  const controller = await new Controller__factory(deployerSigner).attach(controllerAddress)
+
+  // Set MultiInvoker on Controller
+  if ((await controller.multiInvoker()) === multiInvoker.address) {
+    console.log('MultiInvoker already set on Controller.')
+  } else {
+    process.stdout.write('Setting MultiInvoker address on Controller... ')
+    await (await controller.updateMultiInvoker(multiInvoker.address)).wait(2)
     process.stdout.write('complete.\n')
   }
 }

@@ -2,7 +2,7 @@ import { expect } from 'chai'
 import 'hardhat'
 import { utils } from 'ethers'
 
-import { InstanceVars, deployProtocol, createProduct, depositTo } from '../helpers/setupHelpers'
+import { InstanceVars, deployProtocol, createProduct, depositTo, INITIAL_VERSION } from '../helpers/setupHelpers'
 import { Product } from '../../../types/generated'
 
 describe('Closed Product', () => {
@@ -29,9 +29,9 @@ describe('Closed Product', () => {
     await chainlink.next()
     await expect(product.updateClosed(true))
       .to.emit(product, 'ClosedUpdated')
-      .withArgs(true, 2474)
+      .withArgs(true, INITIAL_VERSION + 2)
       .to.emit(product, 'Settle')
-      .withArgs(2474, 2474)
+      .withArgs(INITIAL_VERSION + 2, INITIAL_VERSION + 2)
 
     expect(await product.closed()).to.be.true
   })

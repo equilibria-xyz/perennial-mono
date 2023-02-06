@@ -31,8 +31,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     // ORACLE
 
     await deploy('ChainlinkOracle_ETH', {
-      contract: 'ReservoirFeedOracle',
-      args: [chainlinkETHUSDDataFeedAddress, hre.ethers.BigNumber.from('18446744073709556730')],
+      contract: 'ChainlinkFeedOracle',
+      args: [chainlinkETHUSDDataFeedAddress],
       from: deployer,
       skipIfAlreadyDeployed: true,
       log: true,

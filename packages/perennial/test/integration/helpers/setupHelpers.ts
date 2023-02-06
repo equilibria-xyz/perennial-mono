@@ -44,7 +44,7 @@ const { config, deployments, ethers } = HRE
 
 export const INITIAL_PHASE_ID = 1
 export const INITIAL_AGGREGATOR_ROUND_ID = 10000
-export const INITIAL_VERSION = 2472 // registry's phase 1 starts at aggregatorRoundID 7528
+export const INITIAL_VERSION = INITIAL_AGGREGATOR_ROUND_ID - 7528 // registry's phase 1 starts at aggregatorRoundID 7528
 export const DSU_HOLDER = '0x0B663CeaCEF01f2f88EB7451C70Aa069f19dB997'
 export const USDC_HOLDER = '0x0A59649758aa4d66E25f08Dd01271e891fe52199'
 
@@ -136,9 +136,11 @@ export async function deployProtocol(): Promise<InstanceVars> {
   await collateral.initialize(controller.address)
 
   // Setup MultiInvoker
+  const reserve = IEmptySetReserve__factory.connect(await batcher.RESERVE(), owner)
   const multiInvokerImpl = await new MultiInvoker__factory(owner).deploy(
     usdc.address,
     batcher.address,
+    reserve.address,
     controllerProxy.address,
   )
   const multiInvokerProxy = await new TransparentUpgradeableProxy__factory(owner).deploy(
@@ -161,12 +163,7 @@ export async function deployProtocol(): Promise<InstanceVars> {
   await controller.updateMultiInvoker(multiInvoker.address)
 
   // Set state
-  const dsuHolder = await impersonate.impersonateWithBalance(DSU_HOLDER, utils.parseEther('10'))
-  await dsu.connect(dsuHolder).transfer(user.address, utils.parseEther('20000'))
-  await dsu.connect(dsuHolder).transfer(userB.address, utils.parseEther('20000'))
-  await dsu.connect(dsuHolder).transfer(userC.address, utils.parseEther('20000'))
-  await dsu.connect(dsuHolder).transfer(userD.address, utils.parseEther('20000'))
-  const usdcHolder = await impersonate.impersonateWithBalance(USDC_HOLDER, utils.parseEther('10'))
+  const { dsuHolder, usdcHolder } = await setupTokenHolders(dsu, [user, userB, userC, userD])
   await chainlinkOracle.sync()
 
   const lens = await new PerennialLens__factory(owner).deploy(controller.address)
@@ -179,7 +176,6 @@ export async function deployProtocol(): Promise<InstanceVars> {
   )
 
   const incentiveToken = await new ERC20PresetMinterPauser__factory(owner).deploy('Incentive Token', 'ITKN')
-  const reserve = IEmptySetReserve__factory.connect(await batcher.RESERVE(), owner)
 
   return {
     owner,
@@ -193,7 +189,7 @@ export async function deployProtocol(): Promise<InstanceVars> {
     dsuHolder,
     chainlink,
     chainlinkOracle,
-    contractPayoffProvider: contractPayoffProvider,
+    contractPayoffProvider,
     dsu,
     usdc,
     usdcHolder,
@@ -269,17 +265,22 @@ export async function createIncentiveProgram(
   }
   await incentiveToken.mint(programOwner.address, amount.maker.add(amount.taker))
   await incentiveToken.connect(programOwner).approve(incentivizer.address, amount.maker.add(amount.taker))
+
+  const latestVersion = await product['latestVersion()']()
+  const oracleVersion = await product.atVersion(latestVersion)
   const programInfo = {
     coordinatorId,
     token: incentiveToken.address,
     amount,
-    start: (await time.currentBlockTimestamp()) + 60 * 60,
+    start: oracleVersion.timestamp.add(10),
     duration: 60 * 60 * 24 * 30 * 12 * 1.5,
   }
-  const returnValue = await incentivizer.connect(programOwner).callStatic.create(product.address, programInfo)
 
+  const timestampDiference = (await time.currentBlockTimestamp()) - oracleVersion.timestamp.toNumber()
+  await time.increase(-1 * (timestampDiference + 10))
+  const returnValue = await incentivizer.connect(programOwner).callStatic.create(product.address, programInfo)
   await incentivizer.connect(programOwner).create(product.address, programInfo)
-  await time.increase(60 * 60 + 1)
+  await time.increase(timestampDiference + 10)
   return returnValue
 }
 
@@ -292,4 +293,19 @@ export async function depositTo(
   const { dsu, collateral } = instanceVars
   await dsu.connect(user).approve(collateral.address, position)
   await collateral.connect(user).depositTo(user.address, product.address, position)
+}
+
+export async function setupTokenHolders(
+  dsu: IERC20Metadata,
+  users: SignerWithAddress[],
+): Promise<{ dsuHolder: SignerWithAddress; usdcHolder: SignerWithAddress }> {
+  const dsuHolder = await impersonate.impersonateWithBalance(DSU_HOLDER, utils.parseEther('10'))
+  await Promise.all(
+    users.map(async user => {
+      await dsu.connect(dsuHolder).transfer(user.address, utils.parseEther('20000'))
+    }),
+  )
+  const usdcHolder = await impersonate.impersonateWithBalance(USDC_HOLDER, utils.parseEther('10'))
+
+  return { dsuHolder, usdcHolder }
 }
