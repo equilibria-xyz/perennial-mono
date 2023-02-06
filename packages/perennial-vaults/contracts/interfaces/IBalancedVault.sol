@@ -9,7 +9,7 @@ interface IBalancedVault {
 
     struct PendingAmount {
         UFixed18 amount;
-        uint256 version;
+        uint256 version; // TODO: don't need this for global, already stored in perennial
     }
 
     struct Version {
@@ -17,6 +17,12 @@ interface IBalancedVault {
         UFixed18 shortPosition;
         UFixed18 totalShares;
         UFixed18 totalCollateral;
+    }
+
+    struct VersionContext {
+        uint256 version;
+        UFixed18 latestCollateral;
+        UFixed18 latestShares;
     }
 
     event PositionUpdated(IProduct product, UFixed18 targetPosition);
