@@ -1,14 +1,16 @@
 import { dirname } from 'path'
 
-import defaultConfig, { OPTIMIZER_ENABLED, SOLIDITY_VERSION } from '../common/hardhat.default.config'
+import defaultConfig, { OPTIMIZER_ENABLED } from '../common/hardhat.default.config'
 const eqPerennialOracleDir = dirname(require.resolve('@equilibria/perennial-oracle/package.json'))
+
+import './tasks'
 
 // This Solidity config produces small contract sizes, and is useful when
 // contracts are close to the maximum possible size. The trade off is each
 // function call will likely use extra gas.
 // Mostly inspired by Compound Comet's setup: https://github.com/compound-finance/comet/blob/main/hardhat.config.ts#L124
 const MINIMUM_CONTRACT_SIZE_SOLIDITY_OVERRIDES = {
-  version: SOLIDITY_VERSION,
+  version: '0.8.17',
   settings: {
     viaIR: OPTIMIZER_ENABLED,
     optimizer: OPTIMIZER_ENABLED
@@ -46,6 +48,8 @@ const config = defaultConfig({
   externalDeployments: {
     kovan: [`${eqPerennialOracleDir}/deployments/kovan`],
     goerli: [`${eqPerennialOracleDir}/deployments/goerli`],
+    arbitrumGoerli: [`${eqPerennialOracleDir}/deployments/arbitrumGoerli`],
+    optimismGoerli: [`${eqPerennialOracleDir}/deployments/optimismGoerli`],
     mainnet: [`${eqPerennialOracleDir}/deployments/mainnet`],
     hardhat: [`${eqPerennialOracleDir}/deployments/mainnet`],
     localhost: [`${eqPerennialOracleDir}/deployments/localhost`],
@@ -62,6 +66,8 @@ const config = defaultConfig({
     '@equilibria/perennial-oracle/contracts/test/PassthroughDataFeed.sol',
     '@equilibria/perennial-oracle/contracts/test/PassthroughChainlinkFeed.sol',
     '@equilibria/emptyset-batcher/batcher/Batcher.sol',
+    '@equilibria/root/control/unstructured/CrossChainOwner/UCrossChainOwner_Arbitrum.sol',
+    '@equilibria/root/control/unstructured/CrossChainOwner/UCrossChainOwner_Optimism.sol',
   ],
 })
 

@@ -2,7 +2,7 @@ import { expect } from 'chai'
 import 'hardhat'
 import { utils } from 'ethers'
 
-import { InstanceVars, deployProtocol, createProduct, depositTo } from '../helpers/setupHelpers'
+import { InstanceVars, deployProtocol, createProduct, depositTo, INITIAL_VERSION } from '../helpers/setupHelpers'
 import { Big18Math, expectPositionEq } from '../../../../common/testutil/types'
 import { Product } from '../../../types/generated'
 
@@ -430,13 +430,13 @@ describe('Fees', () => {
       it('updates the fees immediately', async () => {
         await expect(product.updateMakerFee(NEW_MAKER_FEE_RATE))
           .to.emit(product, 'MakerFeeUpdated')
-          .withArgs(NEW_MAKER_FEE_RATE, 2472)
+          .withArgs(NEW_MAKER_FEE_RATE, INITIAL_VERSION)
         await expect(product.updateTakerFee(NEW_TAKER_FEE_RATE))
           .to.emit(product, 'TakerFeeUpdated')
-          .withArgs(NEW_TAKER_FEE_RATE, 2472)
+          .withArgs(NEW_TAKER_FEE_RATE, INITIAL_VERSION)
         await expect(product.updatePositionFee(NEW_POSITION_FEE_RATE))
           .to.emit(product, 'PositionFeeUpdated')
-          .withArgs(NEW_POSITION_FEE_RATE, 2472)
+          .withArgs(NEW_POSITION_FEE_RATE, INITIAL_VERSION)
 
         expect(await product.makerFee()).to.equal(NEW_MAKER_FEE_RATE)
         expect(await product.takerFee()).to.equal(NEW_TAKER_FEE_RATE)
@@ -459,9 +459,9 @@ describe('Fees', () => {
       it('settles before updating maker fee', async () => {
         await expect(product.updateMakerFee(NEW_MAKER_FEE_RATE))
           .to.emit(product, 'MakerFeeUpdated')
-          .withArgs(NEW_MAKER_FEE_RATE, 2473)
+          .withArgs(NEW_MAKER_FEE_RATE, INITIAL_VERSION + 1)
           .to.emit(product, 'Settle')
-          .withArgs(2473, 2473)
+          .withArgs(INITIAL_VERSION + 1, INITIAL_VERSION + 1)
 
         expect(await product.makerFee()).to.equal(NEW_MAKER_FEE_RATE)
       })
@@ -469,9 +469,9 @@ describe('Fees', () => {
       it('settles before updating taker fee', async () => {
         await expect(product.updateTakerFee(NEW_TAKER_FEE_RATE))
           .to.emit(product, 'TakerFeeUpdated')
-          .withArgs(NEW_TAKER_FEE_RATE, 2473)
+          .withArgs(NEW_TAKER_FEE_RATE, INITIAL_VERSION + 1)
           .to.emit(product, 'Settle')
-          .withArgs(2473, 2473)
+          .withArgs(INITIAL_VERSION + 1, INITIAL_VERSION + 1)
 
         expect(await product.takerFee()).to.equal(NEW_TAKER_FEE_RATE)
       })
@@ -479,9 +479,9 @@ describe('Fees', () => {
       it('settles before updating position fee', async () => {
         await expect(product.updatePositionFee(NEW_POSITION_FEE_RATE))
           .to.emit(product, 'PositionFeeUpdated')
-          .withArgs(NEW_POSITION_FEE_RATE, 2473)
+          .withArgs(NEW_POSITION_FEE_RATE, INITIAL_VERSION + 1)
           .to.emit(product, 'Settle')
-          .withArgs(2473, 2473)
+          .withArgs(INITIAL_VERSION + 1, INITIAL_VERSION + 1)
 
         expect(await product.positionFee()).to.equal(NEW_POSITION_FEE_RATE)
       })
@@ -509,7 +509,9 @@ describe('Fees', () => {
 
         await chainlink.next()
 
-        await expect(product.settle()).to.emit(product, 'MakerFeeUpdated').withArgs(NEW_MAKER_FEE_RATE, 2473)
+        await expect(product.settle())
+          .to.emit(product, 'MakerFeeUpdated')
+          .withArgs(NEW_MAKER_FEE_RATE, INITIAL_VERSION + 1)
 
         expect(await product.makerFee()).to.equal(NEW_MAKER_FEE_RATE)
       })
@@ -526,7 +528,9 @@ describe('Fees', () => {
 
         await chainlink.next()
 
-        await expect(product.settle()).to.emit(product, 'TakerFeeUpdated').withArgs(NEW_TAKER_FEE_RATE, 2473)
+        await expect(product.settle())
+          .to.emit(product, 'TakerFeeUpdated')
+          .withArgs(NEW_TAKER_FEE_RATE, INITIAL_VERSION + 1)
 
         expect(await product.takerFee()).to.equal(NEW_TAKER_FEE_RATE)
       })
@@ -543,7 +547,9 @@ describe('Fees', () => {
 
         await chainlink.next()
 
-        await expect(product.settle()).to.emit(product, 'PositionFeeUpdated').withArgs(NEW_POSITION_FEE_RATE, 2473)
+        await expect(product.settle())
+          .to.emit(product, 'PositionFeeUpdated')
+          .withArgs(NEW_POSITION_FEE_RATE, INITIAL_VERSION + 1)
 
         expect(await product.positionFee()).to.equal(NEW_POSITION_FEE_RATE)
       })
@@ -573,11 +579,11 @@ describe('Fees', () => {
 
         await expect(product.settle())
           .to.emit(product, 'MakerFeeUpdated')
-          .withArgs(NEW_MAKER_FEE_RATE, 2473)
+          .withArgs(NEW_MAKER_FEE_RATE, INITIAL_VERSION + 1)
           .to.emit(product, 'TakerFeeUpdated')
-          .withArgs(NEW_TAKER_FEE_RATE, 2473)
+          .withArgs(NEW_TAKER_FEE_RATE, INITIAL_VERSION + 1)
           .to.emit(product, 'PositionFeeUpdated')
-          .withArgs(NEW_POSITION_FEE_RATE, 2473)
+          .withArgs(NEW_POSITION_FEE_RATE, INITIAL_VERSION + 1)
 
         expect(await product.makerFee()).to.equal(NEW_MAKER_FEE_RATE)
         expect(await product.takerFee()).to.equal(NEW_TAKER_FEE_RATE)
