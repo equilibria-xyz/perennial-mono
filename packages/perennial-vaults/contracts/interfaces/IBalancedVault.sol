@@ -5,6 +5,23 @@ import "@equilibria/perennial/contracts/interfaces/ICollateral.sol";
 import "@equilibria/root/number/types/UFixed18.sol";
 
 interface IBalancedVault {
+    /// @dev A generic holder for an `amount` that cannot be settled until `version`
+    struct PendingAmount {
+        UFixed18 amount;
+        uint256 version;
+    }
+
+    /// @dev Version of the vault state at a given oracle version
+    struct Version {
+        /// @dev Vault's position in `long` at the start of the oracle version
+        UFixed18 longPosition;
+        /// @dev Vault's position in `short` at the start of the oracle version
+        UFixed18 shortPosition;
+        /// @dev Vault's total shares issued at the start of the oracle version
+        UFixed18 totalShares;
+        /// @dev Vault's total collateral at the start of the oracle version
+        UFixed18 totalCollateral;
+    }
 
     // TODO: BalancedVault interface
 

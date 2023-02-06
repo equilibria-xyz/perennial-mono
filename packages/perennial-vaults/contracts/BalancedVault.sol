@@ -2,6 +2,7 @@
 pragma solidity 0.8.15;
 
 import "./interfaces/IBalancedVault.sol";
+import "@equilibria/root/control/unstructured/UInitializable.sol";
 
 // TODO: Allow withdrawing on behalf of others if approval is given (maybe should just extend ERC20 at that point...)
 // TODO: block everything if liquidatable
@@ -16,25 +17,7 @@ import "./interfaces/IBalancedVault.sol";
  *      maintain `targetLeverage` with its open positions at any given time. Deposits are only gated in so much as to cap
  *      the maximum amount of assets in the vault.
  */
-contract BalancedVault is IBalancedVault {
-    /// @dev A generic holder for an `amount` that cannot be settled until `version`
-    struct PendingAmount {
-        UFixed18 amount;
-        uint256 version;
-    }
-
-    /// @dev Version of the vault state at a given oracle version
-    struct Version {
-        /// @dev Vault's position in `long` at the start of the oracle version
-        UFixed18 longPosition;
-        /// @dev Vault's position in `short` at the start of the oracle version
-        UFixed18 shortPosition;
-        /// @dev Vault's total shares issued at the start of the oracle version
-        UFixed18 totalShares;
-        /// @dev Vault's total collateral at the start of the oracle version
-        UFixed18 totalCollateral;
-    }
-
+contract BalancedVault is IBalancedVault, UInitializable {
     UFixed18 constant private TWO = UFixed18.wrap(2e18);
 
     /// @dev The address of the Perennial collateral contract
@@ -82,7 +65,6 @@ contract BalancedVault is IBalancedVault {
     /// @dev Mapping of versions of the vault state at a given oracle version
     mapping(uint256 => Version) private _versions;
 
-    // TODO: Initializer
     constructor(
         Token18 asset_,
         ICollateral collateral_,
@@ -97,8 +79,10 @@ contract BalancedVault is IBalancedVault {
         targetLeverage = targetLeverage_;
         maxCollateral = maxCollateral_;
         asset = asset_;
+    }
 
-        asset.approve(address(collateral_));
+    function initialize() external initializer(1) {
+        asset.approve(address(collateral));
     }
 
     /**
