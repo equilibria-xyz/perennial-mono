@@ -110,7 +110,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @return Maximum available redeemable amount
      */
     function maxRedeem(address owner) public view returns (UFixed18) {
-        if (!healthy()) return UFixed18Lib.ZERO;
+        if (unhealthy()) return UFixed18Lib.ZERO;
 
         return balanceOf[owner];
     }
@@ -121,7 +121,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @return Maximum available deposit amount
      */
     function maxDeposit(address) public view returns (UFixed18) {
-        if (!healthy()) return UFixed18Lib.ZERO;
+        if (unhealthy()) return UFixed18Lib.ZERO;
 
         UFixed18 currentCollateral = totalAssets();
 
@@ -183,15 +183,14 @@ contract BalancedVault is IBalancedVault, UInitializable {
     }
 
     /**
-     * @notice Returns whether the vault's positions have been been recently liquidated
-     * @dev If one product's position is zero while the other is non-zero, this indicates a recent liquidation
-     * @return Whether the vault is healthy
+     * @notice Returns whether the vault's are currently in liquidation or are eligible to be
+     * @return Whether the vault is currently unhealthy
      */
-    //TODO: change to liquidatable
-    function healthy() public view returns (bool) {
-        (bool isLongZero, bool isShortZero) =
-            (long.position(address(this)).maker.isZero(), short.position(address(this)).maker.isZero());
-        return isLongZero == isShortZero;
+    function unhealthy() public view returns (bool) {
+        return collateral.liquidatable(address(this), long)
+            || collateral.liquidatable(address(this), short)
+            || long.isLiquidating(address(this))
+            || short.isLiquidating(address(this));
     }
 
     /**
