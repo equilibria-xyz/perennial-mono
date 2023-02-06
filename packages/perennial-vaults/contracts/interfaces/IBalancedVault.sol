@@ -35,7 +35,7 @@ interface IBalancedVault {
     function maxCollateral() external view returns (UFixed18);
     function unclaimed(address owner) external view returns (UFixed18);
     function totalUnclaimed() external view returns (UFixed18);
-    function claim() external;
+    function claim(address owner) external;
 
     // TODO: ERC4626 interface
 
@@ -67,7 +67,7 @@ interface IBalancedVault {
     function totalSupply() external view returns (UFixed18);
     function balanceOf(address account) external view returns (UFixed18);
 //    function transfer(address to, uint256 amount) external returns (bool);
-//    function allowance(address owner, address spender) external view returns (uint256);
-//    function approve(address spender, uint256 amount) external returns (bool);
+    function allowance(address owner, address spender) external view returns (UFixed18);
+    function approve(address spender, UFixed18 amount) external returns (bool);
 //    function transferFrom(address from, address to, uint256 amount) external returns (bool);
 }

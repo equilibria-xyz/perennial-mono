@@ -4,10 +4,7 @@ pragma solidity 0.8.15;
 import "./interfaces/IBalancedVault.sol";
 import "@equilibria/root/control/unstructured/UInitializable.sol";
 
-// TODO: Allow withdrawing on behalf of others if approval is given (maybe should just extend ERC20 at that point...)
-// TODO: block everything if liquidatable
 // TODO: what to do if zero-balance w/ non-zero shares on deposit?
-// TODO: work with multi-invoker
 // TODO: balanceOf and totalSupply that take into account pending?
 
 /**
@@ -41,14 +38,17 @@ contract BalancedVault is IBalancedVault, UInitializable {
     /// @dev Mapping of shares of the vault per user
     mapping(address => UFixed18) public balanceOf;
 
+    /// @dev Total number of shares across all users
+    UFixed18 public totalSupply;
+
+    /// @dev Mapping of allowance across all users
+    mapping(address => mapping(address => UFixed18)) public allowance;
+
     /// @dev Mapping of unclaimed underlying of the vault per user
     mapping(address => UFixed18) public unclaimed;
 
     /// @dev Mapping of unclaimed underlying of the vault per user
     UFixed18 public totalUnclaimed;
-
-    /// @dev Total number of shares across all users
-    UFixed18 public totalSupply;
 
     /// @dev Deposits that have not been settled, or have been settled but not yet processed by this contract
     PendingAmount private _deposit;
@@ -73,12 +73,12 @@ contract BalancedVault is IBalancedVault, UInitializable {
         UFixed18 targetLeverage_,
         UFixed18 maxCollateral_
     ) {
+        asset = asset_;
         collateral = collateral_;
         long = long_;
         short = short_;
         targetLeverage = targetLeverage_;
         maxCollateral = maxCollateral_;
-        asset = asset_;
     }
 
     function initialize() external initializer(1) {
@@ -152,10 +152,8 @@ contract BalancedVault is IBalancedVault, UInitializable {
     }
 
     function redeem(UFixed18 shares, address, address owner) external {
-        // TODO: owner verification
-        // TODO: receiver?
-
         if (shares.gt(maxRedeem(owner))) revert BalancedVaultRedemptionLimitExceeded();
+        if (msg.sender != owner) allowance[owner][msg.sender] = allowance[owner][msg.sender].sub(shares);
 
         uint256 version = _settle(owner);
 
@@ -170,16 +168,21 @@ contract BalancedVault is IBalancedVault, UInitializable {
         _rebalance(UFixed18Lib.ZERO);
     }
 
-    function claim() external {
-        _settle(msg.sender);
+    function claim(address owner) external {
+        _settle(owner);
 
-        UFixed18 claimAmount = unclaimed[msg.sender];
-        unclaimed[msg.sender] = UFixed18Lib.ZERO;
+        UFixed18 claimAmount = unclaimed[owner];
+        unclaimed[owner] = UFixed18Lib.ZERO;
         totalUnclaimed = totalUnclaimed.sub(claimAmount);
 
         _rebalance(claimAmount);
 
-        asset.push(msg.sender, claimAmount);
+        asset.push(owner, claimAmount);
+    }
+
+    function approve(address spender, UFixed18 amount) external returns (bool) {
+        allowance[msg.sender][spender] = amount;
+        return true;
     }
 
     /**
@@ -260,7 +263,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
     }
 
     /**
-     * @notice Rebalances the collateral of the vault
+     * @notice Rebalances the collateral and position of the vault
      * @dev Does not revert when rebalance fails, returns false instead allowing the vault to reset
      * @param claimAmount The amount of assets that will be withdrawn from the vault at the end of the operation
      */
@@ -275,10 +278,10 @@ contract BalancedVault is IBalancedVault, UInitializable {
         (IProduct greaterProduct, IProduct lesserProduct) =
             longCollateral.gt(shortCollateral) ? (long, short) : (short, long);
 
-        _adjustCollateral(greaterProduct, targetCollateral);
-        _adjustCollateral(lesserProduct, currentCollateral.sub(targetCollateral));
-        _adjustPosition(long, targetPosition);
-        _adjustPosition(short, targetPosition);
+        _updateCollateral(greaterProduct, targetCollateral);
+        _updateCollateral(lesserProduct, currentCollateral.sub(targetCollateral));
+        _updateMakerPosition(long, targetPosition);
+        _updateMakerPosition(short, targetPosition);
     }
 
     /**
@@ -286,7 +289,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @param product The product to adjust the vault's position on
      * @param targetPosition The new position to target
      */
-    function _adjustPosition(IProduct product, UFixed18 targetPosition) private {
+    function _updateMakerPosition(IProduct product, UFixed18 targetPosition) private {
         UFixed18 currentPosition = product.position(address(this)).next(product.pre(address(this))).maker;
         UFixed18 currentMaker = product.positionAtVersion(product.latestVersion()).next(product.pre()).maker;
         UFixed18 makerLimit = product.makerLimit();
@@ -307,7 +310,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @param product The product to adjust the vault's collateral on
      * @param targetCollateral The new collateral to target
      */
-    function _adjustCollateral(IProduct product, UFixed18 targetCollateral) private {
+    function _updateCollateral(IProduct product, UFixed18 targetCollateral) private {
         UFixed18 currentCollateral = collateral.collateral(address(this), product);
 
         if (currentCollateral.gt(targetCollateral))
