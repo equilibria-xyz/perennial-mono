@@ -182,6 +182,22 @@ contract BalancedVault is IBalancedVault, UInitializable {
 
     function approve(address spender, UFixed18 amount) external returns (bool) {
         allowance[msg.sender][spender] = amount;
+        emit Approval(msg.sender, spender, amount);
+        return true;
+    }
+
+    function transfer(address to, UFixed18 amount) external returns (bool) {
+        balanceOf[msg.sender] = balanceOf[msg.sender].sub(amount);
+        balanceOf[to] = balanceOf[to].add(amount);
+        emit Transfer(msg.sender, to, amount);
+        return true;
+    }
+
+    function transferFrom(address from, address to, UFixed18 amount) external returns (bool) {
+        allowance[from][msg.sender] = allowance[from][msg.sender].sub(amount);
+        balanceOf[from] = balanceOf[from].sub(amount);
+        balanceOf[to] = balanceOf[to].add(amount);
+        emit Transfer(from, to, amount);
         return true;
     }
 

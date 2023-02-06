@@ -39,8 +39,8 @@ interface IBalancedVault {
 
     // TODO: ERC4626 interface
 
-    event Deposit(address indexed sender, address indexed owner, uint256 assets, uint256 shares);
-    event Withdraw(address indexed sender, address indexed receiver, address indexed owner, uint256 assets, uint256 shares);
+    event Deposit(address indexed sender, address indexed owner, uint256 assets, UFixed18 shares);
+    event Withdraw(address indexed sender, address indexed receiver, address indexed owner, UFixed18 assets, UFixed18 shares);
 
     function asset() external view returns (Token18);
     function totalAssets() external view returns (UFixed18);
@@ -61,13 +61,13 @@ interface IBalancedVault {
 
     // TODO: ERC20 interface
 
-    event Transfer(address indexed from, address indexed to, uint256 value);
-    event Approval(address indexed owner, address indexed spender, uint256 value);
+    event Transfer(address indexed from, address indexed to, UFixed18 value);
+    event Approval(address indexed owner, address indexed spender, UFixed18 value);
 
     function totalSupply() external view returns (UFixed18);
     function balanceOf(address account) external view returns (UFixed18);
-//    function transfer(address to, uint256 amount) external returns (bool);
+    function transfer(address to, UFixed18 amount) external returns (bool);
     function allowance(address owner, address spender) external view returns (UFixed18);
     function approve(address spender, UFixed18 amount) external returns (bool);
-//    function transferFrom(address from, address to, uint256 amount) external returns (bool);
+    function transferFrom(address from, address to, UFixed18 amount) external returns (bool);
 }
