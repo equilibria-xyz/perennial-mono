@@ -5,6 +5,8 @@ import "@equilibria/perennial/contracts/interfaces/ICollateral.sol";
 import "@equilibria/root/number/types/UFixed18.sol";
 
 interface IBalancedVault {
+    // TODO: BalancedVault interface
+
     struct PendingAmount {
         UFixed18 amount;
         uint256 version;
@@ -17,15 +19,13 @@ interface IBalancedVault {
         UFixed18 totalCollateral;
     }
 
-    // TODO: BalancedVault interface
-
     event PositionUpdated(IProduct product, UFixed18 targetPosition);
     event CollateralUpdated(IProduct product, UFixed18 targetCollateral);
 
     error BalancedVaultDepositLimitExceeded();
     error BalancedVaultRedemptionLimitExceeded();
 
-    // function initialize(Token18 asset_) external;
+    function initialize() external;
     function sync() external;
     function unhealthy() external view returns (bool);
     function collateral() external view returns (ICollateral);

@@ -187,6 +187,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
     }
 
     function transfer(address to, UFixed18 amount) external returns (bool) {
+        _settle(msg.sender);
         balanceOf[msg.sender] = balanceOf[msg.sender].sub(amount);
         balanceOf[to] = balanceOf[to].add(amount);
         emit Transfer(msg.sender, to, amount);
@@ -194,6 +195,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
     }
 
     function transferFrom(address from, address to, UFixed18 amount) external returns (bool) {
+        _settle(from);
         allowance[from][msg.sender] = allowance[from][msg.sender].sub(amount);
         balanceOf[from] = balanceOf[from].sub(amount);
         balanceOf[to] = balanceOf[to].add(amount);
