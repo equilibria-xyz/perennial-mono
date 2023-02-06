@@ -1,15 +1,13 @@
 //SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.15;
 
-import "@equilibria/root/token/types/Token18.sol";
 import "./interfaces/IBalancedVault.sol";
-import "../../perennial/contracts/interfaces/ICollateral.sol";
 
 // TODO: Allow withdrawing on behalf of others if approval is given (maybe should just extend ERC20 at that point...)
 // TODO: block everything if liquidatable
 // TODO: what to do if zero-balance w/ non-zero shares on deposit?
 // TODO: work with multi-invoker
-// TODO: interface with ERC20 and ERC4626
+// TODO: balanceOf and totalSupply that take into account pending?
 
 /**
  * @title BalancedVault
@@ -70,19 +68,19 @@ contract BalancedVault is IBalancedVault {
     UFixed18 public totalSupply;
 
     /// @dev Deposits that have not been settled, or have been settled but not yet processed by this contract
-    PendingAmount public deposit;
+    PendingAmount private _deposit;
 
     /// @dev Mapping of pending (not yet converted to shares) per user
-    mapping(address => PendingAmount) public deposits;
+    mapping(address => PendingAmount) private _deposits;
 
     /// @dev Redemptions that have not been settled, or have been settled but not yet processed by this contract
-    PendingAmount public redemption;
+    PendingAmount private _redemption;
 
     /// @dev Mapping of pending (not yet withdrawn) per user
-    mapping(address => PendingAmount) public redemptions;
+    mapping(address => PendingAmount) private _redemptions;
 
     /// @dev Mapping of versions of the vault state at a given oracle version
-    mapping(uint256 => Version) public versions;
+    mapping(uint256 => Version) private _versions;
 
     // TODO: Initializer
     constructor(
@@ -108,8 +106,8 @@ contract BalancedVault is IBalancedVault {
      * @dev Should be called by a keeper when the vault approaches a liquidation state on either side
      */
     function sync() external {
-        _before(address(0));
-        _update(UFixed18Lib.ZERO);
+        _settle(address(0));
+        _rebalance(UFixed18Lib.ZERO);
     }
 
     /**
@@ -136,7 +134,6 @@ contract BalancedVault is IBalancedVault {
     /**
      * @notice The maximum available deposit amount
      * @dev Only exact when vault is synced, otherwise approximate
-     * @param owner The account to deposit for
      * @return Maximum available deposit amount
      */
     function maxDeposit(address) public view returns (UFixed18) {
@@ -159,29 +156,32 @@ contract BalancedVault is IBalancedVault {
 
         uint256 version = _settle(receiver);
 
-        deposit.amount = deposit.amount.add(assets);
-        deposit.oracleVersion = version;
+        _deposit.amount = _deposit.amount.add(assets);
+        _deposit.version = version;
 
-        deposits[receiver].amount = deposits[receiver].amount.add(assets);
-        deposits[receiver].oracleVersion = version;
+        _deposits[receiver].amount = _deposits[receiver].amount.add(assets);
+        _deposits[receiver].version = version;
 
         asset.pull(msg.sender, assets);
 
         _rebalance(UFixed18Lib.ZERO);
     }
 
-    function redeem(UFixed18 shares) external {
-        if (shares.gt(maxRedeem(msg.sender))) revert BalancedVaultRedemptionLimitExceeded();
+    function redeem(UFixed18 shares, address, address owner) external {
+        // TODO: owner verification
+        // TODO: receiver?
 
-        uint256 version = _settle(msg.sender);
+        if (shares.gt(maxRedeem(owner))) revert BalancedVaultRedemptionLimitExceeded();
 
-        redemption.amount = redemption.amount.add(shares);
-        redemption.oracleVersion = version;
+        uint256 version = _settle(owner);
 
-        redemptions[msg.sender].amount = redemptions[msg.sender].amount.add(shares);
-        redemptions[msg.sender].oracleVersion = version;
+        _redemption.amount = _redemption.amount.add(shares);
+        _redemption.version = version;
 
-        balanceOf[msg.sender] = balanceOf[msg.sender].sub(shares);
+        _redemptions[owner].amount = _redemptions[owner].amount.add(shares);
+        _redemptions[owner].version = version;
+
+        balanceOf[owner] = balanceOf[owner].sub(shares);
 
         _rebalance(UFixed18Lib.ZERO);
     }
@@ -190,12 +190,12 @@ contract BalancedVault is IBalancedVault {
         _settle(msg.sender);
 
         UFixed18 claimAmount = unclaimed[msg.sender];
-        delete unclaimed[msg.sender];
+        unclaimed[msg.sender] = UFixed18Lib.ZERO;
         totalUnclaimed = totalUnclaimed.sub(claimAmount);
 
         _rebalance(claimAmount);
 
-        asset.push(msg.sender, claimed);
+        asset.push(msg.sender, claimAmount);
     }
 
     /**
@@ -213,8 +213,8 @@ contract BalancedVault is IBalancedVault {
     /**
      * @notice Hook that is called before every stateful operation
      * @dev Settles the vault's account on both the long and short product, along with any global or user-specific deposits/redemptions
-     * @param user The account that called the operation, or 0 if called by a keeper.
-     * @return The current version
+     * @param account The account that called the operation, or 0 if called by a keeper.
+     * @return version The current version
      */
     function _settle(address account) private returns (uint256 version) {
         long.settleAccount(address(this));
@@ -222,7 +222,7 @@ contract BalancedVault is IBalancedVault {
 
         version = long.latestVersion(address(this));
         UFixed18 collateralAtVersion = _collateralAt(version);
-        UFixed18 sharesAtVersion = _snapshot[version].totalShares;
+        UFixed18 sharesAtVersion = _versions[version].totalShares;
 
         _settleDeposit(version, collateralAtVersion, sharesAtVersion);
         _settleRedemption(version, collateralAtVersion, sharesAtVersion);
@@ -232,59 +232,48 @@ contract BalancedVault is IBalancedVault {
             _settleRedemptions(account, version, collateralAtVersion, sharesAtVersion);
         }
 
-        versions[version] = Version({
-            longPosition: long.positionAtVersion(version),
-            shortPosition: short.positionAtVersion(version),
+        _versions[version] = Version({
+            longPosition: long.positionAtVersion(version).maker,
+            shortPosition: short.positionAtVersion(version).maker,
             totalShares: totalSupply,
             totalCollateral: totalAssets()
         });
     }
 
     function _settleDeposit(uint256 version, UFixed18 collateralAtVersion, UFixed18 sharesAtVersion) private {
-        if (deposit.amount.isZero() || version == deposit.oracleVersion) return;
+        if (_deposit.amount.isZero() || version == _deposit.version) return;
 
-        UFixed18 shareAmount = pendingDeposit.amount.muldiv(collateralAtVersion, sharesAtVersion);
+        UFixed18 shareAmount = _deposit.amount.muldiv(collateralAtVersion, sharesAtVersion);
         totalSupply = totalSupply.add(shareAmount);
 
-        delete deposit;
+        delete _deposit;
     }
 
     function _settleDeposits(address account, uint256 version, UFixed18 collateralAtVersion, UFixed18 sharesAtVersion) private {
-        if (deposits[account].amount.isZero() || version == deposits[account].oracleVersion) return;
+        if (_deposits[account].amount.isZero() || version == _deposits[account].version) return;
 
-        UFixed18 shareAmount = pendingDeposit.amount.muldiv(collateralAtVersion, sharesAtVersion);
+        UFixed18 shareAmount = _deposits[account].amount.muldiv(collateralAtVersion, sharesAtVersion);
         balanceOf[account] = balanceOf[account].add(shareAmount);
 
-        delete deposits[account];
+        delete _deposits[account];
     }
 
     function _settleRedemption(uint256 version, UFixed18 collateralAtVersion, UFixed18 sharesAtVersion) private {
-        if (redemption.amount.isZero() || version == redemption.oracleVersion) return;
+        if (_redemption.amount.isZero() || version == _redemption.version) return;
 
-        UFixed18 underlyingAmount = redemption.amount.muldiv(sharesAtVersion, collateralAtVersion);
+        UFixed18 underlyingAmount = _redemption.amount.muldiv(sharesAtVersion, collateralAtVersion);
         totalUnclaimed = totalUnclaimed.add(underlyingAmount);
 
-        delete redemption;
+        delete _redemption;
     }
 
     function _settleRedemptions(address account, uint256 version, UFixed18 collateralAtVersion, UFixed18 sharesAtVersion) private {
-        if (redemptions[account].amount.isZero() || version == redemptions[account].oracleVersion) return;
+        if (_redemptions[account].amount.isZero() || version == _redemptions[account].version) return;
 
-        UFixed18 underlyingAmount = redemptions[account].amount.muldiv(sharesAtVersion, collateralAtVersion);
+        UFixed18 underlyingAmount = _redemptions[account].amount.muldiv(sharesAtVersion, collateralAtVersion);
         unclaimed[account] = unclaimed[account].add(underlyingAmount);
 
-        delete redemptions[account];
-    }
-
-    function _collateralAt(usint256 version) private returns (UFixed18) {
-        Fixed18 longAccumulated = long.valueAtVersion(version + 1).sub(long.valueAtVersion(version));
-        Fixed18 shortAccumulated = short.valueAtVersion(version + 1).sub(short.valueAtVersion(version));
-
-        Fixed18 accumulated = longAccumulated.mul(_snapshot[version].longPosition)
-            .add(shortAccumulated.mul(_snapshot[version].shortPosition));
-
-        //TODO: what to do if negative?
-        return UFixed18Lib.from(Fixed18Lib.from(_snapshot[version].totalCollateral).add(accumulated));
+        delete _redemptions[account];
     }
 
     /**
@@ -334,7 +323,6 @@ contract BalancedVault is IBalancedVault {
      * @notice Adjusts the collateral on `product` to `targetCollateral`
      * @param product The product to adjust the vault's collateral on
      * @param targetCollateral The new collateral to target
-     * @return Whether the collateral adjust succeeded
      */
     function _adjustCollateral(IProduct product, UFixed18 targetCollateral) private {
         UFixed18 currentCollateral = collateral.collateral(address(this), product);
@@ -359,7 +347,18 @@ contract BalancedVault is IBalancedVault {
         return (
             collateral.collateral(address(this), long),
             collateral.collateral(address(this), short),
-            Token18.wrap(address(asset)).balanceOf()
+            asset.balanceOf()
         );
+    }
+
+    function _collateralAt(uint256 version) private view returns (UFixed18) {
+        Fixed18 longAccumulated = long.valueAtVersion(version + 1).maker.sub(long.valueAtVersion(version).maker);
+        Fixed18 shortAccumulated = short.valueAtVersion(version + 1).maker.sub(short.valueAtVersion(version).maker);
+
+        Fixed18 accumulated = longAccumulated.mul(Fixed18Lib.from(_versions[version].longPosition))
+        .add(shortAccumulated.mul(Fixed18Lib.from(_versions[version].shortPosition)));
+
+        //TODO: what to do if negative?
+        return UFixed18Lib.from(Fixed18Lib.from(_versions[version].totalCollateral).add(accumulated));
     }
 }
