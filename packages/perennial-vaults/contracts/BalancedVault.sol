@@ -6,7 +6,6 @@ import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
 // TODO: what to do if zero-balance w/ non-zero shares on deposit?
-// TODO: balanceOf and totalSupply that take into account pending?
 
 /**
  * @title BalancedVault
@@ -52,16 +51,19 @@ contract BalancedVault is IBalancedVault, UInitializable {
     UFixed18 private _totalUnclaimed;
 
     /// @dev Deposits that have not been settled, or have been settled but not yet processed by this contract
-    PendingAmount private _deposit;
-
-    /// @dev Mapping of pending (not yet converted to shares) per user
-    mapping(address => PendingAmount) private _deposits;
+    UFixed18 private _deposit;
 
     /// @dev Redemptions that have not been settled, or have been settled but not yet processed by this contract
-    PendingAmount private _redemption;
+    UFixed18 private _redemption;
+
+    /// @dev Mapping of pending (not yet converted to shares) per user
+    mapping(address => UFixed18) private _deposits;
 
     /// @dev Mapping of pending (not yet withdrawn) per user
-    mapping(address => PendingAmount) private _redemptions;
+    mapping(address => UFixed18) private _redemptions;
+
+    /// @dev Mapping of the latest version that a pending deposit or redemption has been placed per user
+    mapping(address => uint256) private _latestVersions;
 
     /// @dev Mapping of versions of the vault state at a given oracle version
     mapping(uint256 => Version) private _versions;
@@ -104,11 +106,9 @@ contract BalancedVault is IBalancedVault, UInitializable {
         VersionContext memory context = _settle(receiver);
         if (assets.gt(_maxDepositAtVersion(context))) revert BalancedVaultDepositLimitExceeded();
 
-        _deposit.amount = _deposit.amount.add(assets);
-        _deposit.version = context.version;
-
-        _deposits[receiver].amount = _deposits[receiver].amount.add(assets);
-        _deposits[receiver].version = context.version;
+        _deposit = _deposit.add(assets);
+        _deposits[receiver] = _deposits[receiver].add(assets);
+        _latestVersions[receiver] = context.version;
 
         asset.pull(msg.sender, assets);
 
@@ -121,11 +121,9 @@ contract BalancedVault is IBalancedVault, UInitializable {
         VersionContext memory context = _settle(owner);
         if (shares.gt(_maxRedeemAtVersion(owner, context))) revert BalancedVaultRedemptionLimitExceeded();
 
-        _redemption.amount = _redemption.amount.add(shares);
-        _redemption.version = context.version;
-
-        _redemptions[owner].amount = _redemptions[owner].amount.add(shares);
-        _redemptions[owner].version = context.version;
+        _redemption = _redemption.add(shares);
+        _redemptions[owner] = _redemptions[owner].add(shares);
+        _latestVersions[owner] = context.version;
 
         _balanceOf[owner] = _balanceOf[owner].sub(shares);
 
@@ -187,12 +185,18 @@ contract BalancedVault is IBalancedVault, UInitializable {
     function _settle(address account) private returns (VersionContext memory context) {
         context = _loadContextForWrite();
 
-        _totalSupply = _totalSupplyAtVersion(context);
-        _totalUnclaimed = _totalUnclaimedAtVersion(context);
+        if (context.version > context.latestVersion) {
+            _totalSupply = _totalSupplyAtVersion(context);
+            _totalUnclaimed = _totalUnclaimedAtVersion(context);
+            _deposits[account] = UFixed18Lib.ZERO;
+            _redemptions[account] = UFixed18Lib.ZERO;
+        }
 
-        if (account != address(0)) {
+        if (account != address(0) && context.version > _latestVersions[account]) {
             _balanceOf[account] = _balanceOfAtVersion(account, context);
             _unclaimed[account] = _unclaimedAtVersion(account, context);
+            _deposit = UFixed18Lib.ZERO;
+            _redemption = UFixed18Lib.ZERO;
         }
 
         _versions[context.version] = Version({
@@ -201,12 +205,6 @@ contract BalancedVault is IBalancedVault, UInitializable {
             totalShares: _totalSupply,
             totalCollateral: _collateralAt(context.version)
         });
-
-        //TODO: only if settling latest version?
-        delete _deposit;
-        delete _deposits[account];
-        delete _redemption;
-        delete _redemptions[account];
     }
 
     /**
@@ -253,19 +251,23 @@ contract BalancedVault is IBalancedVault, UInitializable {
     }
 
     function _loadContextForRead() private view returns (VersionContext memory) {
-        uint256 latestVersion = long.latestVersion(address(this)); // both products are always settled at the same time for the vault
+        uint256 latestVersion = _latestVersion();
         uint256 currentVersion = Math.min(long.latestVersion(), short.latestVersion()); // latest version that both products are settled to
-        return VersionContext(currentVersion, _collateralAt(latestVersion), _versions[latestVersion].totalShares);
+
+        return VersionContext(currentVersion, latestVersion, _collateralAt(latestVersion), _versions[latestVersion].totalShares);
     }
 
     function _loadContextForWrite() private returns (VersionContext memory) {
-        uint256 latestVersion = long.latestVersion(address(this)); // both products are always settled at the same time for the vault
-
+        uint256 latestVersion = _latestVersion();
         long.settleAccount(address(this));
         short.settleAccount(address(this));
+        uint256 currentVersion = _latestVersion();
 
-        uint256 currentVersion = long.latestVersion(address(this));  // both products are always settled at the same time for the vault
-        return VersionContext(currentVersion, _collateralAt(latestVersion), _versions[latestVersion].totalShares);
+        return VersionContext(currentVersion, latestVersion, _collateralAt(latestVersion), _versions[latestVersion].totalShares);
+    }
+
+    function _latestVersion() private view returns (uint256) {
+        return long.latestVersion(address(this)); // both products are always settled at the same time for the vault
     }
 
     function _maxDepositAtVersion(VersionContext memory context) private view returns (UFixed18) {
@@ -285,23 +287,23 @@ contract BalancedVault is IBalancedVault, UInitializable {
     }
 
     function _totalSupplyAtVersion(VersionContext memory context) private view returns (UFixed18) {
-        if (_deposit.amount.isZero() || context.version == _deposit.version) return _totalSupply;
-        return _totalSupply.add(_deposit.amount.muldiv(context.latestCollateral, context.latestShares));
+        if (_deposit.isZero() || context.version == _latestVersion()) return _totalSupply;
+        return _totalSupply.add(_deposit.muldiv(context.latestCollateral, context.latestShares));
     }
 
     function _balanceOfAtVersion(address account, VersionContext memory context) private view returns (UFixed18) {
-        if (_deposits[account].amount.isZero() || context.version == _deposits[account].version) return _balanceOf[account];
-        return _balanceOf[account].add(_deposits[account].amount.muldiv(context.latestCollateral, context.latestShares));
+        if (_deposits[account].isZero() || context.version == _latestVersions[account]) return _balanceOf[account];
+        return _balanceOf[account].add(_deposits[account].muldiv(context.latestCollateral, context.latestShares));
     }
 
     function _totalUnclaimedAtVersion(VersionContext memory context) private view returns (UFixed18) {
-        if (_redemption.amount.isZero() || context.version == _redemption.version) return _totalUnclaimed;
-        return _totalUnclaimed.add(_redemption.amount.muldiv(context.latestShares, context.latestCollateral));
+        if (_redemption.isZero() || context.version == _latestVersion()) return _totalUnclaimed;
+        return _totalUnclaimed.add(_redemption.muldiv(context.latestShares, context.latestCollateral));
     }
 
     function _unclaimedAtVersion(address account, VersionContext memory context) private view returns (UFixed18) {
-        if (_redemptions[account].amount.isZero() || context.version == _redemptions[account].version) return _unclaimed[account];
-        return _unclaimed[account].add(_redemptions[account].amount.muldiv(context.latestShares, context.latestCollateral));
+        if (_redemptions[account].isZero() || context.version == _latestVersions[account]) return _unclaimed[account];
+        return _unclaimed[account].add(_redemptions[account].muldiv(context.latestShares, context.latestCollateral));
     }
 
     /**

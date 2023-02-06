@@ -5,12 +5,8 @@ import "@equilibria/perennial/contracts/interfaces/ICollateral.sol";
 import "@equilibria/root/number/types/UFixed18.sol";
 
 interface IBalancedVault {
-    // TODO: BalancedVault interface
 
-    struct PendingAmount {
-        UFixed18 amount;
-        uint256 version; // TODO: don't need this for global, already stored in perennial
-    }
+    // TODO: BalancedVault interface
 
     struct Version {
         UFixed18 longPosition;
@@ -21,6 +17,7 @@ interface IBalancedVault {
 
     struct VersionContext {
         uint256 version;
+        uint256 latestVersion;
         UFixed18 latestCollateral;
         UFixed18 latestShares;
     }
