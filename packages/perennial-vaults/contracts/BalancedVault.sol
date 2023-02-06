@@ -95,6 +95,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
     function sync() external {
         _settle(address(0));
         _rebalance(UFixed18Lib.ZERO);
+        _rebalance(UFixed18Lib.ZERO);
     }
 
     /**
@@ -308,22 +309,40 @@ contract BalancedVault is IBalancedVault, UInitializable {
 
     /**
      * @notice Rebalances the collateral and position of the vault
-     * @dev Does not revert when rebalance fails, returns false instead allowing the vault to reset
+     * @dev Rebalance is executed on best-effort, any failing legs of the strategy will not cause a revert
      * @param claimAmount The amount of assets that will be withdrawn from the vault at the end of the operation
      */
     function _rebalance(UFixed18 claimAmount) private {
+        _rebalanceCollateral(claimAmount);
+        _rebalancePosition();
+    }
+
+    /**
+     * @notice Rebalances the collateral of the vault
+     * @param claimAmount The amount of assets that will be withdrawn from the vault at the end of the operation
+     */
+    function _rebalanceCollateral(UFixed18 claimAmount) private {
         (UFixed18 longCollateral, UFixed18 shortCollateral, UFixed18 idleCollateral) = _collateral();
-        UFixed18 currentCollateral = longCollateral.add(shortCollateral).add(idleCollateral).sub(claimAmount);
-        UFixed18 targetCollateral = currentCollateral.div(TWO);
-        UFixed18 currentUtilized = currentCollateral.sub(_totalUnclaimed); //TODO: does this not wait til n+1 to pull out collateral?
-        UFixed18 currentPrice = long.atVersion(long.latestVersion()).price.abs();
-        UFixed18 targetPosition = currentUtilized.mul(targetLeverage).div(currentPrice).div(TWO);
+        UFixed18 currentCollateral = longCollateral.add(shortCollateral).add(idleCollateral);
+        UFixed18 targetCollateral = currentCollateral.sub(claimAmount).div(TWO);
 
         (IProduct greaterProduct, IProduct lesserProduct) =
             longCollateral.gt(shortCollateral) ? (long, short) : (short, long);
 
         _updateCollateral(greaterProduct, targetCollateral);
         _updateCollateral(lesserProduct, currentCollateral.sub(targetCollateral));
+    }
+
+    /**
+     * @notice Rebalances the position of the vault
+     */
+    function _rebalancePosition() private {
+        (UFixed18 longCollateral, UFixed18 shortCollateral, UFixed18 idleCollateral) = _collateral();
+        UFixed18 currentAssets = longCollateral.add(shortCollateral).add(idleCollateral).sub(_totalUnclaimed);
+        UFixed18 currentUtilized = _totalSupply.muldiv(currentAssets, _totalSupply.add(_redemption));
+        UFixed18 currentPrice = long.atVersion(long.latestVersion()).price.abs();
+        UFixed18 targetPosition = currentUtilized.mul(targetLeverage).div(currentPrice).div(TWO);
+
         _updateMakerPosition(long, targetPosition);
         _updateMakerPosition(short, targetPosition);
     }
