@@ -5,6 +5,7 @@ const eqPerennialDir = dirname(require.resolve('@equilibria/perennial/package.js
 const eqPerennialOracleDir = dirname(require.resolve('@equilibria/perennial-oracle/package.json'))
 
 const config = defaultConfig({
+  solidityVersion: '0.8.17',
   externalDeployments: {
     kovan: [`${eqPerennialDir}/deployments/kovan`, `${eqPerennialOracleDir}/deployments/kovan`],
     goerli: [`${eqPerennialDir}/deployments/goerli`, `${eqPerennialOracleDir}/deployments/goerli`],
