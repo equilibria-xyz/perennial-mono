@@ -3,9 +3,13 @@ pragma solidity 0.8.15;
 
 import "@equilibria/root/token/types/Token18.sol";
 import "./interfaces/IBalancedVault.sol";
+import "../../perennial/contracts/interfaces/ICollateral.sol";
 
 // TODO: Allow withdrawing on behalf of others if approval is given (maybe should just extend ERC20 at that point...)
 // TODO: block everything if liquidatable
+// TODO: what to do if zero-balance w/ non-zero shares on deposit?
+// TODO: work with multi-invoker
+// TODO: interface with ERC20 and ERC4626
 
 /**
  * @title BalancedVault
@@ -21,8 +25,8 @@ contract BalancedVault is IBalancedVault {
         uint256 version;
     }
 
-    /// @dev Snapshot of the vault state at a given oracle version
-    struct Snapshot {
+    /// @dev Version of the vault state at a given oracle version
+    struct Version {
         /// @dev Vault's position in `long` at the start of the oracle version
         UFixed18 longPosition;
         /// @dev Vault's position in `short` at the start of the oracle version
@@ -34,9 +38,6 @@ contract BalancedVault is IBalancedVault {
     }
 
     UFixed18 constant private TWO = UFixed18.wrap(2e18);
-
-    /// @dev The address of the Perennial controller contract
-    IController public immutable controller;
 
     /// @dev The address of the Perennial collateral contract
     ICollateral public immutable collateral;
@@ -53,7 +54,8 @@ contract BalancedVault is IBalancedVault {
     /// @dev The collateral cap for the vault
     UFixed18 public immutable maxCollateral;
 
-    Token18 public immutable dsu;
+    /// @dev The underlying asset of the vault
+    Token18 public immutable asset;
 
     /// @dev Mapping of shares of the vault per user
     mapping(address => UFixed18) public balanceOf;
@@ -67,41 +69,38 @@ contract BalancedVault is IBalancedVault {
     /// @dev Total number of shares across all users
     UFixed18 public totalSupply;
 
-    // TODO: Make all the below internal/private if not necessary to be public.
-
     /// @dev Deposits that have not been settled, or have been settled but not yet processed by this contract
-    PendingAmount public unsettledDeposits;
+    PendingAmount public deposit;
 
     /// @dev Mapping of pending (not yet converted to shares) per user
-    mapping(address => PendingAmount) public pendingDeposits;
+    mapping(address => PendingAmount) public deposits;
 
-    /// @dev Withdrawals that have not been settled, or have been settled but not yet processed by this contract
-    PendingAmount public unsettledWithdrawals;
+    /// @dev Redemptions that have not been settled, or have been settled but not yet processed by this contract
+    PendingAmount public redemption;
 
     /// @dev Mapping of pending (not yet withdrawn) per user
-    mapping(address => PendingAmount) public pendingWithdrawals;
+    mapping(address => PendingAmount) public redemptions;
 
-    /// @dev Mapping of snapshots of the vault state at a given oracle version
-    mapping(uint256 => Snapshot) public snapshots;
+    /// @dev Mapping of versions of the vault state at a given oracle version
+    mapping(uint256 => Version) public versions;
 
     // TODO: Initializer
     constructor(
-        IERC20Upgradeable dsu_,
-        IController controller_,
+        Token18 asset_,
+        ICollateral collateral_,
         IProduct long_,
         IProduct short_,
         UFixed18 targetLeverage_,
         UFixed18 maxCollateral_
     ) {
-        controller = controller_;
-        collateral = controller.collateral();
+        collateral = collateral_;
         long = long_;
         short = short_;
         targetLeverage = targetLeverage_;
         maxCollateral = maxCollateral_;
-        dsu = dsu_;
+        asset = asset_;
 
-        dsu.approve(address(collateral));
+        asset.approve(address(collateral_));
     }
 
     /**
@@ -123,17 +122,15 @@ contract BalancedVault is IBalancedVault {
     }
 
     /**
-     * @notice The maximum available withdrawal amount
+     * @notice The maximum available redeemable amount
      * @dev Only exact when vault is synced, otherwise approximate
-     * @param owner The account to withdraw for
-     * @return Maximum available withdrawal amount
+     * @param owner The account to redeem for
+     * @return Maximum available redeemable amount
      */
-    function maxWithdraw(address owner) public view returns (UFixed18) {
-        // If we're in the middle of closing all positions due to liquidations, return 0.
+    function maxRedeem(address owner) public view returns (UFixed18) {
         if (!healthy()) return UFixed18Lib.ZERO;
 
-        // TODO: Actually calculate this using pending withdrawals.
-        return UFixed18Lib.ZERO;
+        return balanceOf[owner];
     }
 
     /**
@@ -142,16 +139,14 @@ contract BalancedVault is IBalancedVault {
      * @param owner The account to deposit for
      * @return Maximum available deposit amount
      */
-    function maxDeposit(address owner) public view returns (UFixed18) {
-        // If the vault has no assets to back the shares, we are unhealthy and should not allow deposits.
+    function maxDeposit(address) public view returns (UFixed18) {
+        if (!healthy()) return UFixed18Lib.ZERO;
+
         UFixed18 currentCollateral = totalAssets();
-        if (currentCollateral.isZero() && totalSupply > 0) return UFixed18Lib.ZERO;
 
-        UFixed18 availableDeposit = currentCollateral.gt(maxCollateral) ?
-            UFixed18Lib.ZERO :
-            maxCollateral.sub(currentCollateral);
-
-        return availableDeposit;
+        return currentCollateral.gt(maxCollateral) ?
+            maxCollateral.sub(currentCollateral) :
+            UFixed18Lib.ZERO;
     }
 
     /**
@@ -160,45 +155,47 @@ contract BalancedVault is IBalancedVault {
      * @param receiver The account to deposit on behalf of
      */
     function deposit(UFixed18 assets, address receiver) external {
-        if (assets.gt(maxDeposit(receiver))) revert BalancedVaultDepositMoreThanMax();
+        if (assets.gt(maxDeposit(receiver))) revert BalancedVaultDepositLimitExceeded();
 
         uint256 version = _settle(receiver);
 
-        unsettledDeposits.amount = unsettledDeposits.amount.add(assets);
-        unsettledDeposits.oracleVersion = version;
+        deposit.amount = deposit.amount.add(assets);
+        deposit.oracleVersion = version;
 
-        pendingDeposits[receiver].amount = pendingDeposits[receiver].amount.add(assets);
-        pendingDeposits[receiver].oracleVersion = version;
+        deposits[receiver].amount = deposits[receiver].amount.add(assets);
+        deposits[receiver].oracleVersion = version;
 
-        dsu.pull(msg.sender, assets);
+        asset.pull(msg.sender, assets);
 
-        _update(UFixed18Lib.ZERO);
+        _rebalance(UFixed18Lib.ZERO);
     }
 
-    function withdraw(UFixed18 shares) external {
+    function redeem(UFixed18 shares) external {
+        if (shares.gt(maxRedeem(msg.sender))) revert BalancedVaultRedemptionLimitExceeded();
+
         uint256 version = _settle(msg.sender);
 
-        // TODO: ???
-        UFixed18 withdrawalAmount = totalAssets().muldiv(shares, totalSupply);
-        _update(withdrawalAmount);
+        redemption.amount = redemption.amount.add(shares);
+        redemption.oracleVersion = version;
 
-        unsettledWithdrawals.amount = unsettledWithdrawals.amount.add(shares);
-        unsettledWithdrawals.oracleVersion = version;
-
-        pendingWithdrawals[msg.sender].amount = pendingWithdrawals[msg.sender].amount.add(shares);
-        pendingWithdrawals[msg.sender].oracleVersion = version;
+        redemptions[msg.sender].amount = redemptions[msg.sender].amount.add(shares);
+        redemptions[msg.sender].oracleVersion = version;
 
         balanceOf[msg.sender] = balanceOf[msg.sender].sub(shares);
+
+        _rebalance(UFixed18Lib.ZERO);
     }
 
     function claim() external {
         _settle(msg.sender);
 
-        UFixed18 claimed = unclaimed[msg.sender];
+        UFixed18 claimAmount = unclaimed[msg.sender];
         delete unclaimed[msg.sender];
-        totalUnclaimed = totalUnclaimed.sub(claimed);
+        totalUnclaimed = totalUnclaimed.sub(claimAmount);
 
-        dsu.push(msg.sender, claimed);
+        _rebalance(claimAmount);
+
+        asset.push(msg.sender, claimed);
     }
 
     /**
@@ -206,6 +203,7 @@ contract BalancedVault is IBalancedVault {
      * @dev If one product's position is zero while the other is non-zero, this indicates a recent liquidation
      * @return Whether the vault is healthy
      */
+    //TODO: change to liquidatable
     function healthy() public view returns (bool) {
         (bool isLongZero, bool isShortZero) =
             (long.position(address(this)).maker.isZero(), short.position(address(this)).maker.isZero());
@@ -214,7 +212,7 @@ contract BalancedVault is IBalancedVault {
 
     /**
      * @notice Hook that is called before every stateful operation
-     * @dev Settles the vault's account on both the long and short product, along with any global or user-specific deposits/withdrawals
+     * @dev Settles the vault's account on both the long and short product, along with any global or user-specific deposits/redemptions
      * @param user The account that called the operation, or 0 if called by a keeper.
      * @return The current version
      */
@@ -222,19 +220,19 @@ contract BalancedVault is IBalancedVault {
         long.settleAccount(address(this));
         short.settleAccount(address(this));
 
-        version = _version();
+        version = long.latestVersion(address(this));
         UFixed18 collateralAtVersion = _collateralAt(version);
         UFixed18 sharesAtVersion = _snapshot[version].totalShares;
 
-        _settleDeposits(version, collateralAtVersion, sharesAtVersion);
-        _settleWithdrawals(version, collateralAtVersion, sharesAtVersion);
+        _settleDeposit(version, collateralAtVersion, sharesAtVersion);
+        _settleRedemption(version, collateralAtVersion, sharesAtVersion);
 
         if (account != address(0)) {
             _settleDeposits(account, version, collateralAtVersion, sharesAtVersion);
-            _settleWithdrawals(account, version, collateralAtVersion, sharesAtVersion);
+            _settleRedemptions(account, version, collateralAtVersion, sharesAtVersion);
         }
 
-        snapshots[version] = Snapshot({
+        versions[version] = Version({
             longPosition: long.positionAtVersion(version),
             shortPosition: short.positionAtVersion(version),
             totalShares: totalSupply,
@@ -242,40 +240,40 @@ contract BalancedVault is IBalancedVault {
         });
     }
 
-    function _settleDeposits(uint256 version, UFixed18 collateralAtVersion, UFixed18 sharesAtVersion) private {
-        if (unsettledDeposits.amount.isZero() || version == unsettledDeposits.oracleVersion) return;
+    function _settleDeposit(uint256 version, UFixed18 collateralAtVersion, UFixed18 sharesAtVersion) private {
+        if (deposit.amount.isZero() || version == deposit.oracleVersion) return;
 
         UFixed18 shareAmount = pendingDeposit.amount.muldiv(collateralAtVersion, sharesAtVersion);
         totalSupply = totalSupply.add(shareAmount);
 
-        delete unsettledDeposits;
+        delete deposit;
     }
 
     function _settleDeposits(address account, uint256 version, UFixed18 collateralAtVersion, UFixed18 sharesAtVersion) private {
-        if (pendingDeposits[account].amount.isZero() || version == pendingDeposits[account].oracleVersion) return;
+        if (deposits[account].amount.isZero() || version == deposits[account].oracleVersion) return;
 
         UFixed18 shareAmount = pendingDeposit.amount.muldiv(collateralAtVersion, sharesAtVersion);
         balanceOf[account] = balanceOf[account].add(shareAmount);
 
-        delete pendingDeposits[account];
+        delete deposits[account];
     }
 
-    function _settleWithdrawals(uint256 version, UFixed18 collateralAtVersion, UFixed18 sharesAtVersion) private {
-        if (unsettledWithdrawals.amount.isZero() || version == unsettledWithdrawals.oracleVersion) return;
+    function _settleRedemption(uint256 version, UFixed18 collateralAtVersion, UFixed18 sharesAtVersion) private {
+        if (redemption.amount.isZero() || version == redemption.oracleVersion) return;
 
-        UFixed18 underlyingAmount = pendingDeposit.amount.muldiv(sharesAtVersion, collateralAtVersion);
+        UFixed18 underlyingAmount = redemption.amount.muldiv(sharesAtVersion, collateralAtVersion);
         totalUnclaimed = totalUnclaimed.add(underlyingAmount);
 
-        delete unsettledWithdrawals;
+        delete redemption;
     }
 
-    function _settleWithdrawals(address account, uint256 version, UFixed18 collateralAtVersion, UFixed18 sharesAtVersion) private {
-        if (pendingWithdrawals[account].amount.isZero() || version == pendingWithdrawals[account].oracleVersion) return;
+    function _settleRedemptions(address account, uint256 version, UFixed18 collateralAtVersion, UFixed18 sharesAtVersion) private {
+        if (redemptions[account].amount.isZero() || version == redemptions[account].oracleVersion) return;
 
-        UFixed18 underlyingAmount = pendingWithdrawal.amount.muldiv(sharesAtVersion, collateralAtVersion);
+        UFixed18 underlyingAmount = redemptions[account].amount.muldiv(sharesAtVersion, collateralAtVersion);
         unclaimed[account] = unclaimed[account].add(underlyingAmount);
 
-        delete pendingWithdrawal[account];
+        delete redemptions[account];
     }
 
     function _collateralAt(usint256 version) private returns (UFixed18) {
@@ -290,75 +288,25 @@ contract BalancedVault is IBalancedVault {
     }
 
     /**
-     * @notice Returns the current version of the vault's products
-     * @dev We assume that the short product's version is always equal to the long product's version
-     * @return The version of the vault's products
-     */
-    function _version() private view returns (uint256) {
-        return long.latestVersion(address(this));
-    }
-
-    /**
-     * @notice Updates the vault's collateral and position given its current balance and parameters
-     * @param withdrawalAmount The amount of assets that will be withdrawn from the vault at the end of the operation
-     */
-    function _update(UFixed18 withdrawalAmount) private {
-        // TODO: Add flow for if there aren't enough assets to withdraw for all pending witdhrawals.
-
-        // Rebalance collateral if possible
-        bool rebalanced = _updateCollateral(withdrawalAmount);
-
-        // Rebalance position if healthy
-        if (!healthy() || !rebalanced) _reset();
-        else _updatePosition(withdrawalAmount);
-    }
-
-    /**
-     * @notice Resets the position of the vault to zero
-     * @dev Called when an unhealthy state is detected
-     */
-    function _reset() private {
-        _adjustPosition(long, UFixed18Lib.ZERO);
-        _adjustPosition(short, UFixed18Lib.ZERO);
-
-        emit PositionUpdated(UFixed18Lib.ZERO);
-    }
-
-    /**
      * @notice Rebalances the collateral of the vault
      * @dev Does not revert when rebalance fails, returns false instead allowing the vault to reset
-     * @param withdrawalAmount The amount of assets that will be withdrawn from the vault at the end of the operation
-     * @return Whether the rebalance occurred successfully
+     * @param claimAmount The amount of assets that will be withdrawn from the vault at the end of the operation
      */
-    function _updateCollateral(UFixed18 withdrawalAmount) private returns (bool) {
-        (UFixed18 longCollateral, UFixed18 shortCollateral, ) = _collateral();
-        UFixed18 currentCollateral = totalAssets().sub(withdrawalAmount).sub(unredeemedWithdrawals);
+    function _rebalance(UFixed18 claimAmount) private {
+        (UFixed18 longCollateral, UFixed18 shortCollateral, UFixed18 idleCollateral) = _collateral();
+        UFixed18 currentCollateral = longCollateral.add(shortCollateral).add(idleCollateral).sub(claimAmount);
         UFixed18 targetCollateral = currentCollateral.div(TWO);
-
-        (IProduct greaterProduct, IProduct lesserProduct) = longCollateral.gt(shortCollateral) ?
-            (long, short) :
-            (short, long);
-
-        return _adjustCollateral(greaterProduct, targetCollateral) &&
-            _adjustCollateral(lesserProduct, currentCollateral.sub(targetCollateral));
-    }
-
-    /**
-     * @notice Re-targets the positions of the vault
-     * @param withdrawalAmount The amount of assets that will be withdrawn from the vault at the end of the operation
-     */
-    function _updatePosition(UFixed18 withdrawalAmount) private {
-        // 1. Calculate the target position size for each product.
-        UFixed18 currentCollateral = totalAssets().sub(withdrawalAmount);
-        UFixed18 currentUtilized = currentCollateral.sub(unredeemedWithdrawals);
+        UFixed18 currentUtilized = currentCollateral.sub(totalUnclaimed);
         UFixed18 currentPrice = long.atVersion(long.latestVersion()).price.abs();
         UFixed18 targetPosition = currentUtilized.mul(targetLeverage).div(currentPrice).div(TWO);
 
-        // 2. Adjust positions to target position size.
+        (IProduct greaterProduct, IProduct lesserProduct) =
+            longCollateral.gt(shortCollateral) ? (long, short) : (short, long);
+
+        _adjustCollateral(greaterProduct, targetCollateral);
+        _adjustCollateral(lesserProduct, currentCollateral.sub(targetCollateral));
         _adjustPosition(long, targetPosition);
         _adjustPosition(short, targetPosition);
-
-        emit PositionUpdated(targetPosition);
     }
 
     /**
@@ -370,10 +318,16 @@ contract BalancedVault is IBalancedVault {
         UFixed18 currentPosition = product.position(address(this)).next(product.pre(address(this))).maker;
         UFixed18 currentMaker = product.positionAtVersion(product.latestVersion()).next(product.pre()).maker;
         UFixed18 makerLimit = product.makerLimit();
+        UFixed18 makerAvailable = makerLimit.gt(currentMaker) ? makerLimit.sub(currentMaker) : UFixed18Lib.ZERO;
 
-        if (currentPosition.gt(targetPosition)) product.closeMake(currentPosition.sub(targetPosition));
-        if (currentPosition.lt(targetPosition))
-            product.openMake(targetPosition.sub(currentPosition).min(makerLimit.sub(currentMaker)));
+        if (targetPosition.lt(currentPosition))
+            try product.closeMake(currentPosition.sub(targetPosition)) { }
+            catch { return; }
+        if (targetPosition.gt(currentPosition))
+            try product.openMake(targetPosition.sub(currentPosition).min(makerAvailable)) { }
+            catch { return; }
+
+        emit PositionUpdated(product, targetPosition);
     }
 
     /**
@@ -382,17 +336,17 @@ contract BalancedVault is IBalancedVault {
      * @param targetCollateral The new collateral to target
      * @return Whether the collateral adjust succeeded
      */
-    function _adjustCollateral(IProduct product, UFixed18 targetCollateral) private returns (bool) {
+    function _adjustCollateral(IProduct product, UFixed18 targetCollateral) private {
         UFixed18 currentCollateral = collateral.collateral(address(this), product);
+
         if (currentCollateral.gt(targetCollateral))
             try collateral.withdrawTo(address(this), product, currentCollateral.sub(targetCollateral)) { }
-            catch { return false; }
+            catch { return; }
         if (currentCollateral.lt(targetCollateral))
             try collateral.depositTo(address(this), product, targetCollateral.sub(currentCollateral)) { }
-            catch { return false; }
+            catch { return; }
 
         emit CollateralUpdated(product, targetCollateral);
-        return true;
     }
 
     /**
@@ -405,7 +359,7 @@ contract BalancedVault is IBalancedVault {
         return (
             collateral.collateral(address(this), long),
             collateral.collateral(address(this), short),
-            Token18.wrap(address(dsu)).balanceOf()
+            Token18.wrap(address(asset)).balanceOf()
         );
     }
 }
