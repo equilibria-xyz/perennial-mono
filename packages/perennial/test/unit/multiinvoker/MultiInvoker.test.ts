@@ -14,6 +14,7 @@ import {
   IIncentivizer,
   IEmptySetReserve,
   IBatcher,
+  TestnetVault,
 } from '../../../types/generated'
 import { IMultiInvoker } from '../../../types/generated/contracts/interfaces/IMultiInvoker'
 import { InvokerAction, buildInvokerActions } from '../../util'
@@ -33,6 +34,7 @@ describe('MultiInvoker', () => {
   let batcher: FakeContract<IBatcher>
   let incentivizer: FakeContract<IIncentivizer>
   let reserve: FakeContract<IEmptySetReserve>
+  let vault: FakeContract<TestnetVault>
   let multiInvoker: MultiInvoker
 
   const multiInvokerFixture = async () => {
@@ -50,6 +52,7 @@ describe('MultiInvoker', () => {
     incentivizer = await smock.fake<IIncentivizer>('IIncentivizer')
     product = await smock.fake<IProduct>('IProduct')
     reserve = await smock.fake<IEmptySetReserve>('IEmptySetReserve')
+    vault = await smock.fake<TestnetVault>('TestnetVault')
 
     controller.collateral.returns(collateral.address)
     controller.incentivizer.returns(incentivizer.address)
@@ -115,12 +118,26 @@ describe('MultiInvoker', () => {
     const usdcAmount = 100e6
     const position = utils.parseEther('12')
     const programs = [1, 2, 3]
+    const vaultAmount = utils.parseEther('567')
 
     const fixture = async () => {
-      actions = buildInvokerActions(user.address, product.address, position, amount, programs)
+      actions = buildInvokerActions({
+        userAddress: user.address,
+        productAddress: product.address,
+        position,
+        amount,
+        programs,
+        vaultAddress: vault.address,
+        vaultAmount,
+      })
       dsu.transferFrom.whenCalledWith(user.address, multiInvoker.address, amount).returns(true)
       usdc.transferFrom.whenCalledWith(user.address, multiInvoker.address, usdcAmount).returns(true)
       usdc.transfer.whenCalledWith(user.address, usdcAmount).returns(true)
+
+      // Vault deposits
+      dsu.allowance.whenCalledWith(multiInvoker.address, vault.address).returns(0)
+      dsu.approve.whenCalledWith(vault.address, vaultAmount).returns(true)
+      dsu.transferFrom.whenCalledWith(user.address, multiInvoker.address, vaultAmount).returns(true)
     }
 
     beforeEach(async () => {
@@ -258,6 +275,26 @@ describe('MultiInvoker', () => {
       expect(usdc.transfer).to.have.been.calledWith(user.address, usdcAmount)
     })
 
+    it('deposits to vault on VAULT_DEPOSIT action', async () => {
+      await expect(multiInvoker.connect(user).invoke([actions.VAULT_DEPOSIT])).to.not.be.reverted
+
+      expect(dsu.transferFrom).to.have.been.calledWith(user.address, multiInvoker.address, vaultAmount)
+      expect(dsu.approve).to.have.been.calledWith(vault.address, vaultAmount)
+      expect(vault.deposit).to.have.been.calledWith(vaultAmount, user.address)
+    })
+
+    it('redeems from vault on VAULT_REDEEM action', async () => {
+      await expect(multiInvoker.connect(user).invoke([actions.VAULT_REDEEM])).to.not.be.reverted
+
+      expect(vault.redeem).to.have.been.calledWith(vaultAmount, user.address)
+    })
+
+    it('claims from vault on VAULT_CLAIM action', async () => {
+      await expect(multiInvoker.connect(user).invoke([actions.VAULT_CLAIM])).to.not.be.reverted
+
+      expect(vault.claim).to.have.been.calledWith(user.address)
+    })
+
     it('performs a multi invoke', async () => {
       await expect(multiInvoker.connect(user).invoke(Object.values(actions))).to.not.be.reverted
 
@@ -281,6 +318,17 @@ describe('MultiInvoker', () => {
       // Underlying Transfers
       expect(dsu.transferFrom).to.have.been.calledWith(user.address, multiInvoker.address, amount)
       expect(usdc.transferFrom).to.have.been.calledWith(user.address, multiInvoker.address, usdcAmount)
+
+      // Vault deposit
+      expect(dsu.transferFrom).to.have.been.calledWith(user.address, multiInvoker.address, vaultAmount)
+      expect(dsu.approve).to.have.been.calledWith(vault.address, vaultAmount)
+      expect(vault.deposit).to.have.been.calledWith(vaultAmount, user.address)
+
+      // Vault redeem
+      expect(vault.redeem).to.have.been.calledWith(vaultAmount, user.address)
+
+      // Vault claim
+      expect(vault.claim).to.have.been.calledWith(user.address)
     })
   })
 
@@ -331,7 +379,13 @@ describe('MultiInvoker', () => {
       const programs = [1, 2, 3]
 
       const fixture = async () => {
-        actions = buildInvokerActions(user.address, product.address, position, amount, programs)
+        actions = buildInvokerActions({
+          userAddress: user.address,
+          productAddress: product.address,
+          position,
+          amount,
+          programs,
+        })
         dsu.transferFrom.whenCalledWith(user.address, multiInvoker.address, amount).returns(true)
         usdc.transferFrom.whenCalledWith(user.address, multiInvoker.address, usdcAmount).returns(true)
         usdc.transfer.whenCalledWith(user.address, usdcAmount).returns(true)
