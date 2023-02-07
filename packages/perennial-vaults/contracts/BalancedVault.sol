@@ -98,8 +98,8 @@ contract BalancedVault is IBalancedVault, UInitializable {
      */
     function sync() external {
         VersionContext memory context = _settle(address(0));
-        _rebalance(context.version, UFixed18Lib.ZERO);
-        _rebalance(context.version, UFixed18Lib.ZERO);
+        _rebalance(context, UFixed18Lib.ZERO);
+        _rebalance(context, UFixed18Lib.ZERO);
     }
 
     /**
@@ -117,14 +117,14 @@ contract BalancedVault is IBalancedVault, UInitializable {
 
         asset.pull(msg.sender, assets);
 
-        _rebalance(context.version, UFixed18Lib.ZERO);
+        _rebalance(context, UFixed18Lib.ZERO);
     }
 
     function redeem(UFixed18 shares, address, address owner) external {
         if (msg.sender != owner) allowance[owner][msg.sender] = allowance[owner][msg.sender].sub(shares);
 
         VersionContext memory context = _settle(owner);
-        if (shares.gt(_maxRedeemAtVersion(owner, context))) revert BalancedVaultRedemptionLimitExceeded();
+        if (shares.gt(_maxRedeemAtVersion(context, owner))) revert BalancedVaultRedemptionLimitExceeded();
 
         _redemption = _redemption.add(shares);
         _redemptions[owner] = _redemptions[owner].add(shares);
@@ -132,7 +132,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
 
         _balanceOf[owner] = _balanceOf[owner].sub(shares);
 
-        _rebalance(context.version, UFixed18Lib.ZERO);
+        _rebalance(context, UFixed18Lib.ZERO);
     }
 
     function claim(address owner) external {
@@ -142,7 +142,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
         _unclaimed[owner] = UFixed18Lib.ZERO;
         _totalUnclaimed = _totalUnclaimed.sub(claimAmount);
 
-        _rebalance(context.version, claimAmount);
+        _rebalance(context, claimAmount);
 
         asset.push(owner, claimAmount);
     }
@@ -195,8 +195,8 @@ contract BalancedVault is IBalancedVault, UInitializable {
         }
 
         if (account != address(0) && context.version > _latestVersions[account]) {
-            _balanceOf[account] = _balanceOfAtVersion(account, context);
-            _unclaimed[account] = _unclaimedAtVersion(account, context);
+            _balanceOf[account] = _balanceOfAtVersion(context, account);
+            _unclaimed[account] = _unclaimedAtVersion(context, account);
             _deposit = UFixed18Lib.ZERO;
             _redemption = UFixed18Lib.ZERO;
         }
@@ -225,7 +225,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @return Maximum available redeemable amount
      */
     function maxRedeem(address owner) external view returns (UFixed18) {
-        return _maxRedeemAtVersion(owner, _loadContextForRead());
+        return _maxRedeemAtVersion(_loadContextForRead(), owner);
     }
 
     /**
@@ -241,7 +241,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
     }
 
     function balanceOf(address account) external view returns (UFixed18) {
-        return _balanceOfAtVersion(account, _loadContextForRead());
+        return _balanceOfAtVersion(_loadContextForRead(), account);
     }
 
     function totalUnclaimed() external view returns (UFixed18) {
@@ -249,91 +249,25 @@ contract BalancedVault is IBalancedVault, UInitializable {
     }
 
     function unclaimed(address account) external view returns (UFixed18) {
-        return _unclaimedAtVersion(account, _loadContextForRead());
+        return _unclaimedAtVersion(_loadContextForRead(), account);
     }
 
     function convertToShares(UFixed18 assets) external view returns (UFixed18) {
-        return _convertToSharesAtVersion(assets, _loadContextForRead());
+        return _convertToSharesAtVersion(_loadContextForRead(), assets);
     }
 
     function convertToAssets(UFixed18 shares) external view returns (UFixed18) {
-        return _convertToAssetsAtVersion(shares, _loadContextForRead());
-    }
-
-    function _loadContextForRead() private view returns (VersionContext memory) {
-        uint256 latestVersion = _latestVersion();
-        uint256 currentVersion = Math.min(long.latestVersion(), short.latestVersion()); // latest version that both products are settled to
-
-        return VersionContext(currentVersion, latestVersion, _collateralAt(latestVersion), _versions[latestVersion].totalShares);
-    }
-
-    function _loadContextForWrite() private returns (VersionContext memory) {
-        uint256 latestVersion = _latestVersion();
-        long.settleAccount(address(this));
-        short.settleAccount(address(this));
-        uint256 currentVersion = _latestVersion();
-
-        return VersionContext(currentVersion, latestVersion, _collateralAt(latestVersion), _versions[latestVersion].totalShares);
-    }
-
-    function _latestVersion() private view returns (uint256) {
-        return long.latestVersion(address(this)); // both products are always settled at the same time for the vault
-    }
-
-    function _maxDepositAtVersion(VersionContext memory context) private view returns (UFixed18) {
-        if (_unhealthyAtVersion(context)) return UFixed18Lib.ZERO;
-        UFixed18 currentCollateral = _totalAssetsAtVersion(context);
-        return currentCollateral.gt(maxCollateral) ? maxCollateral.sub(currentCollateral) : UFixed18Lib.ZERO;
-    }
-
-    function _maxRedeemAtVersion(address account, VersionContext memory context) public view returns (UFixed18) {
-        if (_unhealthyAtVersion(context)) return UFixed18Lib.ZERO;
-        return _balanceOfAtVersion(account, context);
-    }
-
-    function _totalAssetsAtVersion(VersionContext memory context) private view returns (UFixed18) {
-        (UFixed18 longCollateral, UFixed18 shortCollateral, UFixed18 idleCollateral) = _collateral();
-        return longCollateral.add(shortCollateral).add(idleCollateral).sub(_totalUnclaimedAtVersion(context));
-    }
-
-    function _totalSupplyAtVersion(VersionContext memory context) private view returns (UFixed18) {
-        if (context.version == _latestVersion()) return UFixed18Lib.ZERO;
-        return _convertToSharesAtVersion(_totalSupply, context);
-    }
-
-    function _balanceOfAtVersion(address account, VersionContext memory context) private view returns (UFixed18) {
-        if (context.version == _latestVersions[account]) return UFixed18Lib.ZERO;
-        return _convertToSharesAtVersion(_deposits[account], context);
-    }
-
-    function _totalUnclaimedAtVersion(VersionContext memory context) private view returns (UFixed18) {
-        if (context.version == _latestVersion()) return UFixed18Lib.ZERO;
-        return _convertToAssetsAtVersion(_redemption, context);
-    }
-
-    function _unclaimedAtVersion(address account, VersionContext memory context) private view returns (UFixed18) {
-        if (context.version == _latestVersions[account]) return UFixed18Lib.ZERO;
-        return _convertToAssetsAtVersion(_redemptions[account], context);
-    }
-
-    function _convertToSharesAtVersion(UFixed18 assets, VersionContext memory context) private pure returns (UFixed18) {
-        if (context.latestCollateral.isZero()) return assets;
-        return assets.muldiv(context.latestShares, context.latestCollateral);
-    }
-
-    function _convertToAssetsAtVersion(UFixed18 shares, VersionContext memory context) private pure returns (UFixed18) {
-        if (context.latestShares.isZero()) return shares;
-        return shares.muldiv(context.latestCollateral, context.latestShares);
+        return _convertToAssetsAtVersion(_loadContextForRead(), shares);
     }
 
     /**
-     * @notice Rebalances the collateral and position of the vault
+ * @notice Rebalances the collateral and position of the vault
      * @dev Rebalance is executed on best-effort, any failing legs of the strategy will not cause a revert
      * @param claimAmount The amount of assets that will be withdrawn from the vault at the end of the operation
      */
-    function _rebalance(uint256 version, UFixed18 claimAmount) private {
+    function _rebalance(VersionContext memory context, UFixed18 claimAmount) private {
         _rebalanceCollateral(claimAmount);
-        _rebalancePosition(version);
+        _rebalancePosition(context);
     }
 
     /**
@@ -347,7 +281,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
         if (targetCollateral.lt(controller.minCollateral())) targetCollateral = UFixed18Lib.ZERO;
 
         (IProduct greaterProduct, IProduct lesserProduct) =
-            longCollateral.gt(shortCollateral) ? (long, short) : (short, long);
+        longCollateral.gt(shortCollateral) ? (long, short) : (short, long);
 
         _updateCollateral(greaterProduct, targetCollateral);
         _updateCollateral(lesserProduct, currentCollateral.sub(targetCollateral));
@@ -356,11 +290,12 @@ contract BalancedVault is IBalancedVault, UInitializable {
     /**
      * @notice Rebalances the position of the vault
      */
-    function _rebalancePosition(uint256 version) private {
-        (UFixed18 longCollateral, UFixed18 shortCollateral, ) = _collateral();
-        UFixed18 currentAssets = longCollateral.add(shortCollateral).sub(_totalUnclaimed); // don't include idle funds due to minCollateral
+    function _rebalancePosition(VersionContext memory context) private {
+        UFixed18 currentAssets = _totalAssetsAtVersion(context);
+        if (currentAssets.lt(controller.minCollateral().mul(TWO))) currentAssets = UFixed18Lib.ZERO;
+
         UFixed18 currentUtilized = _totalSupply.muldiv(currentAssets, _totalSupply.add(_redemption));
-        UFixed18 currentPrice = long.atVersion(version).price.abs();
+        UFixed18 currentPrice = long.atVersion(context.version).price.abs();
         UFixed18 targetPosition = currentUtilized.mul(targetLeverage).div(currentPrice).div(TWO);
 
         _updateMakerPosition(long, targetPosition);
@@ -406,6 +341,64 @@ contract BalancedVault is IBalancedVault, UInitializable {
         emit CollateralUpdated(product, targetCollateral);
     }
 
+    function _loadContextForWrite() private returns (VersionContext memory) {
+        uint256 latestVersion = _latestVersion();
+        long.settleAccount(address(this));
+        short.settleAccount(address(this));
+        uint256 currentVersion = _latestVersion();
+
+        return VersionContext(currentVersion, latestVersion, _assetsAt(latestVersion), _sharesAt(latestVersion));
+    }
+
+    function _loadContextForRead() private view returns (VersionContext memory) {
+        uint256 latestVersion = _latestVersion();
+        uint256 currentVersion = Math.min(long.latestVersion(), short.latestVersion()); // latest version that both products are settled to
+
+        return VersionContext(currentVersion, latestVersion, _assetsAt(latestVersion), _sharesAt(latestVersion));
+    }
+
+    function _latestVersion() private view returns (uint256) {
+        return long.latestVersion(address(this)); // both products are always settled at the same time for the vault
+    }
+
+    function _maxDepositAtVersion(VersionContext memory context) private view returns (UFixed18) {
+        if (_unhealthyAtVersion(context)) return UFixed18Lib.ZERO;
+        UFixed18 currentCollateral = _totalAssetsAtVersion(context);
+        return currentCollateral.gt(maxCollateral) ? maxCollateral.sub(currentCollateral) : UFixed18Lib.ZERO;
+    }
+
+    function _maxRedeemAtVersion(VersionContext memory context, address account) public view returns (UFixed18) {
+        if (_unhealthyAtVersion(context)) return UFixed18Lib.ZERO;
+        return _balanceOfAtVersion(context, account);
+    }
+
+    function _totalAssetsAtVersion(VersionContext memory context) private view returns (UFixed18) {
+        (UFixed18 longCollateral, UFixed18 shortCollateral, UFixed18 idleCollateral) = _collateral();
+        (UFixed18 totalCollateral, UFixed18 totalDebt) =
+            (longCollateral.add(shortCollateral).add(idleCollateral), _totalUnclaimedAtVersion(context));
+        return totalCollateral.gt(totalDebt) ? totalCollateral.sub(totalDebt) : UFixed18Lib.ZERO;
+    }
+
+    function _totalSupplyAtVersion(VersionContext memory context) private view returns (UFixed18) {
+        if (context.version == _latestVersion()) return UFixed18Lib.ZERO;
+        return _convertToSharesAtVersion(context, _totalSupply);
+    }
+
+    function _balanceOfAtVersion(VersionContext memory context, address account) private view returns (UFixed18) {
+        if (context.version == _latestVersions[account]) return UFixed18Lib.ZERO;
+        return _convertToSharesAtVersion(context, _deposits[account]);
+    }
+
+    function _totalUnclaimedAtVersion(VersionContext memory context) private view returns (UFixed18) {
+        if (context.version == _latestVersion()) return UFixed18Lib.ZERO;
+        return _convertToAssetsAtVersion(context, _redemption);
+    }
+
+    function _unclaimedAtVersion(VersionContext memory context, address account) private view returns (UFixed18) {
+        if (context.version == _latestVersions[account]) return UFixed18Lib.ZERO;
+        return _convertToAssetsAtVersion(context, _redemptions[account]);
+    }
+
     /**
      * @notice Returns the amounts of the individual sources of assets in the vault
      * @return The amount of collateral in the long product
@@ -420,13 +413,27 @@ contract BalancedVault is IBalancedVault, UInitializable {
         );
     }
 
-    function _collateralAt(uint256 version) private view returns (UFixed18) {
+    function _assetsAt(uint256 version) private view returns (UFixed18) {
         Fixed18 longAccumulated = long.valueAtVersion(version + 1).maker.sub(long.valueAtVersion(version).maker);
         Fixed18 shortAccumulated = short.valueAtVersion(version + 1).maker.sub(short.valueAtVersion(version).maker);
 
         Fixed18 accumulated = longAccumulated.mul(Fixed18Lib.from(_versions[version].longPosition))
-        .add(shortAccumulated.mul(Fixed18Lib.from(_versions[version].shortPosition)));
+            .add(shortAccumulated.mul(Fixed18Lib.from(_versions[version].shortPosition)));
 
         return UFixed18Lib.from(Fixed18Lib.from(_versions[version].totalAssets).add(accumulated).max(Fixed18Lib.ZERO));
+    }
+
+    function _sharesAt(uint256 version) private view returns (UFixed18) {
+        return _versions[version].totalShares;
+    }
+
+    function _convertToSharesAtVersion(VersionContext memory context, UFixed18 assets) private pure returns (UFixed18) {
+        if (context.latestCollateral.isZero()) return assets;
+        return assets.muldiv(context.latestShares, context.latestCollateral);
+    }
+
+    function _convertToAssetsAtVersion(VersionContext memory context, UFixed18 shares) private pure returns (UFixed18) {
+        if (context.latestShares.isZero()) return shares;
+        return shares.muldiv(context.latestCollateral, context.latestShares);
     }
 }
