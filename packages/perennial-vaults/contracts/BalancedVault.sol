@@ -5,8 +5,6 @@ import "./interfaces/IBalancedVault.sol";
 import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
-// TODO: unclaimed larder than collateral?
-
 /**
  * @title BalancedVault
  * @notice ERC4626 vault that manages a 50-50 position between long-short markets of the same payoff on Perennial.
@@ -141,6 +139,11 @@ contract BalancedVault is IBalancedVault, UInitializable {
         UFixed18 claimAmount = _unclaimed[owner];
         _unclaimed[owner] = UFixed18Lib.ZERO;
         _totalUnclaimed = _totalUnclaimed.sub(claimAmount);
+
+        // pro-rate if vault has less collateral than unclaimed
+        (UFixed18 longCollateral, UFixed18 shortCollateral, UFixed18 idleCollateral) = _collateral();
+        UFixed18 totalCollateral = longCollateral.add(shortCollateral).add(idleCollateral);
+        if (totalCollateral.lt(_totalUnclaimed)) claimAmount = claimAmount.muldiv(totalCollateral, _totalUnclaimed);
 
         _rebalance(context, claimAmount);
 
