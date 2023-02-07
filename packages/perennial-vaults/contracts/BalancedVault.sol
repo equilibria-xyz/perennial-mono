@@ -5,8 +5,6 @@ import "./interfaces/IBalancedVault.sol";
 import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
-// TODO: owner -> account, receiver (deposit) -> account
-
 /**
  * @title BalancedVault
  * @notice ERC4626 vault that manages a 50-50 position between long-short markets of the same payoff on Perennial.
@@ -112,48 +110,48 @@ contract BalancedVault is IBalancedVault, UInitializable {
     }
 
     /**
-     * @notice Deposits `assets` assets into the vault, returning shares to `receiver` after the deposit settles.
+     * @notice Deposits `assets` assets into the vault, returning shares to `account` after the deposit settles.
      * @param assets The amount of assets to deposit
-     * @param receiver The account to deposit on behalf of
+     * @param account The account to deposit on behalf of
      */
-    function deposit(UFixed18 assets, address receiver) external {
-        VersionContext memory context = _settle(receiver);
+    function deposit(UFixed18 assets, address account) external {
+        VersionContext memory context = _settle(account);
         if (assets.gt(_maxDepositAtVersion(context))) revert BalancedVaultDepositLimitExceeded();
 
         _deposit = _deposit.add(assets);
-        _deposits[receiver] = _deposits[receiver].add(assets);
-        _latestVersions[receiver] = context.version;
-        emit Deposit(msg.sender, receiver, context.version, assets);
+        _deposits[account] = _deposits[account].add(assets);
+        _latestVersions[account] = context.version;
+        emit Deposit(msg.sender, account, context.version, assets);
 
         asset.pull(msg.sender, assets);
 
         _rebalance(context, UFixed18Lib.ZERO);
     }
 
-    function redeem(UFixed18 shares, address, address owner) external {
-        if (msg.sender != owner) allowance[owner][msg.sender] = allowance[owner][msg.sender].sub(shares);
+    function redeem(UFixed18 shares, address account) external {
+        if (msg.sender != account) allowance[account][msg.sender] = allowance[account][msg.sender].sub(shares);
 
-        VersionContext memory context = _settle(owner);
-        if (shares.gt(_maxRedeemAtVersion(context, owner))) revert BalancedVaultRedemptionLimitExceeded();
+        VersionContext memory context = _settle(account);
+        if (shares.gt(_maxRedeemAtVersion(context, account))) revert BalancedVaultRedemptionLimitExceeded();
 
         _redemption = _redemption.add(shares);
-        _redemptions[owner] = _redemptions[owner].add(shares);
-        _latestVersions[owner] = context.version;
-        emit Redemption(msg.sender, owner, context.version, shares);
+        _redemptions[account] = _redemptions[account].add(shares);
+        _latestVersions[account] = context.version;
+        emit Redemption(msg.sender, account, context.version, shares);
 
-        _balanceOf[owner] = _balanceOf[owner].sub(shares);
-        emit Transfer(owner, address(0), shares);
+        _balanceOf[account] = _balanceOf[account].sub(shares);
+        emit Transfer(account, address(0), shares);
 
         _rebalance(context, UFixed18Lib.ZERO);
     }
 
-    function claim(address owner) external {
-        VersionContext memory context = _settle(owner);
+    function claim(address account) external {
+        VersionContext memory context = _settle(account);
 
-        UFixed18 claimAmount = _unclaimed[owner];
-        _unclaimed[owner] = UFixed18Lib.ZERO;
+        UFixed18 claimAmount = _unclaimed[account];
+        _unclaimed[account] = UFixed18Lib.ZERO;
         _totalUnclaimed = _totalUnclaimed.sub(claimAmount);
-        emit Claim(msg.sender, owner, claimAmount);
+        emit Claim(msg.sender, account, claimAmount);
 
         // pro-rate if vault has less collateral than unclaimed
         (UFixed18 longCollateral, UFixed18 shortCollateral, UFixed18 idleCollateral) = _collateral();
@@ -162,7 +160,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
 
         _rebalance(context, claimAmount);
 
-        asset.push(owner, claimAmount);
+        asset.push(account, claimAmount);
     }
 
     function approve(address spender, UFixed18 amount) external returns (bool) {
@@ -247,11 +245,11 @@ contract BalancedVault is IBalancedVault, UInitializable {
     /**
      * @notice The maximum available redeemable amount
      * @dev Only exact when vault is synced, otherwise approximate
-     * @param owner The account to redeem for
+     * @param account The account to redeem for
      * @return Maximum available redeemable amount
      */
-    function maxRedeem(address owner) external view returns (UFixed18) {
-        return _maxRedeemAtVersion(_loadContextForRead(), owner);
+    function maxRedeem(address account) external view returns (UFixed18) {
+        return _maxRedeemAtVersion(_loadContextForRead(), account);
     }
 
     /**
