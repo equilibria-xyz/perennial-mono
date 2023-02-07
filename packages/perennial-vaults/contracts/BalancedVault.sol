@@ -5,6 +5,8 @@ import "./interfaces/IBalancedVault.sol";
 import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
+// TODO: owner -> account, receiver (deposit) -> account
+
 /**
  * @title BalancedVault
  * @notice ERC4626 vault that manages a 50-50 position between long-short markets of the same payoff on Perennial.
@@ -35,6 +37,12 @@ contract BalancedVault is IBalancedVault, UInitializable {
 
     /// @dev The underlying asset of the vault
     Token18 public immutable asset;
+
+    /// @dev The ERC20 name of the vault
+    string public name;
+
+    /// @dev The ERC20 symbol of the vault
+    string public symbol;
 
     /// @dev Mapping of allowance across all users
     mapping(address => mapping(address => UFixed18)) public allowance;
@@ -86,7 +94,10 @@ contract BalancedVault is IBalancedVault, UInitializable {
         maxCollateral = maxCollateral_;
     }
 
-    function initialize() external initializer(1) {
+    function initialize(string memory name_, string memory symbol_) external initializer(1) {
+        name = name_;
+        symbol = symbol_;
+
         asset.approve(address(collateral));
     }
 
@@ -218,6 +229,10 @@ contract BalancedVault is IBalancedVault, UInitializable {
             totalShares: _totalSupply.add(_redemption),
             totalAssets: _totalAssetsAtVersion(context).sub(_deposit)
         });
+    }
+
+    function decimals() external pure returns (uint8) {
+        return 18;
     }
 
     /**

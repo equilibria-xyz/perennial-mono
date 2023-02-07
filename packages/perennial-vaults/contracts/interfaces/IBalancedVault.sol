@@ -32,7 +32,7 @@ interface IBalancedVault {
     error BalancedVaultDepositLimitExceeded();
     error BalancedVaultRedemptionLimitExceeded();
 
-    function initialize() external;
+    function initialize(string memory name_, string memory symbol_) external;
     function sync() external;
     function controller() external view returns (IController);
     function collateral() external view returns (ICollateral);
@@ -60,8 +60,9 @@ interface IBalancedVault {
     event Transfer(address indexed from, address indexed to, UFixed18 value);
     event Approval(address indexed owner, address indexed spender, UFixed18 value);
 
-    // TODO: named stuff
-    // TODO: owner -> account, receiver (deposit) -> account
+    function name() external view returns (string memory);
+    function symbol() external view returns (string memory);
+    function decimals() external view returns (uint8);
     function totalSupply() external view returns (UFixed18);
     function balanceOf(address account) external view returns (UFixed18);
     function transfer(address to, UFixed18 amount) external returns (bool);
