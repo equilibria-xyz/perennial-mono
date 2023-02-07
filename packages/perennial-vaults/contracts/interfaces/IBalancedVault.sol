@@ -7,7 +7,7 @@ import "@equilibria/root/number/types/UFixed18.sol";
 
 interface IBalancedVault {
 
-    // TODO: BalancedVault interface
+    /* BalancedVault Interface */
 
     struct Version {
         UFixed18 longPosition;
@@ -23,6 +23,9 @@ interface IBalancedVault {
         UFixed18 latestShares;
     }
 
+    event Deposit(address indexed sender, address indexed owner, uint256 version, UFixed18 assets);
+    event Redemption(address indexed sender, address indexed owner, uint256 version, UFixed18 shares);
+    event Claim(address indexed sender, address indexed owner, UFixed18 assets);
     event PositionUpdated(IProduct product, UFixed18 targetPosition);
     event CollateralUpdated(IProduct product, UFixed18 targetCollateral);
 
@@ -41,10 +44,7 @@ interface IBalancedVault {
     function totalUnclaimed() external view returns (UFixed18);
     function claim(address owner) external;
 
-    // TODO: ERC4626 interface
-
-//    event Deposit(address indexed sender, address indexed owner, uint256 assets, UFixed18 shares);
-//    event Withdraw(address indexed sender, address indexed receiver, address indexed owner, UFixed18 assets, UFixed18 shares);
+    /* Partial ERC4626 Interface */
 
     function asset() external view returns (Token18);
     function totalAssets() external view returns (UFixed18);
@@ -55,11 +55,13 @@ interface IBalancedVault {
     function maxRedeem(address owner) external view returns (UFixed18);
     function redeem(UFixed18 shares, address receiver, address owner) external;
 
-    // TODO: ERC20 interface
+    /* Partial ERC20 Interface */
 
     event Transfer(address indexed from, address indexed to, UFixed18 value);
     event Approval(address indexed owner, address indexed spender, UFixed18 value);
 
+    // TODO: named stuff
+    // TODO: owner -> account, receiver (deposit) -> account
     function totalSupply() external view returns (UFixed18);
     function balanceOf(address account) external view returns (UFixed18);
     function transfer(address to, UFixed18 amount) external returns (bool);

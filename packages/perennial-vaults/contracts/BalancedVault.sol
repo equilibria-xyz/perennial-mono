@@ -112,6 +112,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
         _deposit = _deposit.add(assets);
         _deposits[receiver] = _deposits[receiver].add(assets);
         _latestVersions[receiver] = context.version;
+        emit Deposit(msg.sender, receiver, context.version, assets);
 
         asset.pull(msg.sender, assets);
 
@@ -127,8 +128,10 @@ contract BalancedVault is IBalancedVault, UInitializable {
         _redemption = _redemption.add(shares);
         _redemptions[owner] = _redemptions[owner].add(shares);
         _latestVersions[owner] = context.version;
+        emit Redemption(msg.sender, owner, context.version, shares);
 
         _balanceOf[owner] = _balanceOf[owner].sub(shares);
+        emit Transfer(owner, address(0), shares);
 
         _rebalance(context, UFixed18Lib.ZERO);
     }
@@ -139,6 +142,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
         UFixed18 claimAmount = _unclaimed[owner];
         _unclaimed[owner] = UFixed18Lib.ZERO;
         _totalUnclaimed = _totalUnclaimed.sub(claimAmount);
+        emit Claim(msg.sender, owner, claimAmount);
 
         // pro-rate if vault has less collateral than unclaimed
         (UFixed18 longCollateral, UFixed18 shortCollateral, UFixed18 idleCollateral) = _collateral();
@@ -198,10 +202,14 @@ contract BalancedVault is IBalancedVault, UInitializable {
         }
 
         if (account != address(0) && context.version > _latestVersions[account]) {
+            UFixed18 latestBalanceOf = _balanceOf[account];
             _balanceOf[account] = _balanceOfAtVersion(context, account);
             _unclaimed[account] = _unclaimedAtVersion(context, account);
             _deposit = UFixed18Lib.ZERO;
             _redemption = UFixed18Lib.ZERO;
+
+            if (!_balanceOf[account].eq(latestBalanceOf))
+                emit Transfer(address(0), account, _balanceOf[account].sub(latestBalanceOf));
         }
 
         _versions[context.version] = Version({
