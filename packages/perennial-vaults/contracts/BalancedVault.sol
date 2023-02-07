@@ -4,6 +4,7 @@ pragma solidity 0.8.17;
 import "./interfaces/IBalancedVault.sol";
 import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
+import "hardhat/console.sol";
 
 /**
  * @title BalancedVault
@@ -290,6 +291,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @param claimAmount The amount of assets that will be withdrawn from the vault at the end of the operation
      */
     function _rebalance(VersionContext memory context, UFixed18 claimAmount) private {
+        console.log("_rebalance");
         _rebalanceCollateral(claimAmount);
         _rebalancePosition(context);
     }
@@ -299,52 +301,43 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @param claimAmount The amount of assets that will be withdrawn from the vault at the end of the operation
      */
     function _rebalanceCollateral(UFixed18 claimAmount) private {
+        console.log("_rebalanceCollateral");
         (UFixed18 longCollateral, UFixed18 shortCollateral, UFixed18 idleCollateral) = _collateral();
-        UFixed18 currentCollateral = longCollateral.add(shortCollateral).add(idleCollateral);
-        UFixed18 targetCollateral = currentCollateral.sub(claimAmount).div(TWO);
+        UFixed18 currentCollateral = longCollateral.add(shortCollateral).add(idleCollateral).sub(claimAmount);
+        UFixed18 targetCollateral = currentCollateral.div(TWO);
         if (targetCollateral.lt(controller.minCollateral())) targetCollateral = UFixed18Lib.ZERO;
 
+        console.log("currentCollateral: %s", UFixed18.unwrap(currentCollateral));
+        console.log("targetCollateral: %s", UFixed18.unwrap(targetCollateral));
+
         (IProduct greaterProduct, IProduct lesserProduct) =
-        longCollateral.gt(shortCollateral) ? (long, short) : (short, long);
+            longCollateral.gt(shortCollateral) ? (long, short) : (short, long);
 
         _updateCollateral(greaterProduct, targetCollateral);
-        _updateCollateral(lesserProduct, currentCollateral.sub(targetCollateral));
+        _updateCollateral(lesserProduct, targetCollateral);
     }
 
     /**
      * @notice Rebalances the position of the vault
      */
     function _rebalancePosition(VersionContext memory context) private {
+        console.log("_rebalancePosition");
         UFixed18 currentAssets = _totalAssetsAtVersion(context);
+        console.log("currentAssets: %s", UFixed18.unwrap(currentAssets));
         if (currentAssets.lt(controller.minCollateral().mul(TWO))) currentAssets = UFixed18Lib.ZERO;
+        console.log("currentAssets: %s", UFixed18.unwrap(currentAssets));
 
-        UFixed18 currentUtilized = _totalSupply.muldiv(currentAssets, _totalSupply.add(_redemption));
+        UFixed18 currentUtilized = _totalSupply.add(_redemption).isZero() ?
+            currentAssets :
+            _totalSupply.muldiv(currentAssets, _totalSupply.add(_redemption));
+        console.log("currentUtilized: %s", UFixed18.unwrap(currentUtilized));
         UFixed18 currentPrice = long.atVersion(context.version).price.abs();
+        console.log("currentPrice: %s", UFixed18.unwrap(currentPrice));
         UFixed18 targetPosition = currentUtilized.mul(targetLeverage).div(currentPrice).div(TWO);
+        console.log("targetPosition: %s", UFixed18.unwrap(targetPosition));
 
         _updateMakerPosition(long, targetPosition);
         _updateMakerPosition(short, targetPosition);
-    }
-
-    /**
-     * @notice Adjusts the position on `product` to `targetPosition`
-     * @param product The product to adjust the vault's position on
-     * @param targetPosition The new position to target
-     */
-    function _updateMakerPosition(IProduct product, UFixed18 targetPosition) private {
-        UFixed18 currentPosition = product.position(address(this)).next(product.pre(address(this))).maker;
-        UFixed18 currentMaker = product.positionAtVersion(product.latestVersion()).next(product.pre()).maker;
-        UFixed18 makerLimit = product.makerLimit();
-        UFixed18 makerAvailable = makerLimit.gt(currentMaker) ? makerLimit.sub(currentMaker) : UFixed18Lib.ZERO;
-
-        if (targetPosition.lt(currentPosition))
-            try product.closeMake(currentPosition.sub(targetPosition)) { }
-            catch { return; }
-        if (targetPosition.gt(currentPosition))
-            try product.openMake(targetPosition.sub(currentPosition).min(makerAvailable)) { }
-            catch { return; }
-
-        emit PositionUpdated(product, targetPosition);
     }
 
     /**
@@ -353,16 +346,46 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @param targetCollateral The new collateral to target
      */
     function _updateCollateral(IProduct product, UFixed18 targetCollateral) private {
+        console.log("_updateCollateral");
         UFixed18 currentCollateral = collateral.collateral(address(this), product);
+
+        console.log("currentCollateral: %s", UFixed18.unwrap(currentCollateral));
+        console.log("targetCollateral: %s", UFixed18.unwrap(targetCollateral));
+        console.log("deposit amount: %s", UFixed18.unwrap(targetCollateral.sub(currentCollateral)));
 
         if (currentCollateral.gt(targetCollateral))
             try collateral.withdrawTo(address(this), product, currentCollateral.sub(targetCollateral)) { }
-            catch { return; }
+            catch { console.log("error catch - collateral"); return; }
         if (currentCollateral.lt(targetCollateral))
             try collateral.depositTo(address(this), product, targetCollateral.sub(currentCollateral)) { }
-            catch { return; }
+            catch { console.log("error catch - collateral"); return; }
 
         emit CollateralUpdated(product, targetCollateral);
+    }
+
+    /**
+     * @notice Adjusts the position on `product` to `targetPosition`
+     * @param product The product to adjust the vault's position on
+     * @param targetPosition The new position to target
+     */
+    function _updateMakerPosition(IProduct product, UFixed18 targetPosition) private {
+        console.log("_updateMakerPosition");
+        UFixed18 currentPosition = product.position(address(this)).next(product.pre(address(this))).maker;
+        UFixed18 currentMaker = product.positionAtVersion(product.latestVersion()).next(product.pre()).maker;
+        UFixed18 makerLimit = product.makerLimit();
+        UFixed18 makerAvailable = makerLimit.gt(currentMaker) ? makerLimit.sub(currentMaker) : UFixed18Lib.ZERO;
+        console.log("targetPosition: %s", UFixed18.unwrap(targetPosition));
+        console.log("currentPosition: %s", UFixed18.unwrap(currentPosition));
+        console.log("makerAvailable: %s", UFixed18.unwrap(makerAvailable));
+
+        if (targetPosition.lt(currentPosition))
+            try product.closeMake(currentPosition.sub(targetPosition)) { }
+            catch { console.log("error catch"); return; }
+        if (targetPosition.gt(currentPosition))
+            try product.openMake(targetPosition.sub(currentPosition).min(makerAvailable)) { }
+            catch { console.log("error catch"); return; }
+
+        emit PositionUpdated(product, targetPosition);
     }
 
     function _loadContextForWrite() private returns (VersionContext memory) {
@@ -388,7 +411,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
     function _maxDepositAtVersion(VersionContext memory context) private view returns (UFixed18) {
         if (_unhealthyAtVersion(context)) return UFixed18Lib.ZERO;
         UFixed18 currentCollateral = _totalAssetsAtVersion(context);
-        return currentCollateral.gt(maxCollateral) ? maxCollateral.sub(currentCollateral) : UFixed18Lib.ZERO;
+        return maxCollateral.gt(currentCollateral) ? maxCollateral.sub(currentCollateral) : UFixed18Lib.ZERO;
     }
 
     function _maxRedeemAtVersion(VersionContext memory context, address account) public view returns (UFixed18) {
