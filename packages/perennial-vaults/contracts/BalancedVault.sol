@@ -5,11 +5,9 @@ import "./interfaces/IBalancedVault.sol";
 import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
-
-// TODO: minimum collateral
 // TODO: what to do if zero-balance w/ non-zero shares on deposit?
 // TODO: .div by zero in settles
-
+// TODO: unclaimed larder than collateral?
 /**
  * @title BalancedVault
  * @notice ERC4626 vault that manages a 50-50 position between long-short markets of the same payoff on Perennial.
@@ -19,6 +17,9 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
  */
 contract BalancedVault is IBalancedVault, UInitializable {
     UFixed18 constant private TWO = UFixed18.wrap(2e18);
+
+    /// @dev The address of the Perennial controller contract
+    IController public immutable controller;
 
     /// @dev The address of the Perennial collateral contract
     ICollateral public immutable collateral;
@@ -73,14 +74,15 @@ contract BalancedVault is IBalancedVault, UInitializable {
 
     constructor(
         Token18 asset_,
-        ICollateral collateral_,
+        IController controller_,
         IProduct long_,
         IProduct short_,
         UFixed18 targetLeverage_,
         UFixed18 maxCollateral_
     ) {
         asset = asset_;
-        collateral = collateral_;
+        controller = controller_;
+        collateral = controller_.collateral();
         long = long_;
         short = short_;
         targetLeverage = targetLeverage_;
@@ -96,9 +98,9 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @dev Should be called by a keeper when the vault approaches a liquidation state on either side
      */
     function sync() external {
-        _settle(address(0));
-        _rebalance(UFixed18Lib.ZERO);
-        _rebalance(UFixed18Lib.ZERO);
+        VersionContext memory context = _settle(address(0));
+        _rebalance(context.version, UFixed18Lib.ZERO);
+        _rebalance(context.version, UFixed18Lib.ZERO);
     }
 
     /**
@@ -116,7 +118,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
 
         asset.pull(msg.sender, assets);
 
-        _rebalance(UFixed18Lib.ZERO);
+        _rebalance(context.version, UFixed18Lib.ZERO);
     }
 
     function redeem(UFixed18 shares, address, address owner) external {
@@ -131,17 +133,17 @@ contract BalancedVault is IBalancedVault, UInitializable {
 
         _balanceOf[owner] = _balanceOf[owner].sub(shares);
 
-        _rebalance(UFixed18Lib.ZERO);
+        _rebalance(context.version, UFixed18Lib.ZERO);
     }
 
     function claim(address owner) external {
-        _settle(owner);
+        VersionContext memory context = _settle(owner);
 
         UFixed18 claimAmount = _unclaimed[owner];
         _unclaimed[owner] = UFixed18Lib.ZERO;
         _totalUnclaimed = _totalUnclaimed.sub(claimAmount);
 
-        _rebalance(claimAmount);
+        _rebalance(context.version, claimAmount);
 
         asset.push(owner, claimAmount);
     }
@@ -177,8 +179,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
         return collateral.liquidatable(address(this), long)
             || collateral.liquidatable(address(this), short)
             || long.isLiquidating(address(this))
-            || short.isLiquidating(address(this))
-            || ()
+            || short.isLiquidating(address(this));
     }
 
     /**
@@ -316,9 +317,9 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @dev Rebalance is executed on best-effort, any failing legs of the strategy will not cause a revert
      * @param claimAmount The amount of assets that will be withdrawn from the vault at the end of the operation
      */
-    function _rebalance(UFixed18 claimAmount) private {
+    function _rebalance(uint256 version, UFixed18 claimAmount) private {
         _rebalanceCollateral(claimAmount);
-        _rebalancePosition();
+        _rebalancePosition(version);
     }
 
     /**
@@ -329,6 +330,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
         (UFixed18 longCollateral, UFixed18 shortCollateral, UFixed18 idleCollateral) = _collateral();
         UFixed18 currentCollateral = longCollateral.add(shortCollateral).add(idleCollateral);
         UFixed18 targetCollateral = currentCollateral.sub(claimAmount).div(TWO);
+        if (targetCollateral.lt(controller.minCollateral())) targetCollateral = UFixed18Lib.ZERO;
 
         (IProduct greaterProduct, IProduct lesserProduct) =
             longCollateral.gt(shortCollateral) ? (long, short) : (short, long);
@@ -340,11 +342,11 @@ contract BalancedVault is IBalancedVault, UInitializable {
     /**
      * @notice Rebalances the position of the vault
      */
-    function _rebalancePosition() private {
-        (UFixed18 longCollateral, UFixed18 shortCollateral, UFixed18 idleCollateral) = _collateral();
-        UFixed18 currentAssets = longCollateral.add(shortCollateral).add(idleCollateral).sub(_totalUnclaimed);
+    function _rebalancePosition(uint256 version) private {
+        (UFixed18 longCollateral, UFixed18 shortCollateral, ) = _collateral();
+        UFixed18 currentAssets = longCollateral.add(shortCollateral).sub(_totalUnclaimed); // don't include idle funds due to minCollateral
         UFixed18 currentUtilized = _totalSupply.muldiv(currentAssets, _totalSupply.add(_redemption));
-        UFixed18 currentPrice = long.atVersion(long.latestVersion()).price.abs();
+        UFixed18 currentPrice = long.atVersion(version).price.abs();
         UFixed18 targetPosition = currentUtilized.mul(targetLeverage).div(currentPrice).div(TWO);
 
         _updateMakerPosition(long, targetPosition);

@@ -1,6 +1,7 @@
 //SPDX-License-Identifier: Apache-2.0
-pragma solidity ^0.8.15;
+pragma solidity ^0.8.13;
 
+import "@equilibria/perennial/contracts/interfaces/IController.sol";
 import "@equilibria/perennial/contracts/interfaces/ICollateral.sol";
 import "@equilibria/root/number/types/UFixed18.sol";
 
@@ -31,6 +32,7 @@ interface IBalancedVault {
     function initialize() external;
     function sync() external;
     function unhealthy() external view returns (bool);
+    function controller() external view returns (IController);
     function collateral() external view returns (ICollateral);
     function long() external view returns (IProduct);
     function short() external view returns (IProduct);
