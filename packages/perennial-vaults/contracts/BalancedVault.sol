@@ -5,7 +5,10 @@ import "./interfaces/IBalancedVault.sol";
 import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
+
+// TODO: minimum collateral
 // TODO: what to do if zero-balance w/ non-zero shares on deposit?
+// TODO: .div by zero in settles
 
 /**
  * @title BalancedVault
@@ -174,7 +177,8 @@ contract BalancedVault is IBalancedVault, UInitializable {
         return collateral.liquidatable(address(this), long)
             || collateral.liquidatable(address(this), short)
             || long.isLiquidating(address(this))
-            || short.isLiquidating(address(this));
+            || short.isLiquidating(address(this))
+            || ()
     }
 
     /**
@@ -407,7 +411,6 @@ contract BalancedVault is IBalancedVault, UInitializable {
         Fixed18 accumulated = longAccumulated.mul(Fixed18Lib.from(_versions[version].longPosition))
         .add(shortAccumulated.mul(Fixed18Lib.from(_versions[version].shortPosition)));
 
-        //TODO: what to do if negative?
-        return UFixed18Lib.from(Fixed18Lib.from(_versions[version].totalCollateral).add(accumulated));
+        return UFixed18Lib.from(Fixed18Lib.from(_versions[version].totalCollateral).add(accumulated).max(Fixed18Lib.ZERO));
     }
 }
