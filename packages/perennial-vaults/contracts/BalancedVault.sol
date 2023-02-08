@@ -111,13 +111,11 @@ contract BalancedVault is IBalancedVault, UInitializable {
         console.log("sync");
         (VersionContext memory context, ) = _settle(address(0));
         _rebalance(context, UFixed18Lib.ZERO);
-        _rebalance(context, UFixed18Lib.ZERO);
     }
 
     function syncAccount(address account) external {
         console.log("sync account");
         (VersionContext memory context, ) = _settle(account);
-        _rebalance(context, UFixed18Lib.ZERO);
         _rebalance(context, UFixed18Lib.ZERO);
     }
 
@@ -336,7 +334,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
     function _rebalance(VersionContext memory context, UFixed18 claimAmount) private {
         console.log("_rebalance");
         _rebalanceCollateral(claimAmount);
-        _rebalancePosition(context);
+        _rebalancePosition(context, claimAmount);
     }
 
     /**
@@ -363,17 +361,17 @@ contract BalancedVault is IBalancedVault, UInitializable {
     /**
      * @notice Rebalances the position of the vault
      */
-    function _rebalancePosition(VersionContext memory context) private {
+    function _rebalancePosition(VersionContext memory context, UFixed18 claimAmount) private {
         console.log("_rebalancePosition");
-        UFixed18 currentAssets = _totalAssetsAtVersion(context);
+        UFixed18 currentAssets = _totalAssetsAtVersion(context).sub(claimAmount);
         console.log("currentAssets: %s", UFixed18.unwrap(currentAssets));
         if (currentAssets.lt(controller.minCollateral().mul(TWO))) currentAssets = UFixed18Lib.ZERO;
         console.log("currentAssets: %s", UFixed18.unwrap(currentAssets));
 
         console.log("_redemption: %s", UFixed18.unwrap(_redemption));
-        UFixed18 currentUtilized = _totalSupply.add(_redemption).isZero() ?
+        UFixed18 currentUtilized = _totalSupply.isZero() ?
             currentAssets :
-            _totalSupply.muldiv(currentAssets, _totalSupply.add(_redemption));
+            currentAssets.muldiv(_totalSupply.sub(_redemption), _totalSupply);
         console.log("currentUtilized: %s", UFixed18.unwrap(currentUtilized));
         UFixed18 currentPrice = long.atVersion(context.version).price.abs();
         console.log("currentPrice: %s", UFixed18.unwrap(currentPrice));

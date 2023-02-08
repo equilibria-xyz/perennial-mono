@@ -70,7 +70,7 @@ describe('BalancedVault', () => {
   }
 
   async function totalCollateralInVault() {
-    return (await longCollateralInVault()).add(await shortCollateralInVault())
+    return (await longCollateralInVault()).add(await shortCollateralInVault()).add(await asset.balanceOf(vault.address))
   }
 
   beforeEach(async () => {
@@ -143,7 +143,6 @@ describe('BalancedVault', () => {
     await updateOracle()
 
     await vault.sync()
-    await vault.syncAccount(user.address)
     expect(await vault.balanceOf(user.address)).to.equal(utils.parseEther('10010'))
 
     // Now we should have opened positions.
@@ -166,13 +165,14 @@ describe('BalancedVault', () => {
     expect(await longPosition()).to.equal(0)
     expect(await shortPosition()).to.equal(0)
 
-    // // We should have withdrawn all of our collateral.
-    // expect(await totalCollateralInVault()).to.equal(utils.parseEther('10010'))
-    // expect(await vault.unclaimed(user.address)).to.equal(utils.parseEther('10010'))
+    // We should have withdrawn all of our collateral.
+    const fundingAmount = BigNumber.from('466682218231')
+    expect(await totalCollateralInVault()).to.equal(utils.parseEther('10010').add(fundingAmount))
+    expect(await vault.unclaimed(user.address)).to.equal(utils.parseEther('10010').add(fundingAmount))
 
-    // await vault.connect(user).claim(user.address)
-    // expect(await totalCollateralInVault()).to.equal(0)
-    // expect(await asset.balanceOf(user.address)).to.equal(utils.parseEther('20000'))
+    await vault.connect(user).claim(user.address)
+    expect(await totalCollateralInVault()).to.equal(0)
+    expect(await asset.balanceOf(user.address)).to.equal(utils.parseEther('200000').add(fundingAmount))
   })
 
   it('multiple users', async () => {
