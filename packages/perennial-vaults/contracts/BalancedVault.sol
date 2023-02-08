@@ -95,6 +95,11 @@ contract BalancedVault is IBalancedVault, UInitializable {
         maxCollateral = maxCollateral_;
     }
 
+    /**
+     * @notice Initializes the contract state
+     * @param name_ ERC20 asset name
+     * @param symbol_ ERC20 asset symbol
+     */
     function initialize(string memory name_, string memory symbol_) external initializer(1) {
         name = name_;
         symbol = symbol_;
@@ -131,6 +136,13 @@ contract BalancedVault is IBalancedVault, UInitializable {
         _rebalance(context, UFixed18Lib.ZERO);
     }
 
+    /**
+     * @notice Redeems `shares` shares from the vault
+     * @dev Does not return any assets to the user due to delayed settlement. Use `claim` to claim assets
+     *      If account is not msg.sender, requires prior spending approval
+     * @param shares The amount of shares to redeem
+     * @param account The account to redeem on behalf of
+     */
     function redeem(UFixed18 shares, address account) external {
         if (msg.sender != account) allowance[account][msg.sender] = allowance[account][msg.sender].sub(shares);
 
@@ -150,6 +162,10 @@ contract BalancedVault is IBalancedVault, UInitializable {
         _rebalance(context, UFixed18Lib.ZERO);
     }
 
+    /**
+     * @notice Claims all claimable assets for account, sending assets to account
+     * @param account The account to claim for
+     */
     function claim(address account) external {
         (VersionContext memory context, ) = _settle(account);
 
@@ -168,12 +184,24 @@ contract BalancedVault is IBalancedVault, UInitializable {
         asset.push(account, claimAmount);
     }
 
+    /**
+     * @notice Sets `amount` as the allowance of `spender` over the caller's shares
+     * @param spender Address which can spend operate on shares
+     * @param amount Amount of shares that spender can operate on
+     * @return bool true if the approval was successful, otherwise reverts
+     */
     function approve(address spender, UFixed18 amount) external returns (bool) {
         allowance[msg.sender][spender] = amount;
         emit Approval(msg.sender, spender, amount);
         return true;
     }
 
+    /**
+     * @notice Moves `amount` shares from the caller's account to `to`
+     * @param to Address to send shares to
+     * @param amount Amount of shares to send
+     * @return bool true if the transfer was successful, otherwise reverts
+     */
     function transfer(address to, UFixed18 amount) external returns (bool) {
         _settle(msg.sender);
         _balanceOf[msg.sender] = _balanceOf[msg.sender].sub(amount);
@@ -182,6 +210,13 @@ contract BalancedVault is IBalancedVault, UInitializable {
         return true;
     }
 
+    /**
+     * @notice Moves `amount` shares from `from to `to`
+     * @param from Address to send shares from
+     * @param to Address to send shares to
+     * @param amount Amount of shares to send
+     * @return bool true if the transfer was successful, otherwise reverts
+     */
     function transferFrom(address from, address to, UFixed18 amount) external returns (bool) {
         _settle(from);
         allowance[from][msg.sender] = allowance[from][msg.sender].sub(amount);
@@ -191,6 +226,11 @@ contract BalancedVault is IBalancedVault, UInitializable {
         return true;
     }
 
+    /**
+     * @notice Calculates whether or not the vault is in an unhealthy state at the provided version
+     * @param context Version context to calculate health
+     * @return bool true if unhealthy, false if healthy
+     */
     function _unhealthyAtVersion(VersionContext memory context) public view returns (bool) {
         return collateral.liquidatable(address(this), long)
             || collateral.liquidatable(address(this), short)
@@ -238,6 +278,10 @@ contract BalancedVault is IBalancedVault, UInitializable {
         }
     }
 
+    /**
+     * @notice Returns the decimals places of the share token
+     * @return Decimal places of the share share token
+     */
     function decimals() external pure returns (uint8) {
         return 18;
     }
@@ -272,38 +316,66 @@ contract BalancedVault is IBalancedVault, UInitializable {
         return _totalAssetsAtVersion(context);
     }
 
+    /**
+     * @notice The total amount of shares currently issued
+     * @return Amount of shares currently issued
+     */
     function totalSupply() external view returns (UFixed18) {
         (VersionContext memory context, ) = _loadContextForRead(address(0));
         return _totalSupplyAtVersion(context);
     }
 
+    /**
+     * @notice Number of shares held by `account`
+     * @param account Account to query balance of
+     * @return Number of shares held by `account`
+     */
     function balanceOf(address account) external view returns (UFixed18) {
         (, VersionContext memory accountContext) = _loadContextForRead(account);
         return _balanceOfAtVersion(accountContext, account);
     }
 
+    /**
+     * @notice Total unclaimed assets in vault
+     * @return Total unclaimed assets in vault
+     */
     function totalUnclaimed() external view returns (UFixed18) {
         (VersionContext memory context, ) = _loadContextForRead(address(0));
         return _totalUnclaimedAtVersion(context);
     }
 
+    /**
+     * @notice `account`'s unclaimed assets
+     * @param account Account to query unclaimed balance of
+     * @return `account`'s unclaimed assets
+     */
     function unclaimed(address account) external view returns (UFixed18) {
         (, VersionContext memory accountContext) = _loadContextForRead(account);
         return _unclaimedAtVersion(accountContext, account);
     }
 
+    /**
+     * @notice Converts a given amount of assets to shares
+     * @param assets Number of assets to convert to shares
+     * @return Amount of shares for the given assets
+     */
     function convertToShares(UFixed18 assets) external view returns (UFixed18) {
         (VersionContext memory context, ) = _loadContextForRead(address(0));
         return _convertToSharesAtVersion(context, assets);
     }
 
+    /**
+     * @notice Converts a given amount of shares to assets
+     * @param shares Number of shares to convert to assets
+     * @return Amount of assets for the given shares
+     */
     function convertToAssets(UFixed18 shares) external view returns (UFixed18) {
         (VersionContext memory context, ) = _loadContextForRead(address(0));
         return _convertToAssetsAtVersion(context, shares);
     }
 
     /**
- * @notice Rebalances the collateral and position of the vault
+     * @notice Rebalances the collateral and position of the vault
      * @dev Rebalance is executed on best-effort, any failing legs of the strategy will not cause a revert
      * @param claimAmount The amount of assets that will be withdrawn from the vault at the end of the operation
      */
@@ -381,6 +453,12 @@ contract BalancedVault is IBalancedVault, UInitializable {
         emit PositionUpdated(product, targetPosition);
     }
 
+    /**
+     * @notice Loads the context for the given `account`, settling the vault first
+     * @param account Account to load the context for
+     * @return global version context
+     * @return account version context
+     */
     function _loadContextForWrite(address account) private returns (VersionContext memory, VersionContext memory) {
         long.settleAccount(address(this));
         short.settleAccount(address(this));
@@ -392,6 +470,12 @@ contract BalancedVault is IBalancedVault, UInitializable {
         );
     }
 
+    /**
+     * @notice Loads the context for the given `account`
+     * @param account Account to load the context for
+     * @return global version context
+     * @return account version context
+     */
     function _loadContextForRead(address account) private view returns (VersionContext memory, VersionContext memory) {
         uint256 currentVersion = Math.min(long.latestVersion(), short.latestVersion()); // latest version that both products are settled to
 
@@ -401,12 +485,24 @@ contract BalancedVault is IBalancedVault, UInitializable {
         );
     }
 
+    /**
+     * @notice The maximum available deposit amount at the given version
+     * @param context Version context to use in calculation
+     * @return Maximum available deposit amount at version
+     */
     function _maxDepositAtVersion(VersionContext memory context) private view returns (UFixed18) {
         if (_unhealthyAtVersion(context)) return UFixed18Lib.ZERO;
         UFixed18 currentCollateral = _totalAssetsAtVersion(context);
         return maxCollateral.gt(currentCollateral) ? maxCollateral.sub(currentCollateral) : UFixed18Lib.ZERO;
     }
 
+    /**
+     * @notice The maximum available redeemable amount at the given version for `account`
+     * @param context Version context to use in calculation
+     * @param accountContext Account version context to use in calculation
+     * @param account Account to calculate redeemable amount
+     * @return Maximum available redeemable amount at version
+     */
     function _maxRedeemAtVersion(
         VersionContext memory context,
         VersionContext memory accountContext,
@@ -416,6 +512,11 @@ contract BalancedVault is IBalancedVault, UInitializable {
         return _balanceOfAtVersion(accountContext, account);
     }
 
+    /**
+     * @notice The total assets at the given version
+     * @param context Version context to use in calculation
+     * @return Total assets amount at version
+     */
     function _totalAssetsAtVersion(VersionContext memory context) private view returns (UFixed18) {
         (UFixed18 longCollateral, UFixed18 shortCollateral, UFixed18 idleCollateral) = _collateral();
         (UFixed18 totalCollateral, UFixed18 totalDebt) =
@@ -423,21 +524,43 @@ contract BalancedVault is IBalancedVault, UInitializable {
         return totalCollateral.gt(totalDebt) ? totalCollateral.sub(totalDebt) : UFixed18Lib.ZERO;
     }
 
+    /**
+     * @notice The total supply at the given version
+     * @param context Version context to use in calculation
+     * @return Total supply amount at version
+     */
     function _totalSupplyAtVersion(VersionContext memory context) private view returns (UFixed18) {
         if (context.version == _latestVersion) return _totalSupply;
         return _totalSupply.add(_convertToSharesAtVersion(context, _deposit));
     }
 
+    /**
+     * @notice The balance of `account` at the given version
+     * @param accountContext Account version context to use in calculation
+     * @param account Account to calculate balance of amount
+     * @return Account balance at version
+     */
     function _balanceOfAtVersion(VersionContext memory accountContext, address account) private view returns (UFixed18) {
         if (accountContext.version == _latestVersions[account]) return _balanceOf[account];
         return _balanceOf[account].add(_convertToSharesAtVersion(accountContext, _deposits[account]));
     }
 
+    /**
+     * @notice The total unclaimed assets at the given version
+     * @param context Version context to use in calculation
+     * @return Total unclaimed asset amount at version
+     */
     function _totalUnclaimedAtVersion(VersionContext memory context) private view returns (UFixed18) {
         if (context.version == _latestVersion) return _totalUnclaimed;
         return _totalUnclaimed.add(_convertToAssetsAtVersion(context, _redemption));
     }
 
+    /**
+     * @notice The total unclaimed assets at the given version for `account`
+     * @param accountContext Account version context to use in calculation
+     * @param account Account to calculate unclaimed assets for
+     * @return Total unclaimed asset amount for `account` at version
+     */
     function _unclaimedAtVersion(VersionContext memory accountContext, address account) private view returns (UFixed18) {
         if (accountContext.version == _latestVersions[account]) return _unclaimed[account];
         return _unclaimed[account].add(_convertToAssetsAtVersion(accountContext, _redemptions[account]));
@@ -457,6 +580,12 @@ contract BalancedVault is IBalancedVault, UInitializable {
         );
     }
 
+    /**
+     * @notice The total assets at the given version
+     * @dev Calculates and adds accumualted PnL for `version` + 1
+     * @param version Version to get total assets at
+     * @return Total assets in the vault at the given version
+     */
     function _assetsAt(uint256 version) private view returns (UFixed18) {
         Fixed18 longAccumulated = long.valueAtVersion(version + 1).maker.sub(long.valueAtVersion(version).maker);
         Fixed18 shortAccumulated = short.valueAtVersion(version + 1).maker.sub(short.valueAtVersion(version).maker);
@@ -467,15 +596,32 @@ contract BalancedVault is IBalancedVault, UInitializable {
         return UFixed18Lib.from(Fixed18Lib.from(_versions[version].totalAssets).add(accumulated).max(Fixed18Lib.ZERO));
     }
 
+    /**
+     * @notice The total shares at the given version
+     * @param version Version to get total shares at
+     * @return Total shares at `version`
+     */
     function _sharesAt(uint256 version) private view returns (UFixed18) {
         return _versions[version].totalShares;
     }
 
+    /**
+     * @notice Converts a given amount of assets to shares at version
+     * @param context Version context to use in calculation
+     * @param assets Number of assets to convert to shares
+     * @return Amount of shares for the given assets at version
+     */
     function _convertToSharesAtVersion(VersionContext memory context, UFixed18 assets) private pure returns (UFixed18) {
         if (context.latestCollateral.isZero()) return assets;
         return assets.muldiv(context.latestShares, context.latestCollateral);
     }
 
+    /**
+     * @notice Converts a given amount of shares to assets at version
+     * @param context Version context to use in calculation
+     * @param shares Number of shares to convert to shares
+     * @return Amount of assets for the given shares at version
+     */
     function _convertToAssetsAtVersion(VersionContext memory context, UFixed18 shares) private pure returns (UFixed18) {
         if (context.latestShares.isZero()) return shares;
         return shares.muldiv(context.latestCollateral, context.latestShares);
