@@ -227,58 +227,6 @@ contract BalancedVault is IBalancedVault, UInitializable {
     }
 
     /**
-     * @notice Calculates whether or not the vault is in an unhealthy state at the provided version
-     * @param context Version context to calculate health
-     * @return bool true if unhealthy, false if healthy
-     */
-    function _unhealthyAtVersion(VersionContext memory context) public view returns (bool) {
-        return collateral.liquidatable(address(this), long)
-            || collateral.liquidatable(address(this), short)
-            || long.isLiquidating(address(this))
-            || short.isLiquidating(address(this))
-            || (!context.latestShares.isZero() && context.latestCollateral.isZero());
-    }
-
-    /**
-     * @notice Hook that is called before every stateful operation
-     * @dev Settles the vault's account on both the long and short product, along with any global or user-specific deposits/redemptions
-     * @param account The account that called the operation, or 0 if called by a keeper.
-     * @return context The current version context
-     */
-    function _settle(address account) private returns (VersionContext memory context, VersionContext memory accountContext) {
-        (context, accountContext) = _loadContextForWrite(account);
-
-        _totalSupply = _totalSupplyAtVersion(context);
-        _totalUnclaimed = _totalUnclaimedAtVersion(context);
-        if (context.version > _latestVersion) {
-            _deposit = UFixed18Lib.ZERO;
-            _redemption = UFixed18Lib.ZERO;
-            _latestVersion = context.version;
-
-            _versions[context.version] = Version({
-                longPosition: long.position(address(this)).maker,
-                shortPosition: short.position(address(this)).maker,
-                totalShares: _totalSupply,
-                totalAssets: _totalAssetsAtVersion(context)
-            });
-        }
-
-        if (account != address(0)) {
-            UFixed18 latestBalanceOf = _balanceOf[account];
-            _balanceOf[account] = _balanceOfAtVersion(accountContext, account);
-            _unclaimed[account] = _unclaimedAtVersion(accountContext, account);
-            if (accountContext.version > _latestVersions[account]) {
-                _deposits[account] = UFixed18Lib.ZERO;
-                _redemptions[account] = UFixed18Lib.ZERO;
-                _latestVersions[account] = accountContext.version;
-            }
-
-            if (!_balanceOf[account].eq(latestBalanceOf))
-                emit Transfer(address(0), account, _balanceOf[account].sub(latestBalanceOf));
-        }
-    }
-
-    /**
      * @notice Returns the decimals places of the share token
      * @return Decimal places of the share share token
      */
@@ -372,6 +320,45 @@ contract BalancedVault is IBalancedVault, UInitializable {
     function convertToAssets(UFixed18 shares) external view returns (UFixed18) {
         (VersionContext memory context, ) = _loadContextForRead(address(0));
         return _convertToAssetsAtVersion(context, shares);
+    }
+
+    /**
+     * @notice Hook that is called before every stateful operation
+     * @dev Settles the vault's account on both the long and short product, along with any global or user-specific deposits/redemptions
+     * @param account The account that called the operation, or 0 if called by a keeper.
+     * @return context The current version context
+     */
+    function _settle(address account) private returns (VersionContext memory context, VersionContext memory accountContext) {
+        (context, accountContext) = _loadContextForWrite(account);
+
+        _totalSupply = _totalSupplyAtVersion(context);
+        _totalUnclaimed = _totalUnclaimedAtVersion(context);
+        if (context.version > _latestVersion) {
+            _deposit = UFixed18Lib.ZERO;
+            _redemption = UFixed18Lib.ZERO;
+            _latestVersion = context.version;
+
+            _versions[context.version] = Version({
+            longPosition: long.position(address(this)).maker,
+            shortPosition: short.position(address(this)).maker,
+            totalShares: _totalSupply,
+            totalAssets: _totalAssetsAtVersion(context)
+            });
+        }
+
+        if (account != address(0)) {
+            UFixed18 latestBalanceOf = _balanceOf[account];
+            _balanceOf[account] = _balanceOfAtVersion(accountContext, account);
+            _unclaimed[account] = _unclaimedAtVersion(accountContext, account);
+            if (accountContext.version > _latestVersions[account]) {
+                _deposits[account] = UFixed18Lib.ZERO;
+                _redemptions[account] = UFixed18Lib.ZERO;
+                _latestVersions[account] = accountContext.version;
+            }
+
+            if (!_balanceOf[account].eq(latestBalanceOf))
+                emit Transfer(address(0), account, _balanceOf[account].sub(latestBalanceOf));
+        }
     }
 
     /**
@@ -486,6 +473,19 @@ contract BalancedVault is IBalancedVault, UInitializable {
     }
 
     /**
+     * @notice Calculates whether or not the vault is in an unhealthy state at the provided version
+     * @param context Version context to calculate health
+     * @return bool true if unhealthy, false if healthy
+     */
+    function _unhealthyAtVersion(VersionContext memory context) private view returns (bool) {
+        return collateral.liquidatable(address(this), long)
+        || collateral.liquidatable(address(this), short)
+        || long.isLiquidating(address(this))
+        || short.isLiquidating(address(this))
+        || (!context.latestShares.isZero() && context.latestCollateral.isZero());
+    }
+
+    /**
      * @notice The maximum available deposit amount at the given version
      * @param context Version context to use in calculation
      * @return Maximum available deposit amount at version
@@ -507,7 +507,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
         VersionContext memory context,
         VersionContext memory accountContext,
         address account
-    ) public view returns (UFixed18) {
+    ) private view returns (UFixed18) {
         if (_unhealthyAtVersion(context)) return UFixed18Lib.ZERO;
         return _balanceOfAtVersion(accountContext, account);
     }
