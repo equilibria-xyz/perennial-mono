@@ -4,7 +4,6 @@ pragma solidity 0.8.17;
 import "./interfaces/IBalancedVault.sol";
 import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
-import "hardhat/console.sol";
 
 /**
  * @title BalancedVault
@@ -108,16 +107,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @dev Should be called by a keeper when the vault approaches a liquidation state on either side
      */
     function sync() external {
-        console.log("");
-        console.log("sync");
         (VersionContext memory context, ) = _settle(address(0));
-        _rebalance(context, UFixed18Lib.ZERO);
-    }
-
-    function syncAccount(address account) external {
-        console.log("");
-        console.log("sync account");
-        (VersionContext memory context, ) = _settle(account);
         _rebalance(context, UFixed18Lib.ZERO);
     }
 
@@ -127,8 +117,6 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @param account The account to deposit on behalf of
      */
     function deposit(UFixed18 assets, address account) external {
-        console.log("");
-        console.log("deposit");
         (VersionContext memory context, ) = _settle(account);
         if (assets.gt(_maxDepositAtVersion(context))) revert BalancedVaultDepositLimitExceeded();
 
@@ -144,8 +132,6 @@ contract BalancedVault is IBalancedVault, UInitializable {
     }
 
     function redeem(UFixed18 shares, address account) external {
-        console.log("");
-        console.log("redeem");
         if (msg.sender != account) allowance[account][msg.sender] = allowance[account][msg.sender].sub(shares);
 
         (VersionContext memory context, VersionContext memory accountContext) = _settle(account);
@@ -165,8 +151,6 @@ contract BalancedVault is IBalancedVault, UInitializable {
     }
 
     function claim(address account) external {
-        console.log("");
-        console.log("claim");
         (VersionContext memory context, ) = _settle(account);
 
         UFixed18 claimAmount = _unclaimed[account];
@@ -224,23 +208,13 @@ contract BalancedVault is IBalancedVault, UInitializable {
     function _settle(address account) private returns (VersionContext memory context, VersionContext memory accountContext) {
         (context, accountContext) = _loadContextForWrite(account);
 
-        console.log("settling");
-        console.log("_totalSupply (before): %s", UFixed18.unwrap(_totalSupply));
         _totalSupply = _totalSupplyAtVersion(context);
-        console.log("_totalSupply (after): %s", UFixed18.unwrap(_totalSupply));
         _totalUnclaimed = _totalUnclaimedAtVersion(context);
-        console.log("_totalUnclaimed: %s", UFixed18.unwrap(_totalUnclaimed));
         if (context.version > _latestVersion) {
             _deposit = UFixed18Lib.ZERO;
             _redemption = UFixed18Lib.ZERO;
             _latestVersion = context.version;
 
-            console.log("version: %s", context.version);
-            console.log("totalShares: %s", UFixed18.unwrap(_totalSupply));
-            console.log("totalAssetsAtVersion: %s", UFixed18.unwrap(_totalAssetsAtVersion(context)));
-            console.log("totalAssets: %s", UFixed18.unwrap(_totalAssetsAtVersion(context).sub(_deposit)));
-            console.log("longPosition: %s", UFixed18.unwrap(long.position(address(this)).maker));
-            console.log("shortPosition: %s", UFixed18.unwrap(short.position(address(this)).maker));
             _versions[context.version] = Version({
                 longPosition: long.position(address(this)).maker,
                 shortPosition: short.position(address(this)).maker,
@@ -250,14 +224,10 @@ contract BalancedVault is IBalancedVault, UInitializable {
         }
 
         if (account != address(0)) {
-            console.log("settling account %s", account);
             UFixed18 latestBalanceOf = _balanceOf[account];
-            console.log("latestBalanceOf: %s", UFixed18.unwrap(latestBalanceOf));
             _balanceOf[account] = _balanceOfAtVersion(accountContext, account);
-            console.log("_balanceOf[account]: %s", UFixed18.unwrap(_balanceOf[account]));
             _unclaimed[account] = _unclaimedAtVersion(accountContext, account);
             if (accountContext.version > _latestVersions[account]) {
-                console.log("clearing account %s", account);
                 _deposits[account] = UFixed18Lib.ZERO;
                 _redemptions[account] = UFixed18Lib.ZERO;
                 _latestVersions[account] = accountContext.version;
@@ -338,7 +308,6 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @param claimAmount The amount of assets that will be withdrawn from the vault at the end of the operation
      */
     function _rebalance(VersionContext memory context, UFixed18 claimAmount) private {
-        console.log("_rebalance");
         _rebalanceCollateral(claimAmount);
         _rebalancePosition(context, claimAmount);
     }
@@ -348,14 +317,10 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @param claimAmount The amount of assets that will be withdrawn from the vault at the end of the operation
      */
     function _rebalanceCollateral(UFixed18 claimAmount) private {
-        console.log("_rebalanceCollateral");
         (UFixed18 longCollateral, UFixed18 shortCollateral, UFixed18 idleCollateral) = _collateral();
         UFixed18 currentCollateral = longCollateral.add(shortCollateral).add(idleCollateral).sub(claimAmount);
         UFixed18 targetCollateral = currentCollateral.div(TWO);
         if (targetCollateral.lt(controller.minCollateral())) targetCollateral = UFixed18Lib.ZERO;
-
-        console.log("currentCollateral: %s", UFixed18.unwrap(currentCollateral));
-        console.log("targetCollateral: %s", UFixed18.unwrap(targetCollateral));
 
         (IProduct greaterProduct, IProduct lesserProduct) =
             longCollateral.gt(shortCollateral) ? (long, short) : (short, long);
@@ -368,21 +333,14 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @notice Rebalances the position of the vault
      */
     function _rebalancePosition(VersionContext memory context, UFixed18 claimAmount) private {
-        console.log("_rebalancePosition");
         UFixed18 currentAssets = _totalAssetsAtVersion(context).sub(claimAmount);
-        console.log("currentAssets: %s", UFixed18.unwrap(currentAssets));
         if (currentAssets.lt(controller.minCollateral().mul(TWO))) currentAssets = UFixed18Lib.ZERO;
-        console.log("currentAssets: %s", UFixed18.unwrap(currentAssets));
 
-        console.log("_redemption: %s", UFixed18.unwrap(_redemption));
         UFixed18 currentUtilized = _totalSupply.add(_redemption).isZero() ?
             currentAssets :
             currentAssets.muldiv(_totalSupply, _totalSupply.add(_redemption));
-        console.log("currentUtilized: %s", UFixed18.unwrap(currentUtilized));
         UFixed18 currentPrice = long.atVersion(context.version).price.abs();
-        console.log("currentPrice: %s", UFixed18.unwrap(currentPrice));
         UFixed18 targetPosition = currentUtilized.mul(targetLeverage).div(currentPrice).div(TWO);
-        console.log("targetPosition: %s", UFixed18.unwrap(targetPosition));
 
         _updateMakerPosition(long, targetPosition);
         _updateMakerPosition(short, targetPosition);
@@ -394,11 +352,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @param targetCollateral The new collateral to target
      */
     function _updateCollateral(IProduct product, UFixed18 targetCollateral) private {
-        console.log("_updateCollateral");
         UFixed18 currentCollateral = collateral.collateral(address(this), product);
-
-        console.log("currentCollateral: %s", UFixed18.unwrap(currentCollateral));
-        console.log("targetCollateral: %s", UFixed18.unwrap(targetCollateral));
 
         if (currentCollateral.gt(targetCollateral))
             collateral.withdrawTo(address(this), product, currentCollateral.sub(targetCollateral));
@@ -414,14 +368,10 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @param targetPosition The new position to target
      */
     function _updateMakerPosition(IProduct product, UFixed18 targetPosition) private {
-        console.log("_updateMakerPosition");
         UFixed18 currentPosition = product.position(address(this)).next(product.pre(address(this))).maker;
         UFixed18 currentMaker = product.positionAtVersion(product.latestVersion()).next(product.pre()).maker;
         UFixed18 makerLimit = product.makerLimit();
         UFixed18 makerAvailable = makerLimit.gt(currentMaker) ? makerLimit.sub(currentMaker) : UFixed18Lib.ZERO;
-        console.log("targetPosition: %s", UFixed18.unwrap(targetPosition));
-        console.log("currentPosition: %s", UFixed18.unwrap(currentPosition));
-        console.log("makerAvailable: %s", UFixed18.unwrap(makerAvailable));
 
         if (targetPosition.lt(currentPosition))
             product.closeMake(currentPosition.sub(targetPosition));
@@ -435,8 +385,6 @@ contract BalancedVault is IBalancedVault, UInitializable {
         long.settleAccount(address(this));
         short.settleAccount(address(this));
         uint256 currentVersion = long.latestVersion(address(this));
-        console.log("latestVersion: %s", _latestVersion);
-        console.log("currentVersion: %s", currentVersion);
 
         return (
             VersionContext(currentVersion, _assetsAt(_latestVersion), _sharesAt(_latestVersion)),
@@ -472,8 +420,6 @@ contract BalancedVault is IBalancedVault, UInitializable {
         (UFixed18 longCollateral, UFixed18 shortCollateral, UFixed18 idleCollateral) = _collateral();
         (UFixed18 totalCollateral, UFixed18 totalDebt) =
             (longCollateral.add(shortCollateral).add(idleCollateral), _totalUnclaimedAtVersion(context));
-        console.log("totalCollateral: %s", UFixed18.unwrap(totalCollateral));
-        console.log("totalDebt: %s", UFixed18.unwrap(totalDebt));
         return totalCollateral.gt(totalDebt) ? totalCollateral.sub(totalDebt) : UFixed18Lib.ZERO;
     }
 
@@ -484,14 +430,11 @@ contract BalancedVault is IBalancedVault, UInitializable {
 
     function _balanceOfAtVersion(VersionContext memory accountContext, address account) private view returns (UFixed18) {
         if (accountContext.version == _latestVersions[account]) return _balanceOf[account];
-        console.log("not zero");
         return _balanceOf[account].add(_convertToSharesAtVersion(accountContext, _deposits[account]));
     }
 
     function _totalUnclaimedAtVersion(VersionContext memory context) private view returns (UFixed18) {
         if (context.version == _latestVersion) return _totalUnclaimed;
-        console.log("_totalUnclaimed: %s", UFixed18.unwrap(_totalUnclaimed));
-        console.log("_redemption: %s", UFixed18.unwrap(_redemption));
         return _totalUnclaimed.add(_convertToAssetsAtVersion(context, _redemption));
     }
 
@@ -528,10 +471,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
         return _versions[version].totalShares;
     }
 
-    function _convertToSharesAtVersion(VersionContext memory context, UFixed18 assets) private view returns (UFixed18) {
-        console.log("assets: %s", UFixed18.unwrap(assets));
-        console.log("context.latestCollateral: %s", UFixed18.unwrap(context.latestCollateral));
-        console.log("context.latestShares: %s", UFixed18.unwrap(context.latestShares));
+    function _convertToSharesAtVersion(VersionContext memory context, UFixed18 assets) private pure returns (UFixed18) {
         if (context.latestCollateral.isZero()) return assets;
         return assets.muldiv(context.latestShares, context.latestCollateral);
     }
