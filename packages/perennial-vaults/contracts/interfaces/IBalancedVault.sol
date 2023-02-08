@@ -33,6 +33,7 @@ interface IBalancedVault {
 
     function initialize(string memory name_, string memory symbol_) external;
     function sync() external;
+    function syncAccount(address account) external;
     function controller() external view returns (IController);
     function collateral() external view returns (ICollateral);
     function long() external view returns (IProduct);

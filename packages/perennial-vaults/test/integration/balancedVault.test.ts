@@ -143,6 +143,7 @@ describe('BalancedVault', () => {
     await updateOracle()
 
     await vault.sync()
+    await vault.syncAccount(user.address)
     expect(await vault.balanceOf(user.address)).to.equal(utils.parseEther('10010'))
 
     // Now we should have opened positions.
