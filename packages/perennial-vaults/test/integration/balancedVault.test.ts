@@ -137,6 +137,12 @@ describe('BalancedVault', () => {
     })
   })
 
+  describe('#decimals', () => {
+    it('is correct', async () => {
+      expect(await vault.decimals()).to.equal('18')
+    })
+  })
+
   describe('#approve', () => {
     it('approves correctly', async () => {
       expect(await vault.allowance(user.address, liquidator.address)).to.eq(0)
@@ -577,6 +583,59 @@ describe('BalancedVault', () => {
       await updateOracle()
       await vault.sync()
       expect(await collateralDifference()).to.equal(0)
+    })
+
+    it('deposit on behalf', async () => {
+      const largeDeposit = utils.parseEther('10000')
+      await vault.connect(liquidator).deposit(largeDeposit, user.address)
+      await updateOracle()
+
+      await vault.sync()
+      expect(await vault.balanceOf(user.address)).to.equal(utils.parseEther('10000'))
+
+      await expect(vault.connect(liquidator).redeem(utils.parseEther('10000'), user.address)).to.revertedWithPanic(
+        '0x11',
+      )
+
+      await vault.connect(user).approve(liquidator.address, utils.parseEther('10000'))
+
+      // User 2 should not be able to withdraw; they haven't deposited anything.
+      await vault.connect(liquidator).redeem(utils.parseEther('10000'), user.address)
+      await updateOracle()
+      await vault.sync()
+
+      // We should have withdrawn all of our collateral.
+      const fundingAmount = BigNumber.from('1524724459128')
+      await vault.connect(user).claim(user.address)
+      expect(await totalCollateralInVault()).to.equal(0)
+      expect(await asset.balanceOf(liquidator.address)).to.equal(utils.parseEther('190000'))
+      expect(await asset.balanceOf(user.address)).to.equal(utils.parseEther('210000').add(fundingAmount))
+    })
+
+    it('redeem on behalf', async () => {
+      const largeDeposit = utils.parseEther('10000')
+      await vault.connect(user).deposit(largeDeposit, user.address)
+      await updateOracle()
+
+      await vault.sync()
+      expect(await vault.balanceOf(user.address)).to.equal(utils.parseEther('10000'))
+
+      await expect(vault.connect(liquidator).redeem(utils.parseEther('10000'), user.address)).to.revertedWithPanic(
+        '0x11',
+      )
+
+      await vault.connect(user).approve(liquidator.address, utils.parseEther('10000'))
+
+      // User 2 should not be able to withdraw; they haven't deposited anything.
+      await vault.connect(liquidator).redeem(utils.parseEther('10000'), user.address)
+      await updateOracle()
+      await vault.sync()
+
+      // We should have withdrawn all of our collateral.
+      const fundingAmount = BigNumber.from('1524724459128')
+      await vault.connect(user).claim(user.address)
+      expect(await totalCollateralInVault()).to.equal(0)
+      expect(await asset.balanceOf(user.address)).to.equal(utils.parseEther('200000').add(fundingAmount))
     })
 
     context('Liquidation', () => {
