@@ -427,27 +427,54 @@ contract BalancedVault is IBalancedVault, UInitializable {
         emit PositionUpdated(product, targetPosition);
     }
 
+    /**
+     * @notice Moves `amount` shares from `from` to `to`
+     * @param from Address to send shares from
+     * @param to Address to send shares to
+     * @param amount Amount of shares to move
+     */
     function _transfer(address from, address to, UFixed18 amount) private {
         _balanceOf[from] = _balanceOf[from].sub(amount);
         _balanceOf[to] = _balanceOf[to].add(amount);
         emit Transfer(from, to, amount);
     }
 
+    /**
+     * @notice Burns `amount` shares from `from`, adjusting totalSupply
+     * @param from Address to burn shares from
+     * @param amount Amount of shares to burn
+     */
     function _burn(address from, UFixed18 amount) private {
         _balanceOf[from] = _balanceOf[from].sub(amount);
         _totalSupply = _totalSupply.sub(amount);
         emit Transfer(from, address(0), amount);
     }
 
+    /**
+     * @notice Mints `amount` shares, adjusting totalSupply
+     * @param amount Amount of shares to mint
+     */
     function _delayedMint(UFixed18 amount) private {
         _totalSupply = _totalSupply.add(amount);
     }
 
+    /**
+     * @notice Mints `amount` shares to `to`
+     * @param to Address to mint shares to
+     * @param amount Amount of shares to mint
+     */
     function _delayedMintAccount(address to, UFixed18 amount) private {
         _balanceOf[to] = _balanceOf[to].add(amount);
         emit Transfer(address(0), to, amount);
     }
 
+    /**
+     * @notice Decrements `spender`s allowance for `account` by `amount`
+     * @dev Does not decrement if approval is for -1
+     * @param account Address of allower
+     * @param spender Address of spender
+     * @param amount Amount to decrease allowance by
+     */
     function _consumeAllowance(address account, address spender, UFixed18 amount) private {
         if (allowance[account][spender].eq(UFixed18Lib.MAX)) return;
         allowance[account][spender] = allowance[account][spender].sub(amount);
