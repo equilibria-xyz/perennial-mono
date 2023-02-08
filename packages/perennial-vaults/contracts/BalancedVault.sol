@@ -64,6 +64,9 @@ contract BalancedVault is IBalancedVault, UInitializable {
     /// @dev Redemptions that have not been settled, or have been settled but not yet processed by this contract
     UFixed18 private _redemption;
 
+    /// @dev The latest version that a pending deposit or redemption has been placed
+    uint256 private _latestVersion;
+
     /// @dev Mapping of pending (not yet converted to shares) per user
     mapping(address => UFixed18) private _deposits;
 
@@ -105,6 +108,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @dev Should be called by a keeper when the vault approaches a liquidation state on either side
      */
     function sync() external {
+        console.log("sync");
         VersionContext memory context = _settle(address(0));
         _rebalance(context, UFixed18Lib.ZERO);
         _rebalance(context, UFixed18Lib.ZERO);
@@ -116,10 +120,12 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @param account The account to deposit on behalf of
      */
     function deposit(UFixed18 assets, address account) external {
+        console.log("deposit");
         VersionContext memory context = _settle(account);
         if (assets.gt(_maxDepositAtVersion(context))) revert BalancedVaultDepositLimitExceeded();
 
         _deposit = _deposit.add(assets);
+        _latestVersion = context.version;
         _deposits[account] = _deposits[account].add(assets);
         _latestVersions[account] = context.version;
         emit Deposit(msg.sender, account, context.version, assets);
@@ -130,12 +136,14 @@ contract BalancedVault is IBalancedVault, UInitializable {
     }
 
     function redeem(UFixed18 shares, address account) external {
+        console.log("redeem");
         if (msg.sender != account) allowance[account][msg.sender] = allowance[account][msg.sender].sub(shares);
 
         VersionContext memory context = _settle(account);
         if (shares.gt(_maxRedeemAtVersion(context, account))) revert BalancedVaultRedemptionLimitExceeded();
 
         _redemption = _redemption.add(shares);
+        _latestVersion = context.version;
         _redemptions[account] = _redemptions[account].add(shares);
         _latestVersions[account] = context.version;
         emit Redemption(msg.sender, account, context.version, shares);
@@ -147,6 +155,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
     }
 
     function claim(address account) external {
+        console.log("claim");
         VersionContext memory context = _settle(account);
 
         UFixed18 claimAmount = _unclaimed[account];
@@ -204,24 +213,39 @@ contract BalancedVault is IBalancedVault, UInitializable {
     function _settle(address account) private returns (VersionContext memory context) {
         context = _loadContextForWrite();
 
-        if (context.version > context.latestVersion) {
-            _totalSupply = _totalSupplyAtVersion(context);
-            _totalUnclaimed = _totalUnclaimedAtVersion(context);
-            _deposits[account] = UFixed18Lib.ZERO;
-            _redemptions[account] = UFixed18Lib.ZERO;
-        }
-
-        if (account != address(0) && context.version > _latestVersions[account]) {
-            UFixed18 latestBalanceOf = _balanceOf[account];
-            _balanceOf[account] = _balanceOfAtVersion(context, account);
-            _unclaimed[account] = _unclaimedAtVersion(context, account);
+        console.log("settling");
+        _totalSupply = _totalSupplyAtVersion(context);
+        console.log("_totalSupply: %s", UFixed18.unwrap(_totalSupply));
+        _totalUnclaimed = _totalUnclaimedAtVersion(context);
+        console.log("_totalUnclaimed: %s", UFixed18.unwrap(_totalUnclaimed));
+        if (context.version > _latestVersion) {
+            console.log("clearing");
             _deposit = UFixed18Lib.ZERO;
             _redemption = UFixed18Lib.ZERO;
+            _latestVersion = context.version;
+        }
+
+        if (account != address(0)) {
+            console.log("settling account %s", account);
+            UFixed18 latestBalanceOf = _balanceOf[account];
+            console.log("latestBalanceOf: %s", UFixed18.unwrap(latestBalanceOf));
+            _balanceOf[account] = _balanceOfAtVersion(context, account);
+            console.log("_balanceOf[account]: %s", UFixed18.unwrap(_balanceOf[account]));
+            _unclaimed[account] = _unclaimedAtVersion(context, account);
+            if (context.version > _latestVersions[account]) {
+                console.log("clearing account %s", account);
+                _deposits[account] = UFixed18Lib.ZERO;
+                _redemptions[account] = UFixed18Lib.ZERO;
+                _latestVersions[account] = context.version;
+            }
 
             if (!_balanceOf[account].eq(latestBalanceOf))
                 emit Transfer(address(0), account, _balanceOf[account].sub(latestBalanceOf));
         }
 
+        console.log("version: %s", context.version);
+        console.log("totalShares: %s", UFixed18.unwrap(_totalSupply.add(_redemption)));
+        console.log("totalAssets: %s", UFixed18.unwrap(_totalAssetsAtVersion(context).sub(_deposit)));
         _versions[context.version] = Version({
             longPosition: long.positionAtVersion(context.version).maker,
             shortPosition: short.positionAtVersion(context.version).maker,
@@ -327,6 +351,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
         if (currentAssets.lt(controller.minCollateral().mul(TWO))) currentAssets = UFixed18Lib.ZERO;
         console.log("currentAssets: %s", UFixed18.unwrap(currentAssets));
 
+        console.log("_redemption: %s", UFixed18.unwrap(_redemption));
         UFixed18 currentUtilized = _totalSupply.add(_redemption).isZero() ?
             currentAssets :
             _totalSupply.muldiv(currentAssets, _totalSupply.add(_redemption));
@@ -351,14 +376,11 @@ contract BalancedVault is IBalancedVault, UInitializable {
 
         console.log("currentCollateral: %s", UFixed18.unwrap(currentCollateral));
         console.log("targetCollateral: %s", UFixed18.unwrap(targetCollateral));
-        console.log("deposit amount: %s", UFixed18.unwrap(targetCollateral.sub(currentCollateral)));
 
         if (currentCollateral.gt(targetCollateral))
-            try collateral.withdrawTo(address(this), product, currentCollateral.sub(targetCollateral)) { }
-            catch { console.log("error catch - collateral"); return; }
+            collateral.withdrawTo(address(this), product, currentCollateral.sub(targetCollateral));
         if (currentCollateral.lt(targetCollateral))
-            try collateral.depositTo(address(this), product, targetCollateral.sub(currentCollateral)) { }
-            catch { console.log("error catch - collateral"); return; }
+            collateral.depositTo(address(this), product, targetCollateral.sub(currentCollateral));
 
         emit CollateralUpdated(product, targetCollateral);
     }
@@ -379,33 +401,27 @@ contract BalancedVault is IBalancedVault, UInitializable {
         console.log("makerAvailable: %s", UFixed18.unwrap(makerAvailable));
 
         if (targetPosition.lt(currentPosition))
-            try product.closeMake(currentPosition.sub(targetPosition)) { }
-            catch { console.log("error catch"); return; }
+            product.closeMake(currentPosition.sub(targetPosition));
         if (targetPosition.gt(currentPosition))
-            try product.openMake(targetPosition.sub(currentPosition).min(makerAvailable)) { }
-            catch { console.log("error catch"); return; }
+            product.openMake(targetPosition.sub(currentPosition).min(makerAvailable));
 
         emit PositionUpdated(product, targetPosition);
     }
 
     function _loadContextForWrite() private returns (VersionContext memory) {
-        uint256 latestVersion = _latestVersion();
         long.settleAccount(address(this));
         short.settleAccount(address(this));
-        uint256 currentVersion = _latestVersion();
+        uint256 currentVersion = long.latestVersion(address(this));
+        console.log("latestVersion: %s", _latestVersion);
+        console.log("currentVersion: %s", currentVersion);
 
-        return VersionContext(currentVersion, latestVersion, _assetsAt(latestVersion), _sharesAt(latestVersion));
+        return VersionContext(currentVersion, _assetsAt(_latestVersion), _sharesAt(_latestVersion));
     }
 
     function _loadContextForRead() private view returns (VersionContext memory) {
-        uint256 latestVersion = _latestVersion();
         uint256 currentVersion = Math.min(long.latestVersion(), short.latestVersion()); // latest version that both products are settled to
 
-        return VersionContext(currentVersion, latestVersion, _assetsAt(latestVersion), _sharesAt(latestVersion));
-    }
-
-    function _latestVersion() private view returns (uint256) {
-        return long.latestVersion(address(this)); // both products are always settled at the same time for the vault
+        return VersionContext(currentVersion, _assetsAt(_latestVersion), _sharesAt(_latestVersion));
     }
 
     function _maxDepositAtVersion(VersionContext memory context) private view returns (UFixed18) {
@@ -427,23 +443,24 @@ contract BalancedVault is IBalancedVault, UInitializable {
     }
 
     function _totalSupplyAtVersion(VersionContext memory context) private view returns (UFixed18) {
-        if (context.version == _latestVersion()) return UFixed18Lib.ZERO;
-        return _convertToSharesAtVersion(context, _totalSupply);
+        if (context.version == _latestVersion) return UFixed18Lib.ZERO;
+        return _totalSupply.add(_convertToSharesAtVersion(context, _deposit));
     }
 
     function _balanceOfAtVersion(VersionContext memory context, address account) private view returns (UFixed18) {
         if (context.version == _latestVersions[account]) return UFixed18Lib.ZERO;
-        return _convertToSharesAtVersion(context, _deposits[account]);
+        console.log("not zero");
+        return _balanceOf[account].add(_convertToSharesAtVersion(context, _deposits[account]));
     }
 
     function _totalUnclaimedAtVersion(VersionContext memory context) private view returns (UFixed18) {
-        if (context.version == _latestVersion()) return UFixed18Lib.ZERO;
-        return _convertToAssetsAtVersion(context, _redemption);
+        if (context.version == _latestVersion) return UFixed18Lib.ZERO;
+        return _totalUnclaimed.add(_convertToAssetsAtVersion(context, _redemption));
     }
 
     function _unclaimedAtVersion(VersionContext memory context, address account) private view returns (UFixed18) {
         if (context.version == _latestVersions[account]) return UFixed18Lib.ZERO;
-        return _convertToAssetsAtVersion(context, _redemptions[account]);
+        return _unclaimed[account].add(_convertToAssetsAtVersion(context, _redemptions[account]));
     }
 
     /**
@@ -474,7 +491,10 @@ contract BalancedVault is IBalancedVault, UInitializable {
         return _versions[version].totalShares;
     }
 
-    function _convertToSharesAtVersion(VersionContext memory context, UFixed18 assets) private pure returns (UFixed18) {
+    function _convertToSharesAtVersion(VersionContext memory context, UFixed18 assets) private view returns (UFixed18) {
+        console.log("assets: %s", UFixed18.unwrap(assets));
+        console.log("context.latestCollateral: %s", UFixed18.unwrap(context.latestCollateral));
+        console.log("context.latestShares: %s", UFixed18.unwrap(context.latestShares));
         if (context.latestCollateral.isZero()) return assets;
         return assets.muldiv(context.latestShares, context.latestCollateral);
     }

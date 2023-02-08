@@ -18,7 +18,6 @@ interface IBalancedVault {
 
     struct VersionContext {
         uint256 version;
-        uint256 latestVersion;
         UFixed18 latestCollateral;
         UFixed18 latestShares;
     }
