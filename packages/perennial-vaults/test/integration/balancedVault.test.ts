@@ -172,6 +172,7 @@ describe('BalancedVault', () => {
     it('transfers correctly', async () => {
       expect(await vault.balanceOf(user.address)).to.equal(EXPECTED_BALANCE_OF)
       expect(await vault.balanceOf(user2.address)).to.equal(0)
+      expect(await vault.totalSupply()).to.equal(EXPECTED_BALANCE_OF)
 
       await expect(vault.connect(user).transfer(user2.address, EXPECTED_BALANCE_OF.div(2)))
         .to.emit(vault, 'Transfer')
@@ -179,6 +180,7 @@ describe('BalancedVault', () => {
 
       expect(await vault.balanceOf(user.address)).to.equal(EXPECTED_BALANCE_OF.div(2))
       expect(await vault.balanceOf(user2.address)).to.equal(EXPECTED_BALANCE_OF.div(2))
+      expect(await vault.totalSupply()).to.equal(EXPECTED_BALANCE_OF)
 
       await expect(vault.connect(user).transfer(user2.address, EXPECTED_BALANCE_OF.div(2)))
         .to.emit(vault, 'Transfer')
@@ -186,6 +188,7 @@ describe('BalancedVault', () => {
 
       expect(await vault.balanceOf(user.address)).to.equal(0)
       expect(await vault.balanceOf(user2.address)).to.equal(EXPECTED_BALANCE_OF)
+      expect(await vault.totalSupply()).to.equal(EXPECTED_BALANCE_OF)
     })
   })
 
@@ -202,6 +205,7 @@ describe('BalancedVault', () => {
 
       expect(await vault.balanceOf(user.address)).to.equal(EXPECTED_BALANCE_OF)
       expect(await vault.balanceOf(user2.address)).to.equal(0)
+      expect(await vault.totalSupply()).to.equal(EXPECTED_BALANCE_OF)
       expect(await vault.allowance(user.address, liquidator.address)).to.equal(EXPECTED_BALANCE_OF)
 
       await expect(vault.connect(liquidator).transferFrom(user.address, user2.address, EXPECTED_BALANCE_OF.div(2)))
@@ -210,6 +214,7 @@ describe('BalancedVault', () => {
 
       expect(await vault.balanceOf(user.address)).to.equal(EXPECTED_BALANCE_OF.div(2))
       expect(await vault.balanceOf(user2.address)).to.equal(EXPECTED_BALANCE_OF.div(2))
+      expect(await vault.totalSupply()).to.equal(EXPECTED_BALANCE_OF)
       expect(await vault.allowance(user.address, liquidator.address)).to.equal(EXPECTED_BALANCE_OF.div(2))
 
       await expect(vault.connect(liquidator).transferFrom(user.address, user2.address, EXPECTED_BALANCE_OF.div(2)))
@@ -218,6 +223,7 @@ describe('BalancedVault', () => {
 
       expect(await vault.balanceOf(user.address)).to.equal(0)
       expect(await vault.balanceOf(user2.address)).to.equal(EXPECTED_BALANCE_OF)
+      expect(await vault.totalSupply()).to.equal(EXPECTED_BALANCE_OF)
       expect(await vault.allowance(user.address, liquidator.address)).to.equal(0)
     })
 
@@ -226,6 +232,7 @@ describe('BalancedVault', () => {
 
       expect(await vault.balanceOf(user.address)).to.equal(EXPECTED_BALANCE_OF)
       expect(await vault.balanceOf(user2.address)).to.equal(0)
+      expect(await vault.totalSupply()).to.equal(EXPECTED_BALANCE_OF)
       expect(await vault.allowance(user.address, liquidator.address)).to.equal(constants.MaxUint256)
 
       await expect(vault.connect(liquidator).transferFrom(user.address, user2.address, EXPECTED_BALANCE_OF.div(2)))
@@ -234,6 +241,7 @@ describe('BalancedVault', () => {
 
       expect(await vault.balanceOf(user.address)).to.equal(EXPECTED_BALANCE_OF.div(2))
       expect(await vault.balanceOf(user2.address)).to.equal(EXPECTED_BALANCE_OF.div(2))
+      expect(await vault.totalSupply()).to.equal(EXPECTED_BALANCE_OF)
       expect(await vault.allowance(user.address, liquidator.address)).to.equal(constants.MaxUint256)
 
       await expect(vault.connect(liquidator).transferFrom(user.address, user2.address, EXPECTED_BALANCE_OF.div(2)))
@@ -242,6 +250,7 @@ describe('BalancedVault', () => {
 
       expect(await vault.balanceOf(user.address)).to.equal(0)
       expect(await vault.balanceOf(user2.address)).to.equal(EXPECTED_BALANCE_OF)
+      expect(await vault.totalSupply()).to.equal(EXPECTED_BALANCE_OF)
       expect(await vault.allowance(user.address, liquidator.address)).to.equal(constants.MaxUint256)
     })
 
@@ -279,6 +288,7 @@ describe('BalancedVault', () => {
 
       await vault.sync()
       expect(await vault.balanceOf(user.address)).to.equal(utils.parseEther('10010'))
+      expect(await vault.totalSupply()).to.equal(utils.parseEther('10010'))
 
       // Now we should have opened positions.
       // The positions should be equal to (smallDeposit + largeDeposit) * leverage / 2 / originalOraclePrice.
@@ -308,6 +318,7 @@ describe('BalancedVault', () => {
       const fundingAmount = BigNumber.from('1526207855124')
       expect(await totalCollateralInVault()).to.equal(utils.parseEther('10010').add(fundingAmount))
       expect(await vault.unclaimed(user.address)).to.equal(utils.parseEther('10010').add(fundingAmount))
+      expect(await vault.totalUnclaimed()).to.equal(utils.parseEther('10010').add(fundingAmount))
 
       await vault.connect(user).claim(user.address)
       expect(await totalCollateralInVault()).to.equal(0)
@@ -349,11 +360,16 @@ describe('BalancedVault', () => {
       expect(await shortPosition()).to.equal(0)
 
       // We should have withdrawn all of our collateral.
+      const fundingAmount = BigNumber.from('308321913166')
+      const fundingAmount2 = BigNumber.from('3045329143208')
+      expect(await totalCollateralInVault()).to.equal(utils.parseEther('11000').add(fundingAmount).add(fundingAmount2))
+      expect(await vault.unclaimed(user.address)).to.equal(utils.parseEther('1000').add(fundingAmount))
+      expect(await vault.unclaimed(user2.address)).to.equal(utils.parseEther('10000').add(fundingAmount2))
+      expect(await vault.totalUnclaimed()).to.equal(utils.parseEther('11000').add(fundingAmount).add(fundingAmount2))
+
       await vault.connect(user).claim(user.address)
       await vault.connect(user2).claim(user2.address)
 
-      const fundingAmount = BigNumber.from('308321913166')
-      const fundingAmount2 = BigNumber.from('3045329143208')
       expect(await totalCollateralInVault()).to.equal(0)
       expect(await asset.balanceOf(user.address)).to.equal(utils.parseEther('200000').add(fundingAmount))
       expect(await asset.balanceOf(user2.address)).to.equal(utils.parseEther('200000').add(fundingAmount2))
@@ -379,6 +395,7 @@ describe('BalancedVault', () => {
 
       await vault.sync()
       expect(await vault.balanceOf(user.address)).to.equal(utils.parseEther('10010'))
+      expect(await vault.totalSupply()).to.equal(utils.parseEther('10010'))
 
       // Now we should have opened positions.
       // The positions should be equal to (smallDeposit + largeDeposit) * leverage / 2 / originalOraclePrice.
@@ -399,6 +416,7 @@ describe('BalancedVault', () => {
       await vault.connect(user).transfer(user2.address, utils.parseEther('10010'))
       expect(await vault.balanceOf(user.address)).to.equal(0)
       expect(await vault.balanceOf(user2.address)).to.equal(utils.parseEther('10010'))
+      expect(await vault.totalSupply()).to.equal(utils.parseEther('10010'))
       // Now User should not be able to withdraw as they have no more shares
       await expect(vault.connect(user).redeem(1, user.address)).to.be.revertedWithCustomError(
         vault,
@@ -419,6 +437,7 @@ describe('BalancedVault', () => {
       const totalClaimable = utils.parseEther('10010').add(fundingAmount)
       expect(await totalCollateralInVault()).to.equal(totalClaimable)
       expect(await vault.unclaimed(user2.address)).to.equal(totalClaimable)
+      expect(await vault.totalUnclaimed()).to.equal(totalClaimable)
 
       await vault.connect(user2).claim(user2.address)
       expect(await totalCollateralInVault()).to.equal(0)
@@ -451,6 +470,7 @@ describe('BalancedVault', () => {
       await vault.connect(owner).transferFrom(user.address, user2.address, shareBalance.div(2))
       expect(await vault.balanceOf(user.address)).to.equal(shareBalance.sub(shareBalance.div(2)))
       expect(await vault.balanceOf(user2.address)).to.equal(shareBalance.div(2))
+      expect(await vault.totalSupply()).to.equal(shareBalance)
 
       const maxRedeem = await vault.maxRedeem(user.address)
       await vault.connect(user).redeem(maxRedeem, user.address)
@@ -592,6 +612,7 @@ describe('BalancedVault', () => {
 
       await vault.sync()
       expect(await vault.balanceOf(user.address)).to.equal(utils.parseEther('10000'))
+      expect(await vault.totalSupply()).to.equal(utils.parseEther('10000'))
 
       await expect(vault.connect(liquidator).redeem(utils.parseEther('10000'), user.address)).to.revertedWithPanic(
         '0x11',
@@ -619,6 +640,7 @@ describe('BalancedVault', () => {
 
       await vault.sync()
       expect(await vault.balanceOf(user.address)).to.equal(utils.parseEther('10000'))
+      expect(await vault.totalSupply()).to.equal(utils.parseEther('10000'))
 
       await expect(vault.connect(liquidator).redeem(utils.parseEther('10000'), user.address)).to.revertedWithPanic(
         '0x11',
