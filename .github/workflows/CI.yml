@@ -225,7 +225,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           delete-old-comments: true
         if: ${{ github.event_name == 'pull_request' && env.PARSER_BROKEN != 'true' && steps.vaultsChanges.outputs.any_changed == 'true' }}
-  integration-test-oracle:
+  integration-test-vaults:
       name: '[Vaults] Integration Tests w/ Coverage'
       runs-on: ubuntu-latest
       steps:
