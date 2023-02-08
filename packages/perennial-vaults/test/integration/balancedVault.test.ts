@@ -119,7 +119,7 @@ describe('BalancedVault', () => {
     oracle.atVersion.whenCalledWith(currentVersion[0]).returns(currentVersion)
   })
 
-  it('names are correct', async () => {
+  it.only('names are correct', async () => {
     expect(await vault.name()).to.equal('Perennial Vault Alpha')
     expect(await vault.symbol()).to.equal('PVA')
   })
@@ -175,7 +175,7 @@ describe('BalancedVault', () => {
     expect(await asset.balanceOf(user.address)).to.equal(utils.parseEther('200000').add(fundingAmount))
   })
 
-  it('multiple users', async () => {
+  it.only('multiple users', async () => {
     const smallDeposit = utils.parseEther('1000')
     await vault.connect(user).deposit(smallDeposit, user.address)
     await updateOracle()
@@ -186,33 +186,42 @@ describe('BalancedVault', () => {
     await updateOracle()
     await vault.sync()
 
+    console.log((await vault.balanceOf(user.address)).toString())
+    console.log((await vault.balanceOf(user2.address)).toString())
+    console.log((await vault.totalSupply()).toString())
+
     // Now we should have opened positions.
-    // The positions should be equal to (smallDeposit + largeDeposit - fixedFloat) * leverage / 2 / originalOraclePrice.
+    // The positions should be equal to (smallDeposit + largeDeposit) * leverage / 2 / originalOraclePrice.
     expect(await longPosition()).to.be.equal(
-      smallDeposit.add(largeDeposit).sub(fixedFloat).mul(leverage).div(2).div(originalOraclePrice),
+      smallDeposit.add(largeDeposit).mul(leverage).div(2).div(originalOraclePrice),
     )
-    expect(await shortPosition()).to.equal(await longPosition())
+    expect(await shortPosition()).to.equal(smallDeposit.add(largeDeposit).mul(leverage).div(2).div(originalOraclePrice))
 
-    while ((await vault.connect(user2).balanceOf(user2.address)).gt(0)) {
-      const maxWithdraw = await vault.maxRedeem(user2.address)
-      await vault.connect(user2).redeem(maxWithdraw, user2.address)
-      await updateOracle()
-      await vault.sync()
-    }
+    const maxRedeem = await vault.maxRedeem(user.address)
+    console.log('maxRedeem: ', maxRedeem.toString())
+    await vault.connect(user).redeem(maxRedeem, user.address)
+    await updateOracle()
+    await vault.sync()
 
-    while ((await vault.connect(user).balanceOf(user.address)).gt(0)) {
-      const maxWithdraw = await vault.maxRedeem(user.address)
-      await vault.connect(user).redeem(maxWithdraw, user.address)
-      await updateOracle()
-      await vault.sync()
-    }
+    const maxRedeem2 = await vault.maxRedeem(user2.address)
+    console.log('maxRedeem2: ', maxRedeem2.toString())
+    await vault.connect(user2).redeem(maxRedeem2, user2.address)
+    await updateOracle()
+    await vault.sync()
 
     // We should have closed all positions.
     expect(await longPosition()).to.equal(0)
     expect(await shortPosition()).to.equal(0)
 
     // We should have withdrawn all of our collateral.
+    await vault.connect(user).claim(user.address)
+    await vault.connect(user2).claim(user2.address)
+
+    const fundingAmount = BigNumber.from('93552429196')
+    const fundingAmount2 = BigNumber.from('932056913064')
     expect(await totalCollateralInVault()).to.equal(0)
+    expect(await asset.balanceOf(user.address)).to.equal(utils.parseEther('200000').add(fundingAmount))
+    expect(await asset.balanceOf(user2.address)).to.equal(utils.parseEther('200000').add(fundingAmount2))
   })
 
   it('deposit then immediately withdraw', async () => {
