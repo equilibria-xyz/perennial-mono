@@ -11,13 +11,13 @@ import "./ICollateral.sol";
 import "./IProduct.sol";
 
 interface IPerennialVault {
-    event Deposit(address indexed sender, address indexed owner, uint256 version, UFixed18 assets);
-    event Redemption(address indexed sender, address indexed owner, uint256 version, UFixed18 shares);
-    event Claim(address indexed sender, address indexed owner, UFixed18 assets);
+    event Deposit(address indexed sender, address indexed account, uint256 version, UFixed18 assets);
+    event Redemption(address indexed sender, address indexed account, uint256 version, UFixed18 shares);
+    event Claim(address indexed sender, address indexed account, UFixed18 assets);
 
     function deposit(UFixed18 assets, address account) external;
     function redeem(UFixed18 shares, address account) external;
-    function claim(address owner) external;
+    function claim(address account) external;
 }
 
 interface IMultiInvoker {
