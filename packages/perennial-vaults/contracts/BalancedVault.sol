@@ -372,8 +372,8 @@ contract BalancedVault is IBalancedVault, UInitializable {
         (IProduct greaterProduct, IProduct lesserProduct) =
             longCollateral.gt(shortCollateral) ? (long, short) : (short, long);
 
-        _updateCollateral(greaterProduct, targetCollateral);
-        _updateCollateral(lesserProduct, targetCollateral);
+        _updateCollateral(greaterProduct, greaterProduct == long ? longCollateral : shortCollateral, targetCollateral);
+        _updateCollateral(lesserProduct, lesserProduct == long ? longCollateral : shortCollateral, targetCollateral);
     }
 
     /**
@@ -396,11 +396,10 @@ contract BalancedVault is IBalancedVault, UInitializable {
     /**
      * @notice Adjusts the collateral on `product` to `targetCollateral`
      * @param product The product to adjust the vault's collateral on
+     * @param currentCollateral The current collateral of the product
      * @param targetCollateral The new collateral to target
      */
-    function _updateCollateral(IProduct product, UFixed18 targetCollateral) private {
-        UFixed18 currentCollateral = collateral.collateral(address(this), product);
-
+    function _updateCollateral(IProduct product, UFixed18 currentCollateral, UFixed18 targetCollateral) private {
         if (currentCollateral.gt(targetCollateral))
             collateral.withdrawTo(address(this), product, currentCollateral.sub(targetCollateral));
         if (currentCollateral.lt(targetCollateral))
