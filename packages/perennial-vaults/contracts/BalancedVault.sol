@@ -11,6 +11,16 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
  * @dev Vault deploys and rebalances collateral between the corresponding long and short markets, while attempting to
  *      maintain `targetLeverage` with its open positions at any given time. Deposits are only gated in so much as to cap
  *      the maximum amount of assets in the vault.
+ *
+ *      The vault has a "delayed mint" mechanism for shares on deposit. After depositing to the vault, a user must wait
+ *      until the next settlement of the underlying products in order for shares to be reflected in the getters.
+ *      The shares will be fully reflected in contract state when the next settlement occurs on the vault itself.
+ *      Similarly, when redeeming shares, underlying assets are not claimable until a settlement occurs.
+ *      Each state changing interaction triggers the `settle` flywheel in order to bring the vault to the
+ *      desired state.
+ *      In the event that there is not a settlement for a long period of time, keepers can call the `sync` method to
+ *      force settlement and rebalancing. This is most useful to prevent vault liquidation due to PnL changes
+ *      causing the vault to be in an unhealthy state (far away from target leverage)
  */
 contract BalancedVault is IBalancedVault, UInitializable {
     UFixed18 constant private TWO = UFixed18.wrap(2e18);
