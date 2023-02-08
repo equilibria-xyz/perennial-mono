@@ -1,9 +1,8 @@
 import HRE from 'hardhat'
 import { time, impersonate } from '../../../common/testutil'
-import { Big18Math } from '../../../common/testutil/types'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { FakeContract, smock } from '@defi-wonderland/smock'
-import { assert, expect, use } from 'chai'
+import { expect, use } from 'chai'
 import {
   IERC20Metadata,
   IERC20Metadata__factory,
@@ -36,8 +35,6 @@ describe('BalancedVault', () => {
   let long: IProduct
   let short: IProduct
   let leverage: BigNumber
-  let maxLeverage: BigNumber
-  let fixedFloat: BigNumber
   let maxCollateral: BigNumber
   let originalOraclePrice: BigNumber
 
@@ -117,6 +114,13 @@ describe('BalancedVault', () => {
     oracle.sync.returns(currentVersion)
     oracle.currentVersion.returns(currentVersion)
     oracle.atVersion.whenCalledWith(currentVersion[0]).returns(currentVersion)
+  })
+
+  it('cant re-initialize', async () => {
+    await expect(vault.initialize('Perennial Vault Alpha', 'PVA')).to.revertedWithCustomError(
+      vault,
+      'UInitializableAlreadyInitializedError',
+    )
   })
 
   it('names are correct', async () => {

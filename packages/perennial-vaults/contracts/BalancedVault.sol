@@ -144,7 +144,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @param account The account to redeem on behalf of
      */
     function redeem(UFixed18 shares, address account) external {
-        if (msg.sender != account) allowance[account][msg.sender] = allowance[account][msg.sender].sub(shares);
+        if (msg.sender != account) _consumeAllowance(account, msg.sender, shares);
 
         (VersionContext memory context, VersionContext memory accountContext) = _settle(account);
         if (shares.gt(_maxRedeemAtVersion(context, accountContext, account))) revert BalancedVaultRedemptionLimitExceeded();
@@ -155,9 +155,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
         _latestVersions[account] = context.version;
         emit Redemption(msg.sender, account, context.version, shares);
 
-        _balanceOf[account] = _balanceOf[account].sub(shares);
-        _totalSupply = _totalSupply.sub(shares);
-        emit Transfer(account, address(0), shares);
+        _burn(account, shares);
 
         _rebalance(context, UFixed18Lib.ZERO);
     }
@@ -204,9 +202,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
      */
     function transfer(address to, UFixed18 amount) external returns (bool) {
         _settle(msg.sender);
-        _balanceOf[msg.sender] = _balanceOf[msg.sender].sub(amount);
-        _balanceOf[to] = _balanceOf[to].add(amount);
-        emit Transfer(msg.sender, to, amount);
+        _transfer(msg.sender, to, amount);
         return true;
     }
 
@@ -219,10 +215,8 @@ contract BalancedVault is IBalancedVault, UInitializable {
      */
     function transferFrom(address from, address to, UFixed18 amount) external returns (bool) {
         _settle(from);
-        allowance[from][msg.sender] = allowance[from][msg.sender].sub(amount);
-        _balanceOf[from] = _balanceOf[from].sub(amount);
-        _balanceOf[to] = _balanceOf[to].add(amount);
-        emit Transfer(from, to, amount);
+        _consumeAllowance(from, msg.sender, amount);
+        _transfer(from, to, amount);
         return true;
     }
 
@@ -331,33 +325,27 @@ contract BalancedVault is IBalancedVault, UInitializable {
     function _settle(address account) private returns (VersionContext memory context, VersionContext memory accountContext) {
         (context, accountContext) = _loadContextForWrite(account);
 
-        _totalSupply = _totalSupplyAtVersion(context);
-        _totalUnclaimed = _totalUnclaimedAtVersion(context);
         if (context.version > _latestVersion) {
+            _delayedMint(_totalSupplyAtVersion(context).sub(_totalSupply));
+            _totalUnclaimed = _totalUnclaimedAtVersion(context);
             _deposit = UFixed18Lib.ZERO;
             _redemption = UFixed18Lib.ZERO;
             _latestVersion = context.version;
 
             _versions[context.version] = Version({
-            longPosition: long.position(address(this)).maker,
-            shortPosition: short.position(address(this)).maker,
-            totalShares: _totalSupply,
-            totalAssets: _totalAssetsAtVersion(context)
+                longPosition: long.position(address(this)).maker,
+                shortPosition: short.position(address(this)).maker,
+                totalShares: _totalSupply,
+                totalAssets: _totalAssetsAtVersion(context)
             });
         }
 
-        if (account != address(0)) {
-            UFixed18 latestBalanceOf = _balanceOf[account];
-            _balanceOf[account] = _balanceOfAtVersion(accountContext, account);
+        if (account != address(0) && accountContext.version > _latestVersions[account]) {
+            _delayedMintAccount(account, _balanceOfAtVersion(accountContext, account).sub(_balanceOf[account]));
             _unclaimed[account] = _unclaimedAtVersion(accountContext, account);
-            if (accountContext.version > _latestVersions[account]) {
-                _deposits[account] = UFixed18Lib.ZERO;
-                _redemptions[account] = UFixed18Lib.ZERO;
-                _latestVersions[account] = accountContext.version;
-            }
-
-            if (!_balanceOf[account].eq(latestBalanceOf))
-                emit Transfer(address(0), account, _balanceOf[account].sub(latestBalanceOf));
+            _deposits[account] = UFixed18Lib.ZERO;
+            _redemptions[account] = UFixed18Lib.ZERO;
+            _latestVersions[account] = accountContext.version;
         }
     }
 
@@ -438,6 +426,32 @@ contract BalancedVault is IBalancedVault, UInitializable {
             product.openMake(targetPosition.sub(currentPosition).min(makerAvailable));
 
         emit PositionUpdated(product, targetPosition);
+    }
+
+    function _transfer(address from, address to, UFixed18 amount) private {
+        _balanceOf[from] = _balanceOf[from].sub(amount);
+        _balanceOf[to] = _balanceOf[to].add(amount);
+        emit Transfer(from, to, amount);
+    }
+
+    function _burn(address from, UFixed18 amount) private {
+        _balanceOf[from] = _balanceOf[from].sub(amount);
+        _totalSupply = _totalSupply.sub(amount);
+        emit Transfer(from, address(0), amount);
+    }
+
+    function _delayedMint(UFixed18 amount) private {
+        _totalSupply = _totalSupply.add(amount);
+    }
+
+    function _delayedMintAccount(address to, UFixed18 amount) private {
+        _balanceOf[to] = _balanceOf[to].add(amount);
+        emit Transfer(address(0), to, amount);
+    }
+
+    function _consumeAllowance(address account, address spender, UFixed18 amount) private {
+        if (allowance[account][spender].eq(UFixed18Lib.MAX)) return;
+        allowance[account][spender] = allowance[account][spender].sub(amount);
     }
 
     /**
