@@ -139,7 +139,7 @@ describe('BalancedVault', () => {
 
   describe('#decimals', () => {
     it('is correct', async () => {
-      expect(await vault.decimals()).to.equal('18')
+      expect(await vault.decimals()).to.equal(18)
     })
   })
 
