@@ -1,10 +1,8 @@
 import { expect } from 'chai'
 import { BigNumber, constants, utils } from 'ethers'
-import { time } from '../../../../common/testutil'
-import { MultiInvoker__factory, Product } from '../../../types/generated'
+import { MultiInvoker__factory, Product, TestnetVault, TestnetVault__factory } from '../../../types/generated'
 import { IMultiInvoker } from '../../../types/generated/contracts/interfaces/IMultiInvoker'
 import { buildInvokerActions, InvokerAction } from '../../util'
-import { YEAR } from '../core/incentivizer.test'
 
 import {
   InstanceVars,
@@ -58,9 +56,11 @@ describe('MultiInvoker', () => {
     let position: BigNumber
     let amount: BigNumber
     let programs: number[]
+    let vault: TestnetVault
+    let vaultAmount: BigNumber
 
     beforeEach(async () => {
-      const { user, dsu, usdc, usdcHolder, multiInvoker } = instanceVars
+      const { owner, user, dsu, usdc, usdcHolder, multiInvoker } = instanceVars
 
       await usdc.connect(usdcHolder).transfer(user.address, 1_000_000e6)
       await usdc.connect(user).approve(multiInvoker.address, constants.MaxUint256)
@@ -68,12 +68,29 @@ describe('MultiInvoker', () => {
 
       product = await createProduct(instanceVars)
       const PROGRAM_ID = await createIncentiveProgram(instanceVars, product)
+      vault = await new TestnetVault__factory(owner).deploy(dsu.address)
+      await vault._incrementVersion()
 
       position = utils.parseEther('0.001')
       amount = utils.parseEther('10000')
       programs = [PROGRAM_ID.toNumber()]
-      actions = buildInvokerActions(user.address, product.address, position, amount, programs)
-      partialActions = buildInvokerActions(user.address, product.address, position.div(2), amount.div(2), programs)
+      vaultAmount = amount
+      actions = buildInvokerActions({
+        userAddress: user.address,
+        productAddress: product.address,
+        position,
+        amount,
+        programs,
+        vaultAddress: vault.address,
+        vaultAmount,
+      })
+      partialActions = buildInvokerActions({
+        userAddress: user.address,
+        productAddress: product.address,
+        position: position.div(2),
+        amount: amount.div(2),
+        programs,
+      })
     })
 
     it('does nothing on NOOP', async () => {
@@ -336,6 +353,53 @@ describe('MultiInvoker', () => {
         .withArgs(user.address, amount)
         .to.emit(usdc, 'Transfer')
         .withArgs(batcher.address, user.address, 10000e6)
+    })
+
+    it('performs a WRAP and VAULT_DEPOSIT chain', async () => {
+      const { user, multiInvoker, dsu, batcher } = instanceVars
+
+      await expect(multiInvoker.connect(user).invoke([actions.WRAP, actions.VAULT_DEPOSIT]))
+        .to.emit(batcher, 'Wrap')
+        .withArgs(user.address, amount)
+        .to.emit(dsu, 'Transfer')
+        .withArgs(user.address, multiInvoker.address, vaultAmount)
+        .to.emit(dsu, 'Approval')
+        .withArgs(multiInvoker.address, vault.address, vaultAmount)
+        .to.emit(vault, 'Deposit')
+        .withArgs(multiInvoker.address, user.address, 1, vaultAmount)
+
+      expect(await vault.balanceOf(user.address)).to.equal(vaultAmount)
+      expect(await vault.claimable(user.address)).to.equal(0)
+    })
+
+    it('performs a VAULT_REDEEM action', async () => {
+      const { user, multiInvoker } = instanceVars
+
+      await expect(multiInvoker.connect(user).invoke([actions.VAULT_DEPOSIT, actions.VAULT_REDEEM]))
+        .to.emit(vault, 'Redemption')
+        .withArgs(multiInvoker.address, user.address, 1, vaultAmount)
+
+      expect(await vault.balanceOf(user.address)).to.equal(0)
+      expect(await vault.claimable(user.address)).to.equal(vaultAmount)
+    })
+
+    it('performs a VAULT_CLAIM and UNWRAP chain', async () => {
+      const { user, multiInvoker, dsu, reserve } = instanceVars
+
+      await expect(
+        multiInvoker
+          .connect(user)
+          .invoke([actions.VAULT_DEPOSIT, actions.VAULT_REDEEM, actions.VAULT_CLAIM, actions.UNWRAP]),
+      )
+        .to.emit(dsu, 'Transfer')
+        .withArgs(vault.address, user.address, vaultAmount)
+        .to.emit(vault, 'Claim')
+        .withArgs(multiInvoker.address, user.address, vaultAmount)
+        .to.emit(reserve, 'Redeem')
+        .withArgs(multiInvoker.address, amount, 10000e6)
+
+      expect(await vault.balanceOf(user.address)).to.equal(0)
+      expect(await vault.claimable(user.address)).to.equal(0)
     })
 
     context('0 address batcher', () => {

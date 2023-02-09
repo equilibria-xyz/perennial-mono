@@ -10,6 +10,16 @@ import "./IController.sol";
 import "./ICollateral.sol";
 import "./IProduct.sol";
 
+interface IPerennialVault {
+    event Deposit(address indexed sender, address indexed account, uint256 version, UFixed18 assets);
+    event Redemption(address indexed sender, address indexed account, uint256 version, UFixed18 shares);
+    event Claim(address indexed sender, address indexed account, UFixed18 assets);
+
+    function deposit(UFixed18 assets, address account) external;
+    function redeem(UFixed18 shares, address account) external;
+    function claim(address account) external;
+}
+
 interface IMultiInvoker {
     /// @dev Core protocol actions that can be composed
     enum PerennialAction {
@@ -24,7 +34,10 @@ interface IMultiInvoker {
         WRAP,
         UNWRAP,
         WRAP_AND_DEPOSIT,
-        WITHDRAW_AND_UNWRAP
+        WITHDRAW_AND_UNWRAP,
+        VAULT_DEPOSIT,
+        VAULT_REDEEM,
+        VAULT_CLAIM
     }
 
     /// @dev Struct for action invocation
