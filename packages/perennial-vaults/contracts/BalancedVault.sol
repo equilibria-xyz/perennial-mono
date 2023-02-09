@@ -390,7 +390,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @notice Rebalances the position of the vault
      */
     function _rebalancePosition(VersionContext memory context, UFixed18 claimAmount) private {
-        UFixed18 currentAssets = _totalAssetsAtVersion(context).sub(claimAmount);
+        UFixed18 currentAssets = _totalAssetsAtVersion(context).add(_deposit).sub(claimAmount);
         if (currentAssets.lt(controller.minCollateral().mul(TWO))) currentAssets = UFixed18Lib.ZERO;
 
         UFixed18 currentUtilized = _totalSupply.add(_redemption).isZero() ?
@@ -542,7 +542,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
      */
     function _maxDepositAtVersion(VersionContext memory context) private view returns (UFixed18) {
         if (_unhealthyAtVersion(context)) return UFixed18Lib.ZERO;
-        UFixed18 currentCollateral = _totalAssetsAtVersion(context);
+        UFixed18 currentCollateral = _totalAssetsAtVersion(context).add(_deposit);
         return maxCollateral.gt(currentCollateral) ? maxCollateral.sub(currentCollateral) : UFixed18Lib.ZERO;
     }
 
@@ -570,7 +570,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
     function _totalAssetsAtVersion(VersionContext memory context) private view returns (UFixed18) {
         (UFixed18 longCollateral, UFixed18 shortCollateral, UFixed18 idleCollateral) = _collateral();
         (UFixed18 totalCollateral, UFixed18 totalDebt) =
-            (longCollateral.add(shortCollateral).add(idleCollateral), _totalUnclaimedAtVersion(context));
+            (longCollateral.add(shortCollateral).add(idleCollateral), _totalUnclaimedAtVersion(context).add(_deposit));
         return totalCollateral.gt(totalDebt) ? totalCollateral.sub(totalDebt) : UFixed18Lib.ZERO;
     }
 
