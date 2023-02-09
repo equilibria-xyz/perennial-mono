@@ -26,6 +26,8 @@ const ETHERSCAN_API_KEY_OPTIMISM = process.env.ETHERSCAN_API_KEY_OPTIMISM || ''
 const ETHERSCAN_API_KEY_ARBITRUM = process.env.ETHERSCAN_API_KEY_ARBITRUM || ''
 
 const MAINNET_NODE_URL = process.env.MAINNET_NODE_URL || ''
+const ARBITRUM_NODE_URL = process.env.ARBITRUM_NODE_URL || ''
+const OPTIMISM_NODE_URL = process.env.OPTIMISM_NODE_URL || ''
 const GOERLI_NODE_URL = process.env.GOERLI_NODE_URL || ''
 const OPTIMISM_GOERLI_NODE_URL = process.env.OPTIMISM_GOERLI_NODE_URL || ''
 const ARBITRUM_GOERLI_NODE_URL = process.env.ARBITRUM_GOERLI_NODE_URL || ''
@@ -46,6 +48,10 @@ function getUrl(networkName: SupportedChain): string {
   switch (networkName) {
     case 'mainnet':
       return MAINNET_NODE_URL
+    case 'arbitrum':
+      return ARBITRUM_NODE_URL
+    case 'optimism':
+      return OPTIMISM_NODE_URL
     case 'goerli':
       return GOERLI_NODE_URL
     case 'optimismGoerli':
@@ -116,6 +122,8 @@ export default function defaultConfig({
       arbitrumGoerli: createNetworkConfig('arbitrumGoerli'),
       optimismGoerli: createNetworkConfig('optimismGoerli'),
       mainnet: createNetworkConfig('mainnet'),
+      arbitrum: createNetworkConfig('arbitrum'),
+      optimism: createNetworkConfig('optimism'),
     },
     solidity: {
       compilers: [
@@ -181,6 +189,8 @@ export default function defaultConfig({
         kovan: ['external/deployments/kovan', ...(externalDeployments?.kovan || [])],
         goerli: ['external/deployments/goerli', ...(externalDeployments?.goerli || [])],
         mainnet: ['external/deployments/mainnet', ...(externalDeployments?.mainnet || [])],
+        arbitrum: ['external/deployments/arbitrum', ...(externalDeployments?.arbitrum || [])],
+        optimism: ['external/deployments/optimism', ...(externalDeployments?.optimism || [])],
         arbitrumGoerli: ['external/deployments/arbitrumGoerli', ...(externalDeployments?.arbitrumGoerli || [])],
         optimismGoerli: ['external/deployments/optimismGoerli', ...(externalDeployments?.optimismGoerli || [])],
         hardhat: [
