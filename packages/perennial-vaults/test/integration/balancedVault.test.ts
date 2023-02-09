@@ -602,8 +602,9 @@ describe('BalancedVault', () => {
       await vault.sync()
 
       // Since the price changed then went back to the original, the total collateral should have increased.
-      expect(await totalCollateralInVault()).to.be.greaterThan(originalTotalCollateral)
-      expect(await vault.totalAssets()).to.equal(originalTotalCollateral)
+      const fundingAmount = BigNumber.from(21517482108955)
+      expect(await totalCollateralInVault()).to.eq(originalTotalCollateral.add(fundingAmount))
+      expect(await vault.totalAssets()).to.eq(originalTotalCollateral.add(fundingAmount))
     })
 
     it('rounds deposits correctly', async () => {
