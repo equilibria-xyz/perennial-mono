@@ -533,10 +533,10 @@ contract BalancedVault is IBalancedVault, UInitializable {
      */
     function _unhealthyAtVersion(VersionContext memory context) private view returns (bool) {
         return collateral.liquidatable(address(this), long)
-        || collateral.liquidatable(address(this), short)
-        || long.isLiquidating(address(this))
-        || short.isLiquidating(address(this))
-        || (!context.latestShares.isZero() && context.latestCollateral.isZero());
+            || collateral.liquidatable(address(this), short)
+            || long.isLiquidating(address(this))
+            || short.isLiquidating(address(this))
+            || (!context.latestShares.isZero() && context.latestCollateral.isZero());
     }
 
     /**

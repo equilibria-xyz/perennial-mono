@@ -17,7 +17,6 @@ import {
   ICollateral__factory,
 } from '../../types/generated'
 import { BigNumber, constants, utils } from 'ethers'
-import exp from 'constants'
 
 const { config, ethers } = HRE
 use(smock.matchers)
@@ -32,6 +31,7 @@ describe('BalancedVault', () => {
   let owner: SignerWithAddress
   let user: SignerWithAddress
   let user2: SignerWithAddress
+  let perennialUser: SignerWithAddress
   let liquidator: SignerWithAddress
   let long: IProduct
   let short: IProduct
@@ -73,7 +73,7 @@ describe('BalancedVault', () => {
 
   beforeEach(async () => {
     await time.reset(config)
-    ;[owner, user, user2, liquidator] = await ethers.getSigners()
+    ;[owner, user, user2, liquidator, perennialUser] = await ethers.getSigners()
 
     const dsu = IERC20Metadata__factory.connect('0x605D26FBd5be761089281d5cec2Ce86eeA667109', owner)
     const controller = IController__factory.connect('0x9df509186b6d3b7D033359f94c8b1BB5544d51b3', owner)
@@ -102,6 +102,8 @@ describe('BalancedVault', () => {
     await setUpWalletWithDSU(user)
     await setUpWalletWithDSU(user2)
     await setUpWalletWithDSU(liquidator)
+    await setUpWalletWithDSU(perennialUser)
+    await setUpWalletWithDSU(perennialUser)
 
     // Unfortunately, we can't make mocks of existing contracts.
     // So, we make a fake and initialize it with the values that the real contract had at this block.
@@ -709,82 +711,219 @@ describe('BalancedVault', () => {
     })
 
     context('Liquidation', () => {
-      it('recovers before being liquidated', async () => {
-        await vault.connect(user).deposit(utils.parseEther('100000'), user.address)
-        await updateOracle()
+      context('long', () => {
+        it('recovers before being liquidated', async () => {
+          await vault.connect(user).deposit(utils.parseEther('100000'), user.address)
+          await updateOracle()
 
-        // 1. An oracle update makes the long position liquidatable.
-        // We should now longer be able to deposit
-        await updateOracle(utils.parseEther('4000'))
+          // 1. An oracle update makes the long position liquidatable.
+          // We should now longer be able to deposit or redeem
+          await updateOracle(utils.parseEther('4000'))
 
-        await expect(vault.connect(user).deposit(2, user.address)).to.revertedWithCustomError(
-          vault,
-          'BalancedVaultDepositLimitExceeded',
-        )
+          await expect(vault.connect(user).deposit(2, user.address)).to.revertedWithCustomError(
+            vault,
+            'BalancedVaultDepositLimitExceeded',
+          )
+          await expect(vault.connect(user).redeem(2, user.address)).to.revertedWithCustomError(
+            vault,
+            'BalancedVaultRedemptionLimitExceeded',
+          )
 
-        // 2. Settle accounts.
-        // We should still not be able to deposit.
-        await long.connect(user).settleAccount(vault.address)
-        await short.connect(user).settleAccount(vault.address)
-        expect(await vault.maxDeposit(user.address)).to.equal(0)
-        await expect(vault.connect(user).deposit(2, user.address)).to.revertedWithCustomError(
-          vault,
-          'BalancedVaultDepositLimitExceeded',
-        )
+          // 2. Settle accounts.
+          // We should still not be able to deposit.
+          await long.connect(user).settleAccount(vault.address)
+          await short.connect(user).settleAccount(vault.address)
+          expect(await vault.maxDeposit(user.address)).to.equal(0)
+          await expect(vault.connect(user).deposit(2, user.address)).to.revertedWithCustomError(
+            vault,
+            'BalancedVaultDepositLimitExceeded',
+          )
+          await expect(vault.connect(user).redeem(2, user.address)).to.revertedWithCustomError(
+            vault,
+            'BalancedVaultRedemptionLimitExceeded',
+          )
 
-        // 3. Sync the vault before it has a chance to get liquidated, it will work and no longer be liquidatable
-        // We should still be able to deposit.
-        await vault.sync()
-        expect(await vault.maxDeposit(user.address)).to.equal('402312347065256226909035')
-        await vault.connect(user).deposit(2, user.address)
+          // 3. Sync the vault before it has a chance to get liquidated, it will work and no longer be liquidatable
+          // We should still be able to deposit.
+          await vault.sync()
+          expect(await vault.maxDeposit(user.address)).to.equal('402312347065256226909035')
+          await vault.connect(user).deposit(2, user.address)
+        })
+
+        it('recovers from a liquidation', async () => {
+          await vault.connect(user).deposit(utils.parseEther('100000'), user.address)
+          await updateOracle()
+
+          // 1. An oracle update makes the long position liquidatable.
+          // We should now longer be able to deposit or redeem
+          await updateOracle(utils.parseEther('4000'))
+
+          await expect(vault.connect(user).deposit(2, user.address)).to.revertedWithCustomError(
+            vault,
+            'BalancedVaultDepositLimitExceeded',
+          )
+          await expect(vault.connect(user).redeem(2, user.address)).to.revertedWithCustomError(
+            vault,
+            'BalancedVaultRedemptionLimitExceeded',
+          )
+
+          // 2. Settle accounts.
+          // We should still not be able to deposit or redeem.
+          await long.connect(user).settleAccount(vault.address)
+          await short.connect(user).settleAccount(vault.address)
+          expect(await vault.maxDeposit(user.address)).to.equal(0)
+          await expect(vault.connect(user).deposit(2, user.address)).to.revertedWithCustomError(
+            vault,
+            'BalancedVaultDepositLimitExceeded',
+          )
+          await expect(vault.connect(user).redeem(2, user.address)).to.revertedWithCustomError(
+            vault,
+            'BalancedVaultRedemptionLimitExceeded',
+          )
+
+          // 4. Liquidate the long position.
+          // We should still not be able to deposit or redeem.
+          await collateral.connect(liquidator).liquidate(vault.address, long.address)
+          expect(await vault.maxDeposit(user.address)).to.equal(0)
+          await expect(vault.connect(user).deposit(2, user.address)).to.revertedWithCustomError(
+            vault,
+            'BalancedVaultDepositLimitExceeded',
+          )
+          await expect(vault.connect(user).redeem(2, user.address)).to.revertedWithCustomError(
+            vault,
+            'BalancedVaultRedemptionLimitExceeded',
+          )
+
+          // 5. Settle the liquidation.
+          // We now be able to deposit.
+          await updateOracle(utils.parseEther('3000'))
+          await vault.connect(user).deposit(2, user.address)
+
+          await updateOracle()
+          await vault.sync()
+
+          const finalPosition = BigNumber.from('62621983855221267778')
+          const finalCollateral = BigNumber.from('46966487895388362252059')
+          expect(await longPosition()).to.equal(finalPosition)
+          expect(await shortPosition()).to.equal(finalPosition)
+          expect(await longCollateralInVault()).to.equal(finalCollateral)
+          expect(await shortCollateralInVault()).to.equal(finalCollateral)
+        })
       })
 
-      it('recovers from a liquidation', async () => {
-        await vault.connect(user).deposit(utils.parseEther('100000'), user.address)
-        await updateOracle()
+      context('short', () => {
+        beforeEach(async () => {
+          // get utilization closer to target in order to trigger pnl on price deviation
+          await asset.connect(perennialUser).approve(collateral.address, constants.MaxUint256)
+          await collateral
+            .connect(perennialUser)
+            .depositTo(perennialUser.address, long.address, utils.parseEther('120000'))
+          await long.connect(perennialUser).openTake(utils.parseEther('700'))
+          await collateral
+            .connect(perennialUser)
+            .depositTo(perennialUser.address, short.address, utils.parseEther('280000'))
+          await short.connect(perennialUser).openTake(utils.parseEther('1100'))
+          await updateOracle()
+          await vault.sync()
+        })
 
-        // 1. An oracle update makes the long position liquidatable.
-        // We should now longer be able to deposit
-        await updateOracle(utils.parseEther('4000'))
+        it('recovers before being liquidated', async () => {
+          await vault.connect(user).deposit(utils.parseEther('100000'), user.address)
+          await updateOracle()
 
-        await expect(vault.connect(user).deposit(2, user.address)).to.revertedWithCustomError(
-          vault,
-          'BalancedVaultDepositLimitExceeded',
-        )
+          // 1. An oracle update makes the short position liquidatable.
+          // We should now longer be able to deposit or redeem
+          await updateOracle(utils.parseEther('1200'))
 
-        // 2. Settle accounts.
-        // We should still not be able to deposit.
-        await long.connect(user).settleAccount(vault.address)
-        await short.connect(user).settleAccount(vault.address)
-        expect(await vault.maxDeposit(user.address)).to.equal(0)
-        await expect(vault.connect(user).deposit(2, user.address)).to.revertedWithCustomError(
-          vault,
-          'BalancedVaultDepositLimitExceeded',
-        )
+          await expect(vault.connect(user).deposit(2, user.address)).to.revertedWithCustomError(
+            vault,
+            'BalancedVaultDepositLimitExceeded',
+          )
+          await expect(vault.connect(user).redeem(2, user.address)).to.revertedWithCustomError(
+            vault,
+            'BalancedVaultRedemptionLimitExceeded',
+          )
 
-        // 4. Liquidate the long position.
-        // We should still not be able to deposit.
-        await collateral.connect(liquidator).liquidate(vault.address, long.address)
-        expect(await vault.maxDeposit(user.address)).to.equal(0)
-        await expect(vault.connect(user).deposit(2, user.address)).to.revertedWithCustomError(
-          vault,
-          'BalancedVaultDepositLimitExceeded',
-        )
+          // 2. Settle accounts.
+          // We should still not be able to deposit.
+          await long.connect(user).settleAccount(vault.address)
+          await short.connect(user).settleAccount(vault.address)
+          expect(await vault.maxDeposit(user.address)).to.equal(0)
+          await expect(vault.connect(user).deposit(2, user.address)).to.revertedWithCustomError(
+            vault,
+            'BalancedVaultDepositLimitExceeded',
+          )
+          await expect(vault.connect(user).redeem(2, user.address)).to.revertedWithCustomError(
+            vault,
+            'BalancedVaultRedemptionLimitExceeded',
+          )
 
-        // 5. Settle the liquidation.
-        // We now be able to deposit.
-        await updateOracle(utils.parseEther('3000'))
-        await vault.connect(user).deposit(2, user.address)
+          // 3. Sync the vault before it has a chance to get liquidated, it will work and no longer be liquidatable
+          // We should still be able to deposit.
+          await vault.sync()
+          expect(await vault.maxDeposit(user.address)).to.equal('396604778052719336340483')
+          await vault.connect(user).deposit(2, user.address)
+        })
 
-        await updateOracle()
-        await vault.sync()
+        it('recovers from a liquidation', async () => {
+          await vault.connect(user).deposit(utils.parseEther('100000'), user.address)
+          await updateOracle()
 
-        const finalPosition = BigNumber.from('62621983855221267778')
-        const finalCollateral = BigNumber.from('46966487895388362252059')
-        expect(await longPosition()).to.equal(finalPosition)
-        expect(await shortPosition()).to.equal(finalPosition)
-        expect(await longCollateralInVault()).to.equal(finalCollateral)
-        expect(await shortCollateralInVault()).to.equal(finalCollateral)
+          // 1. An oracle update makes the long position liquidatable.
+          // We should now longer be able to deposit or redeem
+          await updateOracle(utils.parseEther('1200'))
+
+          await expect(vault.connect(user).deposit(2, user.address)).to.revertedWithCustomError(
+            vault,
+            'BalancedVaultDepositLimitExceeded',
+          )
+          await expect(vault.connect(user).redeem(2, user.address)).to.revertedWithCustomError(
+            vault,
+            'BalancedVaultRedemptionLimitExceeded',
+          )
+
+          // 2. Settle accounts.
+          // We should still not be able to deposit or redeem.
+          await long.connect(user).settleAccount(vault.address)
+          await short.connect(user).settleAccount(vault.address)
+          expect(await vault.maxDeposit(user.address)).to.equal(0)
+          await expect(vault.connect(user).deposit(2, user.address)).to.revertedWithCustomError(
+            vault,
+            'BalancedVaultDepositLimitExceeded',
+          )
+          await expect(vault.connect(user).redeem(2, user.address)).to.revertedWithCustomError(
+            vault,
+            'BalancedVaultRedemptionLimitExceeded',
+          )
+
+          // 4. Liquidate the long position.
+          // We should still not be able to deposit or redeem.
+          await collateral.connect(liquidator).liquidate(vault.address, short.address)
+          expect(await vault.maxDeposit(user.address)).to.equal(0)
+          await expect(vault.connect(user).deposit(2, user.address)).to.revertedWithCustomError(
+            vault,
+            'BalancedVaultDepositLimitExceeded',
+          )
+          await expect(vault.connect(user).redeem(2, user.address)).to.revertedWithCustomError(
+            vault,
+            'BalancedVaultRedemptionLimitExceeded',
+          )
+
+          // 5. Settle the liquidation.
+          // We now be able to deposit.
+          await updateOracle()
+          await vault.connect(user).deposit(2, user.address)
+
+          await updateOracle()
+          await vault.sync()
+
+          const finalPosition = BigNumber.from('169949012636167808676')
+          const finalCollateral = BigNumber.from('50984710404199215353605')
+          expect(await longPosition()).to.equal(finalPosition)
+          expect(await shortPosition()).to.equal(finalPosition)
+          expect(await longCollateralInVault()).to.equal(finalCollateral)
+          expect(await shortCollateralInVault()).to.equal(finalCollateral)
+        })
       })
     })
   })
