@@ -313,6 +313,8 @@ contract BalancedVault is IBalancedVault, UInitializable {
      */
     function convertToShares(UFixed18 assets) external view returns (UFixed18) {
         (VersionContext memory context, ) = _loadContextForRead(address(0));
+        (context.latestCollateral, context.latestShares) =
+            (_totalAssetsAtVersion(context), _totalSupplyAtVersion(context));
         return _convertToSharesAtVersion(context, assets);
     }
 
@@ -323,6 +325,8 @@ contract BalancedVault is IBalancedVault, UInitializable {
      */
     function convertToAssets(UFixed18 shares) external view returns (UFixed18) {
         (VersionContext memory context, ) = _loadContextForRead(address(0));
+        (context.latestCollateral, context.latestShares) =
+            (_totalAssetsAtVersion(context), _totalSupplyAtVersion(context));
         return _convertToAssetsAtVersion(context, shares);
     }
 
