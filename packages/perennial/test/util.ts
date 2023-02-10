@@ -17,6 +17,7 @@ export type InvokerAction =
   | 'VAULT_DEPOSIT'
   | 'VAULT_REDEEM'
   | 'VAULT_CLAIM'
+  | 'VAULT_WRAP_AND_DEPOSIT'
 
 export const buildInvokerActions = ({
   userAddress,
@@ -95,6 +96,10 @@ export const buildInvokerActions = ({
     VAULT_CLAIM: {
       action: 14,
       args: utils.defaultAbiCoder.encode(['address', 'address'], [userAddress, vaultAddress]),
+    },
+    VAULT_WRAP_AND_DEPOSIT: {
+      action: 15,
+      args: utils.defaultAbiCoder.encode(['address', 'address', 'uint'], [userAddress, vaultAddress, vaultAmount]),
     },
   }
 }

@@ -402,6 +402,23 @@ describe('MultiInvoker', () => {
       expect(await vault.claimable(user.address)).to.equal(0)
     })
 
+    it('performs a VAULT_WRAP_AND_DEPOSIT action', async () => {
+      const { user, multiInvoker, dsu, usdc, batcher } = instanceVars
+
+      await expect(multiInvoker.connect(user).invoke([actions.VAULT_WRAP_AND_DEPOSIT]))
+        .to.emit(usdc, 'Transfer')
+        .withArgs(user.address, multiInvoker.address, 10000e6)
+        .to.emit(batcher, 'Wrap')
+        .withArgs(multiInvoker.address, amount)
+        .to.emit(dsu, 'Approval')
+        .withArgs(multiInvoker.address, vault.address, vaultAmount)
+        .to.emit(vault, 'Deposit')
+        .withArgs(multiInvoker.address, user.address, 1, vaultAmount)
+
+      expect(await vault.balanceOf(user.address)).to.equal(vaultAmount)
+      expect(await vault.claimable(user.address)).to.equal(0)
+    })
+
     context('0 address batcher', () => {
       beforeEach(async () => {
         const { usdc, reserve, controller, multiInvoker, owner, proxyAdmin } = instanceVars
