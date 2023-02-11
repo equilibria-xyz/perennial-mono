@@ -23,6 +23,8 @@ use(smock.matchers)
 
 const DSU_HOLDER = '0xaef566ca7e84d1e736f999765a804687f39d9094'
 
+// TODO: hitting the makerLimit cap
+
 describe('BalancedVault', () => {
   let vault: BalancedVault
   let asset: IERC20Metadata
@@ -713,7 +715,7 @@ describe('BalancedVault', () => {
       expect(await asset.balanceOf(user.address)).to.equal(utils.parseEther('200000').add(fundingAmount))
     })
 
-    context('Liquidation', () => {
+    context('liquidation', () => {
       context('long', () => {
         it('recovers before being liquidated', async () => {
           await vault.connect(user).deposit(utils.parseEther('100000'), user.address)
@@ -927,6 +929,75 @@ describe('BalancedVault', () => {
           expect(await longCollateralInVault()).to.equal(finalCollateral)
           expect(await shortCollateralInVault()).to.equal(finalCollateral)
         })
+      })
+    })
+
+    context('insolvency', () => {
+      beforeEach(async () => {
+        // get utilization closer to target in order to trigger pnl on price deviation
+        await asset.connect(perennialUser).approve(collateral.address, constants.MaxUint256)
+        await collateral
+          .connect(perennialUser)
+          .depositTo(perennialUser.address, long.address, utils.parseEther('120000'))
+        await long.connect(perennialUser).openTake(utils.parseEther('700'))
+        await updateOracle()
+        await vault.sync()
+      })
+
+      it('gracefully unwinds upon insolvency', async () => {
+        // 1. Deposit initial amount into the vault
+        await vault.connect(user).deposit(utils.parseEther('100000'), user.address)
+        await updateOracle()
+        await vault.sync()
+
+        // 2. Redeem most of the amount, but leave it unclaimed
+        await vault.connect(user).redeem(utils.parseEther('80000'), user.address)
+        await updateOracle()
+        await vault.sync()
+
+        // 3. An oracle update makes the long position liquidatable, initiate take close
+        await updateOracle(utils.parseEther('20000'))
+        await long.connect(user).settleAccount(vault.address)
+        await short.connect(user).settleAccount(vault.address)
+        await long.connect(perennialUser).closeTake(utils.parseEther('700'))
+        await collateral.connect(liquidator).liquidate(vault.address, long.address)
+
+        // // 4. Settle the vault to recover and rebalance
+        await updateOracle() // let take settle at high price
+        await updateOracle(utils.parseEther('1500')) // return to normal price to let vault rebalance
+        await vault.sync()
+        await updateOracle()
+        await vault.sync()
+
+        // 5. Vault should no longer have enough collateral to cover claims, pro-rata claim should be enabled
+        const finalPosition = BigNumber.from('0')
+        const finalCollateral = BigNumber.from('24937450010257810297106')
+        const finalUnclaimed = BigNumber.from('80000014845946136115820')
+        expect(await longPosition()).to.equal(finalPosition)
+        expect(await shortPosition()).to.equal(finalPosition)
+        expect(await longCollateralInVault()).to.equal(finalCollateral)
+        expect(await shortCollateralInVault()).to.equal(finalCollateral)
+        expect(await vault.unclaimed(user.address)).to.equal(finalUnclaimed)
+        expect(await vault.totalUnclaimed()).to.equal(finalUnclaimed)
+        await expect(vault.connect(user).deposit(2, user.address)).to.revertedWithCustomError(
+          vault,
+          'BalancedVaultDepositLimitExceeded',
+        )
+
+        // 6. Claim should be pro-rated
+        const initialBalanceOf = await asset.balanceOf(user.address)
+        await vault.claim(user.address)
+        expect(await longCollateralInVault()).to.equal(0)
+        expect(await shortCollateralInVault()).to.equal(0)
+        expect(await vault.unclaimed(user.address)).to.equal(0)
+        expect(await vault.totalUnclaimed()).to.equal(0)
+        expect(await asset.balanceOf(user.address)).to.equal(initialBalanceOf.add(finalCollateral.mul(2)))
+
+        // 7. Should no longer be able to deposit, vault is closed
+        await expect(vault.connect(user).deposit(2, user.address)).to.revertedWithCustomError(
+          vault,
+          'BalancedVaultDepositLimitExceeded',
+        )
       })
     })
   })

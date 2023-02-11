@@ -177,15 +177,17 @@ contract BalancedVault is IBalancedVault, UInitializable {
     function claim(address account) external {
         (VersionContext memory context, ) = _settle(account);
 
-        UFixed18 claimAmount = _unclaimed[account];
+        UFixed18 unclaimedAmount = _unclaimed[account];
+        UFixed18 unclaimedTotal = _totalUnclaimed;
         _unclaimed[account] = UFixed18Lib.ZERO;
-        _totalUnclaimed = _totalUnclaimed.sub(claimAmount);
-        emit Claim(msg.sender, account, claimAmount);
+        _totalUnclaimed = unclaimedTotal.sub(unclaimedAmount);
+        emit Claim(msg.sender, account, unclaimedAmount);
 
         // pro-rate if vault has less collateral than unclaimed
+        UFixed18 claimAmount = unclaimedAmount;
         (UFixed18 longCollateral, UFixed18 shortCollateral, UFixed18 idleCollateral) = _collateral();
         UFixed18 totalCollateral = longCollateral.add(shortCollateral).add(idleCollateral);
-        if (totalCollateral.lt(_totalUnclaimed)) claimAmount = claimAmount.muldiv(totalCollateral, _totalUnclaimed);
+        if (totalCollateral.lt(unclaimedTotal)) claimAmount = claimAmount.muldiv(totalCollateral, unclaimedTotal);
 
         _rebalance(context, claimAmount);
 
@@ -350,6 +352,8 @@ contract BalancedVault is IBalancedVault, UInitializable {
                 longPosition: long.position(address(this)).maker,
                 shortPosition: short.position(address(this)).maker,
                 totalShares: _totalSupply,
+                longAssets: collateral.collateral(address(this), long),
+                shortAssets: collateral.collateral(address(this), short),
                 totalAssets: _totalAssetsAtVersion(context)
             });
         }
@@ -636,18 +640,24 @@ contract BalancedVault is IBalancedVault, UInitializable {
 
     /**
      * @notice The total assets at the given version
-     * @dev Calculates and adds accumualted PnL for `version` + 1
+     * @dev Calculates and adds accumulated PnL for `version` + 1
      * @param version Version to get total assets at
      * @return Total assets in the vault at the given version
      */
     function _assetsAt(uint256 version) private view returns (UFixed18) {
-        Fixed18 longAccumulated = long.valueAtVersion(version + 1).maker.sub(long.valueAtVersion(version).maker);
-        Fixed18 shortAccumulated = short.valueAtVersion(version + 1).maker.sub(short.valueAtVersion(version).maker);
+        Fixed18 longAccumulated = long.valueAtVersion(version + 1).maker.sub(long.valueAtVersion(version).maker)
+            .mul(Fixed18Lib.from(_versions[version].longPosition))
+            .max(Fixed18Lib.from(_versions[version].longAssets).mul(Fixed18Lib.NEG_ONE));  // collateral can't go negative on a product
+        Fixed18 shortAccumulated = short.valueAtVersion(version + 1).maker.sub(short.valueAtVersion(version).maker)
+            .mul(Fixed18Lib.from(_versions[version].shortPosition))
+            .max(Fixed18Lib.from(_versions[version].shortAssets).mul(Fixed18Lib.NEG_ONE)); // collateral can't go negative on a product
 
-        Fixed18 accumulated = longAccumulated.mul(Fixed18Lib.from(_versions[version].longPosition))
-            .add(shortAccumulated.mul(Fixed18Lib.from(_versions[version].shortPosition)));
-
-        return UFixed18Lib.from(Fixed18Lib.from(_versions[version].totalAssets).add(accumulated).max(Fixed18Lib.ZERO));
+        return UFixed18Lib.from(
+            Fixed18Lib.from(_versions[version].totalAssets)
+                .add(longAccumulated)
+                .add(shortAccumulated)
+                .max(Fixed18Lib.ZERO) // vault can't have negative assets, socializes into unclaimed if triggered
+        );
     }
 
     /**
