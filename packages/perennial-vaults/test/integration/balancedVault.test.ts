@@ -23,8 +23,6 @@ use(smock.matchers)
 
 const DSU_HOLDER = '0xaef566ca7e84d1e736f999765a804687f39d9094'
 
-// TODO: hitting the makerLimit cap
-
 describe('BalancedVault', () => {
   let vault: BalancedVault
   let asset: IERC20Metadata
@@ -713,6 +711,55 @@ describe('BalancedVault', () => {
       await vault.connect(user).claim(user.address)
       expect(await totalCollateralInVault()).to.equal(0)
       expect(await asset.balanceOf(user.address)).to.equal(utils.parseEther('200000').add(fundingAmount))
+    })
+
+    it('close to makerLimit', async () => {
+      // Get maker product very close to the makerLimit
+      await asset.connect(perennialUser).approve(collateral.address, constants.MaxUint256)
+      await collateral
+        .connect(perennialUser)
+        .depositTo(perennialUser.address, short.address, utils.parseEther('400000'))
+      await short.connect(perennialUser).openMake(utils.parseEther('480'))
+      await updateOracle()
+      await vault.sync()
+
+      // Deposit should create a greater position than what's available
+      const largeDeposit = utils.parseEther('10000')
+      await vault.connect(user).deposit(largeDeposit, user.address)
+      await updateOracle()
+      await vault.sync()
+
+      // Now we should have opened positions.
+      // The positions should be equal to (smallDeposit + largeDeposit) * leverage / 2 / originalOraclePrice.
+      expect(await longPosition()).to.equal(largeDeposit.mul(leverage).div(2).div(originalOraclePrice))
+      const makerLimitDelta = BigNumber.from('8282802043703935198')
+      expect(await shortPosition()).to.equal(makerLimitDelta)
+    })
+
+    it('exactly at makerLimit', async () => {
+      // Get maker product very close to the makerLimit
+      await asset.connect(perennialUser).approve(collateral.address, constants.MaxUint256)
+      await collateral
+        .connect(perennialUser)
+        .depositTo(perennialUser.address, short.address, utils.parseEther('400000'))
+      const makerAvailable = (await short.makerLimit()).sub(
+        (await short.positionAtVersion(await short['latestVersion()']())).maker,
+      )
+
+      await short.connect(perennialUser).openMake(makerAvailable)
+      await updateOracle()
+      await vault.sync()
+
+      // Deposit should create a greater position than what's available
+      const largeDeposit = utils.parseEther('10000')
+      await vault.connect(user).deposit(largeDeposit, user.address)
+      await updateOracle()
+      await vault.sync()
+
+      // Now we should have opened positions.
+      // The positions should be equal to (smallDeposit + largeDeposit) * leverage / 2 / originalOraclePrice.
+      expect(await longPosition()).to.equal(largeDeposit.mul(leverage).div(2).div(originalOraclePrice))
+      expect(await shortPosition()).to.equal(0)
     })
 
     context('liquidation', () => {
