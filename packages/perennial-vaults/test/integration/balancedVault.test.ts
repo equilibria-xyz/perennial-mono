@@ -334,7 +334,6 @@ describe('BalancedVault', () => {
       const fundingAmount = BigNumber.from('1526207855124')
       expect(await totalCollateralInVault()).to.equal(utils.parseEther('10010').add(fundingAmount))
       expect(await vault.balanceOf(user.address)).to.equal(0)
-      expect(await vault.balanceOf(user2.address)).to.equal(0)
       expect(await vault.totalSupply()).to.equal(0)
       expect(await vault.totalAssets()).to.equal(0)
       expect(await vault.convertToAssets(utils.parseEther('1'))).to.equal(utils.parseEther('1'))
@@ -345,6 +344,8 @@ describe('BalancedVault', () => {
       await vault.connect(user).claim(user.address)
       expect(await totalCollateralInVault()).to.equal(0)
       expect(await asset.balanceOf(user.address)).to.equal(utils.parseEther('200000').add(fundingAmount))
+      expect(await vault.unclaimed(user.address)).to.equal(0)
+      expect(await vault.totalUnclaimed()).to.equal(0)
     })
 
     it('multiple users', async () => {
@@ -417,6 +418,8 @@ describe('BalancedVault', () => {
       expect(await vault.totalAssets()).to.equal(0)
       expect(await asset.balanceOf(user.address)).to.equal(utils.parseEther('200000').add(fundingAmount))
       expect(await asset.balanceOf(user2.address)).to.equal(utils.parseEther('200000').add(fundingAmount2))
+      expect(await vault.unclaimed(user2.address)).to.equal(0)
+      expect(await vault.totalUnclaimed()).to.equal(0)
     })
 
     it('transferring shares', async () => {
