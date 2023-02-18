@@ -145,6 +145,12 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
                 (address owner, IPerennialVault vault) = abi.decode(invocation.args, (address, IPerennialVault));
                 vault.claim(owner);
             }
+
+            // Wrap `amount` USDC from `msg.sender` and deposit the DSU into the `vault`
+            else if (invocation.action == PerennialAction.VAULT_WRAP_AND_DEPOSIT) {
+                (address account, IPerennialVault vault, UFixed18 amount) = abi.decode(invocation.args, (address, IPerennialVault, UFixed18));
+                vaultWrapAndDeposit(account, vault, amount);
+            }
         }
     }
 
@@ -224,6 +230,25 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
     function vaultDeposit(address account, IPerennialVault vault, UFixed18 amount) private {
         // Pull the DSU from the user
         DSU.pull(msg.sender, amount);
+
+        // Just-in-time approval to the vault for the amount being deposited
+        DSU.approve(address(vault), amount);
+
+        // Deposit the DSU to the vault, crediting shares to `account`
+        vault.deposit(amount, account);
+    }
+
+    /**
+     * @notice Wrap `amount` USDC from `msg.sender` and deposit the DSU into the `vault`
+     * @param account Address to receive the vault shares
+     * @param vault Vault to deposit funds into
+     * @param amount Amount of USDC to wrap and deposit into the vault
+     */
+    function vaultWrapAndDeposit(address account, IPerennialVault vault, UFixed18 amount) private {
+        // Pull USDC from the `msg.sender`
+        USDC.pull(msg.sender, amount, true);
+
+        _wrap(address(this), amount);
 
         // Just-in-time approval to the vault for the amount being deposited
         DSU.approve(address(vault), amount);
