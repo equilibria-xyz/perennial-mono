@@ -13,6 +13,8 @@ interface IBalancedVault {
         UFixed18 longPosition;
         UFixed18 shortPosition;
         UFixed18 totalShares;
+        UFixed18 longAssets;
+        UFixed18 shortAssets;
         UFixed18 totalAssets;
     }
 
