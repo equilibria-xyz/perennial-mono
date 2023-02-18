@@ -422,6 +422,81 @@ describe('BalancedVault', () => {
       expect(await vault.totalUnclaimed()).to.equal(0)
     })
 
+    it('deposit during withdraw', async () => {
+      expect(await vault.convertToAssets(utils.parseEther('1'))).to.equal(utils.parseEther('1'))
+      expect(await vault.convertToShares(utils.parseEther('1'))).to.equal(utils.parseEther('1'))
+
+      const smallDeposit = utils.parseEther('1000')
+      await vault.connect(user).deposit(smallDeposit, user.address)
+      await updateOracle()
+      await vault.sync()
+
+      const largeDeposit = utils.parseEther('2000')
+      await vault.connect(user2).deposit(largeDeposit, user2.address)
+      await vault.connect(user).redeem(utils.parseEther('400'), user.address)
+      await updateOracle()
+      await vault.sync()
+
+      // Now we should have opened positions.
+      // The positions should be equal to (smallDeposit + largeDeposit) * leverage / 2 / originalOraclePrice.
+      expect(await longPosition()).to.be.equal(
+        smallDeposit.add(largeDeposit).sub(utils.parseEther('400')).mul(leverage).div(2).div(originalOraclePrice),
+      )
+      expect(await shortPosition()).to.equal(
+        smallDeposit.add(largeDeposit).sub(utils.parseEther('400')).mul(leverage).div(2).div(originalOraclePrice),
+      )
+      const fundingAmount0 = BigNumber.from('93756866841')
+      const balanceOf2 = BigNumber.from('1999999999687477110578')
+      expect(await vault.balanceOf(user.address)).to.equal(utils.parseEther('600'))
+      expect(await vault.balanceOf(user2.address)).to.equal(balanceOf2)
+      expect(await vault.totalAssets()).to.equal(utils.parseEther('2600').add(fundingAmount0))
+      expect(await vault.totalSupply()).to.equal(utils.parseEther('600').add(balanceOf2))
+      expect(await vault.convertToAssets(utils.parseEther('600').add(balanceOf2))).to.equal(
+        utils.parseEther('2600').add(fundingAmount0),
+      )
+      expect(await vault.convertToShares(utils.parseEther('2600').add(fundingAmount0))).to.equal(
+        utils.parseEther('600').add(balanceOf2),
+      )
+
+      const maxRedeem = await vault.maxRedeem(user.address)
+      await vault.connect(user).redeem(maxRedeem, user.address)
+      await updateOracle()
+      await vault.sync()
+
+      const maxRedeem2 = await vault.maxRedeem(user2.address)
+      await vault.connect(user2).redeem(maxRedeem2, user2.address)
+      await updateOracle()
+      await vault.sync()
+
+      // We should have closed all positions.
+      expect(await longPosition()).to.equal(0)
+      expect(await shortPosition()).to.equal(0)
+
+      // We should have withdrawn all of our collateral.
+      const fundingAmount = BigNumber.from('249607634342')
+      const fundingAmount2 = BigNumber.from('622820158534')
+      expect(await totalCollateralInVault()).to.equal(utils.parseEther('3000').add(fundingAmount).add(fundingAmount2))
+      expect(await vault.balanceOf(user.address)).to.equal(0)
+      expect(await vault.balanceOf(user2.address)).to.equal(0)
+      expect(await vault.totalAssets()).to.equal(0)
+      expect(await vault.totalSupply()).to.equal(0)
+      expect(await vault.convertToAssets(utils.parseEther('1'))).to.equal(utils.parseEther('1'))
+      expect(await vault.convertToShares(utils.parseEther('1'))).to.equal(utils.parseEther('1'))
+      expect(await vault.unclaimed(user.address)).to.equal(utils.parseEther('1000').add(fundingAmount))
+      expect(await vault.unclaimed(user2.address)).to.equal(utils.parseEther('2000').add(fundingAmount2))
+      expect(await vault.totalUnclaimed()).to.equal(utils.parseEther('3000').add(fundingAmount).add(fundingAmount2))
+
+      await vault.connect(user).claim(user.address)
+      await vault.connect(user2).claim(user2.address)
+
+      expect(await totalCollateralInVault()).to.equal(0)
+      expect(await vault.totalAssets()).to.equal(0)
+      expect(await asset.balanceOf(user.address)).to.equal(utils.parseEther('200000').add(fundingAmount))
+      expect(await asset.balanceOf(user2.address)).to.equal(utils.parseEther('200000').add(fundingAmount2))
+      expect(await vault.unclaimed(user2.address)).to.equal(0)
+      expect(await vault.totalUnclaimed()).to.equal(0)
+    })
+
     it('transferring shares', async () => {
       const smallDeposit = utils.parseEther('10')
       await vault.connect(user).deposit(smallDeposit, user.address)

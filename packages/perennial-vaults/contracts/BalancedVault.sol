@@ -398,12 +398,12 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @notice Rebalances the position of the vault
      */
     function _rebalancePosition(VersionContext memory context, UFixed18 claimAmount) private {
-        UFixed18 currentAssets = _totalAssetsAtVersion(context).add(_deposit).sub(claimAmount);
-        if (currentAssets.lt(controller.minCollateral().mul(TWO))) currentAssets = UFixed18Lib.ZERO;
-
+        UFixed18 currentAssets = _totalAssetsAtVersion(context).sub(claimAmount);
         UFixed18 currentUtilized = _totalSupply.add(_redemption).isZero() ?
-            currentAssets :
-            currentAssets.muldiv(_totalSupply, _totalSupply.add(_redemption));
+            _deposit.add(currentAssets) :
+            _deposit.add(currentAssets.muldiv(_totalSupply, _totalSupply.add(_redemption)));
+        if (currentUtilized.lt(controller.minCollateral().mul(TWO))) currentUtilized = UFixed18Lib.ZERO;
+
         UFixed18 currentPrice = long.atVersion(context.version).price.abs();
         UFixed18 targetPosition = currentUtilized.mul(targetLeverage).div(currentPrice).div(TWO);
 
