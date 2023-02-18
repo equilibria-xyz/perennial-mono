@@ -94,12 +94,14 @@ type configOverrides = {
   solidityOverrides?: Record<string, SolcUserConfig>
   externalDeployments?: { [networkName: string]: string[] }
   dependencyPaths?: string[]
+  solidityVersion?: string
 }
 
 export default function defaultConfig({
   solidityOverrides,
   externalDeployments,
   dependencyPaths,
+  solidityVersion,
 }: configOverrides = {}): HardhatUserConfig {
   return {
     defaultNetwork: 'hardhat',
@@ -128,7 +130,7 @@ export default function defaultConfig({
     solidity: {
       compilers: [
         {
-          version: SOLIDITY_VERSION,
+          version: solidityVersion || SOLIDITY_VERSION,
           settings: {
             optimizer: {
               enabled: OPTIMIZER_ENABLED,
