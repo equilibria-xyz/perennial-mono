@@ -30,7 +30,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const usdcAddress = (await getOrNull('USDC'))?.address || (await get('TestnetUSDC')).address
   const multisigAddress = getMultisigAddress(networkName) || deployer
   const deployerSigner: SignerWithAddress = await ethers.getSigner(deployer)
-  const TIMELOCK_MIN_DELAY = isTestnet(networkName) ? 60 : 2 * 24 * 60 * 60
+  const TIMELOCK_MIN_DELAY = isTestnet(networkName) ? 60 : 60
 
   console.log('using DSU address: ' + dsuAddress)
   console.log('using USDC address: ' + usdcAddress)
@@ -74,16 +74,16 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   // TIMELOCK OR CROSSCHAINOWNER
 
   // If this is mainnet, deploy a Timelock as ProxyAdmin owner
-  if (isEthereum(networkName)) {
+  if (isArbitrum(networkName)) {
     await deploy('TimelockController', {
       from: deployer,
-      args: [TIMELOCK_MIN_DELAY, [multisigAddress], [ethers.constants.AddressZero]],
+      args: [TIMELOCK_MIN_DELAY, [multisigAddress], [ethers.constants.AddressZero], multisigAddress],
       skipIfAlreadyDeployed: true,
       log: true,
       autoMine: true,
     })
     // Else deploy UCrossChain owners
-  } else if (isArbitrum(networkName)) {
+  } /* else if (isArbitrum(networkName)) {
     await deploy('UCrossChainOwner', {
       contract: 'UCrossChainOwner_Arbitrum',
       from: deployer,
@@ -99,7 +99,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       log: true,
       autoMine: true,
     })
-  }
+  } */
 
   // PROXY OWNERS
 

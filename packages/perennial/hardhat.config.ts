@@ -1,6 +1,6 @@
 import { dirname } from 'path'
 
-import defaultConfig, { OPTIMIZER_ENABLED } from '../common/hardhat.default.config'
+import defaultConfig, { OPTIMIZER_ENABLED, FORK_ENABLED, FORK_NETWORK } from '../common/hardhat.default.config'
 const eqPerennialOracleDir = dirname(require.resolve('@equilibria/perennial-oracle/package.json'))
 
 import './tasks'
@@ -53,7 +53,11 @@ const config = defaultConfig({
     mainnet: [`${eqPerennialOracleDir}/deployments/mainnet`],
     arbitrum: [`${eqPerennialOracleDir}/deployments/arbitrum`],
     optimism: [`${eqPerennialOracleDir}/deployments/optimism`],
-    hardhat: [`${eqPerennialOracleDir}/deployments/mainnet`],
+    hardhat: [
+      FORK_ENABLED
+        ? `${eqPerennialOracleDir}/deployments/${FORK_NETWORK}`
+        : `${eqPerennialOracleDir}/deployments/mainnet`,
+    ],
     localhost: [`${eqPerennialOracleDir}/deployments/localhost`],
   },
   dependencyPaths: [

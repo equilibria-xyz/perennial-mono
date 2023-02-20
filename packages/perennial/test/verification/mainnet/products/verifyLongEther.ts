@@ -2,8 +2,8 @@ import { expect } from 'chai'
 import HRE from 'hardhat'
 import { constants, utils } from 'ethers'
 import { Deployment } from 'hardhat-deploy/types'
-import { Controller, Controller__factory, Product, Product__factory } from '../../../types/generated'
-import opensPositions from '../shared/opensPosition.shared'
+import { Controller, Controller__factory, Product, Product__factory } from '../../../../types/generated'
+import opensPositions from '../../shared/opensPosition.shared'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 
 const { ethers } = HRE
