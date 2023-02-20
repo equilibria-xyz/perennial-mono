@@ -19,7 +19,10 @@ const config = defaultConfig({
       : [`${eqPerennialDir}/deployments/mainnet`, `${eqPerennialDir}/external/deployments/mainnet`],
     localhost: [`${eqPerennialDir}/deployments/localhost`, `${eqPerennialDir}/external/deployments/localhost`],
   },
-  dependencyPaths: ['@equilibria/perennial/contracts/interfaces/IController.sol'],
+  dependencyPaths: [
+    '@equilibria/perennial/contracts/interfaces/IController.sol',
+    '@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol',
+  ],
 })
 
 export default config
