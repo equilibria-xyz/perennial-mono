@@ -44,6 +44,7 @@ describe('Vault - Perennial Vault Alpha - Arbitrum Verification', () => {
     expect(await vault.symbol()).to.equal('PVA')
     expect(await vault.maxCollateral()).to.equal(utils.parseEther('1000000'))
     expect(await vault.targetLeverage()).to.equal(utils.parseEther('3'))
+    expect(await vault.asset()).to.equal(deployments['DSU'].address)
 
     expect(await proxyAdmin.getProxyAdmin(vault.address)).to.equal(proxyAdmin.address)
     expect(await proxyAdmin.getProxyImplementation(vault.address)).to.equal(
