@@ -32,8 +32,8 @@ const GOERLI_NODE_URL = process.env.GOERLI_NODE_URL || ''
 const OPTIMISM_GOERLI_NODE_URL = process.env.OPTIMISM_GOERLI_NODE_URL || ''
 const ARBITRUM_GOERLI_NODE_URL = process.env.ARBITRUM_GOERLI_NODE_URL || ''
 
-const FORK_ENABLED = process.env.FORK_ENABLED === 'true' || false
-const FORK_NETWORK = process.env.FORK_NETWORK || 'mainnet'
+export const FORK_ENABLED = process.env.FORK_ENABLED === 'true' || false
+export const FORK_NETWORK = process.env.FORK_NETWORK || 'mainnet'
 const FORK_BLOCK_NUMBER = process.env.FORK_BLOCK_NUMBER ? parseInt(process.env.FORK_BLOCK_NUMBER) : undefined
 const FORK_USE_REAL_DEPLOYS = process.env.FORK_USE_REAL_DEPLOYS === 'true' || false
 
