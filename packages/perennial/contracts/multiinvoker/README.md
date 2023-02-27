@@ -18,6 +18,8 @@ contract MultiInvokerRollup is MultiInvoker {
 ### 2) Replacing `invoke(Invocation[] calldata invocations)`
 - the fallback function does the multicall job of the invoke, so it would be redundant to use over calling the action fns directly 
 
+
+
 - the fallback would have the same loop as invoke, but 1) the calldata would be tightly packed by the caller / frontend and 2) custom decoding fns would be used instead of `abi.decode`
 
 
@@ -32,9 +34,12 @@ contract MultiInvokerRollup is MultiInvoker {
 - the individual encoding / decoding for each arg type would go as follows 
 
     #### 3.1) user addr caching 
+        - if a user is cached on chain in this contract, then the calldata will contain a packed uint key for the value (address) stored, otherwise the address can be passed as well to include a new user in the cache
     #### 3.2) product addr caching
+        - same as above but for product addresses
     #### 3.3) uint256
+        - encode/decode a uint packed to the smallest # of bytes it can fit, not a 32 bytes uint256
     #### 3.4) uint256[]
+        - same as above with a more tightly packed encoding/decoding of array elements than evm standard
 
-### 4) Potential upgradeability 
-Given the # of potential users and products could be near infinite, it may be a bad idea to set a cap much closer to 0 than 2^256 
+
