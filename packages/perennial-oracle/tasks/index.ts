@@ -1,2 +1,2 @@
-export * from './enumerateRounds'
+export * from './enumerateChainlinkRounds'
 export * from './compareOracleVersions'
