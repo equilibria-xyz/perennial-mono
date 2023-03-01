@@ -13,6 +13,7 @@ import {
   IIncentivizer,
 } from '../../../types/generated'
 import { createPayoffDefinition, expectPositionEq, expectPrePositionEq } from '../../../../common/testutil/types'
+import { loadFixture } from '@nomicfoundation/hardhat-network-helpers'
 
 const { ethers } = HRE
 use(smock.matchers)
@@ -28,8 +29,12 @@ describe('PerennialLens', () => {
   let incentivizer: FakeContract<IIncentivizer>
   let lens: PerennialLens
 
-  beforeEach(async () => {
+  const lensFixture = async () => {
     ;[user, protocolTreasury, productTreasury] = await ethers.getSigners()
+  }
+
+  beforeEach(async () => {
+    await loadFixture(lensFixture)
 
     collateral = await smock.fake<ICollateral>('ICollateral')
     product = await smock.fake<IProduct>('IProduct')
