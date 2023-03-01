@@ -142,12 +142,14 @@ contract MultiInvokerRollup is MultiInvoker {
         (product, ptr) = decodeProduct(input, ptr);
         (amount, ptr) = decodeAmountUFixed18(input, ptr);
 
-        return(product, UFixed18(amount), ptr);
+        return(product, amount, ptr);
     }
 
     function decodeAddressAmount(bytes calldata input, uint ptr) private returns(address account, UFixed18 amount, uint) {
         (account, ptr) = decodeUser(input, ptr);
         (amount, ptr) = decodeAmountUFixed18(input, ptr);
+
+        return(account, amount, ptr);
     }
 
     // INDIVIDUAL TYPE DECODING //
@@ -156,7 +158,7 @@ contract MultiInvokerRollup is MultiInvoker {
         uint8 len = toUint8(input[ptr:ptr+1]);
         ptr += 1; 
         
-        result = UFixed18Lib.from(bytesToUint(input[ptr:ptr+len]));
+        result = UFixed18.wrap(bytesToUint(input[ptr:ptr+len]));
         ptr += len;
 
         return (result, ptr);

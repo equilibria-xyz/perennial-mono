@@ -74,6 +74,35 @@ export const buildInvokerActions = (
   }
 }
 
+export const buildAllActionsRollup = (
+  actions: {
+    action: BigNumberish
+    payload: string
+  }[],
+  // actions: {
+  //   action: InvokerAction
+  //   userCache: BigNumber | null,
+  //   productCache: BigNumber,
+  //   userAddress?: string,
+  //   productAddress?: string,
+  //   position?: BigNumberish,
+  //   amount?: BigNumberish,
+  //   programs?: number[]
+  // }[]
+): string => {
+  let pld = ''
+
+  for (const a of actions) {
+    if (a.action == 'NOOP') {
+      continue
+    }
+
+    pld += a.payload
+  }
+
+  return pld
+}
+
 export const buildInvokerActionRollup = (
   userCache: BigNumber, // BN(0) if not used
   productCache: BigNumber, // BN(0) if not used
@@ -83,8 +112,6 @@ export const buildInvokerActionRollup = (
   amount?: BigNumberish,
   programs?: number[],
 ): { [action in InvokerAction]: { action: BigNumberish; payload: string } } => {
-  console.log('product address: ', productAddress)
-
   return {
     NOOP: {
       action: 0,
@@ -131,7 +158,7 @@ export const buildInvokerActionRollup = (
     CLAIM: {
       action: 7,
       // [productAddress programs]
-      payload: '07' + encodeAddressOrCacheIndex(productCache, productAddress) + encodeUint(BigNumber.from(programs)),
+      payload: '07' + encodeAddressOrCacheIndex(productCache, productAddress) + encodeProgramIds(programs!),
     },
     WRAP: {
       action: 8,
