@@ -1,3 +1,5 @@
+import '@nomiclabs/hardhat-ethers'
+import 'hardhat-deploy'
 import { HardhatRuntimeEnvironment } from 'hardhat/types'
 import { DeployFunction } from 'hardhat-deploy/types'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
