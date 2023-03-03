@@ -6,33 +6,28 @@ import "./MultiInvoker.sol";
 
 contract MultiInvokerRollup is MultiInvoker {
     using UFixed18Lib for uint256;
+
+    event AccountAddedToCache(address indexed account, uint256 nonce);
+    event ContractAddedToCache(address indexed product, uint256 nonce);
+
+    uint256 public accountNonce;
+    mapping(uint => address) public accountCache;
+    mapping(address => uint) public accountNonces;
+
+    uint256 public contractNonce;
+    mapping(uint => address) public contractCache;
+    mapping(address => uint) public contractNonces; 
     
-    event LogBytes(bytes);
-    event LogBytes32(bytes32);
-    event LogUint(uint);
-
-    event UserAddedToCache(address indexed user, uint256 nonce);
-    event ProductAddedToCache(address indexed product, uint256 nonce);
-
-    uint256 public userNonce;
-    mapping(uint => address) public userCache;
-    mapping(address => uint) public userNonces;
-
-    uint256 public productNonce;
-    mapping(uint => address) public productCache;
-    mapping(address => uint) public productNonces; 
-    
-
-    constructor(  
-        Token6 usdc_, 
-        IBatcher batcher_, 
-        IEmptySetReserve reserve_, 
+    constructor(
+        Token6 usdc_,
+        IBatcher batcher_,
+        IEmptySetReserve reserve_,
         IController controller_
-    ) MultiInvoker (
-            usdc_, 
-            batcher_, 
-            reserve_, 
-            controller_
+    ) MultiInvoker(
+        usdc_,
+        batcher_,
+        reserve_,
+        controller_
     ) { }
 
     /// @dev fallback eliminates the need to include function sig
@@ -45,7 +40,7 @@ contract MultiInvokerRollup is MultiInvoker {
     function decodeFallbackAndInvoke(bytes calldata input) private {
         uint ptr;
         uint len = input.length;
-
+    
         for(ptr; ptr < len;) {
             uint8 action = toUint8(input[ptr:ptr+1]);
             ptr += 1;
@@ -53,12 +48,12 @@ contract MultiInvokerRollup is MultiInvoker {
             // solidity doesn't like evaluating bytes as enums :/ 
             if(action == 1) { // DEPOSIT
                 address account; IProduct product; UFixed18 amount;
-                (account, product, amount, ptr) = decodeAddressProductAmount(input, ptr);
+                (account, product, amount, ptr) = decodeAccountProductAmount(input, ptr);
 
                 depositTo(account, IProduct(product), amount);
             } else if (action == 2) { // WITHDRAW
                 address receiver; IProduct product; UFixed18 amount;
-                (receiver, product, amount, ptr) = decodeAddressProductAmount(input, ptr);
+                (receiver, product, amount, ptr) = decodeAccountProductAmount(input, ptr);
 
                 collateral.withdrawFrom(msg.sender, receiver, product, amount);
             } else if (action == 3) { // OPEN_TAKE
@@ -88,27 +83,45 @@ contract MultiInvokerRollup is MultiInvoker {
                 controller.incentivizer().claimFor(msg.sender, product, programIds);
             } else if (action == 8) { // WRAP 
                 address receiver; UFixed18 amount;
-                (receiver, amount, ptr) = decodeAddressAmount(input, ptr);
+                (receiver, amount, ptr) = decodeAccountAmount(input, ptr);
 
                 wrap(receiver, amount);
             } else if (action == 9) { // UNWRAP
                 address receiver; UFixed18 amount;
-                (receiver, amount, ptr) = decodeAddressAmount(input, ptr);
+                (receiver, amount, ptr) = decodeAccountAmount(input, ptr);
 
                 unwrap(receiver, amount);
             } else if (action == 10) { // WRAP_AND_DEPOSIT
                 address account; IProduct product; UFixed18 amount;
-                (account, product, amount, ptr) = decodeAddressProductAmount(input, ptr);
+                (account, product, amount, ptr) = decodeAccountProductAmount(input, ptr);
                 
-                wrapAndDeposit(account, product, amount);
+               wrapAndDeposit(account, product, amount);
             } else if (action == 11) { // WITHDRAW_AND_UNWRAP
                 address receiver; IProduct product; UFixed18 amount;
-                (receiver, product, amount, ptr) = decodeAddressProductAmount(input, ptr);
+                (receiver, product, amount, ptr) = decodeAccountProductAmount(input, ptr);
 
                 withdrawAndUnwrap(receiver, product, amount);
+            } else if (action == 12) { // VAULT_DEPOSIT
+                address depositer; IPerennialVault vault; UFixed18 amount;
+                (depositer, vault, amount, ptr) = decodeAccountVaultAmount(input, ptr);
+
+                vaultDeposit(depositer, vault, amount);
+            } else if (action == 13) { // VAULT_REDEEM
+                IPerennialVault vault; UFixed18 shares;
+                (vault, shares, ptr) = decodeVaultAmount(input, ptr);
+
+                vault.redeem(shares, msg.sender);
+            } else if (action == 14) { // VAULT_CLAIM
+                address owner; IPerennialVault vault;
+                (owner, vault, ptr) = decodeAccountContract(input, ptr);
+
+                vault.claim(owner);
+            } else if (action == 15) { // VAULT_WRAP_AND_DEPOSIT 
+                address account; IPerennialVault vault; UFixed18 amount;
+                (account, vault, amount, ptr) = decodeAccountVaultAmount(input, ptr);
+
+                vaultWrapAndDeposit(account, vault, amount);
             }
-            
-    
         }
     }
 
@@ -123,12 +136,22 @@ contract MultiInvokerRollup is MultiInvoker {
 
     // ARGUMENT TYPE DECODING //
 
-    function decodeAddressProductAmount(bytes calldata input, uint ptr) private returns (address user, IProduct product, UFixed18 amount, uint) {
-        (user, ptr) = decodeUser(input, ptr);
+    function decodeAccountProductAmount(bytes calldata input, uint ptr) private returns (address account, IProduct product, UFixed18 amount, uint) {
+        (account, ptr) = decodeAccount(input, ptr);
         (product, ptr) = decodeProduct(input, ptr);
         (amount, ptr) = decodeAmountUFixed18(input, ptr);
 
-        return (user, product, amount, ptr);
+        return (account, product, amount, ptr);
+    }
+
+    function decodeAccountVaultAmount(bytes calldata input, uint ptr) private returns (address account, IPerennialVault vault, UFixed18 amount, uint) {
+        address temp;
+
+        (account, ptr) = decodeAccount(input, ptr);
+        (temp, ptr) = decodeContract(input, ptr);
+        (amount, ptr) = decodeAmountUFixed18(input, ptr);
+
+        return (account, IPerennialVault(temp), amount, ptr);
     }
 
     function decodeProductPrograms(bytes calldata input, uint ptr) private returns(IProduct product, uint256[] memory programs, uint) {
@@ -142,11 +165,29 @@ contract MultiInvokerRollup is MultiInvoker {
         (product, ptr) = decodeProduct(input, ptr);
         (amount, ptr) = decodeAmountUFixed18(input, ptr);
 
-        return(product, amount, ptr);
+        return(product, UFixed18(amount), ptr);
     }
 
-    function decodeAddressAmount(bytes calldata input, uint ptr) private returns(address account, UFixed18 amount, uint) {
-        (account, ptr) = decodeUser(input, ptr);
+    function decodeVaultAmount(bytes calldata input, uint ptr) private returns (IPerennialVault vault, UFixed18 amount, uint) {
+        address temp;
+
+        (temp, ptr) = decodeContract(input, ptr);
+        (amount, ptr) = decodeAmountUFixed18(input, ptr);
+
+        return(IPerennialVault(temp), amount, ptr);
+    }
+
+    function decodeAccountContract(bytes calldata input, uint ptr) private returns(address account, IPerennialVault vault, uint) {
+        address temp;
+
+        (account, ptr) = decodeAccount(input, ptr);
+        (temp, ptr) = decodeContract(input, ptr);
+
+        return (account, IPerennialVault(temp), ptr);
+    }
+
+    function decodeAccountAmount(bytes calldata input, uint ptr) private returns(address account, UFixed18 amount, uint) {
+        (account, ptr) = decodeAccount(input, ptr);
         (amount, ptr) = decodeAmountUFixed18(input, ptr);
 
         return(account, amount, ptr);
@@ -217,78 +258,99 @@ contract MultiInvokerRollup is MultiInvoker {
 
 
 
-    function decodeUser(bytes calldata input, uint ptr) private returns(address userAddress, uint) {
-        uint8 userLen = toUint8(input[ptr:ptr+1]);
+    function decodeAccount(bytes calldata input, uint ptr) private returns(address account, uint) {
+        uint8 accountLen = toUint8(input[ptr:ptr+1]);
         ptr += 1;
 
         // user is new to registry, add next 20 bytes as address to registry and return address
-        if(userLen == 0) {
-            userAddress = bytesToAddress(input[ptr:ptr+20]);
+        if(accountLen == 0) {
+            account = bytesToAddress(input[ptr:ptr+20]);
             ptr += 20;
 
-            setUserCache(userAddress);
+            setAccountCache(account);
 
         } else {
-            uint userNonceLookup = bytesToUint(input[ptr:ptr+userLen]);
-            ptr += userLen;
+            uint accountNonceLookup = bytesToUint(input[ptr:ptr+accountLen]);
+            ptr += accountLen;
 
-            userAddress = getUserCacheSafe(userNonceLookup);
+            account = getAccountCacheSafe(accountNonceLookup);
         }
 
-        return (userAddress, ptr);
+        return (account, ptr);
     }
 
     function decodeProduct(bytes calldata input, uint ptr) private returns(IProduct product, uint) {
         uint8 productLen = toUint8(input[ptr:ptr+1]);
         ptr += 1;
 
-        // user is new to registry, add next 20 bytes as address to registry and return address
+        // product is new to registry, add next 20 bytes as address to registry and return address
         if(productLen == 0) {
             product = IProduct(bytesToAddress(input[ptr:ptr+20]));
             ptr += 20;
 
-            setProductCache(address(product));
+            setContractCache(address(product));
             
         } else {
             uint productNonceLookup = bytesToUint(input[ptr:ptr+productLen]);
             ptr += productLen;
 
-            product = IProduct(getProductCacheSafe(productNonceLookup));
+            product = IProduct(getContractCacheSafe(productNonceLookup));
         }
 
         return (product, ptr);
     }
 
-    function setUserCache(address user) private {
-        ++userNonce;
-        userCache[userNonce] = user;
-        userNonces[user] = userNonce;
-        emit UserAddedToCache(user, userNonce);
+    function decodeContract(bytes calldata input, uint ptr) private returns(address _contract, uint) {
+        uint8 contractLen = toUint8(input[ptr:ptr+1]);
+        ptr += 1;
+
+        // contract is new to registry, add next 20 bytes as address to registry and return address
+        if(contractLen == 0) {
+            _contract = bytesToAddress(input[ptr:ptr+20]);
+            ptr += 20;
+
+            setContractCache(address(_contract));
+            
+        } else {
+            uint contractNonceLookup = bytesToUint(input[ptr:ptr+contractLen]);
+            ptr += contractLen;
+
+            _contract = getContractCacheSafe(contractNonceLookup);
+        }
+
+        return (_contract, ptr);
+
     }
 
-    function getUserCacheSafe(uint nonce) public returns (address user){
-        user = userCache[nonce];
-        if(user == address(0x0)) revert("Bad calldata, user not cache");
+    function setAccountCache(address account) private {
+        ++accountNonce;
+        accountCache[accountNonce] = account;
+        accountNonces[account] = accountNonce;
+        emit AccountAddedToCache(account, accountNonce);
     }
 
-    function setProductCache(address product) private {
-        ++productNonce;
-        productCache[productNonce] = product;
-        productNonces[product] = productNonce;
-        emit ProductAddedToCache(product, productNonce);
-       
+    function getAccountCacheSafe(uint nonce) public returns (address account){
+        account = accountCache[nonce];
+        if(account == address(0x0)) revert("Bad calldata, user !cached");
     }
 
-    function getProductCacheSafe(uint nonce) public view returns(address product) {
-        product = productCache[nonce];
-        if(product == address(0x0)) revert("Bad calldata, product not found");
+    function setContractCache(address _contract) private {
+        ++contractNonce;
+        contractCache[contractNonce] = _contract;
+        contractNonces[_contract] = contractNonce;
+        emit ContractAddedToCache(_contract, contractNonce);
+    }
+
+    function getContractCacheSafe(uint nonce) public view returns(address _contract) {
+        _contract = contractCache[nonce];
+        if(_contract == address(0x0)) revert("Bad calldata, contract not found in cache");
     }
 
 
     // HELPER FUNCTIONS //
     
     // Unchecked force of 20 bytes into address
-    // This is called in decodeUser and decodeProduct which both only pass 20 byte slices 
+    // This is called in decodeAccount and decodeProduct which both only pass 20 byte slices 
     function bytesToAddress(bytes memory input) private pure returns (address addr) {
         assembly {
             addr := mload(add(input, 20))

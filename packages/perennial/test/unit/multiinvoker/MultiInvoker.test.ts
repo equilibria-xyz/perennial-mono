@@ -14,9 +14,11 @@ import {
   IIncentivizer,
   IEmptySetReserve,
   IBatcher,
+  TestnetVault,
 } from '../../../types/generated'
 import { IMultiInvoker } from '../../../types/generated/contracts/interfaces/IMultiInvoker'
 import { InvokerAction, buildInvokerActions } from '../../util'
+import { loadFixture } from '@nomicfoundation/hardhat-network-helpers'
 
 const { ethers } = HRE
 use(smock.matchers)
@@ -32,10 +34,15 @@ describe('MultiInvoker', () => {
   let batcher: FakeContract<IBatcher>
   let incentivizer: FakeContract<IIncentivizer>
   let reserve: FakeContract<IEmptySetReserve>
+  let vault: FakeContract<TestnetVault>
   let multiInvoker: MultiInvoker
 
-  beforeEach(async () => {
+  const multiInvokerFixture = async () => {
     ;[owner, user] = await ethers.getSigners()
+  }
+
+  beforeEach(async () => {
+    await loadFixture(multiInvokerFixture)
 
     usdc = await smock.fake<IERC20>('IERC20')
     dsu = await smock.fake<IERC20>('IERC20')
@@ -45,6 +52,7 @@ describe('MultiInvoker', () => {
     incentivizer = await smock.fake<IIncentivizer>('IIncentivizer')
     product = await smock.fake<IProduct>('IProduct')
     reserve = await smock.fake<IEmptySetReserve>('IEmptySetReserve')
+    vault = await smock.fake<TestnetVault>('TestnetVault')
 
     controller.collateral.returns(collateral.address)
     controller.incentivizer.returns(incentivizer.address)
@@ -110,12 +118,32 @@ describe('MultiInvoker', () => {
     const usdcAmount = 100e6
     const position = utils.parseEther('12')
     const programs = [1, 2, 3]
+    const vaultAmount = utils.parseEther('567')
+    const vaultUSDCAmount = 567e6
 
-    beforeEach(() => {
-      actions = buildInvokerActions(user.address, product.address, position, amount, programs)
+    const fixture = async () => {
+      actions = buildInvokerActions({
+        userAddress: user.address,
+        productAddress: product.address,
+        position,
+        amount,
+        programs,
+        vaultAddress: vault.address,
+        vaultAmount,
+      })
       dsu.transferFrom.whenCalledWith(user.address, multiInvoker.address, amount).returns(true)
       usdc.transferFrom.whenCalledWith(user.address, multiInvoker.address, usdcAmount).returns(true)
       usdc.transfer.whenCalledWith(user.address, usdcAmount).returns(true)
+      usdc.transferFrom.whenCalledWith(user.address, multiInvoker.address, vaultUSDCAmount).returns(true)
+
+      // Vault deposits
+      dsu.allowance.whenCalledWith(multiInvoker.address, vault.address).returns(0)
+      dsu.approve.whenCalledWith(vault.address, vaultAmount).returns(true)
+      dsu.transferFrom.whenCalledWith(user.address, multiInvoker.address, vaultAmount).returns(true)
+    }
+
+    beforeEach(async () => {
+      await loadFixture(fixture)
     })
 
     it('does nothing on NOOP action', async () => {
@@ -249,6 +277,35 @@ describe('MultiInvoker', () => {
       expect(usdc.transfer).to.have.been.calledWith(user.address, usdcAmount)
     })
 
+    it('deposits to vault on VAULT_DEPOSIT action', async () => {
+      await expect(multiInvoker.connect(user).invoke([actions.VAULT_DEPOSIT])).to.not.be.reverted
+
+      expect(dsu.transferFrom).to.have.been.calledWith(user.address, multiInvoker.address, vaultAmount)
+      expect(dsu.approve).to.have.been.calledWith(vault.address, vaultAmount)
+      expect(vault.deposit).to.have.been.calledWith(vaultAmount, user.address)
+    })
+
+    it('redeems from vault on VAULT_REDEEM action', async () => {
+      await expect(multiInvoker.connect(user).invoke([actions.VAULT_REDEEM])).to.not.be.reverted
+
+      expect(vault.redeem).to.have.been.calledWith(vaultAmount, user.address)
+    })
+
+    it('claims from vault on VAULT_CLAIM action', async () => {
+      await expect(multiInvoker.connect(user).invoke([actions.VAULT_CLAIM])).to.not.be.reverted
+
+      expect(vault.claim).to.have.been.calledWith(user.address)
+    })
+
+    it('wraps USDC to DSU then deposits DSU to the vault on VAULT_WRAP_AND_DEPOSIT action', async () => {
+      await expect(multiInvoker.connect(user).invoke([actions.VAULT_WRAP_AND_DEPOSIT])).to.not.be.reverted
+
+      expect(usdc.transferFrom).to.have.been.calledWith(user.address, multiInvoker.address, vaultUSDCAmount)
+      expect(batcher.wrap).to.have.been.calledWith(vaultAmount, multiInvoker.address)
+      expect(dsu.approve).to.have.been.calledWith(vault.address, vaultAmount)
+      expect(vault.deposit).to.have.been.calledWith(vaultAmount, user.address)
+    })
+
     it('performs a multi invoke', async () => {
       await expect(multiInvoker.connect(user).invoke(Object.values(actions))).to.not.be.reverted
 
@@ -272,6 +329,20 @@ describe('MultiInvoker', () => {
       // Underlying Transfers
       expect(dsu.transferFrom).to.have.been.calledWith(user.address, multiInvoker.address, amount)
       expect(usdc.transferFrom).to.have.been.calledWith(user.address, multiInvoker.address, usdcAmount)
+
+      // Vault deposit
+      expect(dsu.transferFrom).to.have.been.calledWith(user.address, multiInvoker.address, vaultAmount)
+      expect(dsu.approve).to.have.been.calledWith(vault.address, vaultAmount)
+      expect(vault.deposit).to.have.been.calledWith(vaultAmount, user.address)
+
+      // Vault redeem
+      expect(vault.redeem).to.have.been.calledWith(vaultAmount, user.address)
+
+      // Vault claim
+      expect(vault.claim).to.have.been.calledWith(user.address)
+
+      // Vault wrap and deposit
+      expect(batcher.wrap).to.have.been.calledWith(vaultAmount, multiInvoker.address)
     })
   })
 
@@ -321,11 +392,21 @@ describe('MultiInvoker', () => {
       const position = utils.parseEther('12')
       const programs = [1, 2, 3]
 
-      beforeEach(() => {
-        actions = buildInvokerActions(user.address, product.address, position, amount, programs)
+      const fixture = async () => {
+        actions = buildInvokerActions({
+          userAddress: user.address,
+          productAddress: product.address,
+          position,
+          amount,
+          programs,
+        })
         dsu.transferFrom.whenCalledWith(user.address, multiInvoker.address, amount).returns(true)
         usdc.transferFrom.whenCalledWith(user.address, multiInvoker.address, usdcAmount).returns(true)
         usdc.transfer.whenCalledWith(user.address, usdcAmount).returns(true)
+      }
+
+      beforeEach(async () => {
+        await loadFixture(fixture)
       })
 
       it('wraps USDC to DSU using RESERVE on WRAP action', async () => {

@@ -17,6 +17,7 @@ import {
   IOracleProvider__factory,
 } from '../../../types/generated'
 import { createPayoffDefinition } from '../../../../common/testutil/types'
+import { loadFixture } from '@nomicfoundation/hardhat-network-helpers'
 
 const { ethers } = HRE
 
@@ -40,7 +41,7 @@ describe('Controller', () => {
   let controller: Controller
   let productImpl: Product
 
-  beforeEach(async () => {
+  const controllerFixture = async () => {
     ;[
       user,
       owner,
@@ -65,6 +66,10 @@ describe('Controller', () => {
     controller = await new Controller__factory(owner).deploy()
     await controller.initialize(collateral.address, incentivizer.address, productBeacon.address)
     await controller.updateMultiInvoker(multiInvoker.address)
+  }
+
+  beforeEach(async () => {
+    await loadFixture(controllerFixture)
   })
 
   describe('#initialize', async () => {
@@ -122,8 +127,12 @@ describe('Controller', () => {
   })
 
   describe('#updateCoordinatorPendingOwner', async () => {
-    beforeEach(async () => {
+    const fixture = async () => {
       await controller.connect(coordinatorOwner).createCoordinator()
+    }
+
+    beforeEach(async () => {
+      await loadFixture(fixture)
     })
 
     it('updates the coordinator pending owner', async () => {
@@ -175,8 +184,12 @@ describe('Controller', () => {
   })
 
   describe('#acceptCoordinatorOwner', async () => {
-    beforeEach(async () => {
+    const fixture = async () => {
       await controller.connect(coordinatorOwner).createCoordinator()
+    }
+
+    beforeEach(async () => {
+      await loadFixture(fixture)
     })
 
     it('updates the coordinator owner', async () => {
@@ -250,8 +263,12 @@ describe('Controller', () => {
   })
 
   describe('#updateCoordinatorTreasury', async () => {
-    beforeEach(async () => {
+    const fixture = async () => {
       await controller.connect(coordinatorOwner).createCoordinator()
+    }
+
+    beforeEach(async () => {
+      await loadFixture(fixture)
     })
 
     it('updates the coordinator treasury', async () => {
@@ -319,11 +336,15 @@ describe('Controller', () => {
         targetUtilization: utils.parseEther('1'),
       },
     }
-    beforeEach(async () => {
+    const fixture = async () => {
       PRODUCT_INFO.payoffDefinition = createPayoffDefinition({ contractAddress: payoffProvider.address })
       PRODUCT_INFO.oracle = oracle.address
       await controller.connect(coordinatorOwner).createCoordinator()
       await controller.connect(coordinatorOwner).updateCoordinatorTreasury(1, coordinatorTreasury.address)
+    }
+
+    beforeEach(async () => {
+      await loadFixture(fixture)
     })
 
     it('creates the product', async () => {

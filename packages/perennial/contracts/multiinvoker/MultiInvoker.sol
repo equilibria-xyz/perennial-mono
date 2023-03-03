@@ -132,6 +132,30 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
                 (address receiver, IProduct product, UFixed18 amount) = abi.decode(invocation.args, (address, IProduct, UFixed18));
                 withdrawAndUnwrap(receiver, product, amount);
             }
+
+            // Deposit `amount` DSU from `msg.sender` into `vault` on behalf of `account`
+            else if (invocation.action == PerennialAction.VAULT_DEPOSIT) {
+                (address account, IPerennialVault vault, UFixed18 amount) = abi.decode(invocation.args, (address, IPerennialVault, UFixed18));
+                vaultDeposit(account, vault, amount);
+            }
+
+            // Redeem `shares` from from `vault` on behalf of `msg.sender`
+            else if (invocation.action == PerennialAction.VAULT_REDEEM) {
+                (IPerennialVault vault, UFixed18 shares) = abi.decode(invocation.args, (IPerennialVault, UFixed18));
+                vault.redeem(shares, msg.sender);
+            }
+
+            // Claim assets from `vault` on behalf of `owner`
+            else if (invocation.action == PerennialAction.VAULT_CLAIM) {
+                (address owner, IPerennialVault vault) = abi.decode(invocation.args, (address, IPerennialVault));
+                vault.claim(owner);
+            }
+
+            // Wrap `amount` USDC from `msg.sender` and deposit the DSU into the `vault`
+            else if (invocation.action == PerennialAction.VAULT_WRAP_AND_DEPOSIT) {
+                (address account, IPerennialVault vault, UFixed18 amount) = abi.decode(invocation.args, (address, IPerennialVault, UFixed18));
+                vaultWrapAndDeposit(account, vault, amount);
+            }
         }
     }
 
@@ -200,6 +224,42 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
         collateral.withdrawFrom(msg.sender, address(this), product, amount);
 
         _unwrap(receiver, amount);
+    }
+
+    /**
+     * @notice Deposit `amount` DSU from `msg.sender` into `vault` on behalf of `account`
+     * @param account Address to receive the vault shares
+     * @param vault Vault to deposit funds into
+     * @param amount Amount of DSU to deposit into the vault
+     */
+    function vaultDeposit(address account, IPerennialVault vault, UFixed18 amount) internal {
+        // Pull the DSU from the user
+        DSU.pull(msg.sender, amount);
+
+        // Just-in-time approval to the vault for the amount being deposited
+        DSU.approve(address(vault), amount);
+
+        // Deposit the DSU to the vault, crediting shares to `account`
+        vault.deposit(amount, account);
+    }
+
+    /**
+     * @notice Wrap `amount` USDC from `msg.sender` and deposit the DSU into the `vault`
+     * @param account Address to receive the vault shares
+     * @param vault Vault to deposit funds into
+     * @param amount Amount of USDC to wrap and deposit into the vault
+     */
+    function vaultWrapAndDeposit(address account, IPerennialVault vault, UFixed18 amount) internal {
+        // Pull USDC from the `msg.sender`
+        USDC.pull(msg.sender, amount, true);
+
+        _wrap(address(this), amount);
+
+        // Just-in-time approval to the vault for the amount being deposited
+        DSU.approve(address(vault), amount);
+
+        // Deposit the DSU to the vault, crediting shares to `account`
+        vault.deposit(amount, account);
     }
 
     /**

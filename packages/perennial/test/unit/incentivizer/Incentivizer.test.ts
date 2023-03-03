@@ -16,6 +16,7 @@ import {
 } from '../../../types/generated'
 import { currentBlockTimestamp, increase } from '../../../../common/testutil/time'
 import { expectProgramInfoEq, ProgramInfo } from '../../../../common/testutil/types'
+import { loadFixture } from '@nomicfoundation/hardhat-network-helpers'
 
 const { ethers } = HRE
 
@@ -45,7 +46,7 @@ describe('Incentivizer', () => {
 
   let incentivizer: Incentivizer
 
-  beforeEach(async () => {
+  const incentivizerFixture = async () => {
     ;[user, owner, treasury, productOwner, productTreasury, productOwnerB, productTreasuryB, multiInvokerMock] =
       await ethers.getSigners()
     product = await deployMockContract(owner, Product__factory.abi)
@@ -81,6 +82,10 @@ describe('Incentivizer', () => {
     await controller.mock.incentivizationFee.withArgs().returns(0)
     await controller.mock.programsPerProduct.withArgs().returns(2)
     await controller.mock.multiInvoker.withArgs().returns(multiInvokerMock.address)
+  }
+
+  beforeEach(async () => {
+    await loadFixture(incentivizerFixture)
   })
 
   describe('#initialize', async () => {
@@ -422,7 +427,7 @@ describe('Incentivizer', () => {
   })
 
   describe('#sync', async () => {
-    beforeEach(async () => {
+    const fixture = async () => {
       await token.mock.transferFrom
         .withArgs(productOwner.address, incentivizer.address, utils.parseEther('10000'))
         .returns(true)
@@ -456,6 +461,10 @@ describe('Incentivizer', () => {
 
       await incentivizer.connect(productOwner).create(product.address, PROGRAM_INFO_1)
       await incentivizer.connect(productOwner).create(product.address, PROGRAM_INFO_2)
+    }
+
+    beforeEach(async () => {
+      await loadFixture(fixture)
     })
 
     it('correctly starts neither program', async () => {
@@ -750,7 +759,7 @@ describe('Incentivizer', () => {
         version: number
       }
 
-      beforeEach(async () => {
+      const fixture = async () => {
         await increase(12 * HOUR)
 
         const NOW = await currentBlockTimestamp()
@@ -763,6 +772,10 @@ describe('Incentivizer', () => {
         await product.mock.latestVersion.withArgs().returns(STARTED_ORACLE_VERSION.version)
 
         await incentivizer.connect(productSigner).sync(STARTED_ORACLE_VERSION)
+      }
+
+      beforeEach(async () => {
+        await loadFixture(fixture)
       })
 
       it('correctly completes neither program', async () => {
@@ -1002,7 +1015,7 @@ describe('Incentivizer', () => {
   })
 
   describe('#syncAccount', async () => {
-    beforeEach(async () => {
+    const fixture = async () => {
       await token.mock.transferFrom
         .withArgs(productOwner.address, incentivizer.address, utils.parseEther('10000'))
         .returns(true)
@@ -1033,6 +1046,10 @@ describe('Incentivizer', () => {
         start: now + HOUR,
         duration: 60 * DAY,
       })
+    }
+
+    beforeEach(async () => {
+      await loadFixture(fixture)
     })
 
     context('before start', async () => {
@@ -1108,7 +1125,7 @@ describe('Incentivizer', () => {
         price: BigNumberish
       }
 
-      beforeEach(async () => {
+      const fixture = async () => {
         await increase(2 * HOUR)
         START_ORACLE_VERSION = {
           price: utils.parseEther('1'),
@@ -1116,6 +1133,10 @@ describe('Incentivizer', () => {
           version: 17,
         }
         await incentivizer.connect(productSigner).sync(START_ORACLE_VERSION)
+      }
+
+      beforeEach(async () => {
+        await loadFixture(fixture)
       })
 
       it('settles correct amount (maker position)', async () => {
@@ -1208,7 +1229,7 @@ describe('Incentivizer', () => {
         price: BigNumberish
       }
 
-      beforeEach(async () => {
+      const fixture = async () => {
         await increase(2 * HOUR)
         START_ORACLE_VERSION = {
           price: utils.parseEther('1'),
@@ -1216,6 +1237,10 @@ describe('Incentivizer', () => {
           version: 17,
         }
         await incentivizer.connect(productSigner).sync(START_ORACLE_VERSION)
+      }
+
+      beforeEach(async () => {
+        await loadFixture(fixture)
       })
 
       it('settles correct amount (maker position)', async () => {
@@ -1317,7 +1342,7 @@ describe('Incentivizer', () => {
       let REFUND_AMOUNT_0: BigNumberish
       let REFUND_AMOUNT_1: BigNumberish
 
-      beforeEach(async () => {
+      const fixture = async () => {
         await increase(2 * HOUR)
         START_ORACLE_VERSION = {
           price: utils.parseEther('1'),
@@ -1352,6 +1377,10 @@ describe('Incentivizer', () => {
           version: 68,
         }
         await incentivizer.connect(productSigner).sync(POST_COMPLETE_ORACLE_VERSION)
+      }
+
+      beforeEach(async () => {
+        await loadFixture(fixture)
       })
 
       it('settles correct amount (maker position)', async () => {
@@ -1453,7 +1482,7 @@ describe('Incentivizer', () => {
       let REFUND_AMOUNT_0: BigNumberish
       let REFUND_AMOUNT_1: BigNumberish
 
-      beforeEach(async () => {
+      const fixture = async () => {
         await increase(2 * HOUR)
         START_ORACLE_VERSION = {
           price: utils.parseEther('1'),
@@ -1488,6 +1517,10 @@ describe('Incentivizer', () => {
           version: 68,
         }
         await incentivizer.connect(productSigner).sync(POST_COMPLETE_ORACLE_VERSION)
+      }
+
+      beforeEach(async () => {
+        await loadFixture(fixture)
       })
 
       it('settles correct amount (maker position)', async () => {
@@ -1569,7 +1602,7 @@ describe('Incentivizer', () => {
       let REFUND_AMOUNT_0: BigNumberish
       let REFUND_AMOUNT_1: BigNumberish
 
-      beforeEach(async () => {
+      const fixture = async () => {
         await increase(2 * HOUR)
         START_ORACLE_VERSION = {
           price: utils.parseEther('1'),
@@ -1604,6 +1637,10 @@ describe('Incentivizer', () => {
           version: 68,
         }
         await incentivizer.connect(productSigner).sync(POST_COMPLETE_ORACLE_VERSION)
+      }
+
+      beforeEach(async () => {
+        await loadFixture(fixture)
       })
 
       it('settles correct amount (maker position)', async () => {
@@ -1758,7 +1795,7 @@ describe('Incentivizer', () => {
   })
 
   describe('#complete', async () => {
-    beforeEach(async () => {
+    const fixture = async () => {
       await token.mock.transferFrom
         .withArgs(productOwner.address, incentivizer.address, utils.parseEther('10000'))
         .returns(true)
@@ -1775,6 +1812,10 @@ describe('Incentivizer', () => {
         start: NOW + HOUR,
         duration: 30 * DAY,
       })
+    }
+
+    beforeEach(async () => {
+      await loadFixture(fixture)
     })
 
     context('no start first', async () => {
@@ -1854,7 +1895,7 @@ describe('Incentivizer', () => {
         version: number
       }
 
-      beforeEach(async () => {
+      const fixture = async () => {
         await increase(12 * HOUR)
 
         const NOW = await currentBlockTimestamp()
@@ -1867,6 +1908,10 @@ describe('Incentivizer', () => {
         await product.mock.latestVersion.withArgs().returns(STARTED_ORACLE_VERSION.version)
 
         await incentivizer.connect(productSigner).sync(STARTED_ORACLE_VERSION)
+      }
+
+      beforeEach(async () => {
+        await loadFixture(fixture)
       })
 
       it('completes correctly', async () => {
@@ -1997,7 +2042,7 @@ describe('Incentivizer', () => {
     // 8000 * 10^18 / (60 * 60 * 24 * 30) * 180 * 10 = 5555555555555555555
     const EXPECTED_REWARD = ethers.BigNumber.from('5555555555555554200')
 
-    beforeEach(async () => {
+    const fixture = async () => {
       // Setup programs
       await token.mock.transferFrom
         .withArgs(productOwner.address, incentivizer.address, utils.parseEther('10000'))
@@ -2106,6 +2151,10 @@ describe('Incentivizer', () => {
         taker: utils.parseEther('720'),
       })
       await incentivizer.connect(productSignerB).syncAccount(user.address, CURRENT_ORACLE_VERSION)
+    }
+
+    beforeEach(async () => {
+      await loadFixture(fixture)
     })
 
     it('claims individual product', async () => {
@@ -2199,7 +2248,7 @@ describe('Incentivizer', () => {
     // 8000 * 10^18 / (60 * 60 * 24 * 30) * 180 * 10 = 5555555555555555555
     const EXPECTED_REWARD = ethers.BigNumber.from('5555555555555554200')
 
-    beforeEach(async () => {
+    const fixture = async () => {
       // Setup programs
       await token.mock.transferFrom
         .withArgs(productOwner.address, incentivizer.address, utils.parseEther('10000'))
@@ -2308,6 +2357,10 @@ describe('Incentivizer', () => {
         taker: utils.parseEther('720'),
       })
       await incentivizer.connect(productSignerB).syncAccount(user.address, CURRENT_ORACLE_VERSION)
+    }
+
+    beforeEach(async () => {
+      await loadFixture(fixture)
     })
 
     it('claims individual product for user', async () => {
@@ -2354,7 +2407,7 @@ describe('Incentivizer', () => {
   })
 
   describe('#claimFee', async () => {
-    beforeEach(async () => {
+    const fixture = async () => {
       await controller.mock.incentivizationFee.withArgs().returns(utils.parseEther('0.01'))
 
       await token.mock.transferFrom
@@ -2387,6 +2440,10 @@ describe('Incentivizer', () => {
         start: now + HOUR,
         duration: 60 * DAY,
       })
+    }
+
+    beforeEach(async () => {
+      await loadFixture(fixture)
     })
 
     it('claims accrued fees', async () => {

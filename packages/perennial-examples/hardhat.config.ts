@@ -17,6 +17,8 @@ const config = defaultConfig({
       `${eqPerennialOracleDir}/deployments/optimismGoerli`,
     ],
     mainnet: [`${eqPerennialDir}/deployments/mainnet`, `${eqPerennialOracleDir}/deployments/mainnet`],
+    arbitrum: [`${eqPerennialDir}/deployments/arbitrum`, `${eqPerennialOracleDir}/deployments/arbitrum`],
+    optimism: [`${eqPerennialDir}/deployments/optimism`, `${eqPerennialOracleDir}/deployments/optimism`],
     hardhat: [`${eqPerennialDir}/deployments/mainnet`, `${eqPerennialOracleDir}/deployments/mainnet`],
     localhost: [`${eqPerennialDir}/deployments/localhost`, `${eqPerennialOracleDir}/deployments/localhost`],
   },

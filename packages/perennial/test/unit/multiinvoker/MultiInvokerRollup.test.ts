@@ -14,6 +14,7 @@ import {
   IIncentivizer,
   IEmptySetReserve,
   IBatcher,
+  TestnetVault,
 } from '../../../types/generated'
 import { IMultiInvokerRollup } from '../../../types/generated/contracts/interfaces/IMultiInvokerRollup'
 import { InvokerAction, buildInvokerActionRollup, buildAllActionsRollup } from '../../util'
@@ -33,6 +34,7 @@ describe('MultiInvokerRollup', () => {
   let batcher: FakeContract<IBatcher>
   let incentivizer: FakeContract<IIncentivizer>
   let reserve: FakeContract<IEmptySetReserve>
+  let vault: FakeContract<TestnetVault>
   let multiInvokerRollup: MultiInvokerRollup
 
   beforeEach(async () => {
@@ -46,6 +48,7 @@ describe('MultiInvokerRollup', () => {
     incentivizer = await smock.fake<IIncentivizer>('IIncentivizer')
     product = await smock.fake<IProduct>('IProduct')
     reserve = await smock.fake<IEmptySetReserve>('IEmptySetReserve')
+    vault = await smock.fake<TestnetVault>('TestnetVault')
 
     controller.collateral.returns(collateral.address)
     controller.incentivizer.returns(incentivizer.address)
@@ -71,8 +74,6 @@ describe('MultiInvokerRollup', () => {
     dsu.approve.whenCalledWith(reserve.address, 0).returns(true)
     dsu.approve.whenCalledWith(reserve.address, ethers.constants.MaxUint256).returns(true)
     dsu.balanceOf.whenCalledWith(batcher.address).returns(constants.MaxUint256)
-
-    dsu.transferFrom.returns(true)
 
     usdc.allowance.whenCalledWith(multiInvokerRollup.address, batcher.address).returns(0)
     usdc.approve.whenCalledWith(batcher.address, 0).returns(true)
@@ -113,20 +114,31 @@ describe('MultiInvokerRollup', () => {
     const usdcAmount = 100e6
     const position = utils.parseEther('12')
     const programs = [1, 2, 3]
+    const vaultAmount = utils.parseEther('567')
+    const vaultUSDCAmount = 567e6
 
     beforeEach(() => {
       actions = buildInvokerActionRollup(
         BigNumber.from(0),
         BigNumber.from(0),
+        BigNumber.from(0),
         user.address,
         product.address,
+        vault.address,
         position,
         amount,
+        vaultAmount,
         programs,
       )
       dsu.transferFrom.whenCalledWith(user.address, multiInvokerRollup.address, amount).returns(true)
       usdc.transferFrom.whenCalledWith(user.address, multiInvokerRollup.address, usdcAmount).returns(true)
       usdc.transfer.whenCalledWith(user.address, usdcAmount).returns(true)
+      usdc.transferFrom.whenCalledWith(user.address, multiInvokerRollup.address, vaultUSDCAmount).returns(true)
+
+      // Vault deposits
+      dsu.allowance.whenCalledWith(multiInvokerRollup.address, vault.address).returns(0)
+      dsu.approve.whenCalledWith(vault.address, vaultAmount).returns(true)
+      dsu.transferFrom.whenCalledWith(user.address, multiInvokerRollup.address, vaultAmount).returns(true)
     })
 
     it('does nothing on NOOP action', async () => {
@@ -290,9 +302,49 @@ describe('MultiInvokerRollup', () => {
         product.address,
         amount,
       )
-
       expect(reserve.redeem).to.have.been.calledWith(amount)
       expect(usdc.transfer).to.have.been.calledWith(user.address, usdcAmount)
+    })
+
+    it('deposits to vault on VAULT_DEPOSIT action', async () => {
+      const res = user.sendTransaction(
+        buildTransactionRequest(user, multiInvokerRollup, '0x' + actions.VAULT_DEPOSIT.payload),
+      )
+
+      await expect(res).to.not.be.reverted
+      expect(dsu.transferFrom).to.have.been.calledWith(user.address, multiInvokerRollup.address, vaultAmount)
+      expect(dsu.approve).to.have.been.calledWith(vault.address, vaultAmount)
+      expect(vault.deposit).to.have.been.calledWith(vaultAmount, user.address)
+    })
+
+    it('redeems from vault on VAULT_REDEEM action', async () => {
+      const res = user.sendTransaction(
+        buildTransactionRequest(user, multiInvokerRollup, '0x' + actions.VAULT_REDEEM.payload),
+      )
+
+      await expect(res).to.not.be.reverted
+      expect(vault.redeem).to.have.been.calledWith(vaultAmount, user.address)
+    })
+
+    it('claims from vault on VAULT_CLAIM action', async () => {
+      const res = user.sendTransaction(
+        buildTransactionRequest(user, multiInvokerRollup, '0x' + actions.VAULT_CLAIM.payload),
+      )
+
+      await expect(res).to.not.be.reverted
+      expect(vault.claim).to.have.been.calledWith(user.address)
+    })
+
+    it('wraps USDC to DSU then deposits DSU to the vault on VAULT_WRAP_AND_DEPOSIT action', async () => {
+      const res = user.sendTransaction(
+        buildTransactionRequest(user, multiInvokerRollup, '0x' + actions.VAULT_WRAP_AND_DEPOSIT.payload),
+      )
+
+      await expect(res).to.not.be.reverted
+      expect(usdc.transferFrom).to.have.been.calledWith(user.address, multiInvokerRollup.address, vaultUSDCAmount)
+      expect(batcher.wrap).to.have.been.calledWith(vaultAmount, multiInvokerRollup.address)
+      expect(dsu.approve).to.have.been.calledWith(vault.address, vaultAmount)
+      expect(vault.deposit).to.have.been.calledWith(vaultAmount, user.address)
     })
 
     it('performs a multi invoke', async () => {
@@ -322,6 +374,20 @@ describe('MultiInvokerRollup', () => {
       // Underlying Transfers
       expect(dsu.transferFrom).to.have.been.calledWith(user.address, multiInvokerRollup.address, amount)
       expect(usdc.transferFrom).to.have.been.calledWith(user.address, multiInvokerRollup.address, usdcAmount)
+
+      // Vault deposit
+      expect(dsu.transferFrom).to.have.been.calledWith(user.address, multiInvokerRollup.address, vaultAmount)
+      expect(dsu.approve).to.have.been.calledWith(vault.address, vaultAmount)
+      expect(vault.deposit).to.have.been.calledWith(vaultAmount, user.address)
+
+      // Vault redeem
+      expect(vault.redeem).to.have.been.calledWith(vaultAmount, user.address)
+
+      // Vault claim
+      expect(vault.claim).to.have.been.calledWith(user.address)
+
+      // Vault wrap and deposit
+      expect(batcher.wrap).to.have.been.calledWith(vaultAmount, multiInvokerRollup.address)
     })
   })
 
@@ -369,16 +435,20 @@ describe('MultiInvokerRollup', () => {
       const amount = utils.parseEther('100')
       const usdcAmount = 100e6
       const position = utils.parseEther('12')
+      const VaultAmount = utils.parseEther('567')
       const programs = [1, 2, 3]
 
       beforeEach(() => {
         actions = buildInvokerActionRollup(
           BigNumber.from(0),
           BigNumber.from(0),
+          BigNumber.from(0),
           user.address,
           product.address,
+          vault.address,
           position,
           amount,
+          VaultAmount,
           programs,
         )
         dsu.transferFrom.whenCalledWith(user.address, multiInvokerRollup.address, amount).returns(true)
@@ -442,25 +512,32 @@ describe('MultiInvokerRollup', () => {
       const amount = utils.parseEther('50')
       const usdcAmount = 100e6
       const position = utils.parseEther('12')
+      const VaultAmount = utils.parseEther('567')
       const programs = [1, 2, 3]
 
       beforeEach(() => {
         actions = buildInvokerActionRollup(
           BigNumber.from(0),
           BigNumber.from(0),
+          BigNumber.from(0),
           user.address,
           product.address,
+          vault.address,
           position,
           amount,
+          VaultAmount,
           programs,
         )
         actionsCached = buildInvokerActionRollup(
           BigNumber.from(1),
           BigNumber.from(1),
+          BigNumber.from(1),
           undefined,
           undefined,
+          vault.address,
           position,
           amount,
+          VaultAmount,
           programs,
         )
 
@@ -480,8 +557,8 @@ describe('MultiInvokerRollup', () => {
         expect(collateral.depositTo).to.have.been.calledWith(user.address, product.address, amount)
 
         // assert caches set in 1st txn
-        expect(await multiInvokerRollup.connect(user).userNonces(user.address)).to.eq(1)
-        expect(await multiInvokerRollup.connect(user).productNonces(product.address)).to.eq(1)
+        expect(await multiInvokerRollup.connect(user).accountNonces(user.address)).to.eq(1)
+        expect(await multiInvokerRollup.connect(user).contractNonces(product.address)).to.eq(1)
 
         // 2) call contract with cached payload
         res = user.sendTransaction(

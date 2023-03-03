@@ -1,7 +1,9 @@
 import { dirname } from 'path'
 
-import defaultConfig, { OPTIMIZER_ENABLED } from '../common/hardhat.default.config'
+import defaultConfig, { OPTIMIZER_ENABLED, FORK_ENABLED, FORK_NETWORK } from '../common/hardhat.default.config'
 const eqPerennialOracleDir = dirname(require.resolve('@equilibria/perennial-oracle/package.json'))
+
+import './tasks'
 
 // This Solidity config produces small contract sizes, and is useful when
 // contracts are close to the maximum possible size. The trade off is each
@@ -49,7 +51,13 @@ const config = defaultConfig({
     arbitrumGoerli: [`${eqPerennialOracleDir}/deployments/arbitrumGoerli`],
     optimismGoerli: [`${eqPerennialOracleDir}/deployments/optimismGoerli`],
     mainnet: [`${eqPerennialOracleDir}/deployments/mainnet`],
-    hardhat: [`${eqPerennialOracleDir}/deployments/mainnet`],
+    arbitrum: [`${eqPerennialOracleDir}/deployments/arbitrum`],
+    optimism: [`${eqPerennialOracleDir}/deployments/optimism`],
+    hardhat: [
+      FORK_ENABLED
+        ? `${eqPerennialOracleDir}/deployments/${FORK_NETWORK}`
+        : `${eqPerennialOracleDir}/deployments/mainnet`,
+    ],
     localhost: [`${eqPerennialOracleDir}/deployments/localhost`],
   },
   dependencyPaths: [
