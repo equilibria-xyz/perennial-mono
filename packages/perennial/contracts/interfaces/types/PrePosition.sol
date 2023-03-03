@@ -40,6 +40,10 @@ library PrePositionLib {
         return self.openPosition.isEmpty() && self.closePosition.isEmpty();
     }
 
+    function isVersionZero(PrePosition memory self) internal pure returns (bool) {
+        return self.oracleVersion == 0;
+    }
+
     /**
      * @notice Increments the maker side of the open position delta
      * @param self The struct to operate on
@@ -95,7 +99,7 @@ library PrePositionLib {
         PrePosition memory self,
         IOracleProvider.OracleVersion memory toOracleVersion
     ) internal pure returns (bool) {
-        return !isEmpty(self) && toOracleVersion.version > self.oracleVersion;
+        return !isVersionZero(self) && toOracleVersion.version > self.oracleVersion;
     }
 
     /**
