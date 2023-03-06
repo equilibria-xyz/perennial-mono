@@ -1,46 +1,49 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
-import { BigNumberish, utils } from 'ethers'
+import { utils } from 'ethers'
 import { createPayoffDefinition } from '../../../../common/testutil/types'
 import { ChainlinkOracle__factory, IController__factory, IProduct } from '../../../types/generated'
-import { JumpRateUtilizationCurveStruct } from '../../../types/generated/@equilibria/perennial/contracts/interfaces/IProduct'
 
-export interface DeployProductParams {
+export interface DeployProductParams extends Partial<Omit<IProduct.ProductInfoStruct, 'payoffDefinition' | 'oracle'>> {
+  name: string
+  symbol: string
   owner: SignerWithAddress
-  productName: string
-  productSymbol: string
   baseCurrency: string
   quoteCurrency: string
   short: boolean
-  maintenance?: BigNumberish
-  fundingFee?: BigNumberish
-  takerFee?: BigNumberish
-  positionFee?: BigNumberish
-  makerLimit?: BigNumberish
-  utilizationCurve?: JumpRateUtilizationCurveStruct
 }
 
 // Deploys a product that uses an oracle based on an oracle in the Chainlink feed registry.
 // Returns the address of the deployed product.
-export async function deployProductOnMainnetFork(params: DeployProductParams): Promise<string> {
+export async function deployProductOnMainnetFork({
+  name,
+  symbol,
+  owner,
+  baseCurrency,
+  quoteCurrency,
+  short,
+  maintenance,
+  fundingFee,
+  makerFee,
+  takerFee,
+  positionFee,
+  makerLimit,
+  utilizationCurve,
+}: DeployProductParams): Promise<string> {
   const chainlinkFeedRegistry = '0x47Fb2585D2C56Fe188D0E6ec628a38b74fCeeeDf'
-  const oracle = await new ChainlinkOracle__factory(params.owner).deploy(
-    chainlinkFeedRegistry,
-    params.baseCurrency,
-    params.quoteCurrency,
-  )
+  const oracle = await new ChainlinkOracle__factory(owner).deploy(chainlinkFeedRegistry, baseCurrency, quoteCurrency)
 
   const productInfo: IProduct.ProductInfoStruct = {
-    name: params.productName,
-    symbol: params.productSymbol,
-    payoffDefinition: createPayoffDefinition({ short: params.short }),
+    name: name,
+    symbol: symbol,
+    payoffDefinition: createPayoffDefinition({ short: short }),
     oracle: oracle.address,
-    maintenance: params.maintenance ?? utils.parseEther('0.5'),
-    fundingFee: params.fundingFee ?? utils.parseEther('0.10'),
-    makerFee: utils.parseEther('0.0'),
-    takerFee: utils.parseEther('0.0'),
-    positionFee: params.positionFee ?? utils.parseEther('0.5'),
-    makerLimit: params.makerLimit ?? utils.parseEther('100'),
-    utilizationCurve: params.utilizationCurve ?? {
+    maintenance: maintenance ?? utils.parseEther('0.5'),
+    fundingFee: fundingFee ?? utils.parseEther('0.10'),
+    makerFee: makerFee ?? utils.parseEther('0.0'),
+    takerFee: takerFee ?? utils.parseEther('0.0'),
+    positionFee: positionFee ?? utils.parseEther('0.5'),
+    makerLimit: makerLimit ?? utils.parseEther('100'),
+    utilizationCurve: utilizationCurve ?? {
       // Force a 0.10 rate to make tests simpler
       minRate: utils.parseEther('0.10'),
       maxRate: utils.parseEther('0.10'),
@@ -50,13 +53,13 @@ export async function deployProductOnMainnetFork(params: DeployProductParams): P
   }
 
   // This is the controller deployed on mainnet.
-  const controller = IController__factory.connect('0x9df509186b6d3b7D033359f94c8b1BB5544d51b3', params.owner)
+  const controller = IController__factory.connect('0x9df509186b6d3b7D033359f94c8b1BB5544d51b3', owner)
 
-  const coordinatorId = await controller.connect(params.owner).callStatic.createCoordinator()
-  await controller.connect(params.owner).createCoordinator()
+  const coordinatorId = await controller.connect(owner).callStatic.createCoordinator()
+  await controller.connect(owner).createCoordinator()
 
-  const productAddress = await controller.connect(params.owner).callStatic.createProduct(coordinatorId, productInfo)
-  await controller.connect(params.owner).createProduct(coordinatorId, productInfo)
+  const productAddress = await controller.connect(owner).callStatic.createProduct(coordinatorId, productInfo)
+  await controller.connect(owner).createProduct(coordinatorId, productInfo)
 
   return productAddress
 }
