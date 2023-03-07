@@ -59,7 +59,7 @@ contract Forwarder is IForwarder {
         address account,
         IProduct product,
         UFixed18 amount
-    ) public {
+    ) external {
         USDC.pull(msg.sender, amount, true);
         batcher.wrap(amount, address(this));
         collateral.depositTo(account, product, amount);

@@ -557,8 +557,8 @@ describe('MultiInvokerRollup', () => {
         expect(collateral.depositTo).to.have.been.calledWith(user.address, product.address, amount)
 
         // assert caches set in 1st txn
-        expect(await multiInvokerRollup.connect(user).accountNonces(user.address)).to.eq(1)
-        expect(await multiInvokerRollup.connect(user).contractNonces(product.address)).to.eq(1)
+        expect(await multiInvokerRollup.connect(user).addressNonces(user.address)).to.eq(1)
+        expect(await multiInvokerRollup.connect(user).addressNonces(product.address)).to.eq(2)
 
         // 2) call contract with cached payload
         res = user.sendTransaction(
