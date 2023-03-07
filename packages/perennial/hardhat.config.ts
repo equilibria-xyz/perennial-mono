@@ -50,9 +50,11 @@ const config = defaultConfig({
     goerli: [`${eqPerennialOracleDir}/deployments/goerli`],
     arbitrumGoerli: [`${eqPerennialOracleDir}/deployments/arbitrumGoerli`],
     optimismGoerli: [`${eqPerennialOracleDir}/deployments/optimismGoerli`],
+    baseGoerli: [`${eqPerennialOracleDir}/deployments/baseGoerli`],
     mainnet: [`${eqPerennialOracleDir}/deployments/mainnet`],
     arbitrum: [`${eqPerennialOracleDir}/deployments/arbitrum`],
     optimism: [`${eqPerennialOracleDir}/deployments/optimism`],
+    base: [`${eqPerennialOracleDir}/deployments/base`],
     hardhat: [
       FORK_ENABLED
         ? `${eqPerennialOracleDir}/deployments/${FORK_NETWORK}`
