@@ -1,18 +1,22 @@
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.15;
 
 import "./MultiInvoker.sol";
 
-// import "forge-std/Test.sol";
-
+/// @title A calldata-optimized implementation of the Perennial MultiInvoker 
+/// @notice Retains same functionality and `invoke` entry point from inherited MultiInvoker
 contract MultiInvokerRollup is MultiInvoker {
 
     event AddressAddedToCache(address indexed addr, uint256 nonce);
+
+    /// @dev reverts when address cache is relied on before a user / contract has been registered in state
+    /// if thrown, pass the bytes'00' (0 length) + the full 20 byte address instead of the length + index, 
+    /// can parse the events or mapping below to get the newly added cache index
+    error BadCalldata();
 
     uint256 public addressNonce;
     mapping(uint => address) public addressCache;
     mapping(address => uint) public addressNonces;
 
-    
     constructor(
         Token6 usdc_,
         IBatcher batcher_,
@@ -25,97 +29,97 @@ contract MultiInvokerRollup is MultiInvoker {
         controller_
     ) { }
 
-    /// @dev fallback eliminates the need to include function sig
-    fallback (bytes calldata input) external returns (bytes memory) {
-        decodeFallbackAndInvoke(input);
+    /// @dev fallback eliminates the need to include function sig in calldata
+    fallback (bytes calldata input) external returns(bytes memory){
+        _decodeFallbackAndInvoke(input);
     }
 
-    /// @dev this function serves (@todo will serve*) exactly the same as invoke(Invocation[] memory invocations),
+    /// @dev this function serves exactly the same as invoke(Invocation[] memory invocations),
     /// but includes all the logic to handle the highly packed calldata
-    function decodeFallbackAndInvoke(bytes calldata input) private {
+    function _decodeFallbackAndInvoke(bytes calldata input) private {
         uint ptr;
         uint len = input.length;
     
         for(ptr; ptr < len;) {
-            uint8 action = toUint8(input[ptr:ptr+1]);
+            uint8 action = _toUint8(input[ptr:ptr+1]);
             ptr += 1;
 
             // solidity doesn't like evaluating bytes as enums :/ 
-            if(action == 1) { // DEPOSIT
+            if (action == 1) { // DEPOSIT
                 address account; address product; UFixed18 amount;
-                (account, product, amount, ptr) = decodeAddressAddressAmount(input, ptr);
+                (account, product, amount, ptr) = _decodeAddressAddressAmount(input, ptr);
 
-                depositTo(account, IProduct(product), amount);
+                _depositTo(account, IProduct(product), amount);
             } else if (action == 2) { // WITHDRAW
                 address receiver; address product; UFixed18 amount;
-                (receiver, product, amount, ptr) = decodeAddressAddressAmount(input, ptr);
+                (receiver, product, amount, ptr) = _decodeAddressAddressAmount(input, ptr);
 
-                collateral.withdrawFrom(msg.sender, receiver, IProduct(product), amount);
+                _withdrawFrom(receiver, IProduct(product), amount);
             } else if (action == 3) { // OPEN_TAKE
                 address product; UFixed18 amount;
-                (product, amount, ptr) = decodeAddressAmount(input, ptr);
+                (product, amount, ptr) = _decodeAddressAmount(input, ptr);
 
-                IProduct(product).openTakeFor(msg.sender, amount);  
+                _openTakeFor(IProduct(product), amount);  
             } else if (action == 4) { // CLOSE_TAKE
                 address product; UFixed18 amount;
-                (product, amount, ptr) = decodeAddressAmount(input, ptr);
+                (product, amount, ptr) = _decodeAddressAmount(input, ptr);
 
-                IProduct(product).closeTakeFor(msg.sender, amount);
+                _closeTakeFor(IProduct(product), amount);
             } else if (action == 5) { // OPEN_MAKE 
                 address product; UFixed18 amount;
-                (product, amount, ptr) = decodeAddressAmount(input, ptr);
+                (product, amount, ptr) = _decodeAddressAmount(input, ptr);
 
-                IProduct(product).openMakeFor(msg.sender, amount);
+                _openMakeFor(IProduct(product), amount);
             } else if (action == 6) { // CLOSE_MAKE
                 address product; UFixed18 amount;
-                (product, amount, ptr) = decodeAddressAmount(input, ptr);
+                (product, amount, ptr) = _decodeAddressAmount(input, ptr);
 
-                IProduct(product).closeMakeFor(msg.sender, amount);
+                _closeMakeFor(IProduct(product), amount);
             } else if (action == 7) { // CLAIM 
                 address product; uint256[] memory programIds;
-                (product, programIds, ptr) = decodeProductPrograms(input, ptr);
+                (product, programIds, ptr) = _decodeProductPrograms(input, ptr);
 
-                controller.incentivizer().claimFor(msg.sender, IProduct(product), programIds);
+                _claimFor(IProduct(product), programIds);
             } else if (action == 8) { // WRAP 
                 address receiver; UFixed18 amount;
-                (receiver, amount, ptr) = decodeAddressAmount(input, ptr);
+                (receiver, amount, ptr) = _decodeAddressAmount(input, ptr);
 
                 wrap(receiver, amount);
             } else if (action == 9) { // UNWRAP
                 address receiver; UFixed18 amount;
-                (receiver, amount, ptr) = decodeAddressAmount(input, ptr);
+                (receiver, amount, ptr) = _decodeAddressAmount(input, ptr);
 
                 unwrap(receiver, amount);
             } else if (action == 10) { // WRAP_AND_DEPOSIT
                 address account; address product; UFixed18 amount;
-                (account, product, amount, ptr) = decodeAddressAddressAmount(input, ptr);
+                (account, product, amount, ptr) = _decodeAddressAddressAmount(input, ptr);
                 
-               wrapAndDeposit(account, IProduct(product), amount);
+               _wrapAndDeposit(account, IProduct(product), amount);
             } else if (action == 11) { // WITHDRAW_AND_UNWRAP
                 address receiver; address product; UFixed18 amount;
-                (receiver, product, amount, ptr) = decodeAddressAddressAmount(input, ptr);
+                (receiver, product, amount, ptr) = _decodeAddressAddressAmount(input, ptr);
 
-                withdrawAndUnwrap(receiver, IProduct(product), amount);
+                _withdrawAndUnwrap(receiver, IProduct(product), amount);
             } else if (action == 12) { // VAULT_DEPOSIT
                 address depositer; address vault; UFixed18 amount;
-                (depositer, vault, amount, ptr) = decodeAddressAddressAmount(input, ptr);
+                (depositer, vault, amount, ptr) = _decodeAddressAddressAmount(input, ptr);
 
-                vaultDeposit(depositer, IPerennialVault(vault), amount);
+                _vaultDeposit(depositer, IPerennialVault(vault), amount);
             } else if (action == 13) { // VAULT_REDEEM
                 address vault; UFixed18 shares;
-                (vault, shares, ptr) = decodeAddressAmount(input, ptr);
+                (vault, shares, ptr) = _decodeAddressAmount(input, ptr);
 
-                IPerennialVault(vault).redeem(shares, msg.sender);
+                _vaultRedeem(IPerennialVault(vault), shares);
             } else if (action == 14) { // VAULT_CLAIM
                 address owner; address vault;
-                (owner, vault, ptr) = decodeAddressAddress(input, ptr);
+                (owner, vault, ptr) = _decodeAddressAddress(input, ptr);
 
-                IPerennialVault(vault).claim(owner);
+                _vaultClaim(IPerennialVault(vault), owner);
             } else if (action == 15) { // VAULT_WRAP_AND_DEPOSIT 
                 address account; address vault; UFixed18 amount;
-                (account, vault, amount, ptr) = decodeAddressAddressAmount(input, ptr);
+                (account, vault, amount, ptr) = _decodeAddressAddressAmount(input, ptr);
 
-                vaultWrapAndDeposit(account, IPerennialVault(vault), amount);
+                _vaultWrapAndDeposit(account, IPerennialVault(vault), amount);
             }
         }
     }
@@ -131,31 +135,31 @@ contract MultiInvokerRollup is MultiInvoker {
 
     // ARGUMENT TYPE DECODING //
 
-    function decodeAddressAddressAmount(bytes calldata input, uint ptr) private returns (address addr1, address addr2, UFixed18 amount, uint) {
-        (addr1, ptr) = decodeAddress(input, ptr);
-        (addr2, ptr) = decodeAddress(input, ptr);
-        (amount, ptr) = decodeAmountUFixed18(input, ptr);
+    function _decodeAddressAddressAmount(bytes calldata input, uint ptr) private returns (address addr1, address addr2, UFixed18 amount, uint) {
+        (addr1, ptr) = _decodeAddress(input, ptr);
+        (addr2, ptr) = _decodeAddress(input, ptr);
+        (amount, ptr) = _decodeAmountUFixed18(input, ptr);
 
         return (addr1, addr2, amount, ptr);
     }
 
-    function decodeAddressAmount(bytes calldata input, uint ptr) private returns (address addr1, UFixed18 amount, uint) {
-        (addr1, ptr) = decodeAddress(input, ptr);
-        (amount, ptr) = decodeAmountUFixed18(input, ptr);
+    function _decodeAddressAmount(bytes calldata input, uint ptr) private returns (address addr1, UFixed18 amount, uint) {
+        (addr1, ptr) = _decodeAddress(input, ptr);
+        (amount, ptr) = _decodeAmountUFixed18(input, ptr);
 
-        return(addr1, UFixed18(amount), ptr);
+        return(addr1, amount, ptr);
     }
 
-    function decodeProductPrograms(bytes calldata input, uint ptr) private returns(address product, uint256[] memory programs, uint) {
-        (product, ptr) = decodeAddress(input, ptr);
-        (programs, ptr) = decodeUintArray(input, ptr);
+    function _decodeProductPrograms(bytes calldata input, uint ptr) private returns(address product, uint256[] memory programs, uint) {
+        (product, ptr) = _decodeAddress(input, ptr);
+        (programs, ptr) = _decodeUintArray(input, ptr);
 
         return(product, programs, ptr);
     }
 
-    function decodeAddressAddress(bytes calldata input, uint ptr) private returns(address addr1, address addr2, uint) {
-        (addr1, ptr) = decodeAddress(input, ptr);
-        (addr2, ptr) = decodeAddress(input, ptr);
+    function _decodeAddressAddress(bytes calldata input, uint ptr) private returns(address addr1, address addr2, uint) {
+        (addr1, ptr) = _decodeAddress(input, ptr);
+        (addr2, ptr) = _decodeAddress(input, ptr);
 
         return (addr1, addr2, ptr);
     }
@@ -163,56 +167,34 @@ contract MultiInvokerRollup is MultiInvoker {
 
     // INDIVIDUAL TYPE DECODING //
 
-     function decodeAmountUFixed18(bytes calldata input, uint ptr) private returns (UFixed18 result, uint) {
+     function _decodeAmountUFixed18(bytes calldata input, uint ptr) private returns (UFixed18 result, uint) {
         uint temp;
-        (temp, ptr) = decodeUint(input, ptr);
+        (temp, ptr) = _decodeUint(input, ptr);
 
         return(UFixed18.wrap(temp), ptr);
     }
 
-    function decodeUint(bytes calldata input, uint ptr) private returns (uint result, uint) {
-        uint8 len = toUint8(input[ptr:ptr+1]);
+    function _decodeUint(bytes calldata input, uint ptr) private returns (uint result, uint) {
+        uint8 len = _toUint8(input[ptr:ptr+1]);
         ++ptr;
 
-        result = bytesToUint(input[ptr:ptr+len]);
+        result = _bytesToUint(input[ptr:ptr+len]);
         ptr += len;
 
         return (result, ptr);
     }
 
- 
-
-    // function decodeUFixed18Array(bytes calldata input, uint ptr) private returns (UFixed18[] memory, uint) {
-    //     uint8 arrayLen = toUint8(input[ptr:ptr+1]);
-    //     ++ptr;
-
-    //     UFixed18[] memory result = new UFixed18[](arrayLen);
-    //     uint count = 0;
-    //     for(;count < arrayLen;) {
-    //         UFixed18 currUint;
-
-    //         (currUint, ptr) = decodeAmountUFixed18(input, ptr);
-            
-    //         result[count] = currUint;
-
-    //         ++count;
-    //     }
-
-    //     return (result, ptr);
-    // }
-
-
-    function decodeUintArray(bytes calldata input, uint ptr) private returns (uint256[] memory, uint) {
-        uint8 arrayLen = toUint8(input[ptr:ptr+1]);
+    function _decodeUintArray(bytes calldata input, uint ptr) private returns (uint256[] memory, uint) {
+        uint8 arrayLen = _toUint8(input[ptr:ptr+1]);
         ++ptr;
 
         uint256[] memory result = new uint256[](arrayLen);
 
         uint count = 0;
-        for(;count < arrayLen;) {
+        for (;count < arrayLen;) {
             uint currUint;
 
-            (currUint, ptr) = decodeUint(input, ptr);
+            (currUint, ptr) = _decodeUint(input, ptr);
 
             result[count] = currUint;
 
@@ -221,70 +203,69 @@ contract MultiInvokerRollup is MultiInvoker {
         return (result, ptr);
     }
 
-    function decodeAddress(bytes calldata input, uint ptr) private returns(address addr, uint) {
-        uint8 addrLen = toUint8(input[ptr:ptr+1]);
+    function _decodeAddress(bytes calldata input, uint ptr) private returns(address addr, uint) {
+        uint8 addrLen = _toUint8(input[ptr:ptr+1]);
         ptr += 1;
 
         // user is new to registry, add next 20 bytes as address to registry and return address
-        if(addrLen == 0) {
-            addr = bytesToAddress(input[ptr:ptr+20]);
+        if (addrLen == 0) {
+            addr = _bytesToAddress(input[ptr:ptr+20]);
             ptr += 20;
 
-            setAddressCache(addr);
+            _setAddressCache(addr);
 
         } else {
-            uint addrNonceLookup = bytesToUint(input[ptr:ptr+addrLen]);
+            uint addrNonceLookup = _bytesToUint(input[ptr:ptr+addrLen]);
             ptr += addrLen;
 
-            addr = getAddressCacheSafe(addrNonceLookup);
+            addr = _getAddressCacheSafe(addrNonceLookup);
         }
 
         return (addr, ptr);
     }
 
-    function setAddressCache(address addr) private {
+    function _setAddressCache(address addr) private {
         ++addressNonce;
         addressCache[addressNonce] = addr;
         addressNonces[addr] = addressNonce;
         emit AddressAddedToCache(addr, addressNonce);
     }
 
-    function getAddressCacheSafe(uint nonce) public returns (address addr){
+    function _getAddressCacheSafe(uint nonce) public returns (address addr){
         addr = addressCache[nonce];
-        if(addr == address(0x0)) revert("Bad calldata, user !cached");
+        if (addr == address(0)) revert BadCalldata();
     }
 
     // HELPER FUNCTIONS //
     
     // Unchecked force of 20 bytes into address
     // This is called in decodeAccount and decodeProduct which both only pass 20 byte slices 
-    function bytesToAddress(bytes memory input) private pure returns (address addr) {
+    function _bytesToAddress(bytes memory input) private pure returns (address addr) {
         assembly {
             addr := mload(add(input, 20))
         } 
     }
 
     // Unchecked implementation of GNSPS' standard BytesLib.sol
-    function toUint8(bytes memory _b) internal pure returns (uint8 res) {
+    function _toUint8(bytes memory _b) internal pure returns (uint8 res) {
         assembly {
             res := mload(add(_b, 0x1))
         }
     }
 
     // loads arbitrarily-sized byte array into a uint unchecked
-    function bytesToUint(bytes memory _b) private returns(uint256 res) {
+    function _bytesToUint(bytes memory _b) private returns(uint256 res) {
         uint len = _b.length;
 
         assembly {
             res := mload(add(_b, 0x20))
         }
 
-        if(res == 0x20) {
+        if (res == 0x20) {
             return 0;
         }
 
         // readable right shift to change right padding of mload to left padding
         res >>= 256 - (len * 8);
     }
-
 }

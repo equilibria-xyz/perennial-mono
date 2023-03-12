@@ -95,7 +95,7 @@ library PrePositionLib {
         PrePosition memory self,
         IOracleProvider.OracleVersion memory toOracleVersion
     ) internal pure returns (bool) {
-        return !isEmpty(self) && toOracleVersion.version > self.oracleVersion;
+        return self.oracleVersion != 0 && toOracleVersion.version > self.oracleVersion;
     }
 
     /**

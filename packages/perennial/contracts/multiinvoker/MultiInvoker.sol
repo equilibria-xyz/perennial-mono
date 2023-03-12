@@ -79,37 +79,37 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
             // Deposit from `msg.sender` into `account`s `product` collateral account
             if (invocation.action == PerennialAction.DEPOSIT) {
                 (address account, IProduct product, UFixed18 amount) = abi.decode(invocation.args, (address, IProduct, UFixed18));
-                depositTo(account, product, amount);
+                _depositTo(account, product, amount);
 
             // Withdraw from `msg.sender`s `product` collateral account to `receiver`
             } else if (invocation.action == PerennialAction.WITHDRAW) {
                 (address receiver, IProduct product, UFixed18 amount) = abi.decode(invocation.args, (address, IProduct, UFixed18));
-                collateral.withdrawFrom(msg.sender, receiver, product, amount);
+                _withdrawFrom(receiver, product, amount);
 
             // Open a take position on behalf of `msg.sender`
             } else if (invocation.action == PerennialAction.OPEN_TAKE) {
                 (IProduct product, UFixed18 amount) = abi.decode(invocation.args, (IProduct, UFixed18));
-                product.openTakeFor(msg.sender, amount);
+                _openTakeFor(product, amount);
 
             // Close a take position on behalf of `msg.sender`
             } else if (invocation.action == PerennialAction.CLOSE_TAKE) {
                 (IProduct product, UFixed18 amount) = abi.decode(invocation.args, (IProduct, UFixed18));
-                product.closeTakeFor(msg.sender, amount);
+                _closeTakeFor(product, amount);
 
             // Open a make position on behalf of `msg.sender`
             } else if (invocation.action == PerennialAction.OPEN_MAKE) {
                 (IProduct product, UFixed18 amount) = abi.decode(invocation.args, (IProduct, UFixed18));
-                product.openMakeFor(msg.sender, amount);
+                _openMakeFor(product, amount);
 
             // Close a make position on behalf of `msg.sender`
             } else if (invocation.action == PerennialAction.CLOSE_MAKE) {
                 (IProduct product, UFixed18 amount) = abi.decode(invocation.args, (IProduct, UFixed18));
-                product.closeMakeFor(msg.sender, amount);
+                _closeMakeFor(product, amount);
 
             // Claim `msg.sender`s incentive reward for `product` programs
             } else if (invocation.action == PerennialAction.CLAIM) {
                 (IProduct product, uint256[] memory programIds) = abi.decode(invocation.args, (IProduct, uint256[]));
-                controller.incentivizer().claimFor(msg.sender, product, programIds);
+                _claimFor(product, programIds);
 
             // Wrap `msg.sender`s USDC into DSU and return the DSU to `account`
             } else if (invocation.action == PerennialAction.WRAP) {
@@ -124,39 +124,58 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
             // Wrap `msg.sender`s USDC into DSU and deposit into `account`s `product` collateral account
             } else if (invocation.action == PerennialAction.WRAP_AND_DEPOSIT) {
                 (address account, IProduct product, UFixed18 amount) = abi.decode(invocation.args, (address, IProduct, UFixed18));
-                wrapAndDeposit(account, product, amount);
+                _wrapAndDeposit(account, product, amount);
             }
 
             // Withdraw DSU from `msg.sender`s `product` collateral account, unwrap into USDC, and return the USDC to `receiver`
             else if (invocation.action == PerennialAction.WITHDRAW_AND_UNWRAP) {
                 (address receiver, IProduct product, UFixed18 amount) = abi.decode(invocation.args, (address, IProduct, UFixed18));
-                withdrawAndUnwrap(receiver, product, amount);
+                _withdrawAndUnwrap(receiver, product, amount);
             }
 
             // Deposit `amount` DSU from `msg.sender` into `vault` on behalf of `account`
             else if (invocation.action == PerennialAction.VAULT_DEPOSIT) {
                 (address account, IPerennialVault vault, UFixed18 amount) = abi.decode(invocation.args, (address, IPerennialVault, UFixed18));
-                vaultDeposit(account, vault, amount);
+                _vaultDeposit(account, vault, amount);
             }
 
             // Redeem `shares` from from `vault` on behalf of `msg.sender`
             else if (invocation.action == PerennialAction.VAULT_REDEEM) {
                 (IPerennialVault vault, UFixed18 shares) = abi.decode(invocation.args, (IPerennialVault, UFixed18));
-                vault.redeem(shares, msg.sender);
+                _vaultRedeem(vault, shares);
             }
 
             // Claim assets from `vault` on behalf of `owner`
             else if (invocation.action == PerennialAction.VAULT_CLAIM) {
                 (address owner, IPerennialVault vault) = abi.decode(invocation.args, (address, IPerennialVault));
-                vault.claim(owner);
+                _vaultClaim(vault, owner);
             }
 
             // Wrap `amount` USDC from `msg.sender` and deposit the DSU into the `vault`
             else if (invocation.action == PerennialAction.VAULT_WRAP_AND_DEPOSIT) {
                 (address account, IPerennialVault vault, UFixed18 amount) = abi.decode(invocation.args, (address, IPerennialVault, UFixed18));
-                vaultWrapAndDeposit(account, vault, amount);
+                _vaultWrapAndDeposit(account, vault, amount);
             }
         }
+    }
+
+    /// @dev the 4 position editing functions, open/close and make/take
+    /// @param product Product to edit `msg.sender`s position of
+    /// @param amount Amount to edit position of
+    function _openTakeFor(IProduct product, UFixed18 amount) internal {
+        product.openTakeFor(msg.sender, amount);
+    }
+
+    function _closeTakeFor(IProduct product, UFixed18 amount) internal {
+        product.closeTakeFor(msg.sender, amount);
+    }
+
+    function _openMakeFor(IProduct product, UFixed18 amount) internal {
+        product.openMakeFor(msg.sender, amount);
+    }
+
+    function _closeMakeFor(IProduct product, UFixed18 amount) internal {
+        product.closeMakeFor(msg.sender, amount);
     }
 
     /**
@@ -165,12 +184,30 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
      * @param product Product to deposit funds for
      * @param amount Amount of DSU to deposit into the collateral account
      */
-    function depositTo(address account, IProduct product, UFixed18 amount) internal {
+    function _depositTo(address account, IProduct product, UFixed18 amount) internal {
         // Pull the token from the `msg.sender`
         DSU.pull(msg.sender, amount);
 
         // Deposit the amount to the collateral account
         collateral.depositTo(account, product, amount);
+    }
+
+    /**
+    * @notice Withdraws `amount` DSU from `msg.sender`s `product` collateral account to `receiver`
+    * @param receiver address to withdraw funds on behalf of msg.sender to
+    * @param product Product to withdraw frunds from
+    * @param amount Amount of DSU to withdraw out of the collateral account
+    */
+    function _withdrawFrom(address receiver, IProduct product, UFixed18 amount) internal {
+        
+        collateral.withdrawFrom(msg.sender, receiver, IProduct(product), amount);
+    }
+
+    /**
+    * @notice Claim `msg.sender`s incentive reward for `product` programs
+    */
+    function _claimFor(IProduct product, uint256[] memory programIds) internal {
+        controller.incentivizer().claimFor(msg.sender, product, programIds);
     }
 
     /**
@@ -203,7 +240,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
      * @param product Product to deposit funds for
      * @param amount Amount of USDC to deposit into the collateral account
      */
-    function wrapAndDeposit(address account, IProduct product, UFixed18 amount) internal {
+    function _wrapAndDeposit(address account, IProduct product, UFixed18 amount) internal {
         // Pull USDC from the `msg.sender`
         USDC.pull(msg.sender, amount, true);
 
@@ -219,7 +256,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
      * @param product Product to withdraw funds for
      * @param amount Amount of DSU to withdraw from the collateral account
      */
-    function withdrawAndUnwrap(address receiver, IProduct product, UFixed18 amount) internal {
+    function _withdrawAndUnwrap(address receiver, IProduct product, UFixed18 amount) internal {
         // Withdraw the amount from the collateral account
         collateral.withdrawFrom(msg.sender, address(this), product, amount);
 
@@ -232,7 +269,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
      * @param vault Vault to deposit funds into
      * @param amount Amount of DSU to deposit into the vault
      */
-    function vaultDeposit(address account, IPerennialVault vault, UFixed18 amount) internal {
+    function _vaultDeposit(address account, IPerennialVault vault, UFixed18 amount) internal {
         // Pull the DSU from the user
         DSU.pull(msg.sender, amount);
 
@@ -243,13 +280,21 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
         vault.deposit(amount, account);
     }
 
+    function _vaultRedeem(IPerennialVault vault, UFixed18 shares) internal {
+        vault.redeem(shares, msg.sender);
+    }
+
+    function _vaultClaim(IPerennialVault vault, address owner) internal {
+        vault.claim(owner);
+    }
+
     /**
      * @notice Wrap `amount` USDC from `msg.sender` and deposit the DSU into the `vault`
      * @param account Address to receive the vault shares
      * @param vault Vault to deposit funds into
      * @param amount Amount of USDC to wrap and deposit into the vault
      */
-    function vaultWrapAndDeposit(address account, IPerennialVault vault, UFixed18 amount) internal {
+    function _vaultWrapAndDeposit(address account, IPerennialVault vault, UFixed18 amount) internal {
         // Pull USDC from the `msg.sender`
         USDC.pull(msg.sender, amount, true);
 
