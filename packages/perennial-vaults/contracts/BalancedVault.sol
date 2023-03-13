@@ -37,6 +37,12 @@ contract BalancedVault is IBalancedVault, UInitializable {
     /// @dev The address of the Perennial product on the short side
     IProduct public immutable short;
 
+    /// @dev The address of the Perennial product on the long side
+    IProduct public immutable longB;
+
+    /// @dev The address of the Perennial product on the short side
+    IProduct public immutable shortB;
+
     /// @dev The target leverage amount for the vault
     UFixed18 public immutable targetLeverage;
 
@@ -67,6 +73,8 @@ contract BalancedVault is IBalancedVault, UInitializable {
     /// @dev Mapping of unclaimed underlying of the vault per user
     UFixed18 private _totalUnclaimed;
 
+    /* Asset A */
+
     /// @dev Deposits that have not been settled, or have been settled but not yet processed by this contract
     UFixed18 private _deposit;
 
@@ -88,11 +96,36 @@ contract BalancedVault is IBalancedVault, UInitializable {
     /// @dev Mapping of versions of the vault state at a given oracle version
     mapping(uint256 => Version) private _versions;
 
+    /* Asset B */
+
+    /// @dev Deposits that have not been settled, or have been settled but not yet processed by this contract
+    UFixed18 private _depositB;
+
+    /// @dev Redemptions that have not been settled, or have been settled but not yet processed by this contract
+    UFixed18 private _redemptionB;
+
+    /// @dev The latest version that a pending deposit or redemption has been placed
+    uint256 private _latestVersionB;
+
+    /// @dev Mapping of pending (not yet converted to shares) per user
+    mapping(address => UFixed18) private _depositsB;
+
+    /// @dev Mapping of pending (not yet withdrawn) per user
+    mapping(address => UFixed18) private _redemptionsB;
+
+    /// @dev Mapping of the latest version that a pending deposit or redemption has been placed per user
+    mapping(address => uint256) private _latestVersionsB;
+
+    /// @dev Mapping of versions of the vault state at a given oracle version
+    mapping(uint256 => Version) private _versionsB;
+
     constructor(
         Token18 asset_,
         IController controller_,
         IProduct long_,
         IProduct short_,
+        IProduct longB_,
+        IProduct shortB_,
         UFixed18 targetLeverage_,
         UFixed18 maxCollateral_
     ) {
@@ -101,6 +134,8 @@ contract BalancedVault is IBalancedVault, UInitializable {
         collateral = controller_.collateral();
         long = long_;
         short = short_;
+        longB = longB_;
+        shortB = shortB_;
         targetLeverage = targetLeverage_;
         maxCollateral = maxCollateral_;
     }
@@ -135,10 +170,16 @@ contract BalancedVault is IBalancedVault, UInitializable {
         (VersionContext memory context, ) = _settle(account);
         if (assets.gt(_maxDepositAtVersion(context))) revert BalancedVaultDepositLimitExceeded();
 
-        _deposit = _deposit.add(assets);
+        _deposit = _deposit.add(assets.div(TWO));
         _latestVersion = context.version;
-        _deposits[account] = _deposits[account].add(assets);
+        _deposits[account] = _deposits[account].add(assets.div(TWO));
         _latestVersions[account] = context.version;
+
+        _depositB = _depositB.add(assets.div(TWO));
+        _latestVersionB = context.version;
+        _depositsB[account] = _depositsB[account].add(assets.div(TWO));
+        _latestVersionsB[account] = context.version;
+
         emit Deposit(msg.sender, account, context.version, assets);
 
         asset.pull(msg.sender, assets);
@@ -159,10 +200,16 @@ contract BalancedVault is IBalancedVault, UInitializable {
         (VersionContext memory context, VersionContext memory accountContext) = _settle(account);
         if (shares.gt(_maxRedeemAtVersion(context, accountContext, account))) revert BalancedVaultRedemptionLimitExceeded();
 
-        _redemption = _redemption.add(shares);
+        _redemption = _redemption.add(shares.div(TWO));
         _latestVersion = context.version;
-        _redemptions[account] = _redemptions[account].add(shares);
+        _redemptions[account] = _redemptions[account].add(shares.div(TWO));
         _latestVersions[account] = context.version;
+
+        _redemptionB = _redemptionB.add(shares.div(TWO));
+        _latestVersionB = context.version;
+        _redemptionsB[account] = _redemptionsB[account].add(shares.div(TWO));
+        _latestVersionsB[account] = context.version;
+
         emit Redemption(msg.sender, account, context.version, shares);
 
         _burn(account, shares);
@@ -181,10 +228,16 @@ contract BalancedVault is IBalancedVault, UInitializable {
         UFixed18 unclaimedTotal = _totalUnclaimed;
         _unclaimed[account] = UFixed18Lib.ZERO;
         _totalUnclaimed = unclaimedTotal.sub(unclaimedAmount);
-        emit Claim(msg.sender, account, unclaimedAmount);
+
+        UFixed18 unclaimedAmountB = _unclaimedB[account];
+        UFixed18 unclaimedTotalB = _totalUnclaimedB;
+        _unclaimedB[account] = UFixed18Lib.ZERO;
+        _totalUnclaimedB = unclaimedTotalB.sub(unclaimedAmountB);
+
+        UFixed18 claimAmount = unclaimedAmount.add(unclaimedAmountB);
+        emit Claim(msg.sender, account, claimAmount);
 
         // pro-rate if vault has less collateral than unclaimed
-        UFixed18 claimAmount = unclaimedAmount;
         (UFixed18 longCollateral, UFixed18 shortCollateral, UFixed18 idleCollateral) = _collateral();
         UFixed18 totalCollateral = longCollateral.add(shortCollateral).add(idleCollateral);
         if (totalCollateral.lt(unclaimedTotal)) claimAmount = claimAmount.muldiv(totalCollateral, unclaimedTotal);
@@ -365,6 +418,8 @@ contract BalancedVault is IBalancedVault, UInitializable {
             _redemptions[account] = UFixed18Lib.ZERO;
             _latestVersions[account] = accountContext.version;
         }
+
+        // TODO: duplicate everything for asset B
     }
 
     /**
@@ -375,6 +430,8 @@ contract BalancedVault is IBalancedVault, UInitializable {
     function _rebalance(VersionContext memory context, UFixed18 claimAmount) private {
         _rebalanceCollateral(claimAmount);
         _rebalancePosition(context, claimAmount);
+
+        // TODO: duplicate rebalance flow for asset B
     }
 
     /**

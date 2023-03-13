@@ -1,7 +1,7 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { utils } from 'ethers'
 import { createPayoffDefinition } from '../../../../common/testutil/types'
-import { ChainlinkOracle__factory, IController__factory, IProduct } from '../../../types/generated'
+import { ChainlinkOracle__factory, IController__factory, IProduct, IProduct__factory } from '../../../types/generated'
 
 export interface DeployProductParams extends Partial<Omit<IProduct.ProductInfoStruct, 'payoffDefinition' | 'oracle'>> {
   name: string
@@ -28,7 +28,7 @@ export async function deployProductOnMainnetFork({
   positionFee,
   makerLimit,
   utilizationCurve,
-}: DeployProductParams): Promise<string> {
+}: DeployProductParams): Promise<IProduct> {
   const chainlinkFeedRegistry = '0x47Fb2585D2C56Fe188D0E6ec628a38b74fCeeeDf'
   const oracle = await new ChainlinkOracle__factory(owner).deploy(chainlinkFeedRegistry, baseCurrency, quoteCurrency)
 
@@ -61,5 +61,5 @@ export async function deployProductOnMainnetFork({
   const productAddress = await controller.connect(owner).callStatic.createProduct(coordinatorId, productInfo)
   await controller.connect(owner).createProduct(coordinatorId, productInfo)
 
-  return productAddress
+  return IProduct__factory.connect(productAddress, owner)
 }

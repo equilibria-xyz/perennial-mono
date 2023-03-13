@@ -17,6 +17,7 @@ import {
   ICollateral__factory,
 } from '../../types/generated'
 import { BigNumber, constants, utils } from 'ethers'
+import { deployProductOnMainnetFork } from './helpers/setupHelpers'
 
 const { config, ethers } = HRE
 use(smock.matchers)
@@ -33,8 +34,10 @@ describe('BalancedVault', () => {
   let user2: SignerWithAddress
   let perennialUser: SignerWithAddress
   let liquidator: SignerWithAddress
-  let long: IProduct
-  let short: IProduct
+  let longEth: IProduct
+  let longBtc: IProduct
+  let shortEth: IProduct
+  let shortBtc: IProduct
   let leverage: BigNumber
   let maxCollateral: BigNumber
   let originalOraclePrice: BigNumber
@@ -52,19 +55,19 @@ describe('BalancedVault', () => {
   }
 
   async function longPosition() {
-    return (await long.position(vault.address)).maker
+    return (await longEth.position(vault.address)).maker
   }
 
   async function shortPosition() {
-    return (await short.position(vault.address)).maker
+    return (await shortEth.position(vault.address)).maker
   }
 
   async function longCollateralInVault() {
-    return await collateral['collateral(address,address)'](vault.address, long.address)
+    return await collateral['collateral(address,address)'](vault.address, longEth.address)
   }
 
   async function shortCollateralInVault() {
-    return await collateral['collateral(address,address)'](vault.address, short.address)
+    return await collateral['collateral(address,address)'](vault.address, shortEth.address)
   }
 
   async function totalCollateralInVault() {
@@ -77,17 +80,32 @@ describe('BalancedVault', () => {
 
     const dsu = IERC20Metadata__factory.connect('0x605D26FBd5be761089281d5cec2Ce86eeA667109', owner)
     const controller = IController__factory.connect('0x9df509186b6d3b7D033359f94c8b1BB5544d51b3', owner)
-    long = IProduct__factory.connect('0xdB60626FF6cDC9dB07d3625A93d21dDf0f8A688C', owner)
-    short = IProduct__factory.connect('0xfeD3E166330341e0305594B8c6e6598F9f4Cbe9B', owner)
-    collateral = ICollateral__factory.connect('0x2d264ebdb6632a06a1726193d4d37fef1e5dbdcd', owner)
+    longEth = IProduct__factory.connect('0xdB60626FF6cDC9dB07d3625A93d21dDf0f8A688C', owner)
+    longBtc = await deployProductOnMainnetFork({
+      owner,
+      baseCurrency: '',
+      quoteCurrency: '',
+      short: false,
+      name: '',
+      symbol: '',
+      fundingFee: undefined,
+      maintenance: undefined,
+      makerFee: undefined,
+      makerLimit: undefined,
+      positionFee: undefined,
+      takerFee: undefined,
+      utilizationCurve: undefined,
+    })
+    shortEth = IProduct__factory.connect('0xfeD3E166330341e0305594B8c6e6598F9f4Cbe9B', owner)
+    shortBtc = collateral = ICollateral__factory.connect('0x2d264ebdb6632a06a1726193d4d37fef1e5dbdcd', owner)
     leverage = utils.parseEther('4.0')
     maxCollateral = utils.parseEther('500000')
 
     vault = await new BalancedVault__factory(owner).deploy(
       dsu.address,
       controller.address,
-      long.address,
-      short.address,
+      longEth.address,
+      shortEth.address,
       leverage,
       maxCollateral,
     )
@@ -694,8 +712,8 @@ describe('BalancedVault', () => {
       expect(await longCollateralInVault()).to.equal(await shortCollateralInVault())
 
       await updateOracle(utils.parseEther('1300'))
-      await long.connect(user).settleAccount(vault.address)
-      await short.connect(user).settleAccount(vault.address)
+      await longEth.connect(user).settleAccount(vault.address)
+      await shortEth.connect(user).settleAccount(vault.address)
 
       // Collaterals should not be equal any more.
       expect(await longCollateralInVault()).to.not.equal(await shortCollateralInVault())
@@ -793,8 +811,8 @@ describe('BalancedVault', () => {
       await asset.connect(perennialUser).approve(collateral.address, constants.MaxUint256)
       await collateral
         .connect(perennialUser)
-        .depositTo(perennialUser.address, short.address, utils.parseEther('400000'))
-      await short.connect(perennialUser).openMake(utils.parseEther('480'))
+        .depositTo(perennialUser.address, shortEth.address, utils.parseEther('400000'))
+      await shortEth.connect(perennialUser).openMake(utils.parseEther('480'))
       await updateOracle()
       await vault.sync()
 
@@ -816,12 +834,12 @@ describe('BalancedVault', () => {
       await asset.connect(perennialUser).approve(collateral.address, constants.MaxUint256)
       await collateral
         .connect(perennialUser)
-        .depositTo(perennialUser.address, short.address, utils.parseEther('400000'))
-      const makerAvailable = (await short.makerLimit()).sub(
-        (await short.positionAtVersion(await short['latestVersion()']())).maker,
+        .depositTo(perennialUser.address, shortEth.address, utils.parseEther('400000'))
+      const makerAvailable = (await shortEth.makerLimit()).sub(
+        (await shortEth.positionAtVersion(await shortEth['latestVersion()']())).maker,
       )
 
-      await short.connect(perennialUser).openMake(makerAvailable)
+      await shortEth.connect(perennialUser).openMake(makerAvailable)
       await updateOracle()
       await vault.sync()
 
@@ -858,8 +876,8 @@ describe('BalancedVault', () => {
 
           // 2. Settle accounts.
           // We should still not be able to deposit.
-          await long.connect(user).settleAccount(vault.address)
-          await short.connect(user).settleAccount(vault.address)
+          await longEth.connect(user).settleAccount(vault.address)
+          await shortEth.connect(user).settleAccount(vault.address)
           expect(await vault.maxDeposit(user.address)).to.equal(0)
           await expect(vault.connect(user).deposit(2, user.address)).to.revertedWithCustomError(
             vault,
@@ -896,8 +914,8 @@ describe('BalancedVault', () => {
 
           // 2. Settle accounts.
           // We should still not be able to deposit or redeem.
-          await long.connect(user).settleAccount(vault.address)
-          await short.connect(user).settleAccount(vault.address)
+          await longEth.connect(user).settleAccount(vault.address)
+          await shortEth.connect(user).settleAccount(vault.address)
           expect(await vault.maxDeposit(user.address)).to.equal(0)
           await expect(vault.connect(user).deposit(2, user.address)).to.revertedWithCustomError(
             vault,
@@ -910,7 +928,7 @@ describe('BalancedVault', () => {
 
           // 4. Liquidate the long position.
           // We should still not be able to deposit or redeem.
-          await collateral.connect(liquidator).liquidate(vault.address, long.address)
+          await collateral.connect(liquidator).liquidate(vault.address, longEth.address)
           expect(await vault.maxDeposit(user.address)).to.equal(0)
           await expect(vault.connect(user).deposit(2, user.address)).to.revertedWithCustomError(
             vault,
@@ -944,12 +962,12 @@ describe('BalancedVault', () => {
           await asset.connect(perennialUser).approve(collateral.address, constants.MaxUint256)
           await collateral
             .connect(perennialUser)
-            .depositTo(perennialUser.address, long.address, utils.parseEther('120000'))
-          await long.connect(perennialUser).openTake(utils.parseEther('700'))
+            .depositTo(perennialUser.address, longEth.address, utils.parseEther('120000'))
+          await longEth.connect(perennialUser).openTake(utils.parseEther('700'))
           await collateral
             .connect(perennialUser)
-            .depositTo(perennialUser.address, short.address, utils.parseEther('280000'))
-          await short.connect(perennialUser).openTake(utils.parseEther('1100'))
+            .depositTo(perennialUser.address, shortEth.address, utils.parseEther('280000'))
+          await shortEth.connect(perennialUser).openTake(utils.parseEther('1100'))
           await updateOracle()
           await vault.sync()
         })
@@ -973,8 +991,8 @@ describe('BalancedVault', () => {
 
           // 2. Settle accounts.
           // We should still not be able to deposit.
-          await long.connect(user).settleAccount(vault.address)
-          await short.connect(user).settleAccount(vault.address)
+          await longEth.connect(user).settleAccount(vault.address)
+          await shortEth.connect(user).settleAccount(vault.address)
           expect(await vault.maxDeposit(user.address)).to.equal(0)
           await expect(vault.connect(user).deposit(2, user.address)).to.revertedWithCustomError(
             vault,
@@ -1011,8 +1029,8 @@ describe('BalancedVault', () => {
 
           // 2. Settle accounts.
           // We should still not be able to deposit or redeem.
-          await long.connect(user).settleAccount(vault.address)
-          await short.connect(user).settleAccount(vault.address)
+          await longEth.connect(user).settleAccount(vault.address)
+          await shortEth.connect(user).settleAccount(vault.address)
           expect(await vault.maxDeposit(user.address)).to.equal(0)
           await expect(vault.connect(user).deposit(2, user.address)).to.revertedWithCustomError(
             vault,
@@ -1025,7 +1043,7 @@ describe('BalancedVault', () => {
 
           // 4. Liquidate the long position.
           // We should still not be able to deposit or redeem.
-          await collateral.connect(liquidator).liquidate(vault.address, short.address)
+          await collateral.connect(liquidator).liquidate(vault.address, shortEth.address)
           expect(await vault.maxDeposit(user.address)).to.equal(0)
           await expect(vault.connect(user).deposit(2, user.address)).to.revertedWithCustomError(
             vault,
@@ -1060,8 +1078,8 @@ describe('BalancedVault', () => {
         await asset.connect(perennialUser).approve(collateral.address, constants.MaxUint256)
         await collateral
           .connect(perennialUser)
-          .depositTo(perennialUser.address, long.address, utils.parseEther('120000'))
-        await long.connect(perennialUser).openTake(utils.parseEther('700'))
+          .depositTo(perennialUser.address, longEth.address, utils.parseEther('120000'))
+        await longEth.connect(perennialUser).openTake(utils.parseEther('700'))
         await updateOracle()
         await vault.sync()
       })
@@ -1079,10 +1097,10 @@ describe('BalancedVault', () => {
 
         // 3. An oracle update makes the long position liquidatable, initiate take close
         await updateOracle(utils.parseEther('20000'))
-        await long.connect(user).settleAccount(vault.address)
-        await short.connect(user).settleAccount(vault.address)
-        await long.connect(perennialUser).closeTake(utils.parseEther('700'))
-        await collateral.connect(liquidator).liquidate(vault.address, long.address)
+        await longEth.connect(user).settleAccount(vault.address)
+        await shortEth.connect(user).settleAccount(vault.address)
+        await longEth.connect(perennialUser).closeTake(utils.parseEther('700'))
+        await collateral.connect(liquidator).liquidate(vault.address, longEth.address)
 
         // // 4. Settle the vault to recover and rebalance
         await updateOracle() // let take settle at high price
