@@ -68,11 +68,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
      * @param invocations The list of invocations to execute in order
      */
     function invoke(Invocation[] calldata invocations) external {
-        // ACTION TYPES
-        // 
-        // 0000 0000
-        // 
-
+        
         for (uint256 i = 0; i < invocations.length; i++) {
             Invocation memory invocation = invocations[i];
 

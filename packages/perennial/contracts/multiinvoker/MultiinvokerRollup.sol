@@ -11,7 +11,7 @@ contract MultiInvokerRollup is MultiInvoker {
     /// @dev reverts when address cache is relied on before a user / contract has been registered in state
     /// if thrown, pass the bytes'00' (0 length) + the full 20 byte address instead of the length + index, 
     /// can parse the events or mapping below to get the newly added cache index
-    error BadCalldata();
+    error MultiInvokerRollupInvalidCalldataError();
 
     uint256 public addressNonce;
     mapping(uint => address) public addressCache;
@@ -30,8 +30,9 @@ contract MultiInvokerRollup is MultiInvoker {
     ) { }
 
     /// @dev fallback eliminates the need to include function sig in calldata
-    fallback (bytes calldata input) external returns(bytes memory){
+    fallback (bytes calldata input) external returns (bytes memory){
         _decodeFallbackAndInvoke(input);
+        return "";
     }
 
     /// @dev this function serves exactly the same as invoke(Invocation[] memory invocations),
@@ -40,7 +41,7 @@ contract MultiInvokerRollup is MultiInvoker {
         uint ptr;
         uint len = input.length;
     
-        for(ptr; ptr < len;) {
+        for (ptr; ptr < len;) {
             uint8 action = _toUint8(input[ptr:ptr+1]);
             ptr += 1;
 
@@ -167,6 +168,7 @@ contract MultiInvokerRollup is MultiInvoker {
 
     // INDIVIDUAL TYPE DECODING //
 
+    /// @dev 
      function _decodeAmountUFixed18(bytes calldata input, uint ptr) private returns (UFixed18 result, uint) {
         uint temp;
         (temp, ptr) = _decodeUint(input, ptr);
@@ -174,6 +176,7 @@ contract MultiInvokerRollup is MultiInvoker {
         return(UFixed18.wrap(temp), ptr);
     }
 
+    /// @dev 
     function _decodeUint(bytes calldata input, uint ptr) private returns (uint result, uint) {
         uint8 len = _toUint8(input[ptr:ptr+1]);
         ++ptr;
@@ -184,6 +187,7 @@ contract MultiInvokerRollup is MultiInvoker {
         return (result, ptr);
     }
 
+    /// @dev 
     function _decodeUintArray(bytes calldata input, uint ptr) private returns (uint256[] memory, uint) {
         uint8 arrayLen = _toUint8(input[ptr:ptr+1]);
         ++ptr;
@@ -203,6 +207,10 @@ contract MultiInvokerRollup is MultiInvoker {
         return (result, ptr);
     }
 
+    /// @dev decodes an address from calldata if length == 0, storing next 20 bytes as address to cache 
+    /// else loading address from uint cache index
+    /// @param input full calldata
+    /// @param ptr start index of current address being decoded 
     function _decodeAddress(bytes calldata input, uint ptr) private returns(address addr, uint) {
         uint8 addrLen = _toUint8(input[ptr:ptr+1]);
         ptr += 1;
@@ -224,6 +232,7 @@ contract MultiInvokerRollup is MultiInvoker {
         return (addr, ptr);
     }
 
+    /// 
     function _setAddressCache(address addr) private {
         ++addressNonce;
         addressCache[addressNonce] = addr;
@@ -231,29 +240,30 @@ contract MultiInvokerRollup is MultiInvoker {
         emit AddressAddedToCache(addr, addressNonce);
     }
 
+    /// @dev there is something wrong with the calldata if it uses cache before caching address
     function _getAddressCacheSafe(uint nonce) public returns (address addr){
         addr = addressCache[nonce];
-        if (addr == address(0)) revert BadCalldata();
+        if (addr == address(0)) revert MultiInvokerRollupInvalidCalldataError();
     }
 
     // HELPER FUNCTIONS //
     
-    // Unchecked force of 20 bytes into address
-    // This is called in decodeAccount and decodeProduct which both only pass 20 byte slices 
+    /// @dev Unchecked force of 20 bytes into address
+    /// This is called in decodeAccount and decodeProduct which both only pass 20 byte slices 
     function _bytesToAddress(bytes memory input) private pure returns (address addr) {
         assembly {
             addr := mload(add(input, 20))
         } 
     }
 
-    // Unchecked implementation of GNSPS' standard BytesLib.sol
+    /// @dev Unchecked implementation of GNSPS' standard BytesLib.sol
     function _toUint8(bytes memory _b) internal pure returns (uint8 res) {
         assembly {
             res := mload(add(_b, 0x1))
         }
     }
 
-    // loads arbitrarily-sized byte array into a uint unchecked
+    /// @dev Loads arbitrarily-sized byte array into a uint unchecked
     function _bytesToUint(bytes memory _b) private returns(uint256 res) {
         uint len = _b.length;
 
