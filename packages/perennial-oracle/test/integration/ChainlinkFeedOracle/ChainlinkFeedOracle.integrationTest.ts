@@ -16,9 +16,9 @@ import { buildChainlinkRoundId } from '../../../util'
 
 const { ethers, config } = HRE
 
-const PHASE_3_STARTING_ROUND = buildChainlinkRoundId(3, 1234)
-const PHASE_4_STARTING_ROUND = buildChainlinkRoundId(4, 543)
-const PHASE_5_STARTING_ROUND = buildChainlinkRoundId(5, 756)
+const PHASE_3_LATEST_ROUND = buildChainlinkRoundId(3, 1234)
+const PHASE_4_LATEST_ROUND = buildChainlinkRoundId(4, 543)
+const PHASE_5_LATEST_ROUND = buildChainlinkRoundId(5, 28756)
 
 describe('ChainlinkFeedOracle', () => {
   let owner: SignerWithAddress
@@ -32,12 +32,9 @@ describe('ChainlinkFeedOracle', () => {
     ;[owner, user] = await ethers.getSigners()
     const aggregatorMockFactory = await smock.mock<PassthroughDataFeed__factory>('PassthroughDataFeed')
 
-    aggregatorProxy = await AggregatorProxyInterface__factory.connect(
-      '0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419',
-      owner,
-    )
+    aggregatorProxy = AggregatorProxyInterface__factory.connect('0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419', owner)
     aggregatorMock = await aggregatorMockFactory.deploy(aggregatorProxy.address)
-    const latestData3 = await aggregatorProxy.getRoundData(PHASE_3_STARTING_ROUND)
+    const latestData3 = await aggregatorProxy.getRoundData(PHASE_3_LATEST_ROUND)
     // This is necessary because smock's mocking is buggy for some reason, likely due to naming collisions
     await aggregatorMock._setLatestRoundData(...latestData3)
 
@@ -50,7 +47,7 @@ describe('ChainlinkFeedOracle', () => {
     })
 
     it('returns version 0', async () => {
-      const expectedData = await aggregatorProxy.getRoundData(PHASE_3_STARTING_ROUND)
+      const expectedData = await aggregatorProxy.getRoundData(PHASE_3_LATEST_ROUND)
       const atVersion = await oracle.atVersion(0)
       expect(atVersion.price).to.equal(expectedData.answer.mul(10 ** 10))
       expect(atVersion.timestamp).to.equal(expectedData.updatedAt)
@@ -63,7 +60,7 @@ describe('ChainlinkFeedOracle', () => {
       const returnValue = await oracle.callStatic.sync()
       oracle.connect(user).sync()
 
-      const expectedData = await aggregatorProxy.getRoundData(PHASE_3_STARTING_ROUND)
+      const expectedData = await aggregatorProxy.getRoundData(PHASE_3_LATEST_ROUND)
       const expectedPrice = expectedData.answer.mul(10 ** 10)
 
       expect(returnValue.price).to.equal(expectedPrice)
@@ -83,13 +80,13 @@ describe('ChainlinkFeedOracle', () => {
 
     describe('after synced', async () => {
       beforeEach(async () => {
-        await aggregatorMock._setLatestRoundData(...(await aggregatorProxy.getRoundData(PHASE_3_STARTING_ROUND.add(1))))
+        await aggregatorMock._setLatestRoundData(...(await aggregatorProxy.getRoundData(PHASE_3_LATEST_ROUND.add(1))))
 
         await oracle.connect(user).sync()
       })
 
       it('doesnt sync new version if not available', async () => {
-        const expectedData = await aggregatorProxy.getRoundData(PHASE_3_STARTING_ROUND.add(1))
+        const expectedData = await aggregatorProxy.getRoundData(PHASE_3_LATEST_ROUND.add(1))
         const expectedPrice = expectedData.answer.mul(10 ** 10)
         const returnValue = await oracle.callStatic.sync()
         oracle.connect(user).sync()
@@ -110,7 +107,7 @@ describe('ChainlinkFeedOracle', () => {
       })
 
       it('syncs new version if available', async () => {
-        const expectedData = await aggregatorProxy.getRoundData(PHASE_3_STARTING_ROUND.add(2))
+        const expectedData = await aggregatorProxy.getRoundData(PHASE_3_LATEST_ROUND.add(2))
         const expectedPrice = expectedData.answer.mul(10 ** 10)
         await aggregatorMock._setLatestRoundData(...expectedData)
 
@@ -134,12 +131,12 @@ describe('ChainlinkFeedOracle', () => {
 
       it('syncs with new phase', async () => {
         // Sync up to version 3 which is in Phase 3
-        await aggregatorMock._setLatestRoundData(...(await aggregatorProxy.getRoundData(PHASE_3_STARTING_ROUND.add(3))))
+        await aggregatorMock._setLatestRoundData(...(await aggregatorProxy.getRoundData(PHASE_3_LATEST_ROUND.add(3))))
         await oracle.connect(user).sync()
 
         // Next round comes from phase 4.
         // We check if there is another round in phase 3 (there is, which is version 4) so this corresponds to Version 5
-        const expectedData = await aggregatorProxy.getRoundData(PHASE_4_STARTING_ROUND.add(1))
+        const expectedData = await aggregatorProxy.getRoundData(PHASE_4_LATEST_ROUND.add(1))
         await aggregatorMock._setLatestRoundData(...expectedData)
 
         const expectedPrice = expectedData.answer.mul(10 ** 10)
@@ -160,7 +157,7 @@ describe('ChainlinkFeedOracle', () => {
         expect(atVersion5.timestamp).to.equal(expectedData.updatedAt)
         expect(atVersion5.version).to.equal(5)
 
-        const version4ExpectedData = await aggregatorProxy.getRoundData(PHASE_3_STARTING_ROUND.add(4))
+        const version4ExpectedData = await aggregatorProxy.getRoundData(PHASE_3_LATEST_ROUND.add(4))
         const atVersion4 = await oracle.atVersion(4)
         expect(atVersion4.price).to.equal(version4ExpectedData.answer.mul(10 ** 10))
         expect(atVersion4.timestamp).to.equal(version4ExpectedData.updatedAt)
@@ -168,13 +165,13 @@ describe('ChainlinkFeedOracle', () => {
       })
 
       it('syncs with new phase, next round in previous phase after latest round', async () => {
-        const p3r1237 = await aggregatorProxy.getRoundData(PHASE_3_STARTING_ROUND.add(3))
-        const p3r1238 = await aggregatorProxy.getRoundData(PHASE_3_STARTING_ROUND.add(4))
-        const p4r544 = await aggregatorProxy.getRoundData(PHASE_4_STARTING_ROUND.add(1))
+        const p3r1237 = await aggregatorProxy.getRoundData(PHASE_3_LATEST_ROUND.add(3))
+        const p3r1238 = await aggregatorProxy.getRoundData(PHASE_3_LATEST_ROUND.add(4))
+        const p4r544 = await aggregatorProxy.getRoundData(PHASE_4_LATEST_ROUND.add(1))
 
         // Sync up to version 3 which is in Phase 3
         await aggregatorMock._setLatestRoundData(...p3r1237)
-        aggregatorMock.getRoundData.whenCalledWith(PHASE_3_STARTING_ROUND.add(4)).returns([
+        aggregatorMock.getRoundData.whenCalledWith(PHASE_3_LATEST_ROUND.add(4)).returns([
           p3r1238.roundId,
           p3r1238.answer,
           p4r544.startedAt, // Force this round to be after the newly synced one
@@ -220,9 +217,9 @@ describe('ChainlinkFeedOracle', () => {
       })
 
       it('syncs with new phase with search', async () => {
-        const p3r1237 = await aggregatorProxy.getRoundData(PHASE_3_STARTING_ROUND.add(3))
-        const p4r544 = await aggregatorProxy.getRoundData(PHASE_4_STARTING_ROUND.add(1))
-        aggregatorMock.getRoundData.whenCalledWith(PHASE_3_STARTING_ROUND.add(4)).reverts()
+        const p3r1237 = await aggregatorProxy.getRoundData(PHASE_3_LATEST_ROUND.add(3))
+        const p4r544 = await aggregatorProxy.getRoundData(PHASE_4_LATEST_ROUND.add(1))
+        aggregatorMock.getRoundData.whenCalledWith(PHASE_3_LATEST_ROUND.add(4)).reverts()
 
         // Sync up to version 3 which is in Phase 3
         await aggregatorMock._setLatestRoundData(...p3r1237)
@@ -272,32 +269,75 @@ describe('ChainlinkFeedOracle', () => {
         await oracle.connect(user).sync()
 
         // Next round comes from phase 5.
-        // The search will find intermediary phase 4 starts at round 5057 (version 25381), so this is version 25382
-        const p5r756 = await aggregatorProxy.getRoundData(PHASE_5_STARTING_ROUND)
-        await aggregatorMock._setLatestRoundData(...p5r756)
+        // The search will not find any phase 4 rounds that are after 3,26614 so then
+        // it will search phase 5, and  find it starts at round 16247 (version 25381), so this is version 37890
+        const p5r28756 = await aggregatorProxy.getRoundData(PHASE_5_LATEST_ROUND)
+        await aggregatorMock._setLatestRoundData(...p5r28756)
 
-        const expectedPrice = p5r756.answer.mul(10 ** 10)
+        const expectedPrice = p5r28756.answer.mul(10 ** 10)
         const returnValue = await oracle.callStatic.sync()
         await oracle.connect(user).sync()
 
         expect(returnValue.price).to.equal(expectedPrice)
-        expect(returnValue.timestamp).to.equal(p5r756.updatedAt)
-        expect(returnValue.version).to.equal(25382)
+        expect(returnValue.timestamp).to.equal(p5r28756.updatedAt)
+        expect(returnValue.version).to.equal(37890)
 
         const currentVersion = await oracle.currentVersion()
         expect(currentVersion.price).to.equal(expectedPrice)
-        expect(currentVersion.timestamp).to.equal(p5r756.updatedAt)
-        expect(currentVersion.version).to.equal(25382)
+        expect(currentVersion.timestamp).to.equal(p5r28756.updatedAt)
+        expect(currentVersion.version).to.equal(37890)
 
-        const atVersionCurrent = await oracle.atVersion(25382)
+        const atVersionCurrent = await oracle.atVersion(37890)
         expect(atVersionCurrent.price).to.equal(expectedPrice)
-        expect(atVersionCurrent.timestamp).to.equal(p5r756.updatedAt)
-        expect(atVersionCurrent.version).to.equal(25382)
+        expect(atVersionCurrent.timestamp).to.equal(p5r28756.updatedAt)
+        expect(atVersionCurrent.version).to.equal(37890)
 
-        const expectedIntermediaryP4 = await aggregatorProxy.getRoundData(buildChainlinkRoundId(4, 5057))
+        const expectedP5First = await aggregatorProxy.getRoundData(buildChainlinkRoundId(5, 16247))
         const atVersionIntermediary = await oracle.atVersion(25381)
-        expect(atVersionIntermediary.price).to.equal(expectedIntermediaryP4.answer.mul(10 ** 10))
-        expect(atVersionIntermediary.timestamp).to.equal(expectedIntermediaryP4.updatedAt)
+        expect(atVersionIntermediary.price).to.equal(expectedP5First.answer.mul(10 ** 10))
+        expect(atVersionIntermediary.timestamp).to.equal(expectedP5First.updatedAt)
+        expect(atVersionIntermediary.version).to.equal(25381)
+
+        const atVersionP3Last = await oracle.atVersion(25380)
+        expect(atVersionP3Last.price).to.equal(p3rLAST.answer.mul(10 ** 10))
+        expect(atVersionP3Last.timestamp).to.equal(p3rLAST.updatedAt)
+        expect(atVersionP3Last.version).to.equal(25380)
+      })
+
+      it('syncs with new phase 2 phases away from the last with intermediary phase', async () => {
+        // Sync up to the very last round in phase 3, version 25380
+        const p3rLAST = await aggregatorProxy.getRoundData(buildChainlinkRoundId(3, 26614))
+        await aggregatorMock._setLatestRoundData(...p3rLAST)
+        await oracle.connect(user).sync()
+
+        // Next round comes from phase 5.
+        // The search will not find any phase 4 rounds that are after 3,26614 so then
+        // it will search phase 5, and  find it starts at round 16247 (version 25381), so this is version 37890
+        const p5r28756 = await aggregatorProxy.getRoundData(PHASE_5_LATEST_ROUND)
+        await aggregatorMock._setLatestRoundData(...p5r28756)
+
+        const expectedPrice = p5r28756.answer.mul(10 ** 10)
+        const returnValue = await oracle.callStatic.sync()
+        await oracle.connect(user).sync()
+
+        expect(returnValue.price).to.equal(expectedPrice)
+        expect(returnValue.timestamp).to.equal(p5r28756.updatedAt)
+        expect(returnValue.version).to.equal(37890)
+
+        const currentVersion = await oracle.currentVersion()
+        expect(currentVersion.price).to.equal(expectedPrice)
+        expect(currentVersion.timestamp).to.equal(p5r28756.updatedAt)
+        expect(currentVersion.version).to.equal(37890)
+
+        const atVersionCurrent = await oracle.atVersion(37890)
+        expect(atVersionCurrent.price).to.equal(expectedPrice)
+        expect(atVersionCurrent.timestamp).to.equal(p5r28756.updatedAt)
+        expect(atVersionCurrent.version).to.equal(37890)
+
+        const expectedP5First = await aggregatorProxy.getRoundData(buildChainlinkRoundId(5, 16247))
+        const atVersionIntermediary = await oracle.atVersion(25381)
+        expect(atVersionIntermediary.price).to.equal(expectedP5First.answer.mul(10 ** 10))
+        expect(atVersionIntermediary.timestamp).to.equal(expectedP5First.updatedAt)
         expect(atVersionIntermediary.version).to.equal(25381)
 
         const atVersionP3Last = await oracle.atVersion(25380)
@@ -317,12 +357,12 @@ describe('ChainlinkFeedOracle', () => {
 
   describe('#atVersion', async () => {
     beforeEach(async () => {
-      await aggregatorMock._setLatestRoundData(...(await aggregatorProxy.getRoundData(PHASE_3_STARTING_ROUND.add(3))))
+      await aggregatorMock._setLatestRoundData(...(await aggregatorProxy.getRoundData(PHASE_3_LATEST_ROUND.add(3))))
       await oracle.connect(user).sync()
     })
 
     it('reads prior version', async () => {
-      const expectedData = await aggregatorProxy.getRoundData(PHASE_3_STARTING_ROUND.add(1))
+      const expectedData = await aggregatorProxy.getRoundData(PHASE_3_LATEST_ROUND.add(1))
       const atVersion = await oracle.atVersion(1)
       expect(atVersion.price).to.equal(expectedData.answer.mul(10 ** 10))
       expect(atVersion.timestamp).to.equal(expectedData.updatedAt)
@@ -330,7 +370,7 @@ describe('ChainlinkFeedOracle', () => {
     })
 
     it('reads versions in multiple phases', async () => {
-      await aggregatorMock._setLatestRoundData(...(await aggregatorProxy.getRoundData(PHASE_4_STARTING_ROUND.add(1))))
+      await aggregatorMock._setLatestRoundData(...(await aggregatorProxy.getRoundData(PHASE_4_LATEST_ROUND.add(1))))
 
       // Syncs from Phase 3 to Phase 4
       await oracle.connect(user).sync()
@@ -347,7 +387,7 @@ describe('ChainlinkFeedOracle', () => {
 
       // Check Version from Phase 3: Versions 0 to 4
       // Check last round of phase3
-      const v4expectedData = await aggregatorProxy.getRoundData(PHASE_3_STARTING_ROUND.add(4))
+      const v4expectedData = await aggregatorProxy.getRoundData(PHASE_3_LATEST_ROUND.add(4))
       const atVersionPhase3 = await oracle.atVersion(4)
       expect(atVersionPhase3.price).to.equal(v4expectedData.answer.mul(10 ** 10))
       expect(atVersionPhase3.timestamp).to.equal(v4expectedData.updatedAt)
@@ -355,7 +395,7 @@ describe('ChainlinkFeedOracle', () => {
 
       // Check Version from Phase 4: Versions 5 to end
       // Check first round of phase4
-      const v5expectedData = await aggregatorProxy.getRoundData(PHASE_4_STARTING_ROUND.add(1))
+      const v5expectedData = await aggregatorProxy.getRoundData(PHASE_4_LATEST_ROUND.add(1))
       const atVersionPhase4 = await oracle.atVersion(5)
       expect(atVersionPhase4.price).to.equal(v5expectedData.answer.mul(10 ** 10))
       expect(atVersionPhase4.timestamp).to.equal(v5expectedData.updatedAt)
