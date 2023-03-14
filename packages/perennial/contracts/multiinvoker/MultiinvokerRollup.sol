@@ -8,9 +8,7 @@ contract MultiInvokerRollup is MultiInvoker {
 
     event AddressAddedToCache(address indexed addr, uint256 nonce);
 
-    /// @dev reverts when address cache is relied on before a user / contract has been registered in state
-    /// if thrown, pass the bytes'00' (0 length) + the full 20 byte address instead of the length + index, 
-    /// can parse the events or mapping below to get the newly added cache index
+    /// @dev reverts when calldata has an issue. causes: length of bytes in a uint > or cache index empty
     error MultiInvokerRollupInvalidCalldataError();
 
     uint256 public addressNonce;
@@ -27,7 +25,7 @@ contract MultiInvokerRollup is MultiInvoker {
         batcher_,
         reserve_,
         controller_
-    ) { }
+    ) { return; }
 
     /// @dev fallback eliminates the need to include function sig in calldata
     fallback (bytes calldata input) external returns (bytes memory){
