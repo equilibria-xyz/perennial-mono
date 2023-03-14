@@ -114,12 +114,12 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
             // Wrap `msg.sender`s USDC into DSU and return the DSU to `account`
             } else if (invocation.action == PerennialAction.WRAP) {
                 (address receiver, UFixed18 amount) = abi.decode(invocation.args, (address, UFixed18));
-                wrap(receiver, amount);
+                _wrap(receiver, amount);
 
             // Unwrap `msg.sender`s DSU into USDC and return the USDC to `account`
             } else if (invocation.action == PerennialAction.UNWRAP) {
                 (address receiver, UFixed18 amount) = abi.decode(invocation.args, (address, UFixed18));
-                unwrap(receiver, amount);
+                _unwrap(receiver, amount);
 
             // Wrap `msg.sender`s USDC into DSU and deposit into `account`s `product` collateral account
             } else if (invocation.action == PerennialAction.WRAP_AND_DEPOSIT) {
@@ -215,11 +215,11 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
      * @param receiver Address to receive the DSU
      * @param amount Amount of USDC to wrap
      */
-    function wrap(address receiver, UFixed18 amount) internal {
+    function _wrap(address receiver, UFixed18 amount) internal {
         // Pull USDC from the `msg.sender`
         USDC.pull(msg.sender, amount, true);
 
-        _wrap(receiver, amount);
+        _handleWrap(receiver, amount);
     }
 
     /**
@@ -227,11 +227,11 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
      * @param receiver Address to receive the USDC
      * @param amount Amount of DSU to unwrap
      */
-    function unwrap(address receiver, UFixed18 amount) internal {
+    function _unwrap(address receiver, UFixed18 amount) internal {
         // Pull the token from the `msg.sender`
         DSU.pull(msg.sender, amount);
 
-        _unwrap(receiver, amount);
+        _handleUnwrap(receiver, amount);
     }
 
     /**
@@ -312,7 +312,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
      * @param receiver Address to receive the DSU
      * @param amount Amount of USDC to wrap
      */
-    function _wrap(address receiver, UFixed18 amount) internal {
+    function _handleWrap(address receiver, UFixed18 amount) internal {
         // If the batcher is 0 or  doesn't have enough for this wrap, go directly to the reserve
         if (address(batcher) == address(0) || amount.gt(DSU.balanceOf(address(batcher)))) {
             reserve.mint(amount);
@@ -328,7 +328,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
      * @param receiver Address to receive the USDC
      * @param amount Amount of DSU to unwrap
      */
-    function _unwrap(address receiver, UFixed18 amount) internal {
+    function _handleUnwrap(address receiver, UFixed18 amount) internal {
         // If the batcher is 0 or doesn't have enough for this unwrap, go directly to the reserve
         if (address(batcher) == address(0) || amount.gt(USDC.balanceOf(address(batcher)))) {
             reserve.redeem(amount);

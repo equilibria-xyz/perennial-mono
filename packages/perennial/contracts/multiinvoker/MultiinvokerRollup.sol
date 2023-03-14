@@ -84,12 +84,12 @@ contract MultiInvokerRollup is MultiInvoker {
                 address receiver; UFixed18 amount;
                 (receiver, amount, ptr) = _decodeAddressAmount(input, ptr);
 
-                wrap(receiver, amount);
+                _wrap(receiver, amount);
             } else if (action == 9) { // UNWRAP
                 address receiver; UFixed18 amount;
                 (receiver, amount, ptr) = _decodeAddressAmount(input, ptr);
 
-                unwrap(receiver, amount);
+                _unwrap(receiver, amount);
             } else if (action == 10) { // WRAP_AND_DEPOSIT
                 address account; address product; UFixed18 amount;
                 (account, product, amount, ptr) = _decodeAddressAddressAmount(input, ptr);
