@@ -122,6 +122,8 @@ library ChainlinkAggregatorLib {
     function _search(AggregatorProxyInterface proxy, uint16 phaseId, uint256 targetTimestamp, uint256 minTimestamp, uint256 minRoundId) private view returns (uint256) {
         uint256 maxRoundId = minRoundId + 1000; // Start 1000 rounds away when searching for maximum
         uint256 maxTimestamp = _tryGetProxyRoundData(proxy, phaseId, uint80(maxRoundId));
+
+        // Find the round bounds of the phase to perform the binary search
         while (maxTimestamp <= targetTimestamp) {
             minRoundId = maxRoundId;
             minTimestamp = maxTimestamp;
@@ -129,6 +131,10 @@ library ChainlinkAggregatorLib {
             maxTimestamp = _tryGetProxyRoundData(proxy, phaseId, uint80(maxRoundId));
         }
 
+        // Binary Search starts here. The algorithm calculates the middle round ID and finds it's timestamp
+        // If the midtimestamp is greater than target, set max to mid and continue
+        // If the midtimestamp is less than or equal to target, set min to mid and continue
+        // Exit when min + 1 is equal to or greater than max (no rounds between them)
         while (minRoundId + 1 < maxRoundId) {
             uint256 midRound = Math.average(minRoundId, maxRoundId);
             uint256 midTimestamp = _tryGetProxyRoundData(proxy, phaseId, uint80(midRound));
