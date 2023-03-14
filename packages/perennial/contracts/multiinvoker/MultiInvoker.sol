@@ -68,19 +68,19 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
      * @param invocations The list of invocations to execute in order
      */
     function invoke(Invocation[] calldata invocations) external {
-        
+
         for (uint256 i = 0; i < invocations.length; i++) {
             Invocation memory invocation = invocations[i];
 
             // Deposit from `msg.sender` into `account`s `product` collateral account
             if (invocation.action == PerennialAction.DEPOSIT) {
                 (address account, IProduct product, UFixed18 amount) = abi.decode(invocation.args, (address, IProduct, UFixed18));
-                _depositTo(account, product, amount);
+                _deposit(account, product, amount);
 
             // Withdraw from `msg.sender`s `product` collateral account to `receiver`
             } else if (invocation.action == PerennialAction.WITHDRAW) {
                 (address receiver, IProduct product, UFixed18 amount) = abi.decode(invocation.args, (address, IProduct, UFixed18));
-                _withdrawFrom(receiver, product, amount);
+                _withdraw(receiver, product, amount);
 
             // Open a take position on behalf of `msg.sender`
             } else if (invocation.action == PerennialAction.OPEN_TAKE) {
@@ -180,7 +180,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
      * @param product Product to deposit funds for
      * @param amount Amount of DSU to deposit into the collateral account
      */
-    function _depositTo(address account, IProduct product, UFixed18 amount) internal {
+    function _deposit(address account, IProduct product, UFixed18 amount) internal {
         // Pull the token from the `msg.sender`
         DSU.pull(msg.sender, amount);
 
@@ -194,8 +194,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
     * @param product Product to withdraw frunds from
     * @param amount Amount of DSU to withdraw out of the collateral account
     */
-    function _withdrawFrom(address receiver, IProduct product, UFixed18 amount) internal {
-        
+    function _withdraw(address receiver, IProduct product, UFixed18 amount) internal {
         collateral.withdrawFrom(msg.sender, receiver, IProduct(product), amount);
     }
 

@@ -50,12 +50,12 @@ contract MultiInvokerRollup is MultiInvoker {
                 address account; address product; UFixed18 amount;
                 (account, product, amount, ptr) = _decodeAddressAddressAmount(input, ptr);
 
-                _depositTo(account, IProduct(product), amount);
+                _deposit(account, IProduct(product), amount);
             } else if (action == 2) { // WITHDRAW
                 address receiver; address product; UFixed18 amount;
                 (receiver, product, amount, ptr) = _decodeAddressAddressAmount(input, ptr);
 
-                _withdrawFrom(receiver, IProduct(product), amount);
+                _withdraw(receiver, IProduct(product), amount);
             } else if (action == 3) { // OPEN_TAKE
                 address product; UFixed18 amount;
                 (product, amount, ptr) = _decodeAddressAmount(input, ptr);
@@ -165,7 +165,6 @@ contract MultiInvokerRollup is MultiInvoker {
         return (addr1, addr2, ptr);
     }
 
-
     // INDIVIDUAL TYPE DECODING //
 
     /// @dev 
@@ -194,8 +193,7 @@ contract MultiInvokerRollup is MultiInvoker {
 
         uint256[] memory result = new uint256[](arrayLen);
 
-        uint count = 0;
-        for (;count < arrayLen;) {
+        for (uint count; count < arrayLen;) {
             uint currUint;
 
             (currUint, ptr) = _decodeUint(input, ptr);
@@ -261,6 +259,9 @@ contract MultiInvokerRollup is MultiInvoker {
         assembly {
             res := mload(add(_b, 0x1))
         }
+
+        // length must not exceed max bytes length of a word/uint
+        if (res > 32) revert MultiInvokerRollupInvalidCalldataError();
     }
 
     /// @dev Loads arbitrarily-sized byte array into a uint unchecked
