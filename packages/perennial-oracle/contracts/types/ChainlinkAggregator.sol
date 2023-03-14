@@ -122,7 +122,7 @@ library ChainlinkAggregatorLib {
     function _search(AggregatorProxyInterface proxy, uint16 phaseId, uint256 targetTimestamp, uint256 minTimestamp, uint256 minRoundId) private view returns (uint256) {
         uint256 maxRoundId = minRoundId + 1000; // Start 1000 rounds away when searching for maximum
         uint256 maxTimestamp = _tryGetProxyRoundData(proxy, phaseId, uint80(maxRoundId));
-        while (maxTimestamp < targetTimestamp) {
+        while (maxTimestamp <= targetTimestamp) {
             minRoundId = maxRoundId;
             minTimestamp = maxTimestamp;
             maxRoundId = maxRoundId * 2; // Find bounds of phase by multiplying the max round by 2
@@ -141,9 +141,9 @@ library ChainlinkAggregatorLib {
             }
         }
 
-        // If the found timestamp is not greater than target timestamp, then the desired round does
+        // If the found timestamp is not greater than target timestamp or no max was found, then the desired round does
         // not exist in this phase
-        if (maxTimestamp <= targetTimestamp) return 0;
+        if (maxTimestamp <= targetTimestamp || maxTimestamp == type(uint256).max) return 0;
 
         return _aggregatorRoundIdToProxyRoundId(phaseId, uint80(maxRoundId));
     }

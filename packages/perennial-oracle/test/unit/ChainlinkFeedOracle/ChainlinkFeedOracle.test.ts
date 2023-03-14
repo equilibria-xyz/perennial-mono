@@ -208,13 +208,13 @@ describe('ChainlinkFeedOracle', () => {
 
         // This is the first seen round of the new phase
         // Phase 1 was (36 - 12 + 1) = 25 rounds long (versions 0 to 24)
-        // Phase 2 starts at version 25, which is 2 rounds before 345
-        const phase2SwitchoverRound = buildChainlinkRoundId(INITIAL_PHASE + 1, 343)
-        const roundId = buildChainlinkRoundId(INITIAL_PHASE + 1, 345)
+        // Phase 2 starts at version 25, which is 2 rounds before 1345
+        const phase2SwitchoverRound = buildChainlinkRoundId(INITIAL_PHASE + 1, 1343)
+        const roundId = buildChainlinkRoundId(INITIAL_PHASE + 1, 1345)
 
-        // Setup the binary search logic. If the searched for round is below 343, then return TIMESTAMP_START
-        // If the round is after 343, return >> TIMESTAMP_START
-        // If the round is 343, return slightly greater than TIMESTAMP_START
+        // Setup the binary search logic. If the searched for round is below switchoverRound, then return TIMESTAMP_START
+        // If the round is after switchoverRound, return invalid round
+        // If the round is switchoverRound, return slightly greater than TIMESTAMP_START
         aggregatorProxy.getRoundData.returns((args: BigNumberish[]) => {
           const roundRequested = BigNumber.from(args[0])
           if (roundRequested.eq(roundId)) {
@@ -226,7 +226,7 @@ describe('ChainlinkFeedOracle', () => {
               roundId,
             ]
           } else if (roundRequested.gt(phase2SwitchoverRound)) {
-            return [roundRequested, 0, TIMESTAMP_START + 2 * HOUR, TIMESTAMP_START + 2 * HOUR, roundRequested]
+            return [roundRequested, 0, 0, 0, roundRequested]
           } else if (roundRequested.lt(phase2SwitchoverRound)) {
             return [roundRequested, 0, TIMESTAMP_START, TIMESTAMP_START, roundRequested]
           }
@@ -275,7 +275,9 @@ describe('ChainlinkFeedOracle', () => {
 
       it('syncs with new phase that is 5 greater current phase with search', async () => {
         const phase1NextRound = buildChainlinkRoundId(INITIAL_PHASE, INITIAL_ROUND + 25)
-        aggregatorProxy.getRoundData.whenCalledWith(phase1NextRound).reverts()
+        aggregatorProxy.getRoundData
+          .whenCalledWith(phase1NextRound)
+          .returns([phase1NextRound, 0, 0, 0, phase1NextRound])
 
         // This is the first seen round of Phase 6
         // Phase 1 was (36 - 12 + 1) = 25 rounds long (versions 0 to 24)
@@ -285,21 +287,15 @@ describe('ChainlinkFeedOracle', () => {
         const phase4SwitchoverRound = buildChainlinkRoundId(INITIAL_PHASE + 3, 112)
 
         // Setup the binary search logic for phase 4
-        // Phase 2 and 5 are empty and are skipped
         // If the round is equal to 6,345, return TIMESTAMP_START + HOUR
-        // If the round is below    4,112, return TIMESTAMP_START
+        // If the round is below    4,112, return TIMESTAMP_START - 1
         // If the round is after    4,112, return TIMESTAMP_START + 2 * HOUR
         // If the round is equal to 4,112, return TIMESTAMP_START + 1
         aggregatorProxy.getRoundData.returns((args: BigNumberish[]) => {
           const roundRequested = BigNumber.from(args[0])
+          const phaseRequested = Number(roundRequested.toBigInt() >> BigInt(64))
 
-          if (
-            // Phases 2 and 5 are empty
-            roundRequested.eq(buildChainlinkRoundId(INITIAL_PHASE + 1, 1)) ||
-            roundRequested.eq(buildChainlinkRoundId(INITIAL_PHASE + 4, 1))
-          ) {
-            return [0, 0, 0, 0, 0]
-          } else if (roundRequested.eq(roundId)) {
+          if (roundRequested.eq(roundId)) {
             return [
               roundId,
               ethers.BigNumber.from(133300000000),
@@ -310,6 +306,10 @@ describe('ChainlinkFeedOracle', () => {
           } else if (roundRequested.gt(phase4SwitchoverRound)) {
             return [roundRequested, 0, TIMESTAMP_START + 2 * HOUR, TIMESTAMP_START + 2 * HOUR, roundRequested]
           } else if (roundRequested.lt(phase4SwitchoverRound)) {
+            if (phaseRequested < 4 && roundRequested.gt(buildChainlinkRoundId(phaseRequested, 1000))) {
+              // Only go 1000 rounds into phase 2 and 3
+              return [roundRequested, 0, 0, 0, roundRequested]
+            }
             return [roundRequested, 0, TIMESTAMP_START, TIMESTAMP_START, roundRequested]
           }
           return [
