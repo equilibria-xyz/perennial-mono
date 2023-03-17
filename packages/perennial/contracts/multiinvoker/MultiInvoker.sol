@@ -156,37 +156,37 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
     }
 
     /**
-    * @notice opens `amount` of take on behalf of `msg.sender` in `product`
-    * @param product Product to increase take position of
-    * @param amount Amount to increase take position by
-    */
+     * @notice opens `amount` of take on behalf of `msg.sender` in `product`
+     * @param product Product to increase take position of
+     * @param amount Amount to increase take position by
+     */
     function _openTakeFor(IProduct product, UFixed18 amount) internal {
         product.openTakeFor(msg.sender, amount);
     }
 
     /**
-    * @notice closes `amount` of take on behalf of `msg.sender` in `product`
-    * @param product Product to decrease take position of
-    * @param amount Amount to decrease take position by
-    */
+     * @notice closes `amount` of take on behalf of `msg.sender` in `product`
+     * @param product Product to decrease take position of
+     * @param amount Amount to decrease take position by
+     */
     function _closeTakeFor(IProduct product, UFixed18 amount) internal {
         product.closeTakeFor(msg.sender, amount);
     }
 
     /**
-    * @notice opens `amount` of make on behalf of `msg.sender` in `product`
-    * @param product Product to increase make position of
-    * @param amount Amount to increase make position by
-    */
+     * @notice opens `amount` of make on behalf of `msg.sender` in `product`
+     * @param product Product to increase make position of
+     * @param amount Amount to increase make position by
+     */
     function _openMakeFor(IProduct product, UFixed18 amount) internal {
         product.openMakeFor(msg.sender, amount);
     }
 
     /**
-    * @notice closes `amount` of make on behalf of `msg.sender` in `product`
-    * @param product Product to decrease make position of
-    * @param amount Amount to decrease make position by
-    */
+     * @notice closes `amount` of make on behalf of `msg.sender` in `product`
+     * @param product Product to decrease make position of
+     * @param amount Amount to decrease make position by
+     */
     function _closeMakeFor(IProduct product, UFixed18 amount) internal {
         product.closeMakeFor(msg.sender, amount);
     }
@@ -206,19 +206,19 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
     }
 
     /**
-    * @notice Withdraws `amount` DSU from `msg.sender`s `product` collateral account to `receiver`
-    * @param receiver address to withdraw funds on behalf of msg.sender to
-    * @param product Product to withdraw frunds from
-    * @param amount Amount of DSU to withdraw out of the collateral account
-    */
+     * @notice Withdraws `amount` DSU from `msg.sender`s `product` collateral account to `receiver`
+     * @param receiver address to withdraw funds on behalf of msg.sender to
+     * @param product Product to withdraw frunds from
+     * @param amount Amount of DSU to withdraw out of the collateral account
+     */
     function _withdraw(address receiver, IProduct product, UFixed18 amount) internal {
         collateral.withdrawFrom(msg.sender, receiver, IProduct(product), amount);
     }
 
     /**
-    * @notice Claim `msg.sender`s incentive reward for `product` programs
-    * @param product Product to claim
-    */
+     * @notice Claim `msg.sender`s incentive reward for `product` programs
+     * @param product Product to claim
+     */
     function _claimFor(IProduct product, uint256[] memory programIds) internal {
         controller.incentivizer().claimFor(msg.sender, product, programIds);
     }
@@ -294,18 +294,21 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
     }
 
     /**
-    *
-    *
-    */
+     * @notice Redeems `shares` shares from the vault on behalf of `msg.sender`
+     * @dev Does not return any assets to the user due to delayed settlement. Use `claim` to claim assets
+     *      If account is not msg.sender, requires prior spending approval
+     * @param shares Amount of shares to redeem
+     * @param vault Vault to redeem from
+     */
     function _vaultRedeem(IPerennialVault vault, UFixed18 shares) internal {
         vault.redeem(shares, msg.sender);
     }
 
     /**
-    * @notice 
-    * @param vault
-    * @param owner 
-    */
+     * @notice Claims all claimable assets for account, sending assets to account
+     * @param vault Vault to claim from
+     * @param account Account to claim for
+     */
     function _vaultClaim(IPerennialVault vault, address owner) internal {
         vault.claim(owner);
     }
