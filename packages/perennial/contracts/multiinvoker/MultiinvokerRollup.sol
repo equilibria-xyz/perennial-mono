@@ -41,12 +41,12 @@ contract MultiInvokerRollup is MultiInvoker {
     * [1:2] => uint length of current encoded type 
     * [2:length] => current encoded type (see individual type decoding functions)
     */
-    function _decodeFallbackAndInvoke(bytes calldata input) private {
+    function _decodeFallbackAndInvoke(bytes calldata input) internal {
         uint ptr;
         uint len = input.length;
     
         for (ptr; ptr < len;) {
-            uint8 action = _toUint8(input[ptr:ptr+1]);
+            uint8 action = _bytesToUint8(input[ptr:ptr+1]);
             ptr += 1;
 
             // solidity doesn't like evaluating bytes as enums :/ 
@@ -128,10 +128,15 @@ contract MultiInvokerRollup is MultiInvoker {
             }
         }
     }
-  
-    /// ARGUMENT TYPE DECODING ///
-    /// helper functions to decode the arguments of different actions
 
+    /// @notice unchecked sets address in cache if calldata specifies it (full uint256 of room in nonce)
+    function _setAddressCache(address addr) private {
+        ++addressNonce;
+        addressCache[addressNonce] = addr;
+        addressNonces[addr] = addressNonce;
+        emit AddressAddedToCache(addr, addressNonce);
+    }
+  
     /// @notice Decodes next bytes of action as address, address, and UFixed18
     function _decodeAddressAddressAmount(bytes calldata input, uint ptr) private returns (address addr1, address addr2, UFixed18 amount, uint) {
         (addr1, ptr) = _decodeAddress(input, ptr);
@@ -165,10 +170,38 @@ contract MultiInvokerRollup is MultiInvoker {
         return (addr1, addr2, ptr);
     }
 
-    /// INDIVIDUAL TYPE DECODING ///
+    /// @notice decodes an address from calldata if length == 0, storing next 20 bytes as address to cache 
+    /// else loading address from uint cache index
+    function _decodeAddress(bytes calldata input, uint ptr) private returns(address addr, uint) {
+        uint8 addrLen = _bytesToUint8(input[ptr:ptr+1]);
+        ptr += 1;
+
+        // user is new to registry, add next 20 bytes as address to registry and return address
+        if (addrLen == 0) {
+            addr = _bytesToAddress(input[ptr:ptr+20]);
+            ptr += 20;
+
+            _setAddressCache(addr);
+
+        } else {
+            uint addrNonceLookup = _bytesToUint256(input[ptr:ptr+addrLen]);
+            ptr += addrLen;
+
+            addr = _getAddressCacheSafe(addrNonceLookup);
+        }
+
+        return (addr, ptr);
+    }
+
+    /// @notice checked gets the address in cache cooresponding to the cache index if passed in calldata
+    /// @dev there is an issue with the calldata if a txn uses cache before caching address
+    function _getAddressCacheSafe(uint nonce) private view returns (address addr){
+        addr = addressCache[nonce];
+        if (addr == address(0)) revert MultiInvokerRollupInvalidCalldataError();
+    }
 
     /// @notice wraps next length of bytes as UFixed18
-     function _decodeAmountUFixed18(bytes calldata input, uint ptr) private returns (UFixed18 result, uint) {
+     function _decodeAmountUFixed18(bytes calldata input, uint ptr) private view returns (UFixed18 result, uint) {
         uint temp;
         (temp, ptr) = _decodeUint(input, ptr);
 
@@ -176,19 +209,19 @@ contract MultiInvokerRollup is MultiInvoker {
     }
 
     /// @notice Unpacks next length of bytes into uint256
-    function _decodeUint(bytes calldata input, uint ptr) private returns (uint result, uint) {
-        uint8 len = _toUint8(input[ptr:ptr+1]);
+    function _decodeUint(bytes calldata input, uint ptr) private pure returns (uint result, uint) {
+        uint8 len = _bytesToUint8(input[ptr:ptr+1]);
         ++ptr;
 
-        result = _bytesToUint(input[ptr:ptr+len]);
+        result = _bytesToUint256(input[ptr:ptr+len]);
         ptr += len;
 
         return (result, ptr);
     }
 
     /// @notice Unpacks next length of bytes as lengths of bytes into array of uint256
-    function _decodeUintArray(bytes calldata input, uint ptr) private returns (uint256[] memory, uint) {
-        uint8 arrayLen = _toUint8(input[ptr:ptr+1]);
+    function _decodeUintArray(bytes calldata input, uint ptr) private pure returns (uint256[] memory, uint) {
+        uint8 arrayLen = _bytesToUint8(input[ptr:ptr+1]);
         ++ptr;
 
         uint256[] memory result = new uint256[](arrayLen);
@@ -205,46 +238,6 @@ contract MultiInvokerRollup is MultiInvoker {
         return (result, ptr);
     }
 
-    /// @notice decodes an address from calldata if length == 0, storing next 20 bytes as address to cache 
-    /// else loading address from uint cache index
-    function _decodeAddress(bytes calldata input, uint ptr) private returns(address addr, uint) {
-        uint8 addrLen = _toUint8(input[ptr:ptr+1]);
-        ptr += 1;
-
-        // user is new to registry, add next 20 bytes as address to registry and return address
-        if (addrLen == 0) {
-            addr = _bytesToAddress(input[ptr:ptr+20]);
-            ptr += 20;
-
-            _setAddressCache(addr);
-
-        } else {
-            uint addrNonceLookup = _bytesToUint(input[ptr:ptr+addrLen]);
-            ptr += addrLen;
-
-            addr = _getAddressCacheSafe(addrNonceLookup);
-        }
-
-        return (addr, ptr);
-    }
-
-    /// @notice unchecked sets address in cache if calldata specifies it (full uint256 of room in nonce)
-    function _setAddressCache(address addr) private {
-        ++addressNonce;
-        addressCache[addressNonce] = addr;
-        addressNonces[addr] = addressNonce;
-        emit AddressAddedToCache(addr, addressNonce);
-    }
-
-    /// @notice checked gets the address in cache cooresponding to the cache index if passed in calldata
-    /// @dev there is an issue with the calldata if a txn uses cache before caching address
-    function _getAddressCacheSafe(uint nonce) public returns (address addr){
-        addr = addressCache[nonce];
-        if (addr == address(0)) revert MultiInvokerRollupInvalidCalldataError();
-    }
-
-    // UTILS //
-    
     /// @notice Unchecked force of 20 bytes into address
     /// @dev This is called in decodeAccount and decodeProduct which both only pass 20 byte slices 
     function _bytesToAddress(bytes memory input) private pure returns (address addr) {
@@ -255,7 +248,7 @@ contract MultiInvokerRollup is MultiInvoker {
 
     /// @notice Implementation of GNSPS' standard BytesLib.sol
     /// @dev there is an issue with calldata if a txn specifies the length of next bytes as > the max byte length of a uint256
-    function _toUint8(bytes memory _b) internal pure returns (uint8 res) {
+    function _bytesToUint8(bytes memory _b) private pure returns (uint8 res) {
         assembly {
             res := mload(add(_b, 0x1))
         }
@@ -266,7 +259,7 @@ contract MultiInvokerRollup is MultiInvoker {
 
     /// @notice Unchecked loads arbitrarily-sized bytes into a uint
     /// @dev bytes length enforced as < max word size in above function 
-    function _bytesToUint(bytes memory _b) private returns(uint256 res) {
+    function _bytesToUint256(bytes memory _b) private pure returns(uint256 res) {
         uint len = _b.length;
 
         assembly {
