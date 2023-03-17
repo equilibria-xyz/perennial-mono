@@ -155,21 +155,38 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
         }
     }
 
-    /// @dev the 4 position editing functions, open/close and make/take
-    /// @param product Product to edit `msg.sender`s position of
-    /// @param amount Amount to edit position of
+    /**
+    * @notice opens `amount` of take on behalf of `msg.sender` in `product`
+    * @param product Product to increase take position of
+    * @param amount Amount to increase take position by
+    */
     function _openTakeFor(IProduct product, UFixed18 amount) internal {
         product.openTakeFor(msg.sender, amount);
     }
 
+    /**
+    * @notice closes `amount` of take on behalf of `msg.sender` in `product`
+    * @param product Product to decrease take position of
+    * @param amount Amount to decrease take position by
+    */
     function _closeTakeFor(IProduct product, UFixed18 amount) internal {
         product.closeTakeFor(msg.sender, amount);
     }
 
+    /**
+    * @notice opens `amount` of make on behalf of `msg.sender` in `product`
+    * @param product Product to increase make position of
+    * @param amount Amount to increase make position by
+    */
     function _openMakeFor(IProduct product, UFixed18 amount) internal {
         product.openMakeFor(msg.sender, amount);
     }
 
+    /**
+    * @notice closes `amount` of make on behalf of `msg.sender` in `product`
+    * @param product Product to decrease make position of
+    * @param amount Amount to decrease make position by
+    */
     function _closeMakeFor(IProduct product, UFixed18 amount) internal {
         product.closeMakeFor(msg.sender, amount);
     }
@@ -200,6 +217,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
 
     /**
     * @notice Claim `msg.sender`s incentive reward for `product` programs
+    * @param product Product to claim
     */
     function _claimFor(IProduct product, uint256[] memory programIds) internal {
         controller.incentivizer().claimFor(msg.sender, product, programIds);
@@ -275,10 +293,19 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
         vault.deposit(amount, account);
     }
 
+    /**
+    *
+    *
+    */
     function _vaultRedeem(IPerennialVault vault, UFixed18 shares) internal {
         vault.redeem(shares, msg.sender);
     }
 
+    /**
+    * @notice 
+    * @param vault
+    * @param owner 
+    */
     function _vaultClaim(IPerennialVault vault, address owner) internal {
         vault.claim(owner);
     }
