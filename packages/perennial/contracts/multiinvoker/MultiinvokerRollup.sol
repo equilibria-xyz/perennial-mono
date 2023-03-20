@@ -129,8 +129,8 @@ contract MultiInvokerRollup is MultiInvoker {
         }
     }
 
-    /// @notice unchecked sets address in cache if calldata specifies it (full uint256 of room in nonce)
-    /// @param
+    /// @notice Unchecked sets address in cache
+    /// @param addr Address to add to cache 
     function _setAddressCache(address addr) private {
         ++addressNonce;
         addressCache[addressNonce] = addr;
@@ -202,7 +202,7 @@ contract MultiInvokerRollup is MultiInvoker {
 
     /** 
      * @notice decodes an address from calldata 
-     * @dev if length == 0, storing next 20 bytes as address to cache 
+     * @dev if length == 0, stores next 20 bytes as address to cache 
      * else loading address from uint cache index
      * @param input Full calldata payload
      * @param ptr Current index of input to start decoding
@@ -245,7 +245,7 @@ contract MultiInvokerRollup is MultiInvoker {
      * @notice wraps next length of bytes as UFixed18
      * @param input Full calldata payload
      * @param ptr Current index of input to start decoding
-
+     * @param ptr Current index of input to start decoding
      * @return Current index of calldata to continue decoding
      */
      function _decodeAmountUFixed18(bytes calldata input, uint ptr) private view returns (UFixed18 result, uint) {
@@ -325,8 +325,12 @@ contract MultiInvokerRollup is MultiInvoker {
         if (res > 32) revert MultiInvokerRollupInvalidCalldataError();
     }
 
-    /// @notice Unchecked loads arbitrarily-sized bytes into a uint
-    /// @dev bytes length enforced as < max word size in above function 
+    /** 
+     * @notice Unchecked loads arbitrarily-sized bytes into a uint
+     * @dev Bytes length enforced as < max word size in above function
+     * @param input The bytes to convert to uint256
+     * @return The resulting uint256
+     */
     function _bytesToUint256(bytes memory input) private pure returns (uint256 res) {
         uint len = input.length;
 
