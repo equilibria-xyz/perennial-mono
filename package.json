@@ -13,10 +13,12 @@
     "deploy:goerli": "./scripts/deploy_goerli.sh",
     "deploy:arbitrumGoerli": "./scripts/deploy_arbitrum_goerli.sh",
     "deploy:optimismGoerli": "./scripts/deploy_optimism_goerli.sh",
+    "deploy:baseGoerli": "./scripts/deploy_base_goerli.sh",
     "verify:goerli": "yarn workspaces run verify --network goerli",
     "deploy:fork:goerli": "concurrently \"yarn workspace @equilibria/perennial run node:fork:goerli --no-deploy > /dev/null\" \"./scripts/deploy_goerli_fork.sh\"",
     "deploy:fork:arbitrumGoerli": "concurrently \"yarn workspace @equilibria/perennial run node:fork:arbitrumGoerli --no-deploy > /dev/null\" \"./scripts/deploy_arbitrum_goerli_fork.sh\"",
     "deploy:fork:optimismGoerli": "concurrently \"yarn workspace @equilibria/perennial run node:fork:optimismGoerli --no-deploy > /dev/null\" \"./scripts/deploy_optimism_goerli_fork.sh\"",
+    "deploy:fork:baseGoerli": "concurrently \"yarn workspace @equilibria/perennial run node:fork:baseGoerli --no-deploy > /dev/null\" \"./scripts/deploy_base_goerli_fork.sh\"",
     "deploy:fork:mainnet": "concurrently \"yarn workspace @equilibria/perennial run node:fork:mainnet --no-deploy > /dev/null\" \"./scripts/deploy_mainnet_fork.sh\""
   },
   "devDependencies": {
