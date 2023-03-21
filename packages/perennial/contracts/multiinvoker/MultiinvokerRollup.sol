@@ -329,7 +329,7 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
 
     /** 
      * @notice Unchecked loads arbitrarily-sized bytes into a uint
-     * @dev    Bytes length enforced as < max word size in above function
+     * @dev    Bytes length enforced as < max word size
      * @param  input The bytes to convert to uint256
      * @return res The resulting uint256
      */
