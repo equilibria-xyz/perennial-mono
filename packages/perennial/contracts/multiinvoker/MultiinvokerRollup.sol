@@ -1,18 +1,23 @@
-pragma solidity ^0.8.15;
+// SPDX-License-Identifier: BUSL-1.1
+pragma solidity 0.8.15;
 
 import "./MultiInvoker.sol";
+import "../interfaces/IMultiInvokerRollup.sol";
 
 /// @title A calldata-optimized implementation of the Perennial MultiInvoker 
 /// @notice Retains same functionality and `invoke` entry point from inherited MultiInvoker
-contract MultiInvokerRollup is MultiInvoker {
+contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
 
-    event AddressAddedToCache(address indexed addr, uint256 nonce);
+    /// @dev the pointer struct for current decoding position in calldata to pass by reference
+    struct PTR {
+        uint256 pos;
+    }
 
-    /// @dev reverts when calldata has an issue. causes: length of bytes in a uint > || cache index empty
-    error MultiInvokerRollupInvalidCalldataError();
-
+    /// @dev the current number of addresses cached in state
     uint256 public addressNonce;
+    /// @dev the table of address nonce to stored address
     mapping(uint => address) public addressCache;
+    /// @dev reverse lookup of the above table for constructing calldata
     mapping(address => uint) public addressNonces;
 
     constructor(
@@ -25,7 +30,7 @@ contract MultiInvokerRollup is MultiInvoker {
         batcher_,
         reserve_,
         controller_
-    ) { return; }
+    ) { }
 
     /// @dev fallback eliminates the need to include function sig in calldata
     fallback (bytes calldata input) external returns (bytes memory){
@@ -42,87 +47,87 @@ contract MultiInvokerRollup is MultiInvoker {
      * [2:length] => current encoded type (see individual type decoding functions)
      */
     function _decodeFallbackAndInvoke(bytes calldata input) internal {
-        uint ptr;
+        PTR memory ptr = PTR(0);
+        
         uint len = input.length;
     
-        for (ptr; ptr < len;) {
-            uint8 action = _bytesToUint8(input[ptr:ptr+1]);
-            ptr += 1;
+        for (ptr.pos; ptr.pos < len;) {
+            uint8 action = _toUint8(input, ptr);
 
             // solidity doesn't like evaluating bytes as enums :/ 
             if (action == 1) { // DEPOSIT
                 address account; address product; UFixed18 amount;
-                (account, product, amount, ptr) = _decodeAddressAddressAmount(input, ptr);
+                (account, product, amount) = _decodeAddressAddressAmount(input, ptr);
 
                 _deposit(account, IProduct(product), amount);
             } else if (action == 2) { // WITHDRAW
                 address receiver; address product; UFixed18 amount;
-                (receiver, product, amount, ptr) = _decodeAddressAddressAmount(input, ptr);
+                (receiver, product, amount) = _decodeAddressAddressAmount(input, ptr);
 
                 _withdraw(receiver, IProduct(product), amount);
             } else if (action == 3) { // OPEN_TAKE
                 address product; UFixed18 amount;
-                (product, amount, ptr) = _decodeAddressAmount(input, ptr);
+                (product, amount) = _decodeAddressAmount(input, ptr);
 
                 _openTakeFor(IProduct(product), amount);  
             } else if (action == 4) { // CLOSE_TAKE
                 address product; UFixed18 amount;
-                (product, amount, ptr) = _decodeAddressAmount(input, ptr);
+                (product, amount) = _decodeAddressAmount(input, ptr);
 
                 _closeTakeFor(IProduct(product), amount);
             } else if (action == 5) { // OPEN_MAKE 
                 address product; UFixed18 amount;
-                (product, amount, ptr) = _decodeAddressAmount(input, ptr);
+                (product, amount) = _decodeAddressAmount(input, ptr);
 
                 _openMakeFor(IProduct(product), amount);
             } else if (action == 6) { // CLOSE_MAKE
                 address product; UFixed18 amount;
-                (product, amount, ptr) = _decodeAddressAmount(input, ptr);
+                (product, amount) = _decodeAddressAmount(input, ptr);
 
                 _closeMakeFor(IProduct(product), amount);
             } else if (action == 7) { // CLAIM 
                 address product; uint256[] memory programIds;
-                (product, programIds, ptr) = _decodeProductPrograms(input, ptr);
+                (product, programIds) = _decodeProductPrograms(input, ptr);
 
                 _claimFor(IProduct(product), programIds);
             } else if (action == 8) { // WRAP 
                 address receiver; UFixed18 amount;
-                (receiver, amount, ptr) = _decodeAddressAmount(input, ptr);
+                (receiver, amount) = _decodeAddressAmount(input, ptr);
 
                 _wrap(receiver, amount);
             } else if (action == 9) { // UNWRAP
                 address receiver; UFixed18 amount;
-                (receiver, amount, ptr) = _decodeAddressAmount(input, ptr);
+                (receiver, amount) = _decodeAddressAmount(input, ptr);
 
                 _unwrap(receiver, amount);
             } else if (action == 10) { // WRAP_AND_DEPOSIT
                 address account; address product; UFixed18 amount;
-                (account, product, amount, ptr) = _decodeAddressAddressAmount(input, ptr);
+                (account, product, amount) = _decodeAddressAddressAmount(input, ptr);
                 
                _wrapAndDeposit(account, IProduct(product), amount);
             } else if (action == 11) { // WITHDRAW_AND_UNWRAP
                 address receiver; address product; UFixed18 amount;
-                (receiver, product, amount, ptr) = _decodeAddressAddressAmount(input, ptr);
+                (receiver, product, amount) = _decodeAddressAddressAmount(input, ptr);
 
                 _withdrawAndUnwrap(receiver, IProduct(product), amount);
             } else if (action == 12) { // VAULT_DEPOSIT
                 address depositer; address vault; UFixed18 amount;
-                (depositer, vault, amount, ptr) = _decodeAddressAddressAmount(input, ptr);
+                (depositer, vault, amount) = _decodeAddressAddressAmount(input, ptr);
 
                 _vaultDeposit(depositer, IPerennialVault(vault), amount);
             } else if (action == 13) { // VAULT_REDEEM
                 address vault; UFixed18 shares;
-                (vault, shares, ptr) = _decodeAddressAmount(input, ptr);
+                (vault, shares) = _decodeAddressAmount(input, ptr);
 
                 _vaultRedeem(IPerennialVault(vault), shares);
             } else if (action == 14) { // VAULT_CLAIM
                 address owner; address vault;
-                (owner, vault, ptr) = _decodeAddressAddress(input, ptr);
+                (owner, vault) = _decodeAddressAddress(input, ptr);
 
                 _vaultClaim(IPerennialVault(vault), owner);
             } else if (action == 15) { // VAULT_WRAP_AND_DEPOSIT 
                 address account; address vault; UFixed18 amount;
-                (account, vault, amount, ptr) = _decodeAddressAddressAmount(input, ptr);
+                (account, vault, amount) = _decodeAddressAddressAmount(input, ptr);
 
                 _vaultWrapAndDeposit(account, IPerennialVault(vault), amount);
             }
@@ -130,7 +135,7 @@ contract MultiInvokerRollup is MultiInvoker {
     }
 
     /// @notice Unchecked sets address in cache
-    /// @param addr Address to add to cache 
+    /// @param  addr Address to add to cache 
     function _setAddressCache(address addr) private {
         ++addressNonce;
         addressCache[addressNonce] = addr;
@@ -140,64 +145,60 @@ contract MultiInvokerRollup is MultiInvoker {
     
      /**
      * @notice Decodes next bytes of action as address, address
-     * @param input Full calldata payload
-     * @param ptr Current index of input to start decoding
-     * @return First address for action 
-     * @return Second address for action
-     * @return Current index of calldata to continue decoding
+     * @param  input Full calldata payload
+     * @param  ptr Current index of input to start decoding
+     * @return addr1 First address for action 
+     * @return addr2 Second address for action
      */
-    function _decodeAddressAddress(bytes calldata input, uint ptr) private returns (address addr1, address addr2, uint) {
-        (addr1, ptr) = _decodeAddress(input, ptr);
-        (addr2, ptr) = _decodeAddress(input, ptr);
+    function _decodeAddressAddress(bytes calldata input, PTR memory ptr) private returns (address addr1, address addr2) {
+        addr1= _decodeAddress(input, ptr);
+        addr2 = _decodeAddress(input, ptr);
 
-        return (addr1, addr2, ptr);
+        return (addr1, addr2);
     }
 
     /**
      * @notice Decodes next bytes of action as address, address, and UFixed18
-     * @param input Full calldata payload
-     * @param ptr Current index of input to start decoding
-     * @return First address for action 
-     * @return Second address for action
-     * @return UFixed18 wrpped amount for action
-     * @return Current index of calldata to continue decoding
+     * @param  input Full calldata payload
+     * @param  ptr Current index of input to start decoding
+     * @return addr1 First address for action 
+     * @return addr2 Second address for action
+     * @return amount UFixed18 wrpped amount for action
      */
-    function _decodeAddressAddressAmount(bytes calldata input, uint ptr) private returns (address addr1, address addr2, UFixed18 amount, uint) {
-        (addr1, ptr) = _decodeAddress(input, ptr);
-        (addr2, ptr) = _decodeAddress(input, ptr);
-        (amount, ptr) = _decodeAmountUFixed18(input, ptr);
+    function _decodeAddressAddressAmount(bytes calldata input, PTR memory ptr) private returns (address addr1, address addr2, UFixed18 amount) {
+        addr1 = _decodeAddress(input, ptr);
+        addr2 = _decodeAddress(input, ptr);
+        amount = _decodeAmountUFixed18(input, ptr);
 
-        return (addr1, addr2, amount, ptr);
+        return (addr1, addr2, amount);
     }
 
     /**
      * @notice Decodes next bytes of action as address, UFixed18
-     * @param input Full calldata payload
-     * @param ptr Current index of input to start decoding
-     * @return Address for action
-     * @return UFixed18 wrapped amount for action
-     * @return Current index of calldata to continue decoding
+     * @param  input Full calldata payload
+     * @param  ptr Current index of input to start decoding
+     * @return addr1 Address for action
+     * @return amount UFixed18 wrapped amount for action
      */
-    function _decodeAddressAmount(bytes calldata input, uint ptr) private returns (address addr1, UFixed18 amount, uint) {
-        (addr1, ptr) = _decodeAddress(input, ptr);
-        (amount, ptr) = _decodeAmountUFixed18(input, ptr);
+    function _decodeAddressAmount(bytes calldata input, PTR memory ptr) private returns (address addr1, UFixed18 amount) {
+        addr1 = _decodeAddress(input, ptr);
+        amount = _decodeAmountUFixed18(input, ptr);
 
-        return(addr1, amount, ptr);
+        return(addr1, amount);
     }
 
     /**
      * @notice Decodes next bytes of action as address, uint256[]
-     * @param input Full calldata payload
-     * @param ptr Current index of input to start decoding
-     * @return Product address for action
-     * @return ProgramIds for action
-     * @return Current index of calldata to continue decoding
+     * @param  input Full calldata payload
+     * @param  ptr Current index of input to start decoding
+     * @return product Address for action
+     * @return programs ProgramIds for action
      */
-    function _decodeProductPrograms(bytes calldata input, uint ptr) private returns (address product, uint256[] memory programs, uint) {
-        (product, ptr) = _decodeAddress(input, ptr);
-        (programs, ptr) = _decodeUintArray(input, ptr);
+    function _decodeProductPrograms(bytes calldata input, PTR memory ptr) private returns (address product, uint256[] memory programs) {
+        product = _decodeAddress(input, ptr);
+        programs = _decodeUintArray(input, ptr);
 
-        return(product, programs, ptr);
+        return(product, programs);
     }
 
     /** 
@@ -206,102 +207,84 @@ contract MultiInvokerRollup is MultiInvoker {
      * else loading address from uint cache index
      * @param input Full calldata payload
      * @param ptr Current index of input to start decoding
-     * @return Address encoded in calldata
-     * @return Current index of calldata to continue decoding
+     * @return addr Address encoded in calldata
     */
-    function _decodeAddress(bytes calldata input, uint ptr) private returns (address addr, uint) {
-        uint8 addrLen = _bytesToUint8(input[ptr:ptr+1]);
-        ptr += 1;
+    function _decodeAddress(bytes calldata input, PTR memory ptr) private returns (address addr) {
+        uint len = _toUint8(input, ptr);
 
         // user is new to registry, add next 20 bytes as address to registry and return address
-        if (addrLen == 0) {
-            addr = _bytesToAddress(input[ptr:ptr+20]);
-            ptr += 20;
+        if (len == 0) {
+            addr = _toAddress(input, ptr);
 
             _setAddressCache(addr);
-
         } else {
-            uint addrNonceLookup = _bytesToUint256(input[ptr:ptr+addrLen]);
-            ptr += addrLen;
+            uint addrNonceLookup = _bytesToUint256(input[ptr.pos:ptr.pos+len]);
+            ptr.pos += len;
 
-            addr = _getAddressCacheSafe(addrNonceLookup);
+            addr = _getAddressCache(addrNonceLookup);
         }
-
-        return (addr, ptr);
     }
 
     /**
-     * @notice checked gets the address in cache mapped to the cache index
-     * @dev there is an issue with the calldata if a txn uses cache before caching address
-     * @param nonce The cache index
-     * @return Address stored at cache index
+     * @notice Checked gets the address in cache mapped to the cache index
+     * @dev    There is an issue with the calldata if a txn uses cache before caching address
+     * @param  nonce The cache index
+     * @return addr Address stored at cache index
      */
-    function _getAddressCacheSafe(uint nonce) private view returns (address addr){
+    function _getAddressCache(uint nonce) private view returns (address addr){
         addr = addressCache[nonce];
         if (addr == address(0)) revert MultiInvokerRollupInvalidCalldataError();
     }
 
     /**
-     * @notice wraps next length of bytes as UFixed18
-     * @param input Full calldata payload
-     * @param ptr Current index of input to start decoding
-     * @param ptr Current index of input to start decoding
-     * @return Current index of calldata to continue decoding
-     */
-     function _decodeAmountUFixed18(bytes calldata input, uint ptr) private view returns (UFixed18 result, uint) {
-        uint temp;
-        (temp, ptr) = _decodeUint(input, ptr);
-
-        return(UFixed18.wrap(temp), ptr);
-    }
-
-    /**
-     * @notice Unpacks next length of bytes into uint256
+     * @notice Wraps next length of bytes as UFixed18
      * @param  input Full calldata payload
      * @param  ptr Current index of input to start decoding
-     * @return Decoded uint
-     * @return Current index of calldata to continue decoding
+     * @param  ptr Current index of input to start decoding
      */
-    function _decodeUint(bytes calldata input, uint ptr) private pure returns (uint result, uint) {
-        uint8 len = _bytesToUint8(input[ptr:ptr+1]);
-        ++ptr;
-
-        result = _bytesToUint256(input[ptr:ptr+len]);
-        ptr += len;
-
-        return (result, ptr);
+     function _decodeAmountUFixed18(bytes calldata input, PTR memory ptr) private view returns (UFixed18 result) {
+        return UFixed18.wrap(_toUint256(input, ptr));
     }
 
     /**
      * @notice Unpacks next length of bytes as lengths of bytes into array of uint256
      * @param  input Full calldata payload
      * @param  ptr Current index of input to start decoding
-     * @param  ProgramIds for CLAIM action 
-     * @return Current index of calldata to continue decoding
+     * @return ProgramIds for CLAIM action 
      */
-    function _decodeUintArray(bytes calldata input, uint ptr) private pure returns (uint256[] memory, uint) {
-        uint8 arrayLen = _bytesToUint8(input[ptr:ptr+1]);
-        ++ptr;
+    function _decodeUintArray(bytes calldata input, PTR memory ptr) private pure returns (uint256[] memory) {
+        uint8 arrayLen = _toUint8(input, ptr);
 
         uint256[] memory result = new uint256[](arrayLen);
 
         for (uint count; count < arrayLen;) {
             uint currUint;
 
-            (currUint, ptr) = _decodeUint(input, ptr);
+            currUint = _toUint256(input, ptr);
 
             result[count] = currUint;
 
             ++count;
         }
-        return (result, ptr);
+        return result;
+    }
+
+    /**
+     * @notice Helper function to get address from calldata
+     * @param  input Full calldata payload
+     * @param  ptr Current index of input to start decoding 
+     * @return addr The decoded address
+     */
+    function _toAddress(bytes calldata input, PTR memory ptr) private pure returns (address addr) {
+        addr = _bytesToAddress(input[ptr.pos:ptr.pos+20]);
+        ptr.pos += 20;
     }
 
     /**
      * @dev This is called in decodeAccount and decodeProduct which both only pass 20 byte slices 
      * @notice Unchecked force of 20 bytes into address
-     * @param input The 20 bytes to be converted to address
-     * @return Address representation of `input`
+     * @param  input The 20 bytes to be converted to address
+     * @return addr Address representation of `input`
     */
     function _bytesToAddress(bytes memory input) private pure returns (address addr) {
         assembly {
@@ -310,11 +293,22 @@ contract MultiInvokerRollup is MultiInvoker {
     }
 
     /**
+     * @notice Helper function to get uint8 length from calldata
+     * @param  input Full calldata payload
+     * @param  ptr Current index of input to start decoding 
+     * @return res The decoded uint8 length
+     */
+    function _toUint8(bytes calldata input, PTR memory ptr) private pure returns (uint8 res) {
+        res = _bytesToUint8(input[ptr.pos:ptr.pos+1]);
+        ++ptr.pos;
+    }
+
+    /**
      * @notice Implementation of GNSPS' standard BytesLib.sol
-     * @dev is only called with 1 byte slices
-     * @dev there is an issue with calldata if a txn specifies the length of next bytes as > the max byte length of a uint256
-     * @param input 1 byte slice to convert to uint8 to decode lengths
-     * @return uint8 representation of input
+     * @dev    Is only called with 1 byte slices. there is an issue with calldata if 
+     * a txn specifies the length of next bytes as > the max byte length of a uint256
+     * @param  input 1 byte slice to convert to uint8 to decode lengths
+     * @return res The uint8 representation of input
      */
     function _bytesToUint8(bytes memory input) private pure returns (uint8 res) {
         assembly {
@@ -325,11 +319,24 @@ contract MultiInvokerRollup is MultiInvoker {
         if (res > 32) revert MultiInvokerRollupInvalidCalldataError();
     }
 
+    /**
+     * @notice Helper function to get uint256 from calldata
+     * @param  input Full calldata payload
+     * @param  ptr Current index of input to start decoding 
+     * @return res The decoded uint256
+     */
+    function _toUint256(bytes calldata input, PTR memory ptr) private pure returns (uint256 res) {
+        uint len = _toUint8(input, ptr);
+
+        res = _bytesToUint256(input[ptr.pos:ptr.pos+len]);
+        ptr.pos += len;
+    }
+
     /** 
      * @notice Unchecked loads arbitrarily-sized bytes into a uint
-     * @dev Bytes length enforced as < max word size in above function
-     * @param input The bytes to convert to uint256
-     * @return The resulting uint256
+     * @dev    Bytes length enforced as < max word size in above function
+     * @param  input The bytes to convert to uint256
+     * @return res The resulting uint256
      */
     function _bytesToUint256(bytes memory input) private pure returns (uint256 res) {
         uint len = input.length;

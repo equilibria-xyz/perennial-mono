@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.15;
+pragma solidity 0.8.15;
 
 import "@equilibria/root/control/unstructured/UInitializable.sol";
 
@@ -307,7 +307,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
     /**
      * @notice Claims all claimable assets for account, sending assets to account
      * @param vault Vault to claim from
-     * @param account Account to claim for
+     * @param owner Account to claim for
      */
     function _vaultClaim(IPerennialVault vault, address owner) internal {
         vault.claim(owner);
