@@ -305,8 +305,6 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
 
     /**
      * @notice Implementation of GNSPS' standard BytesLib.sol
-     * @dev    Is only called with 1 byte slices. there is an issue with calldata if 
-     * a txn specifies the length of next bytes as > the max byte length of a uint256
      * @param  input 1 byte slice to convert to uint8 to decode lengths
      * @return res The uint8 representation of input
      */
@@ -314,9 +312,6 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
         assembly {
             res := mload(add(input, 0x1))
         }
-
-        // length must not exceed max bytes length of a word/uint
-        if (res > 32) revert MultiInvokerRollupInvalidCalldataError();
     }
 
     /**
@@ -340,6 +335,9 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
      */
     function _bytesToUint256(bytes memory input) private pure returns (uint256 res) {
         uint len = input.length;
+
+        // length must not exceed max bytes length of a word/uint
+        if (len > 32) revert MultiInvokerRollupInvalidCalldataError();
 
         assembly {
             res := mload(add(input, 0x20))
