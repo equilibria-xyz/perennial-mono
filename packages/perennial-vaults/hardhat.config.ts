@@ -6,7 +6,6 @@ const eqPerennialDir = dirname(require.resolve('@equilibria/perennial/package.js
 const config = defaultConfig({
   solidityVersion: '0.8.17',
   externalDeployments: {
-    kovan: [`${eqPerennialDir}/deployments/kovan`, `${eqPerennialDir}/external/deployments/kovan`],
     goerli: [`${eqPerennialDir}/deployments/goerli`, `${eqPerennialDir}/external/deployments/goerli`],
     mainnet: [`${eqPerennialDir}/deployments/mainnet`, `${eqPerennialDir}/external/deployments/mainnet`],
     arbitrumGoerli: [
@@ -14,6 +13,8 @@ const config = defaultConfig({
       `${eqPerennialDir}/external/deployments/arbitrumGoerli`,
     ],
     arbitrum: [`${eqPerennialDir}/deployments/arbitrum`, `${eqPerennialDir}/external/deployments/arbitrum`],
+    baseGoerli: [`${eqPerennialDir}/deployments/baseGoerli`, `${eqPerennialDir}/external/deployments/baseGoerli`],
+    base: [`${eqPerennialDir}/deployments/base`, `${eqPerennialDir}/external/deployments/base`],
     hardhat: FORK_ENABLED
       ? [`${eqPerennialDir}/deployments/${FORK_NETWORK}`, `${eqPerennialDir}/external/deployments/${FORK_NETWORK}`]
       : [`${eqPerennialDir}/deployments/mainnet`, `${eqPerennialDir}/external/deployments/mainnet`],

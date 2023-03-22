@@ -27,24 +27,29 @@ export default task('checkLiquidatable', 'Checks all Product users to see if liq
     const users = Array.from(new Set([...deposits].map(e => e.args.user.toLowerCase())))
     const usersChunked = chunk<string>(users, 50)
 
-    console.log(`Checking if any of ${users.length} users are liquidatable`)
+    console.log(`Product: ${args.product}. Checking if any of ${users.length} users are liquidatable`)
     for (let i = 0; i < usersChunked.length; i++) {
       const userGroup = usersChunked[i]
       const liquidatable = await Promise.all(
         userGroup.map(account => lens.callStatic.liquidatable(account, args.product)),
       )
-      liquidatable.forEach(async (l, i) => {
-        if (l) {
-          const snapshot = await lens.callStatic['snapshot(address,address)'](userGroup[i], args.product)
-          console.log(`
+      await Promise.all(
+        liquidatable.map(async (l, i) => {
+          if (l) {
+            const snapshot = await lens.callStatic['snapshot(address,address)'](userGroup[i], args.product)
+            console.log(`
             Found liquidatable user: ${userGroup[i]},
             position:
               maker: ${formatEther(snapshot.position.maker)}
               taker: ${formatEther(snapshot.position.taker)}
             collateral: ${formatEther(snapshot.collateral)}
           `)
-        }
-      })
+            return true
+          }
+
+          return false
+        }),
+      )
     }
     console.log('done.')
   })

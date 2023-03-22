@@ -14,9 +14,10 @@ import {
   UCrossChainOwner__factory,
 } from '../types/generated'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
-import { isArbitrum, isEthereum, isOptimism, isTestnet } from '../../common/testutil/network'
+import { isArbitrum, isBase, isEthereum, isOptimism, isTestnet } from '../../common/testutil/network'
 
 const ROOT_CONTROLLER_ID = 0
+const CROSS_CHAIN_OWNER_DISABLED = true
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployments, getNamedAccounts, ethers } = hre
@@ -74,10 +75,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   // TIMELOCK OR CROSSCHAINOWNER
 
   // If this is mainnet, deploy a Timelock as ProxyAdmin owner
-  if (isEthereum(networkName)) {
+  if (isEthereum(networkName) || CROSS_CHAIN_OWNER_DISABLED) {
     await deploy('TimelockController', {
       from: deployer,
-      args: [TIMELOCK_MIN_DELAY, [multisigAddress], [ethers.constants.AddressZero], multisigAddress],
+      args: [TIMELOCK_MIN_DELAY, [multisigAddress], [ethers.constants.AddressZero]],
       skipIfAlreadyDeployed: true,
       log: true,
       autoMine: true,
@@ -91,7 +92,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       log: true,
       autoMine: true,
     })
-  } else if (isOptimism(networkName)) {
+  } else if (isOptimism(networkName) || isBase(networkName)) {
     await deploy('UCrossChainOwner', {
       contract: 'UCrossChainOwner_Optimism',
       from: deployer,
@@ -200,9 +201,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   }
 
   // TRANSFER OWNERSHIP
-  const ownerAddress = isEthereum(networkName)
-    ? (await get('TimelockController')).address
-    : (await get('UCrossChainOwner')).address
+  const ownerAddress =
+    isEthereum(networkName) || CROSS_CHAIN_OWNER_DISABLED
+      ? (await get('TimelockController')).address
+      : (await get('UCrossChainOwner')).address
 
   if ((await proxyAdmin.owner()) === ownerAddress) {
     console.log(`proxyAdmin owner already set to ${ownerAddress}`)
