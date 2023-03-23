@@ -52,41 +52,14 @@ contract BalancedVault is IBalancedVault, UInitializable {
     /// @dev The ERC20 symbol of the vault
     string public symbol;
 
-    /// @dev Mapping of allowance across all users
-    mapping(address => mapping(address => UFixed18)) public allowance;
+    /// @dev Per-asset accounting state variables
+    ProductAccounting[100] productAccounting;
 
-    /// @dev Mapping of shares of the vault per user
-    mapping(address => UFixed18) private _balanceOf;
+    /// @dev The number of products in the vault
+    uint256 private numberOfProducts;
 
-    /// @dev Total number of shares across all users
-    UFixed18 private _totalSupply;
-
-    /// @dev Mapping of unclaimed underlying of the vault per user
-    mapping(address => UFixed18) private _unclaimed;
-
-    /// @dev Mapping of unclaimed underlying of the vault per user
-    UFixed18 private _totalUnclaimed;
-
-    /// @dev Deposits that have not been settled, or have been settled but not yet processed by this contract
-    UFixed18 private _deposit;
-
-    /// @dev Redemptions that have not been settled, or have been settled but not yet processed by this contract
-    UFixed18 private _redemption;
-
-    /// @dev The latest version that a pending deposit or redemption has been placed
-    uint256 private _latestVersion;
-
-    /// @dev Mapping of pending (not yet converted to shares) per user
-    mapping(address => UFixed18) private _deposits;
-
-    /// @dev Mapping of pending (not yet withdrawn) per user
-    mapping(address => UFixed18) private _redemptions;
-
-    /// @dev Mapping of the latest version that a pending deposit or redemption has been placed per user
-    mapping(address => uint256) private _latestVersions;
-
-    /// @dev Mapping of versions of the vault state at a given oracle version
-    mapping(uint256 => Version) private _versions;
+    /// @dev The sum of the weights of all products in the vault
+    uint256 private totalWeight;
 
     constructor(
         Token18 asset_,
@@ -135,10 +108,15 @@ contract BalancedVault is IBalancedVault, UInitializable {
         (VersionContext memory context, ) = _settle(account);
         if (assets.gt(_maxDepositAtVersion(context))) revert BalancedVaultDepositLimitExceeded();
 
-        _deposit = _deposit.add(assets);
-        _latestVersion = context.version;
-        _deposits[account] = _deposits[account].add(assets);
-        _latestVersions[account] = context.version;
+        for (uint256 i = 0; i < numberOfProducts; ++i) {
+            UFixed18 assetsToDeposit = assets.muldiv(productAccounting[i].weight, totalWeight);
+
+            productAccounting[i].deposit = productAccounting[i].deposit.add(assetsToDeposit);
+            productAccounting[i].latestVersion = context.version;
+            productAccounting[i].deposits[account] = productAccounting[i].deposits[account].add(assetsToDeposit);
+            productAccounting[i].latestVersions[account] = context.version;
+        }
+
         emit Deposit(msg.sender, account, context.version, assets);
 
         asset.pull(msg.sender, assets);
@@ -159,10 +137,14 @@ contract BalancedVault is IBalancedVault, UInitializable {
         (VersionContext memory context, VersionContext memory accountContext) = _settle(account);
         if (shares.gt(_maxRedeemAtVersion(context, accountContext, account))) revert BalancedVaultRedemptionLimitExceeded();
 
-        _redemption = _redemption.add(shares);
-        _latestVersion = context.version;
-        _redemptions[account] = _redemptions[account].add(shares);
-        _latestVersions[account] = context.version;
+        for (uint256 i = 0; i < numberOfProducts; ++i) {
+            UFixed18 sharesToRedeem = shares.muldiv(productAccounting[i].weight, totalWeight);
+
+            productAccounting[i].redemption = productAccounting[i].redemption.add(sharesToRedeem);
+            productAccounting[i].latestVersion = context.version;
+            productAccounting[i].redemptions[account] = productAccounting[i].redemptions[account].add(sharesToRedeem);
+            productAccounting[i].latestVersions[account] = context.version;
+        }
         emit Redemption(msg.sender, account, context.version, shares);
 
         _burn(account, shares);
@@ -177,14 +159,20 @@ contract BalancedVault is IBalancedVault, UInitializable {
     function claim(address account) external {
         (VersionContext memory context, ) = _settle(account);
 
-        UFixed18 unclaimedAmount = _unclaimed[account];
-        UFixed18 unclaimedTotal = _totalUnclaimed;
-        _unclaimed[account] = UFixed18Lib.ZERO;
-        _totalUnclaimed = unclaimedTotal.sub(unclaimedAmount);
-        emit Claim(msg.sender, account, unclaimedAmount);
+        UFixed18 claimAmount = UFixed18Lib.ZERO;
+        UFixed18 unclaimedTotal = UFixed18Lib.ZERO;
+        for (uint256 i = 0; i < numberOfProducts; ++i) {
+            UFixed18 unclaimedAmount = productAccounting[i].unclaimed[account];
+            claimAmount = claimAmount.add(unclaimedAmount);
+            UFixed18 unclaimedTotalForProduct = productAccounting[i].totalUnclaimed;
+            unclaimedTotal = unclaimedTotal.add(unclaimedTotalForProduct);
+            productAccounting[i].unclaimed[account] = UFixed18Lib.ZERO;
+            productAccounting[i].totalUnclaimed = unclaimedTotalForProduct.sub(unclaimedAmount);
+        }
+
+        emit Claim(msg.sender, account, claimAmount);
 
         // pro-rate if vault has less collateral than unclaimed
-        UFixed18 claimAmount = unclaimedAmount;
         (UFixed18 longCollateral, UFixed18 shortCollateral, UFixed18 idleCollateral) = _collateral();
         UFixed18 totalCollateral = longCollateral.add(shortCollateral).add(idleCollateral);
         if (totalCollateral.lt(unclaimedTotal)) claimAmount = claimAmount.muldiv(totalCollateral, unclaimedTotal);
@@ -201,7 +189,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @return bool true if the approval was successful, otherwise reverts
      */
     function approve(address spender, UFixed18 amount) external returns (bool) {
-        allowance[msg.sender][spender] = amount;
+        productAccounting[0].allowance[msg.sender][spender] = amount;
         emit Approval(msg.sender, spender, amount);
         return true;
     }
@@ -341,29 +329,29 @@ contract BalancedVault is IBalancedVault, UInitializable {
     function _settle(address account) private returns (VersionContext memory context, VersionContext memory accountContext) {
         (context, accountContext) = _loadContextForWrite(account);
 
-        if (context.version > _latestVersion) {
-            _delayedMint(_totalSupplyAtVersion(context).sub(_totalSupply));
-            _totalUnclaimed = _totalUnclaimedAtVersion(context);
-            _deposit = UFixed18Lib.ZERO;
-            _redemption = UFixed18Lib.ZERO;
-            _latestVersion = context.version;
+        if (context.version > productAccounting[0].latestVersion) {
+            _delayedMint(_totalSupplyAtVersion(context).sub(productAccounting[0].totalSupply));
+            productAccounting[0].totalUnclaimed = _totalUnclaimedAtVersion(context);
+            productAccounting[0].deposit = UFixed18Lib.ZERO;
+            productAccounting[0].redemption = UFixed18Lib.ZERO;
+            productAccounting[0].latestVersion = context.version;
 
-            _versions[context.version] = Version({
+            productAccounting[0].versions[context.version] = Version({
                 longPosition: long.position(address(this)).maker,
                 shortPosition: short.position(address(this)).maker,
-                totalShares: _totalSupply,
+                totalShares: productAccounting[0].totalSupply,
                 longAssets: collateral.collateral(address(this), long),
                 shortAssets: collateral.collateral(address(this), short),
                 totalAssets: _totalAssetsAtVersion(context)
             });
         }
 
-        if (account != address(0) && accountContext.version > _latestVersions[account]) {
-            _delayedMintAccount(account, _balanceOfAtVersion(accountContext, account).sub(_balanceOf[account]));
-            _unclaimed[account] = _unclaimedAtVersion(accountContext, account);
-            _deposits[account] = UFixed18Lib.ZERO;
-            _redemptions[account] = UFixed18Lib.ZERO;
-            _latestVersions[account] = accountContext.version;
+        if (account != address(0) && accountContext.version > productAccounting[0].latestVersions[account]) {
+            _delayedMintAccount(account, _balanceOfAtVersion(accountContext, account).sub(productAccounting[0].balanceOf[account]));
+            productAccounting[0].unclaimed[account] = _unclaimedAtVersion(accountContext, account);
+            productAccounting[0].deposits[account] = UFixed18Lib.ZERO;
+            productAccounting[0].redemptions[account] = UFixed18Lib.ZERO;
+            productAccounting[0].latestVersions[account] = accountContext.version;
         }
     }
 
@@ -399,9 +387,9 @@ contract BalancedVault is IBalancedVault, UInitializable {
      */
     function _rebalancePosition(VersionContext memory context, UFixed18 claimAmount) private {
         UFixed18 currentAssets = _totalAssetsAtVersion(context).sub(claimAmount);
-        UFixed18 currentUtilized = _totalSupply.add(_redemption).isZero() ?
-            _deposit.add(currentAssets) :
-            _deposit.add(currentAssets.muldiv(_totalSupply, _totalSupply.add(_redemption)));
+        UFixed18 currentUtilized = productAccounting[0].totalSupply.add(productAccounting[0].redemption).isZero() ?
+            productAccounting[0].deposit.add(currentAssets) :
+            productAccounting[0].deposit.add(currentAssets.muldiv(productAccounting[0].totalSupply, productAccounting[0].totalSupply.add(productAccounting[0].redemption)));
         if (currentUtilized.lt(controller.minCollateral().mul(TWO))) currentUtilized = UFixed18Lib.ZERO;
 
         UFixed18 currentPrice = long.atVersion(context.version).price.abs();
@@ -452,8 +440,8 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @param amount Amount of shares to move
      */
     function _transfer(address from, address to, UFixed18 amount) private {
-        _balanceOf[from] = _balanceOf[from].sub(amount);
-        _balanceOf[to] = _balanceOf[to].add(amount);
+        productAccounting[0].balanceOf[from] = productAccounting[0].balanceOf[from].sub(amount);
+        productAccounting[0].balanceOf[to] = productAccounting[0].balanceOf[to].add(amount);
         emit Transfer(from, to, amount);
     }
 
@@ -463,8 +451,8 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @param amount Amount of shares to burn
      */
     function _burn(address from, UFixed18 amount) private {
-        _balanceOf[from] = _balanceOf[from].sub(amount);
-        _totalSupply = _totalSupply.sub(amount);
+        productAccounting[0].balanceOf[from] = productAccounting[0].balanceOf[from].sub(amount);
+        productAccounting[0].totalSupply = productAccounting[0].totalSupply.sub(amount);
         emit Transfer(from, address(0), amount);
     }
 
@@ -473,7 +461,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @param amount Amount of shares to mint
      */
     function _delayedMint(UFixed18 amount) private {
-        _totalSupply = _totalSupply.add(amount);
+        productAccounting[0].totalSupply = productAccounting[0].totalSupply.add(amount);
     }
 
     /**
@@ -482,7 +470,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @param amount Amount of shares to mint
      */
     function _delayedMintAccount(address to, UFixed18 amount) private {
-        _balanceOf[to] = _balanceOf[to].add(amount);
+        productAccounting[0].balanceOf[to] = productAccounting[0].balanceOf[to].add(amount);
         emit Transfer(address(0), to, amount);
     }
 
@@ -494,8 +482,8 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @param amount Amount to decrease allowance by
      */
     function _consumeAllowance(address account, address spender, UFixed18 amount) private {
-        if (allowance[account][spender].eq(UFixed18Lib.MAX)) return;
-        allowance[account][spender] = allowance[account][spender].sub(amount);
+        if (productAccounting[0].allowance[account][spender].eq(UFixed18Lib.MAX)) return;
+        productAccounting[0].allowance[account][spender] = productAccounting[0].allowance[account][spender].sub(amount);
     }
 
     /**
@@ -510,8 +498,8 @@ contract BalancedVault is IBalancedVault, UInitializable {
         uint256 currentVersion = long.latestVersion(address(this));
 
         return (
-            VersionContext(currentVersion, _assetsAt(_latestVersion), _sharesAt(_latestVersion)),
-            VersionContext(currentVersion, _assetsAt(_latestVersions[account]), _sharesAt(_latestVersions[account]))
+            VersionContext(currentVersion, _assetsAt(productAccounting[0].latestVersion), _sharesAt(productAccounting[0].latestVersion)),
+            VersionContext(currentVersion, _assetsAt(productAccounting[0].latestVersions[account]), _sharesAt(productAccounting[0].latestVersions[account]))
         );
     }
 
@@ -525,8 +513,8 @@ contract BalancedVault is IBalancedVault, UInitializable {
         uint256 currentVersion = Math.min(long.latestVersion(), short.latestVersion()); // latest version that both products are settled to
 
         return (
-            VersionContext(currentVersion, _assetsAt(_latestVersion), _sharesAt(_latestVersion)),
-            VersionContext(currentVersion, _assetsAt(_latestVersions[account]), _sharesAt(_latestVersions[account]))
+            VersionContext(currentVersion, _assetsAt(productAccounting[0].latestVersion), _sharesAt(productAccounting[0].latestVersion)),
+            VersionContext(currentVersion, _assetsAt(productAccounting[0].latestVersions[account]), _sharesAt(productAccounting[0].latestVersions[account]))
         );
     }
 
@@ -550,7 +538,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
      */
     function _maxDepositAtVersion(VersionContext memory context) private view returns (UFixed18) {
         if (_unhealthyAtVersion(context)) return UFixed18Lib.ZERO;
-        UFixed18 currentCollateral = _totalAssetsAtVersion(context).add(_deposit);
+        UFixed18 currentCollateral = _totalAssetsAtVersion(context).add(productAccounting[0].deposit);
         return maxCollateral.gt(currentCollateral) ? maxCollateral.sub(currentCollateral) : UFixed18Lib.ZERO;
     }
 
@@ -578,7 +566,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
     function _totalAssetsAtVersion(VersionContext memory context) private view returns (UFixed18) {
         (UFixed18 longCollateral, UFixed18 shortCollateral, UFixed18 idleCollateral) = _collateral();
         (UFixed18 totalCollateral, UFixed18 totalDebt) =
-            (longCollateral.add(shortCollateral).add(idleCollateral), _totalUnclaimedAtVersion(context).add(_deposit));
+            (longCollateral.add(shortCollateral).add(idleCollateral), _totalUnclaimedAtVersion(context).add(productAccounting[0].deposit));
         return totalCollateral.gt(totalDebt) ? totalCollateral.sub(totalDebt) : UFixed18Lib.ZERO;
     }
 
@@ -588,8 +576,8 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @return Total supply amount at version
      */
     function _totalSupplyAtVersion(VersionContext memory context) private view returns (UFixed18) {
-        if (context.version == _latestVersion) return _totalSupply;
-        return _totalSupply.add(_convertToSharesAtVersion(context, _deposit));
+        if (context.version == productAccounting[0].latestVersion) return productAccounting[0].totalSupply;
+        return productAccounting[0].totalSupply.add(_convertToSharesAtVersion(context, productAccounting[0].deposit));
     }
 
     /**
@@ -599,8 +587,8 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @return Account balance at version
      */
     function _balanceOfAtVersion(VersionContext memory accountContext, address account) private view returns (UFixed18) {
-        if (accountContext.version == _latestVersions[account]) return _balanceOf[account];
-        return _balanceOf[account].add(_convertToSharesAtVersion(accountContext, _deposits[account]));
+        if (accountContext.version == productAccounting[0].latestVersions[account]) return productAccounting[0].balanceOf[account];
+        return productAccounting[0].balanceOf[account].add(_convertToSharesAtVersion(accountContext, productAccounting[0].deposits[account]));
     }
 
     /**
@@ -609,8 +597,8 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @return Total unclaimed asset amount at version
      */
     function _totalUnclaimedAtVersion(VersionContext memory context) private view returns (UFixed18) {
-        if (context.version == _latestVersion) return _totalUnclaimed;
-        return _totalUnclaimed.add(_convertToAssetsAtVersion(context, _redemption));
+        if (context.version == productAccounting[0].latestVersion) return productAccounting[0].totalUnclaimed;
+        return productAccounting[0].totalUnclaimed.add(_convertToAssetsAtVersion(context, productAccounting[0].redemption));
     }
 
     /**
@@ -620,8 +608,8 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @return Total unclaimed asset amount for `account` at version
      */
     function _unclaimedAtVersion(VersionContext memory accountContext, address account) private view returns (UFixed18) {
-        if (accountContext.version == _latestVersions[account]) return _unclaimed[account];
-        return _unclaimed[account].add(_convertToAssetsAtVersion(accountContext, _redemptions[account]));
+        if (accountContext.version == productAccounting[0].latestVersions[account]) return productAccounting[0].unclaimed[account];
+        return productAccounting[0].unclaimed[account].add(_convertToAssetsAtVersion(accountContext, productAccounting[0].redemptions[account]));
     }
 
     /**
@@ -646,14 +634,14 @@ contract BalancedVault is IBalancedVault, UInitializable {
      */
     function _assetsAt(uint256 version) private view returns (UFixed18) {
         Fixed18 longAccumulated = long.valueAtVersion(version + 1).maker.sub(long.valueAtVersion(version).maker)
-            .mul(Fixed18Lib.from(_versions[version].longPosition))
-            .max(Fixed18Lib.from(_versions[version].longAssets).mul(Fixed18Lib.NEG_ONE));  // collateral can't go negative on a product
+            .mul(Fixed18Lib.from(productAccounting[0].versions[version].longPosition))
+            .max(Fixed18Lib.from(productAccounting[0].versions[version].longAssets).mul(Fixed18Lib.NEG_ONE));  // collateral can't go negative on a product
         Fixed18 shortAccumulated = short.valueAtVersion(version + 1).maker.sub(short.valueAtVersion(version).maker)
-            .mul(Fixed18Lib.from(_versions[version].shortPosition))
-            .max(Fixed18Lib.from(_versions[version].shortAssets).mul(Fixed18Lib.NEG_ONE)); // collateral can't go negative on a product
+            .mul(Fixed18Lib.from(productAccounting[0].versions[version].shortPosition))
+            .max(Fixed18Lib.from(productAccounting[0].versions[version].shortAssets).mul(Fixed18Lib.NEG_ONE)); // collateral can't go negative on a product
 
         return UFixed18Lib.from(
-            Fixed18Lib.from(_versions[version].totalAssets)
+            Fixed18Lib.from(productAccounting[0].versions[version].totalAssets)
                 .add(longAccumulated)
                 .add(shortAccumulated)
                 .max(Fixed18Lib.ZERO) // vault can't have negative assets, socializes into unclaimed if triggered
@@ -666,7 +654,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @return Total shares at `version`
      */
     function _sharesAt(uint256 version) private view returns (UFixed18) {
-        return _versions[version].totalShares;
+        return productAccounting[0].versions[version].totalShares;
     }
 
     /**
