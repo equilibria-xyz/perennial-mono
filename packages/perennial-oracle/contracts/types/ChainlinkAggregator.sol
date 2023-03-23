@@ -55,6 +55,7 @@ library ChainlinkAggregatorLib {
      * @param lastSyncedRoundId last synced round ID for the proxy
      * @param latestRound latest round from the proxy
      * @return roundCount The number of rounds in the phase
+     * @return nextPhaseId The phaseID for the next phase
      * @return nextPhaseStartingRoundId The starting round ID for the next phase
      */
     function getPhaseSwitchoverData(
@@ -62,7 +63,7 @@ library ChainlinkAggregatorLib {
         uint256 startingRoundId,
         uint256 lastSyncedRoundId,
         ChainlinkRound memory latestRound
-    ) internal view returns (uint256 roundCount, uint256 nextPhaseStartingRoundId) {
+    ) internal view returns (uint256 roundCount, uint16 nextPhaseId, uint256 nextPhaseStartingRoundId) {
         AggregatorProxyInterface proxy = AggregatorProxyInterface(ChainlinkAggregator.unwrap(self));
 
         // Try to get the immediate next round in the same phase. If this errors, we know that the phase has ended
@@ -74,7 +75,7 @@ library ChainlinkAggregatorLib {
             if (nextRoundId == 0 || nextUpdatedAt == 0) { // Invalid round
                 // pass
             } else if (nextUpdatedAt < latestRound.timestamp) {
-                return ((nextRoundId - startingRoundId) + 1, latestRound.roundId);
+                return ((nextRoundId - startingRoundId) + 1, latestRound.phaseId(), latestRound.roundId);
             }
         } catch  {
             // pass
@@ -83,13 +84,13 @@ library ChainlinkAggregatorLib {
         // lastSyncedRound is the last round in it's phase before latestRound, so we need to find where the next phase starts
         // The next phase should start at the round that is closest to but after lastSyncedRound.timestamp
         ChainlinkRound memory lastSyncedRound = getRound(self, lastSyncedRoundId);
-        uint16 phaseToSearch = lastSyncedRound.phaseId() + 1;
+        uint16 phaseToSearch = lastSyncedRound.phaseId();
         while (nextPhaseStartingRoundId == 0) {
-            nextPhaseStartingRoundId = getStartingRoundId(self, phaseToSearch, lastSyncedRound.timestamp);
             phaseToSearch += 1;
+            nextPhaseStartingRoundId = getStartingRoundId(self, phaseToSearch, lastSyncedRound.timestamp);
         }
 
-        return ((lastSyncedRoundId - startingRoundId) + 1, nextPhaseStartingRoundId);
+        return ((lastSyncedRoundId - startingRoundId) + 1, phaseToSearch, nextPhaseStartingRoundId);
     }
 
     /**
