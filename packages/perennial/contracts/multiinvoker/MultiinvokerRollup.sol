@@ -56,78 +56,84 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
 
             // solidity doesn't like evaluating bytes as enums :/ 
             if (action == 1) { // DEPOSIT
-                address account; address product; UFixed18 amount;
-                (account, product, amount) = _decodeAddressAddressAmount(input, ptr);
+                address account = _toAddress(input, ptr);
+                address product = _toAddress(input, ptr);
+                UFixed18 amount = _toAmount(input, ptr);
 
                 _deposit(account, IProduct(product), amount);
             } else if (action == 2) { // WITHDRAW
-                address receiver; address product; UFixed18 amount;
-                (receiver, product, amount) = _decodeAddressAddressAmount(input, ptr);
+                address receiver = _toAddress(input, ptr);
+                address product = _toAddress(input, ptr);
+                UFixed18 amount = _toAmount(input, ptr);
 
                 _withdraw(receiver, IProduct(product), amount);
             } else if (action == 3) { // OPEN_TAKE
-                address product; UFixed18 amount;
-                (product, amount) = _decodeAddressAmount(input, ptr);
+                address product = _toAddress(input, ptr);
+                UFixed18 amount = _toAmount(input, ptr);
 
                 _openTakeFor(IProduct(product), amount);  
             } else if (action == 4) { // CLOSE_TAKE
-                address product; UFixed18 amount;
-                (product, amount) = _decodeAddressAmount(input, ptr);
+                address product = _toAddress(input, ptr);
+                UFixed18 amount = _toAmount(input, ptr);
 
                 _closeTakeFor(IProduct(product), amount);
             } else if (action == 5) { // OPEN_MAKE 
-                address product; UFixed18 amount;
-                (product, amount) = _decodeAddressAmount(input, ptr);
+                address product = _toAddress(input, ptr);
+                UFixed18 amount = _toAmount(input, ptr);
 
                 _openMakeFor(IProduct(product), amount);
             } else if (action == 6) { // CLOSE_MAKE
-                address product; UFixed18 amount;
-                (product, amount) = _decodeAddressAmount(input, ptr);
+                address product = _toAddress(input, ptr);
+                UFixed18 amount = _toAmount(input, ptr);
 
                 _closeMakeFor(IProduct(product), amount);
             } else if (action == 7) { // CLAIM 
-                address product; uint256[] memory programIds;
-                (product, programIds) = _decodeProductPrograms(input, ptr);
+                address product = _toAddress(input, ptr);
+                uint256[] memory programIds = _toUintArray(input, ptr);
 
                 _claimFor(IProduct(product), programIds);
             } else if (action == 8) { // WRAP 
-                address receiver; UFixed18 amount;
-                (receiver, amount) = _decodeAddressAmount(input, ptr);
+                address receiver = _toAddress(input, ptr);
+                UFixed18 amount = _toAmount(input, ptr);
 
                 _wrap(receiver, amount);
             } else if (action == 9) { // UNWRAP
-                address receiver; UFixed18 amount;
-                (receiver, amount) = _decodeAddressAmount(input, ptr);
+                address receiver = _toAddress(input, ptr);
+                UFixed18 amount = _toAmount(input, ptr);
 
                 _unwrap(receiver, amount);
             } else if (action == 10) { // WRAP_AND_DEPOSIT
-                address account; address product; UFixed18 amount;
-                (account, product, amount) = _decodeAddressAddressAmount(input, ptr);
+                address account = _toAddress(input, ptr);
+                address product = _toAddress(input, ptr);
+                UFixed18 amount = _toAmount(input, ptr);
                 
                _wrapAndDeposit(account, IProduct(product), amount);
             } else if (action == 11) { // WITHDRAW_AND_UNWRAP
-                address receiver; address product; UFixed18 amount;
-                (receiver, product, amount) = _decodeAddressAddressAmount(input, ptr);
+                address receiver = _toAddress(input, ptr);
+                address product = _toAddress(input, ptr);
+                UFixed18 amount = _toAmount(input, ptr);
 
                 _withdrawAndUnwrap(receiver, IProduct(product), amount);
             } else if (action == 12) { // VAULT_DEPOSIT
-                address depositer; address vault; UFixed18 amount;
-                (depositer, vault, amount) = _decodeAddressAddressAmount(input, ptr);
+                address depositer = _toAddress(input, ptr);
+                address vault = _toAddress(input, ptr);
+                UFixed18 amount = _toAmount(input, ptr);
 
                 _vaultDeposit(depositer, IPerennialVault(vault), amount);
             } else if (action == 13) { // VAULT_REDEEM
-                address vault; UFixed18 shares;
-                (vault, shares) = _decodeAddressAmount(input, ptr);
+                address vault = _toAddress(input, ptr);
+                UFixed18 shares = _toAmount(input, ptr);
 
                 _vaultRedeem(IPerennialVault(vault), shares);
             } else if (action == 14) { // VAULT_CLAIM
-                address owner; address vault;
-                (owner, vault) = _decodeAddressAddress(input, ptr);
+                address owner = _toAddress(input, ptr);
+                address vault = _toAddress(input, ptr);
 
                 _vaultClaim(IPerennialVault(vault), owner);
             } else if (action == 15) { // VAULT_WRAP_AND_DEPOSIT 
-                address account; address vault; UFixed18 amount;
-                (account, vault, amount) = _decodeAddressAddressAmount(input, ptr);
+                address account = _toAddress(input, ptr);
+                address vault = _toAddress(input, ptr);
+                UFixed18 amount = _toAmount(input, ptr);
 
                 _vaultWrapAndDeposit(account, IPerennialVault(vault), amount);
             }
@@ -142,79 +148,20 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
         addressNonces[addr] = addressNonce;
         emit AddressAddedToCache(addr, addressNonce);
     }
-    
-     /**
-     * @notice Decodes next bytes of action as address, address
-     * @param  input Full calldata payload
-     * @param  ptr Current index of input to start decoding
-     * @return addr1 First address for action 
-     * @return addr2 Second address for action
-     */
-    function _decodeAddressAddress(bytes calldata input, PTR memory ptr) private returns (address addr1, address addr2) {
-        addr1= _decodeAddress(input, ptr);
-        addr2 = _decodeAddress(input, ptr);
-
-        return (addr1, addr2);
-    }
 
     /**
-     * @notice Decodes next bytes of action as address, address, and UFixed18
+     * @notice Helper function to get address from calldata
      * @param  input Full calldata payload
-     * @param  ptr Current index of input to start decoding
-     * @return addr1 First address for action 
-     * @return addr2 Second address for action
-     * @return amount UFixed18 wrpped amount for action
+     * @param  ptr Current index of input to start decoding 
+     * @return addr The decoded address
      */
-    function _decodeAddressAddressAmount(bytes calldata input, PTR memory ptr) private returns (address addr1, address addr2, UFixed18 amount) {
-        addr1 = _decodeAddress(input, ptr);
-        addr2 = _decodeAddress(input, ptr);
-        amount = _decodeAmountUFixed18(input, ptr);
-
-        return (addr1, addr2, amount);
-    }
-
-    /**
-     * @notice Decodes next bytes of action as address, UFixed18
-     * @param  input Full calldata payload
-     * @param  ptr Current index of input to start decoding
-     * @return addr1 Address for action
-     * @return amount UFixed18 wrapped amount for action
-     */
-    function _decodeAddressAmount(bytes calldata input, PTR memory ptr) private returns (address addr1, UFixed18 amount) {
-        addr1 = _decodeAddress(input, ptr);
-        amount = _decodeAmountUFixed18(input, ptr);
-
-        return(addr1, amount);
-    }
-
-    /**
-     * @notice Decodes next bytes of action as address, uint256[]
-     * @param  input Full calldata payload
-     * @param  ptr Current index of input to start decoding
-     * @return product Address for action
-     * @return programs ProgramIds for action
-     */
-    function _decodeProductPrograms(bytes calldata input, PTR memory ptr) private returns (address product, uint256[] memory programs) {
-        product = _decodeAddress(input, ptr);
-        programs = _decodeUintArray(input, ptr);
-
-        return(product, programs);
-    }
-
-    /** 
-     * @notice decodes an address from calldata 
-     * @dev if length == 0, stores next 20 bytes as address to cache 
-     * else loading address from uint cache index
-     * @param input Full calldata payload
-     * @param ptr Current index of input to start decoding
-     * @return addr Address encoded in calldata
-    */
-    function _decodeAddress(bytes calldata input, PTR memory ptr) private returns (address addr) {
+    function _toAddress(bytes calldata input, PTR memory ptr) private pure returns (address addr) {
         uint len = _toUint8(input, ptr);
 
         // user is new to registry, add next 20 bytes as address to registry and return address
         if (len == 0) {
-            addr = _toAddress(input, ptr);
+            addr = _bytesToAddress(input[ptr.pos:ptr.pos+20]);
+            ptr.pos += 20;
 
             _setAddressCache(addr);
         } else {
@@ -242,7 +189,7 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
      * @param  ptr Current index of input to start decoding
      * @param  ptr Current index of input to start decoding
      */
-     function _decodeAmountUFixed18(bytes calldata input, PTR memory ptr) private view returns (UFixed18 result) {
+     function _toAmount(bytes calldata input, PTR memory ptr) private view returns (UFixed18 result) {
         return UFixed18.wrap(_toUint256(input, ptr));
     }
 
@@ -252,7 +199,7 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
      * @param  ptr Current index of input to start decoding
      * @return ProgramIds for CLAIM action 
      */
-    function _decodeUintArray(bytes calldata input, PTR memory ptr) private pure returns (uint256[] memory) {
+    function _toUintArray(bytes calldata input, PTR memory ptr) private pure returns (uint256[] memory) {
         uint8 arrayLen = _toUint8(input, ptr);
 
         uint256[] memory result = new uint256[](arrayLen);
@@ -267,17 +214,6 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
             ++count;
         }
         return result;
-    }
-
-    /**
-     * @notice Helper function to get address from calldata
-     * @param  input Full calldata payload
-     * @param  ptr Current index of input to start decoding 
-     * @return addr The decoded address
-     */
-    function _toAddress(bytes calldata input, PTR memory ptr) private pure returns (address addr) {
-        addr = _bytesToAddress(input[ptr.pos:ptr.pos+20]);
-        ptr.pos += 20;
     }
 
     /**
