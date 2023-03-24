@@ -155,7 +155,7 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
      * @param  ptr Current index of input to start decoding 
      * @return addr The decoded address
      */
-    function _toAddress(bytes calldata input, PTR memory ptr) private pure returns (address addr) {
+    function _toAddress(bytes calldata input, PTR memory ptr) private returns (address addr) {
         uint len = _toUint8(input, ptr);
 
         // user is new to registry, add next 20 bytes as address to registry and return address
@@ -277,10 +277,6 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
 
         assembly {
             res := mload(add(input, 0x20))
-        }
-
-        if (res == 0x20) {
-            return 0;
         }
 
         // readable right shift to change right padding of mload to left padding
