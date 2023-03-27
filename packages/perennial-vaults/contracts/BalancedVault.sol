@@ -137,8 +137,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
             marketAccounting[market].deposits[account] = marketAccounting[market].deposits[account].add(assetsToDeposit);
             marketAccounting[market].latestVersions[account] = contexts[market].version;
 
-            // TODO: One event per market or one event for all?
-            emit Deposit(msg.sender, account, contexts[market].version, assets);
+            emit Deposit(msg.sender, account, market, contexts[market].version, assets);
         }
 
         asset.pull(msg.sender, assets);
@@ -170,8 +169,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
             marketAccounting[market].latestVersions[account] = contexts[market].version;
             _burn(market, account, shares);
 
-            // TODO: Should we emit one Redemption event per market?
-            emit Redemption(msg.sender, account, contexts[market].version, proportion);
+            emit Redemption(msg.sender, account, market, contexts[market].version, proportion);
         }
 
         _rebalance(contexts, UFixed18Lib.ZERO);
