@@ -13,27 +13,17 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
         uint256 pos;
     }
 
-    /// @dev the current number of addresses cached in state
-    uint256 public addressNonce;
-    /// @dev the table of address nonce to stored address
-    mapping(uint => address) public addressCache;
-    /// @dev reverse lookup of the above table for constructing calldata
-    mapping(address => uint) public addressNonces;
+    /// @dev array of all stored addresses (users, products, vaults, etc) for calldata packing
+    address[] public addressCache;
+    /// @dev index lookup of above array for constructing calldata
+    mapping(address => uint256) public addressLookup;
 
-    constructor(
-        Token6 usdc_,
-        IBatcher batcher_,
-        IEmptySetReserve reserve_,
-        IController controller_
-    ) MultiInvoker(
-        usdc_,
-        batcher_,
-        reserve_,
-        controller_
-    ) { }
+    constructor(Token6 usdc, IBatcher _batcher, IEmptySetReserve _reserve, IController _controller) 
+    MultiInvoker(usdc, _batcher, _reserve, _controller) 
+    { }
 
     /// @dev fallback eliminates the need to include function sig in calldata
-    fallback (bytes calldata input) external returns (bytes memory){
+    fallback (bytes calldata input) external returns (bytes memory) {
         _decodeFallbackAndInvoke(input);
         return "";
     }
@@ -49,7 +39,7 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
     function _decodeFallbackAndInvoke(bytes calldata input) internal {
         PTR memory ptr = PTR(0);
         
-        uint len = input.length;
+        uint256 len = input.length;
     
         for (ptr.pos; ptr.pos < len;) {
             uint8 action = _toUint8(input, ptr);
@@ -71,27 +61,27 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
                 address product = _toAddress(input, ptr);
                 UFixed18 amount = _toAmount(input, ptr);
 
-                _openTakeFor(IProduct(product), amount);  
+                _openTake(IProduct(product), amount);  
             } else if (action == 4) { // CLOSE_TAKE
                 address product = _toAddress(input, ptr);
                 UFixed18 amount = _toAmount(input, ptr);
 
-                _closeTakeFor(IProduct(product), amount);
+                _closeTake(IProduct(product), amount);
             } else if (action == 5) { // OPEN_MAKE 
                 address product = _toAddress(input, ptr);
                 UFixed18 amount = _toAmount(input, ptr);
 
-                _openMakeFor(IProduct(product), amount);
+                _openMake(IProduct(product), amount);
             } else if (action == 6) { // CLOSE_MAKE
                 address product = _toAddress(input, ptr);
                 UFixed18 amount = _toAmount(input, ptr);
 
-                _closeMakeFor(IProduct(product), amount);
+                _closeMake(IProduct(product), amount);
             } else if (action == 7) { // CLAIM 
                 address product = _toAddress(input, ptr);
                 uint256[] memory programIds = _toUintArray(input, ptr);
 
-                _claimFor(IProduct(product), programIds);
+                _claim(IProduct(product), programIds);
             } else if (action == 8) { // WRAP 
                 address receiver = _toAddress(input, ptr);
                 UFixed18 amount = _toAmount(input, ptr);
@@ -143,10 +133,14 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
     /// @notice Unchecked sets address in cache
     /// @param  addr Address to add to cache 
     function _setAddressCache(address addr) private {
-        ++addressNonce;
-        addressCache[addressNonce] = addr;
-        addressNonces[addr] = addressNonce;
-        emit AddressAddedToCache(addr, addressNonce);
+        // index of address to be added to cache
+        uint256 idx = addressCache.length;
+
+        // set address and lookup table
+        addressCache.push(addr);
+        addressLookup[addr] = idx;
+
+        emit AddressAddedToCache(addr, idx);
     }
 
     /**
@@ -156,7 +150,7 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
      * @return addr The decoded address
      */
     function _toAddress(bytes calldata input, PTR memory ptr) private returns (address addr) {
-        uint len = _toUint8(input, ptr);
+        uint8 len = _toUint8(input, ptr);
 
         // user is new to registry, add next 20 bytes as address to registry and return address
         if (len == 0) {
@@ -165,7 +159,7 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
 
             _setAddressCache(addr);
         } else {
-            uint addrNonceLookup = _bytesToUint256(input[ptr.pos:ptr.pos+len]);
+            uint256 addrNonceLookup = _bytesToUint256(input[ptr.pos:ptr.pos+len]);
             ptr.pos += len;
 
             addr = _getAddressCache(addrNonceLookup);
@@ -175,11 +169,11 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
     /**
      * @notice Checked gets the address in cache mapped to the cache index
      * @dev    There is an issue with the calldata if a txn uses cache before caching address
-     * @param  nonce The cache index
+     * @param  idx The cache index
      * @return addr Address stored at cache index
      */
-    function _getAddressCache(uint nonce) private view returns (address addr){
-        addr = addressCache[nonce];
+    function _getAddressCache(uint256 idx) private view returns (address addr){
+        addr = addressCache[idx];
         if (addr == address(0)) revert MultiInvokerRollupInvalidCalldataError();
     }
 
@@ -204,8 +198,8 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
 
         uint256[] memory result = new uint256[](arrayLen);
 
-        for (uint count; count < arrayLen;) {
-            uint currUint;
+        for (uint256 count; count < arrayLen;) {
+            uint256 currUint;
 
             currUint = _toUint256(input, ptr);
 
@@ -257,7 +251,7 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
      * @return res The decoded uint256
      */
     function _toUint256(bytes calldata input, PTR memory ptr) private pure returns (uint256 res) {
-        uint len = _toUint8(input, ptr);
+        uint8 len = _toUint8(input, ptr);
 
         res = _bytesToUint256(input[ptr.pos:ptr.pos+len]);
         ptr.pos += len;
@@ -270,7 +264,7 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
      * @return res The resulting uint256
      */
     function _bytesToUint256(bytes memory input) private pure returns (uint256 res) {
-        uint len = input.length;
+        uint256 len = input.length;
 
         // length must not exceed max bytes length of a word/uint
         if (len > 32) revert MultiInvokerRollupInvalidCalldataError();

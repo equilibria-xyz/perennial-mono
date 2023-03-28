@@ -7,8 +7,7 @@ interface IMultiInvokerRollup is IMultiInvoker {
     event AddressAddedToCache(address indexed addr, uint256 nonce);
     /// @dev reverts when calldata has an issue. causes: length of bytes in a uint > || cache index empty
     error MultiInvokerRollupInvalidCalldataError();
-    
-    function addressNonce() external view returns(uint256);
+
     function addressCache(uint256 nonce) external view returns(address);
-    function addressNonces(address addr) external view returns(uint256 nonce);
+    function addressLookup(address addr) external view returns(uint256 nonce);
 }

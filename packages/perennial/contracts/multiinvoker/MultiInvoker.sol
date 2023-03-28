@@ -85,27 +85,27 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
             // Open a take position on behalf of `msg.sender`
             } else if (invocation.action == PerennialAction.OPEN_TAKE) {
                 (IProduct product, UFixed18 amount) = abi.decode(invocation.args, (IProduct, UFixed18));
-                _openTakeFor(product, amount);
+                _openTake(product, amount);
 
             // Close a take position on behalf of `msg.sender`
             } else if (invocation.action == PerennialAction.CLOSE_TAKE) {
                 (IProduct product, UFixed18 amount) = abi.decode(invocation.args, (IProduct, UFixed18));
-                _closeTakeFor(product, amount);
+                _closeTake(product, amount);
 
             // Open a make position on behalf of `msg.sender`
             } else if (invocation.action == PerennialAction.OPEN_MAKE) {
                 (IProduct product, UFixed18 amount) = abi.decode(invocation.args, (IProduct, UFixed18));
-                _openMakeFor(product, amount);
+                _openMake(product, amount);
 
             // Close a make position on behalf of `msg.sender`
             } else if (invocation.action == PerennialAction.CLOSE_MAKE) {
                 (IProduct product, UFixed18 amount) = abi.decode(invocation.args, (IProduct, UFixed18));
-                _closeMakeFor(product, amount);
+                _closeMake(product, amount);
 
             // Claim `msg.sender`s incentive reward for `product` programs
             } else if (invocation.action == PerennialAction.CLAIM) {
                 (IProduct product, uint256[] memory programIds) = abi.decode(invocation.args, (IProduct, uint256[]));
-                _claimFor(product, programIds);
+                _claim(product, programIds);
 
             // Wrap `msg.sender`s USDC into DSU and return the DSU to `account`
             } else if (invocation.action == PerennialAction.WRAP) {
@@ -160,7 +160,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
      * @param product Product to increase take position of
      * @param amount Amount to increase take position by
      */
-    function _openTakeFor(IProduct product, UFixed18 amount) internal {
+    function _openTake(IProduct product, UFixed18 amount) internal {
         product.openTakeFor(msg.sender, amount);
     }
 
@@ -169,7 +169,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
      * @param product Product to decrease take position of
      * @param amount Amount to decrease take position by
      */
-    function _closeTakeFor(IProduct product, UFixed18 amount) internal {
+    function _closeTake(IProduct product, UFixed18 amount) internal {
         product.closeTakeFor(msg.sender, amount);
     }
 
@@ -178,7 +178,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
      * @param product Product to increase make position of
      * @param amount Amount to increase make position by
      */
-    function _openMakeFor(IProduct product, UFixed18 amount) internal {
+    function _openMake(IProduct product, UFixed18 amount) internal {
         product.openMakeFor(msg.sender, amount);
     }
 
@@ -187,7 +187,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
      * @param product Product to decrease make position of
      * @param amount Amount to decrease make position by
      */
-    function _closeMakeFor(IProduct product, UFixed18 amount) internal {
+    function _closeMake(IProduct product, UFixed18 amount) internal {
         product.closeMakeFor(msg.sender, amount);
     }
 
@@ -219,7 +219,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
      * @notice Claim `msg.sender`s incentive reward for `product` programs
      * @param product Product to claim
      */
-    function _claimFor(IProduct product, uint256[] memory programIds) internal {
+    function _claim(IProduct product, uint256[] memory programIds) internal {
         controller.incentivizer().claimFor(msg.sender, product, programIds);
     }
 
