@@ -104,16 +104,16 @@ interface IBalancedVault {
 
     function asset() external view returns (Token18);
     function totalAssets() external view returns (UFixed18);
-    function convertToAssets(UFixed18 shares, address account) external view returns (UFixed18);
+    function convertToAssets(UFixed18 proportion, address account) external view returns (UFixed18);
     function maxDeposit(address account) external view returns (UFixed18);
     function deposit(UFixed18 assets, address account) external;
     function maxRedeem(address account) external view returns (UFixed18);
     function redeem(UFixed18 proportion, address account) external;
 
-    /* Partial ERC20 Interface */
-
     event Transfer(address indexed from, address indexed to, UFixed18 value);
     event Approval(address indexed account, address indexed spender, bool approved);
+
+    /* Partial ERC20 Interface */
 
     function name() external view returns (string memory);
     function symbol() external view returns (string memory);
