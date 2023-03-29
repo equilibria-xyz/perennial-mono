@@ -67,10 +67,6 @@ contract BalancedVault is IBalancedVault, UInitializable {
     /// @dev Mapping of account => spender => whether spender is approved to spend account's shares
     mapping(address => mapping(address => bool)) public isApproved;
 
-    /// @dev Deposits across all markets that have not been settled, or have been settled but not yet processed by this contract
-    // TODO: Make sure this is set properly in the initializer
-    UFixed18 _deposit;
-
     constructor(
         Token18 asset_,
         IController controller_,
@@ -560,9 +556,8 @@ contract BalancedVault is IBalancedVault, UInitializable {
         UFixed18 currentCollateral = UFixed18Lib.ZERO;
         for (uint256 market = 0; market < contexts.length; ++market) {
             if (_unhealthyAtVersion(contexts[market])) return UFixed18Lib.ZERO;
-            currentCollateral = currentCollateral.add(_totalAssetsAtVersion(contexts[market]));
+            currentCollateral = currentCollateral.add(_totalAssetsAtVersion(contexts[market])).add(marketAccounting[market].deposit);
         }
-        currentCollateral = currentCollateral.add(_deposit);
         return maxCollateral.gt(currentCollateral) ? maxCollateral.sub(currentCollateral) : UFixed18Lib.ZERO;
     }
 
