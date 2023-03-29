@@ -1,5 +1,5 @@
 import HRE from 'hardhat'
-import { time, impersonate } from '../../../common/testutil'
+import { time, impersonate } from '../../../../common/testutil'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { FakeContract, smock } from '@defi-wonderland/smock'
 import { expect, use } from 'chai'
@@ -15,7 +15,7 @@ import {
   IOracleProvider,
   ICollateral,
   ICollateral__factory,
-} from '../../types/generated'
+} from '../../../types/generated'
 import { BigNumber, constants, utils } from 'ethers'
 
 const { config, ethers } = HRE

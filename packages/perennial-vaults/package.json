@@ -17,7 +17,7 @@
     "verify": "hardhat etherscan-verify --sleep --solc-input",
     "gasReport": "REPORT_GAS=true yarn test:integration",
     "test": "hardhat test test/unit/**/*",
-    "test:integration": "FORK_ENABLED=true FORK_BLOCK_NUMBER=16581533 hardhat test test/integration/*",
+    "test:integration": "FORK_ENABLED=true FORK_BLOCK_NUMBER=16581533 hardhat test test/integration/**/*",
     "test:verification:arbitrum": "FORK_ENABLED=true FORK_NETWORK=arbitrum FORK_BLOCK_NUMBER=62617287 FORK_USE_REAL_DEPLOYS=true hardhat test test/verification/arbitrum/**/*",
     "coverage": "hardhat coverage --testfiles 'test/unit/**/*'",
     "coverage:integration": "FORK_ENABLED=true FORK_BLOCK_NUMBER=16581533 hardhat coverage --testfiles 'test/integration/*'",
