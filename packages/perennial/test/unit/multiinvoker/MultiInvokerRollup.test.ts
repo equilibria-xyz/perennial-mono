@@ -529,8 +529,8 @@ describe('MultiInvokerRollup', () => {
           programs,
         )
         actionsCached = buildInvokerActionRollup(
-          BigNumber.from(0),
           BigNumber.from(1),
+          BigNumber.from(2),
           BigNumber.from(0),
           undefined,
           undefined,
@@ -557,10 +557,12 @@ describe('MultiInvokerRollup', () => {
         expect(collateral.depositTo).to.have.been.calledWith(user.address, product.address, amount)
 
         // assert caches set in 1st txn
-        expect(await multiInvokerRollup.connect(user).addressLookup(user.address)).to.eq(0)
-        expect(await multiInvokerRollup.connect(user).addressLookup(product.address)).to.eq(1)
+        expect(await multiInvokerRollup.connect(user).addressLookup(user.address)).to.eq(1)
+        expect(await multiInvokerRollup.connect(user).addressLookup(product.address)).to.eq(2)
 
         // 2) call contract with cached payload
+        console.log('pld', actionsCached.DEPOSIT.payload)
+
         res = user.sendTransaction(
           buildTransactionRequest(user, multiInvokerRollup, '0x' + actionsCached.DEPOSIT.payload),
         )

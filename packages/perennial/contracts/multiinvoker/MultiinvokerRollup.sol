@@ -20,7 +20,11 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
 
     constructor(Token6 usdc, IBatcher _batcher, IEmptySetReserve _reserve, IController _controller) 
     MultiInvoker(usdc, _batcher, _reserve, _controller) 
-    { }
+    {   
+        // an empty `addressLookup` resolves to 0
+        // prevents a real address from colliding with 0 index
+        _setAddressCache(address(0));
+    }
 
     /// @dev fallback eliminates the need to include function sig in calldata
     fallback (bytes calldata input) external returns (bytes memory) {
