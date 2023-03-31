@@ -13,8 +13,8 @@ const { formatEther } = utils
 const QUERY_PAGE_SIZE = 1000
 
 type QueryResult = {
-  takeOpeneds: { amount: string; version: string }[]
-  takeCloseds: { amount: string; version: string }[]
+  takeOpeneds: { amount: string; version: string; fee: string }[]
+  takeCloseds: { amount: string; version: string; fee: string }[]
   settles: { toVersion: string; toVersionPrice: string; preVersion: string; preVersionPrice: string }[]
   lastSettle: { blockNumber: string }[]
 }
@@ -51,10 +51,12 @@ export default task('collectMetrics', 'Collects metrics for a given day')
         takeOpeneds(first: $first, skip: $skip, where: { blockTimestamp_gte: $fromTs, blockTimestamp_lt: $toTs }) {
           amount
           version
+          fee
         }
         takeCloseds(first: $first, skip: $skip, where: { blockTimestamp_gte: $fromTs, blockTimestamp_lt: $toTs }) {
           amount
           version
+          fee
         }
         settles(first: $first, skip: $skip, where: { blockTimestamp_gte: $fromTs, blockTimestamp_lt: $toTs }) {
           toVersion
@@ -98,13 +100,15 @@ export default task('collectMetrics', 'Collects metrics for a given day')
       rawData.settles = [...rawData.settles, ...res.settles]
     }
 
-    const takeOpeneds = rawData.takeOpeneds.map(({ amount, version }) => ({
+    const takeOpeneds = rawData.takeOpeneds.map(({ amount, version, fee }) => ({
       amount: BigNumber.from(amount),
       version: BigNumber.from(version),
+      fee: BigNumber.from(fee),
     }))
-    const takeCloseds = rawData.takeCloseds.map(({ amount, version }) => ({
+    const takeCloseds = rawData.takeCloseds.map(({ amount, version, fee }) => ({
       amount: BigNumber.from(amount),
       version: BigNumber.from(version),
+      fee: BigNumber.from(fee),
     }))
     const settles = rawData.settles.map(({ toVersion, toVersionPrice, preVersion, preVersionPrice }) => ({
       toVersion: BigNumber.from(toVersion),
@@ -133,6 +137,9 @@ export default task('collectMetrics', 'Collects metrics for a given day')
       (acc, { amount, version }) => Big18Math.mul(getPrice(version), amount).add(acc),
       BigNumber.from(0),
     )
+    const fees = takeOpeneds
+      .reduce((acc, { fee }) => fee.add(acc), BigNumber.from(0))
+      .add(takeCloseds.reduce((acc, { fee }) => fee.add(acc), BigNumber.from(0)))
 
     const totalVolume = openVolume.add(closeVolume)
 
@@ -154,6 +161,7 @@ export default task('collectMetrics', 'Collects metrics for a given day')
           .div(2),
       ),
       totalVolume: formatEther(totalVolume),
+      totalFees: formatEther(fees),
     }
 
     const str = csv ? Object.values(data).join(',') : JSON.stringify(data, null, outputFile ? 0 : 2)
