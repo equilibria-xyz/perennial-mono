@@ -6,6 +6,7 @@ import { expect, use } from 'chai'
 import {
   IERC20Metadata,
   IERC20Metadata__factory,
+  IController,
   IController__factory,
   IProduct,
   IProduct__factory,
@@ -28,6 +29,7 @@ describe('BalancedVault', () => {
   let asset: IERC20Metadata
   let oracle: FakeContract<IOracleProvider>
   let collateral: ICollateral
+  let controller: IController
   let owner: SignerWithAddress
   let user: SignerWithAddress
   let user2: SignerWithAddress
@@ -49,6 +51,11 @@ describe('BalancedVault', () => {
     oracle.sync.returns(newVersion)
     oracle.currentVersion.returns(newVersion)
     oracle.atVersion.whenCalledWith(newVersion.version).returns(newVersion)
+  }
+
+  async function updateOracleAndSync(newPrice?: BigNumber) {
+    await updateOracle(newPrice)
+    await vault.sync()
   }
 
   async function longPosition() {
@@ -76,7 +83,7 @@ describe('BalancedVault', () => {
     ;[owner, user, user2, liquidator, perennialUser] = await ethers.getSigners()
 
     const dsu = IERC20Metadata__factory.connect('0x605D26FBd5be761089281d5cec2Ce86eeA667109', owner)
-    const controller = IController__factory.connect('0x9df509186b6d3b7D033359f94c8b1BB5544d51b3', owner)
+    controller = IController__factory.connect('0x9df509186b6d3b7D033359f94c8b1BB5544d51b3', owner)
     long = IProduct__factory.connect('0xdB60626FF6cDC9dB07d3625A93d21dDf0f8A688C', owner)
     short = IProduct__factory.connect('0xfeD3E166330341e0305594B8c6e6598F9f4Cbe9B', owner)
     collateral = ICollateral__factory.connect('0x2d264ebdb6632a06a1726193d4d37fef1e5dbdcd', owner)
@@ -148,141 +155,30 @@ describe('BalancedVault', () => {
 
   describe('#approve', () => {
     it('approves correctly', async () => {
-      expect(await vault.allowance(user.address, liquidator.address)).to.eq(0)
+      expect(await vault.isApproved(user.address, liquidator.address)).to.be.false
 
-      await expect(vault.connect(user).approve(liquidator.address, utils.parseEther('10')))
+      await expect(vault.connect(user).setApproval(liquidator.address, true))
         .to.emit(vault, 'Approval')
-        .withArgs(user.address, liquidator.address, utils.parseEther('10'))
+        .withArgs(user.address, liquidator.address, true)
 
-      expect(await vault.allowance(user.address, liquidator.address)).to.eq(utils.parseEther('10'))
+      expect(await vault.isApproved(user.address, liquidator.address)).to.be.true
 
-      await expect(vault.connect(user).approve(liquidator.address, 0))
+      await expect(vault.connect(user).setApproval(liquidator.address, false))
         .to.emit(vault, 'Approval')
-        .withArgs(user.address, liquidator.address, 0)
+        .withArgs(user.address, liquidator.address, false)
 
-      expect(await vault.allowance(user.address, liquidator.address)).to.eq(0)
-    })
-  })
-
-  describe('#transfer', () => {
-    const EXPECTED_BALANCE_OF = utils.parseEther('10000')
-    beforeEach(async () => {
-      await vault.connect(user).deposit(EXPECTED_BALANCE_OF, user.address)
-      await updateOracle()
-      await vault.sync()
-    })
-
-    it('transfers correctly', async () => {
-      expect(await vault.balanceOf(user.address)).to.equal(EXPECTED_BALANCE_OF)
-      expect(await vault.balanceOf(user2.address)).to.equal(0)
-      expect(await vault.totalSupply()).to.equal(EXPECTED_BALANCE_OF)
-
-      await expect(vault.connect(user).transfer(user2.address, EXPECTED_BALANCE_OF.div(2)))
-        .to.emit(vault, 'Transfer')
-        .withArgs(user.address, user2.address, EXPECTED_BALANCE_OF.div(2))
-
-      expect(await vault.balanceOf(user.address)).to.equal(EXPECTED_BALANCE_OF.div(2))
-      expect(await vault.balanceOf(user2.address)).to.equal(EXPECTED_BALANCE_OF.div(2))
-      expect(await vault.totalSupply()).to.equal(EXPECTED_BALANCE_OF)
-
-      await expect(vault.connect(user).transfer(user2.address, EXPECTED_BALANCE_OF.div(2)))
-        .to.emit(vault, 'Transfer')
-        .withArgs(user.address, user2.address, EXPECTED_BALANCE_OF.div(2))
-
-      expect(await vault.balanceOf(user.address)).to.equal(0)
-      expect(await vault.balanceOf(user2.address)).to.equal(EXPECTED_BALANCE_OF)
-      expect(await vault.totalSupply()).to.equal(EXPECTED_BALANCE_OF)
-    })
-  })
-
-  describe('#transferFrom', () => {
-    const EXPECTED_BALANCE_OF = utils.parseEther('10000')
-    beforeEach(async () => {
-      await vault.connect(user).deposit(EXPECTED_BALANCE_OF, user.address)
-      await updateOracle()
-      await vault.sync()
-    })
-
-    it('transfers from approved correctly', async () => {
-      await vault.connect(user).approve(liquidator.address, EXPECTED_BALANCE_OF)
-
-      expect(await vault.balanceOf(user.address)).to.equal(EXPECTED_BALANCE_OF)
-      expect(await vault.balanceOf(user2.address)).to.equal(0)
-      expect(await vault.totalSupply()).to.equal(EXPECTED_BALANCE_OF)
-      expect(await vault.allowance(user.address, liquidator.address)).to.equal(EXPECTED_BALANCE_OF)
-
-      await expect(vault.connect(liquidator).transferFrom(user.address, user2.address, EXPECTED_BALANCE_OF.div(2)))
-        .to.emit(vault, 'Transfer')
-        .withArgs(user.address, user2.address, EXPECTED_BALANCE_OF.div(2))
-
-      expect(await vault.balanceOf(user.address)).to.equal(EXPECTED_BALANCE_OF.div(2))
-      expect(await vault.balanceOf(user2.address)).to.equal(EXPECTED_BALANCE_OF.div(2))
-      expect(await vault.totalSupply()).to.equal(EXPECTED_BALANCE_OF)
-      expect(await vault.allowance(user.address, liquidator.address)).to.equal(EXPECTED_BALANCE_OF.div(2))
-
-      await expect(vault.connect(liquidator).transferFrom(user.address, user2.address, EXPECTED_BALANCE_OF.div(2)))
-        .to.emit(vault, 'Transfer')
-        .withArgs(user.address, user2.address, EXPECTED_BALANCE_OF.div(2))
-
-      expect(await vault.balanceOf(user.address)).to.equal(0)
-      expect(await vault.balanceOf(user2.address)).to.equal(EXPECTED_BALANCE_OF)
-      expect(await vault.totalSupply()).to.equal(EXPECTED_BALANCE_OF)
-      expect(await vault.allowance(user.address, liquidator.address)).to.equal(0)
-    })
-
-    it('transfers from approved correctly (infinite)', async () => {
-      await vault.connect(user).approve(liquidator.address, constants.MaxUint256)
-
-      expect(await vault.balanceOf(user.address)).to.equal(EXPECTED_BALANCE_OF)
-      expect(await vault.balanceOf(user2.address)).to.equal(0)
-      expect(await vault.totalSupply()).to.equal(EXPECTED_BALANCE_OF)
-      expect(await vault.allowance(user.address, liquidator.address)).to.equal(constants.MaxUint256)
-
-      await expect(vault.connect(liquidator).transferFrom(user.address, user2.address, EXPECTED_BALANCE_OF.div(2)))
-        .to.emit(vault, 'Transfer')
-        .withArgs(user.address, user2.address, EXPECTED_BALANCE_OF.div(2))
-
-      expect(await vault.balanceOf(user.address)).to.equal(EXPECTED_BALANCE_OF.div(2))
-      expect(await vault.balanceOf(user2.address)).to.equal(EXPECTED_BALANCE_OF.div(2))
-      expect(await vault.totalSupply()).to.equal(EXPECTED_BALANCE_OF)
-      expect(await vault.allowance(user.address, liquidator.address)).to.equal(constants.MaxUint256)
-
-      await expect(vault.connect(liquidator).transferFrom(user.address, user2.address, EXPECTED_BALANCE_OF.div(2)))
-        .to.emit(vault, 'Transfer')
-        .withArgs(user.address, user2.address, EXPECTED_BALANCE_OF.div(2))
-
-      expect(await vault.balanceOf(user.address)).to.equal(0)
-      expect(await vault.balanceOf(user2.address)).to.equal(EXPECTED_BALANCE_OF)
-      expect(await vault.totalSupply()).to.equal(EXPECTED_BALANCE_OF)
-      expect(await vault.allowance(user.address, liquidator.address)).to.equal(constants.MaxUint256)
-    })
-
-    it('reverts when spender is unapproved', async () => {
-      await expect(
-        vault.connect(liquidator).transferFrom(user.address, user2.address, EXPECTED_BALANCE_OF.div(2)),
-      ).to.revertedWithPanic('0x11')
-    })
-
-    it('reverts when spender is unapproved (self)', async () => {
-      await expect(
-        vault.connect(user).transferFrom(user.address, user2.address, EXPECTED_BALANCE_OF.div(2)),
-      ).to.revertedWithPanic('0x11')
+      expect(await vault.isApproved(user.address, liquidator.address)).to.be.false
     })
   })
 
   describe('#deposit/#redeem/#claim/#sync', () => {
     it('simple deposits and withdraws', async () => {
-      expect(await vault.convertToAssets(utils.parseEther('1'))).to.equal(utils.parseEther('1'))
-      expect(await vault.convertToShares(utils.parseEther('1'))).to.equal(utils.parseEther('1'))
-
       const smallDeposit = utils.parseEther('10')
       await vault.connect(user).deposit(smallDeposit, user.address)
       expect(await longCollateralInVault()).to.equal(0)
       expect(await shortCollateralInVault()).to.equal(0)
-      expect(await vault.totalSupply()).to.equal(0)
       expect(await vault.totalAssets()).to.equal(0)
-      await updateOracle()
-      await vault.sync()
+      await updateOracleAndSync()
 
       // We're underneath the collateral minimum, so we shouldn't have opened any positions.
       expect(await longPosition()).to.equal(0)
@@ -292,19 +188,12 @@ describe('BalancedVault', () => {
       await vault.connect(user).deposit(largeDeposit, user.address)
       expect(await longCollateralInVault()).to.equal(utils.parseEther('5005'))
       expect(await shortCollateralInVault()).to.equal(utils.parseEther('5005'))
-      expect(await vault.balanceOf(user.address)).to.equal(smallDeposit)
-      expect(await vault.totalSupply()).to.equal(smallDeposit)
       expect(await vault.totalAssets()).to.equal(smallDeposit)
-      expect(await vault.convertToAssets(utils.parseEther('10'))).to.equal(utils.parseEther('10'))
-      expect(await vault.convertToShares(utils.parseEther('10'))).to.equal(utils.parseEther('10'))
-      await updateOracle()
+      expect(await vault.convertToAssets(utils.parseEther('1'), user.address)).to.equal(utils.parseEther('10'))
+      await updateOracleAndSync()
 
-      await vault.sync()
-      expect(await vault.balanceOf(user.address)).to.equal(utils.parseEther('10010'))
-      expect(await vault.totalSupply()).to.equal(utils.parseEther('10010'))
       expect(await vault.totalAssets()).to.equal(utils.parseEther('10010'))
-      expect(await vault.convertToAssets(utils.parseEther('10010'))).to.equal(utils.parseEther('10010'))
-      expect(await vault.convertToShares(utils.parseEther('10010'))).to.equal(utils.parseEther('10010'))
+      expect(await vault.convertToAssets(utils.parseEther('1'), user.address)).to.equal(utils.parseEther('10010'))
 
       // Now we should have opened positions.
       // The positions should be equal to (smallDeposit + largeDeposit) * leverage / 2 / originalOraclePrice.
@@ -315,16 +204,14 @@ describe('BalancedVault', () => {
         smallDeposit.add(largeDeposit).mul(leverage).div(2).div(originalOraclePrice),
       )
 
-      // User 2 should not be able to withdraw; they haven't deposited anything.
-      await expect(vault.connect(user2).redeem(1, user2.address)).to.be.revertedWithCustomError(
-        vault,
-        'BalancedVaultRedemptionLimitExceeded',
-      )
+      // User 2 hasn't deposited anything, so nothing should be redeemed.
+      await expect(vault.connect(user2).redeem(utils.parseEther('1'), user2.address))
+        .to.emit(vault, 'Transfer')
+        .withArgs(user2.address, constants.AddressZero, 0)
 
-      expect(await vault.maxRedeem(user.address)).to.equal(utils.parseEther('10010'))
+      expect(await vault.maxRedeem(user.address)).to.equal(utils.parseEther('1'))
       await vault.connect(user).redeem(await vault.maxRedeem(user.address), user.address)
-      await updateOracle()
-      await vault.sync()
+      await updateOracleAndSync()
 
       // We should have closed all positions.
       expect(await longPosition()).to.equal(0)
@@ -333,11 +220,8 @@ describe('BalancedVault', () => {
       // We should have withdrawn all of our collateral.
       const fundingAmount = BigNumber.from('1526207855124')
       expect(await totalCollateralInVault()).to.equal(utils.parseEther('10010').add(fundingAmount))
-      expect(await vault.balanceOf(user.address)).to.equal(0)
-      expect(await vault.totalSupply()).to.equal(0)
       expect(await vault.totalAssets()).to.equal(0)
-      expect(await vault.convertToAssets(utils.parseEther('1'))).to.equal(utils.parseEther('1'))
-      expect(await vault.convertToShares(utils.parseEther('1'))).to.equal(utils.parseEther('1'))
+      expect(await vault.convertToAssets(utils.parseEther('1'), user.address)).to.equal(0)
       expect(await vault.unclaimed(user.address)).to.equal(utils.parseEther('10010').add(fundingAmount))
       expect(await vault.totalUnclaimed()).to.equal(utils.parseEther('10010').add(fundingAmount))
 
@@ -349,18 +233,13 @@ describe('BalancedVault', () => {
     })
 
     it('multiple users', async () => {
-      expect(await vault.convertToAssets(utils.parseEther('1'))).to.equal(utils.parseEther('1'))
-      expect(await vault.convertToShares(utils.parseEther('1'))).to.equal(utils.parseEther('1'))
-
       const smallDeposit = utils.parseEther('1000')
       await vault.connect(user).deposit(smallDeposit, user.address)
-      await updateOracle()
-      await vault.sync()
+      await updateOracleAndSync()
 
       const largeDeposit = utils.parseEther('10000')
       await vault.connect(user2).deposit(largeDeposit, user2.address)
-      await updateOracle()
-      await vault.sync()
+      await updateOracleAndSync()
 
       // Now we should have opened positions.
       // The positions should be equal to (smallDeposit + largeDeposit) * leverage / 2 / originalOraclePrice.
@@ -371,27 +250,20 @@ describe('BalancedVault', () => {
         smallDeposit.add(largeDeposit).mul(leverage).div(2).div(originalOraclePrice),
       )
       const fundingAmount0 = BigNumber.from(156261444735)
-      const balanceOf2 = BigNumber.from('9999999998437385552894')
-      expect(await vault.balanceOf(user.address)).to.equal(utils.parseEther('1000'))
-      expect(await vault.balanceOf(user2.address)).to.equal(balanceOf2)
+      expect(await vault.convertToAssets(utils.parseEther('1'), user.address)).to.equal(
+        utils.parseEther('1000').add(fundingAmount0),
+      )
+      // We subtract 1 from the expected value because of rounding down.
+      expect(await vault.convertToAssets(utils.parseEther('1'), user2.address)).to.equal(
+        utils.parseEther('10000').sub(1),
+      )
       expect(await vault.totalAssets()).to.equal(utils.parseEther('11000').add(fundingAmount0))
-      expect(await vault.totalSupply()).to.equal(utils.parseEther('1000').add(balanceOf2))
-      expect(await vault.convertToAssets(utils.parseEther('1000').add(balanceOf2))).to.equal(
-        utils.parseEther('11000').add(fundingAmount0),
-      )
-      expect(await vault.convertToShares(utils.parseEther('11000').add(fundingAmount0))).to.equal(
-        utils.parseEther('1000').add(balanceOf2),
-      )
 
-      const maxRedeem = await vault.maxRedeem(user.address)
-      await vault.connect(user).redeem(maxRedeem, user.address)
-      await updateOracle()
-      await vault.sync()
+      await vault.connect(user).redeem(utils.parseEther('1'), user.address)
+      await updateOracleAndSync()
 
-      const maxRedeem2 = await vault.maxRedeem(user2.address)
-      await vault.connect(user2).redeem(maxRedeem2, user2.address)
-      await updateOracle()
-      await vault.sync()
+      await vault.connect(user2).redeem(utils.parseEther('1'), user2.address)
+      await updateOracleAndSync()
 
       // We should have closed all positions.
       expect(await longPosition()).to.equal(0)
@@ -401,12 +273,9 @@ describe('BalancedVault', () => {
       const fundingAmount = BigNumber.from('308321913166')
       const fundingAmount2 = BigNumber.from('3045329143208')
       expect(await totalCollateralInVault()).to.equal(utils.parseEther('11000').add(fundingAmount).add(fundingAmount2))
-      expect(await vault.balanceOf(user.address)).to.equal(0)
-      expect(await vault.balanceOf(user2.address)).to.equal(0)
       expect(await vault.totalAssets()).to.equal(0)
-      expect(await vault.totalSupply()).to.equal(0)
-      expect(await vault.convertToAssets(utils.parseEther('1'))).to.equal(utils.parseEther('1'))
-      expect(await vault.convertToShares(utils.parseEther('1'))).to.equal(utils.parseEther('1'))
+      expect(await vault.convertToAssets(utils.parseEther('1'), user.address)).to.equal(0)
+      expect(await vault.convertToAssets(utils.parseEther('1'), user2.address)).to.equal(0)
       expect(await vault.unclaimed(user.address)).to.equal(utils.parseEther('1000').add(fundingAmount))
       expect(await vault.unclaimed(user2.address)).to.equal(utils.parseEther('10000').add(fundingAmount2))
       expect(await vault.totalUnclaimed()).to.equal(utils.parseEther('11000').add(fundingAmount).add(fundingAmount2))
@@ -423,19 +292,14 @@ describe('BalancedVault', () => {
     })
 
     it('deposit during withdraw', async () => {
-      expect(await vault.convertToAssets(utils.parseEther('1'))).to.equal(utils.parseEther('1'))
-      expect(await vault.convertToShares(utils.parseEther('1'))).to.equal(utils.parseEther('1'))
-
       const smallDeposit = utils.parseEther('1000')
       await vault.connect(user).deposit(smallDeposit, user.address)
-      await updateOracle()
-      await vault.sync()
+      await updateOracleAndSync()
 
       const largeDeposit = utils.parseEther('2000')
       await vault.connect(user2).deposit(largeDeposit, user2.address)
-      await vault.connect(user).redeem(utils.parseEther('400'), user.address)
-      await updateOracle()
-      await vault.sync()
+      await vault.connect(user).redeem(utils.parseEther('0.4'), user.address)
+      await updateOracleAndSync()
 
       // Now we should have opened positions.
       // The positions should be equal to (smallDeposit + largeDeposit) * leverage / 2 / originalOraclePrice.
@@ -446,27 +310,13 @@ describe('BalancedVault', () => {
         smallDeposit.add(largeDeposit).sub(utils.parseEther('400')).mul(leverage).div(2).div(originalOraclePrice),
       )
       const fundingAmount0 = BigNumber.from('93756866841')
-      const balanceOf2 = BigNumber.from('1999999999687477110578')
-      expect(await vault.balanceOf(user.address)).to.equal(utils.parseEther('600'))
-      expect(await vault.balanceOf(user2.address)).to.equal(balanceOf2)
       expect(await vault.totalAssets()).to.equal(utils.parseEther('2600').add(fundingAmount0))
-      expect(await vault.totalSupply()).to.equal(utils.parseEther('600').add(balanceOf2))
-      expect(await vault.convertToAssets(utils.parseEther('600').add(balanceOf2))).to.equal(
-        utils.parseEther('2600').add(fundingAmount0),
-      )
-      expect(await vault.convertToShares(utils.parseEther('2600').add(fundingAmount0))).to.equal(
-        utils.parseEther('600').add(balanceOf2),
-      )
 
-      const maxRedeem = await vault.maxRedeem(user.address)
-      await vault.connect(user).redeem(maxRedeem, user.address)
-      await updateOracle()
-      await vault.sync()
+      await vault.connect(user).redeem(utils.parseEther('1'), user.address)
+      await updateOracleAndSync()
 
-      const maxRedeem2 = await vault.maxRedeem(user2.address)
-      await vault.connect(user2).redeem(maxRedeem2, user2.address)
-      await updateOracle()
-      await vault.sync()
+      await vault.connect(user2).redeem(utils.parseEther('1'), user2.address)
+      await updateOracleAndSync()
 
       // We should have closed all positions.
       expect(await longPosition()).to.equal(0)
@@ -476,12 +326,9 @@ describe('BalancedVault', () => {
       const fundingAmount = BigNumber.from('249607634342')
       const fundingAmount2 = BigNumber.from('622820158534')
       expect(await totalCollateralInVault()).to.equal(utils.parseEther('3000').add(fundingAmount).add(fundingAmount2))
-      expect(await vault.balanceOf(user.address)).to.equal(0)
-      expect(await vault.balanceOf(user2.address)).to.equal(0)
+      expect(await vault.convertToAssets(utils.parseEther('1'), user.address)).to.equal(0)
+      expect(await vault.convertToAssets(utils.parseEther('1'), user2.address)).to.equal(0)
       expect(await vault.totalAssets()).to.equal(0)
-      expect(await vault.totalSupply()).to.equal(0)
-      expect(await vault.convertToAssets(utils.parseEther('1'))).to.equal(utils.parseEther('1'))
-      expect(await vault.convertToShares(utils.parseEther('1'))).to.equal(utils.parseEther('1'))
       expect(await vault.unclaimed(user.address)).to.equal(utils.parseEther('1000').add(fundingAmount))
       expect(await vault.unclaimed(user2.address)).to.equal(utils.parseEther('2000').add(fundingAmount2))
       expect(await vault.totalUnclaimed()).to.equal(utils.parseEther('3000').add(fundingAmount).add(fundingAmount2))
@@ -495,173 +342,6 @@ describe('BalancedVault', () => {
       expect(await asset.balanceOf(user2.address)).to.equal(utils.parseEther('200000').add(fundingAmount2))
       expect(await vault.unclaimed(user2.address)).to.equal(0)
       expect(await vault.totalUnclaimed()).to.equal(0)
-    })
-
-    it('transferring shares', async () => {
-      const smallDeposit = utils.parseEther('10')
-      await vault.connect(user).deposit(smallDeposit, user.address)
-      expect(await longCollateralInVault()).to.equal(0)
-      expect(await shortCollateralInVault()).to.equal(0)
-      await updateOracle()
-      await vault.sync()
-
-      // We're underneath the collateral minimum, so we shouldn't have opened any positions.
-      expect(await longPosition()).to.equal(0)
-      expect(await shortPosition()).to.equal(0)
-
-      const largeDeposit = utils.parseEther('10000')
-      await vault.connect(user).deposit(largeDeposit, user.address)
-      expect(await longCollateralInVault()).to.equal(utils.parseEther('5005'))
-      expect(await shortCollateralInVault()).to.equal(utils.parseEther('5005'))
-      await updateOracle()
-
-      await vault.sync()
-      expect(await vault.balanceOf(user.address)).to.equal(utils.parseEther('10010'))
-      expect(await vault.totalSupply()).to.equal(utils.parseEther('10010'))
-
-      // Now we should have opened positions.
-      // The positions should be equal to (smallDeposit + largeDeposit) * leverage / 2 / originalOraclePrice.
-      expect(await longPosition()).to.equal(
-        smallDeposit.add(largeDeposit).mul(leverage).div(2).div(originalOraclePrice),
-      )
-      expect(await shortPosition()).to.equal(
-        smallDeposit.add(largeDeposit).mul(leverage).div(2).div(originalOraclePrice),
-      )
-
-      // User 2 should not be able to withdraw; they haven't deposited anything.
-      await expect(vault.connect(user2).redeem(1, user2.address)).to.be.revertedWithCustomError(
-        vault,
-        'BalancedVaultRedemptionLimitExceeded',
-      )
-
-      // Transfer all of user's shares to user2
-      await vault.connect(user).transfer(user2.address, utils.parseEther('10010'))
-      expect(await vault.balanceOf(user.address)).to.equal(0)
-      expect(await vault.balanceOf(user2.address)).to.equal(utils.parseEther('10010'))
-      expect(await vault.totalSupply()).to.equal(utils.parseEther('10010'))
-      // Now User should not be able to withdraw as they have no more shares
-      await expect(vault.connect(user).redeem(1, user.address)).to.be.revertedWithCustomError(
-        vault,
-        'BalancedVaultRedemptionLimitExceeded',
-      )
-
-      expect(await vault.maxRedeem(user2.address)).to.equal(utils.parseEther('10010'))
-      await vault.connect(user2).redeem(await vault.maxRedeem(user2.address), user2.address)
-      await updateOracle()
-      await vault.sync()
-
-      // We should have closed all positions.
-      expect(await longPosition()).to.equal(0)
-      expect(await shortPosition()).to.equal(0)
-
-      // We should have withdrawn all of our collateral.
-      const fundingAmount = BigNumber.from('1526207855124')
-      const totalClaimable = utils.parseEther('10010').add(fundingAmount)
-      expect(await totalCollateralInVault()).to.equal(totalClaimable)
-      expect(await vault.totalAssets()).to.equal(0)
-      expect(await vault.unclaimed(user2.address)).to.equal(totalClaimable)
-      expect(await vault.totalUnclaimed()).to.equal(totalClaimable)
-
-      await vault.connect(user2).claim(user2.address)
-      expect(await totalCollateralInVault()).to.equal(0)
-      expect(await vault.totalAssets()).to.equal(0)
-      expect(await asset.balanceOf(user2.address)).to.equal(utils.parseEther('200000').add(totalClaimable))
-    })
-
-    it('partial transfers using transferFrom', async () => {
-      const smallDeposit = utils.parseEther('10')
-      await vault.connect(user).deposit(smallDeposit, user.address)
-      await updateOracle()
-      await vault.sync()
-
-      const largeDeposit = utils.parseEther('10000')
-      await vault.connect(user).deposit(largeDeposit, user.address)
-      await updateOracle()
-      await vault.sync()
-
-      // Now we should have opened positions.
-      // The positions should be equal to (smallDeposit + largeDeposit) * leverage / 2 / originalOraclePrice.
-      expect(await longPosition()).to.be.equal(
-        smallDeposit.add(largeDeposit).mul(leverage).div(2).div(originalOraclePrice),
-      )
-      expect(await shortPosition()).to.equal(
-        smallDeposit.add(largeDeposit).mul(leverage).div(2).div(originalOraclePrice),
-      )
-
-      // Setup approval
-      const shareBalance = await vault.balanceOf(user.address)
-      await vault.connect(user).approve(owner.address, shareBalance.div(2))
-      await vault.connect(owner).transferFrom(user.address, user2.address, shareBalance.div(2))
-      expect(await vault.balanceOf(user.address)).to.equal(shareBalance.sub(shareBalance.div(2)))
-      expect(await vault.balanceOf(user2.address)).to.equal(shareBalance.div(2))
-      expect(await vault.totalSupply()).to.equal(shareBalance)
-
-      const maxRedeem = await vault.maxRedeem(user.address)
-      await vault.connect(user).redeem(maxRedeem, user.address)
-      const maxRedeem2 = await vault.maxRedeem(user2.address)
-      await vault.connect(user2).redeem(maxRedeem2, user2.address)
-      await updateOracle()
-      await vault.sync()
-
-      // We should have closed all positions.
-      expect(await longPosition()).to.equal(0)
-      expect(await shortPosition()).to.equal(0)
-
-      // We should have withdrawn all of our collateral.
-      await vault.connect(user).claim(user.address)
-      await vault.connect(user2).claim(user2.address)
-
-      const fundingAmount = BigNumber.from('1526207855124')
-      const totalAssetsIn = utils.parseEther('10010')
-      expect(await totalCollateralInVault()).to.equal(0)
-      expect(await vault.totalAssets()).to.equal(0)
-      expect(await asset.balanceOf(user.address)).to.equal(
-        utils.parseEther('200000').sub(totalAssetsIn.div(2)).add(fundingAmount.div(2)),
-      )
-      expect(await asset.balanceOf(user2.address)).to.equal(
-        utils.parseEther('200000').add(totalAssetsIn.div(2)).add(fundingAmount.div(2)),
-      )
-    })
-
-    it('maxWithdraw', async () => {
-      const smallDeposit = utils.parseEther('500')
-      await vault.connect(user).deposit(smallDeposit, user.address)
-      await updateOracle()
-      await vault.sync()
-
-      const shareAmount = BigNumber.from(utils.parseEther('500'))
-      expect(await vault.maxRedeem(user.address)).to.equal(shareAmount)
-
-      const largeDeposit = utils.parseEther('10000')
-      await vault.connect(user).deposit(largeDeposit, user.address)
-      await updateOracle()
-      await vault.sync()
-
-      const shareAmount2 = BigNumber.from('9999999998435236774264')
-      expect(await vault.maxRedeem(user.address)).to.equal(shareAmount.add(shareAmount2))
-
-      // We shouldn't be able to withdraw more than maxWithdraw.
-      await expect(
-        vault.connect(user).redeem((await vault.maxRedeem(user.address)).add(1), user.address),
-      ).to.be.revertedWithCustomError(vault, 'BalancedVaultRedemptionLimitExceeded')
-
-      // But we should be able to withdraw exactly maxWithdraw.
-      await vault.connect(user).redeem(await vault.maxRedeem(user.address), user.address)
-
-      // The oracle price hasn't changed yet, so we shouldn't be able to withdraw any more.
-      expect(await vault.maxRedeem(user.address)).to.equal(0)
-
-      // But if we update the oracle price, we should be able to withdraw the rest of our collateral.
-      await updateOracle()
-      await vault.sync()
-
-      expect(await longPosition()).to.equal(0)
-      expect(await shortPosition()).to.equal(0)
-
-      // Our collateral should be less than the fixedFloat and greater than 0.
-      await vault.claim(user.address)
-      expect(await totalCollateralInVault()).to.eq(0)
-      expect(await vault.totalAssets()).to.equal(0)
     })
 
     it('maxDeposit', async () => {
@@ -685,8 +365,7 @@ describe('BalancedVault', () => {
 
     it('rebalances collateral', async () => {
       await vault.connect(user).deposit(utils.parseEther('100000'), user.address)
-      await updateOracle()
-      await vault.sync()
+      await updateOracleAndSync()
 
       const originalTotalCollateral = await totalCollateralInVault()
 
@@ -705,8 +384,7 @@ describe('BalancedVault', () => {
       // Collaterals should be equal again!
       expect(await longCollateralInVault()).to.equal(await shortCollateralInVault())
 
-      await updateOracle(originalOraclePrice)
-      await vault.sync()
+      await updateOracleAndSync(originalOraclePrice)
 
       // Since the price changed then went back to the original, the total collateral should have increased.
       const fundingAmount = BigNumber.from(21517482108955)
@@ -721,36 +399,32 @@ describe('BalancedVault', () => {
       const oddDepositAmount = utils.parseEther('10000').add(1) // 10K + 1 wei
 
       await vault.connect(user).deposit(oddDepositAmount, user.address)
-      await updateOracle()
-      await vault.sync()
+      await updateOracleAndSync()
       expect(await collateralDifference()).to.equal(0)
       expect(await asset.balanceOf(vault.address)).to.equal(1)
 
       await vault.connect(user).deposit(oddDepositAmount, user.address)
-      await updateOracle()
-      await vault.sync()
+      await updateOracleAndSync()
       expect(await collateralDifference()).to.equal(0)
     })
 
     it('deposit on behalf', async () => {
       const largeDeposit = utils.parseEther('10000')
       await vault.connect(liquidator).deposit(largeDeposit, user.address)
-      await updateOracle()
+      await updateOracleAndSync()
+      expect(await vault.convertToAssets(utils.parseEther('1'), user.address)).to.equal(utils.parseEther('10000'))
+      expect(await vault.totalAssets()).to.equal(utils.parseEther('10000'))
 
-      await vault.sync()
-      expect(await vault.balanceOf(user.address)).to.equal(utils.parseEther('10000'))
-      expect(await vault.totalSupply()).to.equal(utils.parseEther('10000'))
-
-      await expect(vault.connect(liquidator).redeem(utils.parseEther('10000'), user.address)).to.revertedWithPanic(
-        '0x11',
+      await expect(vault.connect(liquidator).redeem(utils.parseEther('1'), user.address)).to.revertedWithCustomError(
+        vault,
+        'BalancedVaultNotApproved',
       )
 
-      await vault.connect(user).approve(liquidator.address, utils.parseEther('10000'))
+      await vault.connect(user).setApproval(liquidator.address, true)
 
       // User 2 should not be able to withdraw; they haven't deposited anything.
-      await vault.connect(liquidator).redeem(utils.parseEther('10000'), user.address)
-      await updateOracle()
-      await vault.sync()
+      await vault.connect(liquidator).redeem(utils.parseEther('1'), user.address)
+      await updateOracleAndSync()
 
       // We should have withdrawn all of our collateral.
       const fundingAmount = BigNumber.from('1524724459128')
@@ -764,22 +438,20 @@ describe('BalancedVault', () => {
     it('redeem on behalf', async () => {
       const largeDeposit = utils.parseEther('10000')
       await vault.connect(user).deposit(largeDeposit, user.address)
-      await updateOracle()
+      await updateOracleAndSync()
+      expect(await vault.convertToAssets(utils.parseEther('1'), user.address)).to.equal(utils.parseEther('10000'))
+      expect(await vault.totalAssets()).to.equal(utils.parseEther('10000'))
 
-      await vault.sync()
-      expect(await vault.balanceOf(user.address)).to.equal(utils.parseEther('10000'))
-      expect(await vault.totalSupply()).to.equal(utils.parseEther('10000'))
-
-      await expect(vault.connect(liquidator).redeem(utils.parseEther('10000'), user.address)).to.revertedWithPanic(
-        '0x11',
+      await expect(vault.connect(liquidator).redeem(utils.parseEther('1'), user.address)).to.revertedWithCustomError(
+        vault,
+        'BalancedVaultNotApproved',
       )
 
-      await vault.connect(user).approve(liquidator.address, utils.parseEther('10000'))
+      await vault.connect(user).setApproval(liquidator.address, true)
 
       // User 2 should not be able to withdraw; they haven't deposited anything.
-      await vault.connect(liquidator).redeem(utils.parseEther('10000'), user.address)
-      await updateOracle()
-      await vault.sync()
+      await vault.connect(liquidator).redeem(utils.parseEther('1'), user.address)
+      await updateOracleAndSync()
 
       // We should have withdrawn all of our collateral.
       const fundingAmount = BigNumber.from('1524724459128')
@@ -795,14 +467,12 @@ describe('BalancedVault', () => {
         .connect(perennialUser)
         .depositTo(perennialUser.address, short.address, utils.parseEther('400000'))
       await short.connect(perennialUser).openMake(utils.parseEther('480'))
-      await updateOracle()
-      await vault.sync()
+      await updateOracleAndSync()
 
       // Deposit should create a greater position than what's available
       const largeDeposit = utils.parseEther('10000')
       await vault.connect(user).deposit(largeDeposit, user.address)
-      await updateOracle()
-      await vault.sync()
+      await updateOracleAndSync()
 
       // Now we should have opened positions.
       // The positions should be equal to (smallDeposit + largeDeposit) * leverage / 2 / originalOraclePrice.
@@ -822,19 +492,45 @@ describe('BalancedVault', () => {
       )
 
       await short.connect(perennialUser).openMake(makerAvailable)
-      await updateOracle()
-      await vault.sync()
+      await updateOracleAndSync()
 
       // Deposit should create a greater position than what's available
       const largeDeposit = utils.parseEther('10000')
       await vault.connect(user).deposit(largeDeposit, user.address)
-      await updateOracle()
-      await vault.sync()
+      await updateOracleAndSync()
 
       // Now we should have opened positions.
       // The positions should be equal to (smallDeposit + largeDeposit) * leverage / 2 / originalOraclePrice.
       expect(await longPosition()).to.equal(largeDeposit.mul(leverage).div(2).div(originalOraclePrice))
       expect(await shortPosition()).to.equal(0)
+    })
+
+    it('product closing closes all positions', async () => {
+      const largeDeposit = utils.parseEther('10000')
+      await vault.connect(user).deposit(largeDeposit, user.address)
+      await updateOracleAndSync()
+
+      expect(await longPosition()).to.be.greaterThan(0)
+      expect(await shortPosition()).to.be.greaterThan(0)
+      const productOwner = await impersonate.impersonateWithBalance(
+        await controller['owner(address)'](long.address),
+        utils.parseEther('10'),
+      )
+      await long.connect(productOwner).updateClosed(true)
+      await updateOracleAndSync()
+      await updateOracleAndSync()
+
+      // We should have closed all positions
+      expect(await longPosition()).to.equal(0)
+      expect(await shortPosition()).to.equal(0)
+
+      await long.connect(productOwner).updateClosed(false)
+      await updateOracleAndSync()
+      await updateOracleAndSync()
+
+      // Positions should be opened back up again
+      expect(await longPosition()).to.be.greaterThan(0)
+      expect(await shortPosition()).to.be.greaterThan(0)
     })
 
     context('liquidation', () => {
@@ -851,7 +547,7 @@ describe('BalancedVault', () => {
             vault,
             'BalancedVaultDepositLimitExceeded',
           )
-          await expect(vault.connect(user).redeem(2, user.address)).to.revertedWithCustomError(
+          await expect(vault.connect(user).redeem(utils.parseEther('1'), user.address)).to.revertedWithCustomError(
             vault,
             'BalancedVaultRedemptionLimitExceeded',
           )
@@ -865,7 +561,7 @@ describe('BalancedVault', () => {
             vault,
             'BalancedVaultDepositLimitExceeded',
           )
-          await expect(vault.connect(user).redeem(2, user.address)).to.revertedWithCustomError(
+          await expect(vault.connect(user).redeem(utils.parseEther('1'), user.address)).to.revertedWithCustomError(
             vault,
             'BalancedVaultRedemptionLimitExceeded',
           )
@@ -889,7 +585,7 @@ describe('BalancedVault', () => {
             vault,
             'BalancedVaultDepositLimitExceeded',
           )
-          await expect(vault.connect(user).redeem(2, user.address)).to.revertedWithCustomError(
+          await expect(vault.connect(user).redeem(utils.parseEther('1'), user.address)).to.revertedWithCustomError(
             vault,
             'BalancedVaultRedemptionLimitExceeded',
           )
@@ -903,7 +599,7 @@ describe('BalancedVault', () => {
             vault,
             'BalancedVaultDepositLimitExceeded',
           )
-          await expect(vault.connect(user).redeem(2, user.address)).to.revertedWithCustomError(
+          await expect(vault.connect(user).redeem(utils.parseEther('1'), user.address)).to.revertedWithCustomError(
             vault,
             'BalancedVaultRedemptionLimitExceeded',
           )
@@ -916,7 +612,7 @@ describe('BalancedVault', () => {
             vault,
             'BalancedVaultDepositLimitExceeded',
           )
-          await expect(vault.connect(user).redeem(2, user.address)).to.revertedWithCustomError(
+          await expect(vault.connect(user).redeem(utils.parseEther('1'), user.address)).to.revertedWithCustomError(
             vault,
             'BalancedVaultRedemptionLimitExceeded',
           )
@@ -926,8 +622,7 @@ describe('BalancedVault', () => {
           await updateOracle(utils.parseEther('3000'))
           await vault.connect(user).deposit(2, user.address)
 
-          await updateOracle()
-          await vault.sync()
+          await updateOracleAndSync()
 
           const finalPosition = BigNumber.from('62621983855221267778')
           const finalCollateral = BigNumber.from('46966487895388362252059')
@@ -950,8 +645,7 @@ describe('BalancedVault', () => {
             .connect(perennialUser)
             .depositTo(perennialUser.address, short.address, utils.parseEther('280000'))
           await short.connect(perennialUser).openTake(utils.parseEther('1100'))
-          await updateOracle()
-          await vault.sync()
+          await updateOracleAndSync()
         })
 
         it('recovers before being liquidated', async () => {
@@ -966,7 +660,7 @@ describe('BalancedVault', () => {
             vault,
             'BalancedVaultDepositLimitExceeded',
           )
-          await expect(vault.connect(user).redeem(2, user.address)).to.revertedWithCustomError(
+          await expect(vault.connect(user).redeem(utils.parseEther('1'), user.address)).to.revertedWithCustomError(
             vault,
             'BalancedVaultRedemptionLimitExceeded',
           )
@@ -980,7 +674,7 @@ describe('BalancedVault', () => {
             vault,
             'BalancedVaultDepositLimitExceeded',
           )
-          await expect(vault.connect(user).redeem(2, user.address)).to.revertedWithCustomError(
+          await expect(vault.connect(user).redeem(utils.parseEther('1'), user.address)).to.revertedWithCustomError(
             vault,
             'BalancedVaultRedemptionLimitExceeded',
           )
@@ -1004,7 +698,7 @@ describe('BalancedVault', () => {
             vault,
             'BalancedVaultDepositLimitExceeded',
           )
-          await expect(vault.connect(user).redeem(2, user.address)).to.revertedWithCustomError(
+          await expect(vault.connect(user).redeem(utils.parseEther('1'), user.address)).to.revertedWithCustomError(
             vault,
             'BalancedVaultRedemptionLimitExceeded',
           )
@@ -1018,7 +712,7 @@ describe('BalancedVault', () => {
             vault,
             'BalancedVaultDepositLimitExceeded',
           )
-          await expect(vault.connect(user).redeem(2, user.address)).to.revertedWithCustomError(
+          await expect(vault.connect(user).redeem(utils.parseEther('1'), user.address)).to.revertedWithCustomError(
             vault,
             'BalancedVaultRedemptionLimitExceeded',
           )
@@ -1031,7 +725,7 @@ describe('BalancedVault', () => {
             vault,
             'BalancedVaultDepositLimitExceeded',
           )
-          await expect(vault.connect(user).redeem(2, user.address)).to.revertedWithCustomError(
+          await expect(vault.connect(user).redeem(utils.parseEther('1'), user.address)).to.revertedWithCustomError(
             vault,
             'BalancedVaultRedemptionLimitExceeded',
           )
@@ -1041,8 +735,7 @@ describe('BalancedVault', () => {
           await updateOracle()
           await vault.connect(user).deposit(2, user.address)
 
-          await updateOracle()
-          await vault.sync()
+          await updateOracleAndSync()
 
           const finalPosition = BigNumber.from('169949012636167808676')
           const finalCollateral = BigNumber.from('50984710404199215353605')
@@ -1062,20 +755,17 @@ describe('BalancedVault', () => {
           .connect(perennialUser)
           .depositTo(perennialUser.address, long.address, utils.parseEther('120000'))
         await long.connect(perennialUser).openTake(utils.parseEther('700'))
-        await updateOracle()
-        await vault.sync()
+        await updateOracleAndSync()
       })
 
       it('gracefully unwinds upon insolvency', async () => {
         // 1. Deposit initial amount into the vault
         await vault.connect(user).deposit(utils.parseEther('100000'), user.address)
-        await updateOracle()
-        await vault.sync()
+        await updateOracleAndSync()
 
         // 2. Redeem most of the amount, but leave it unclaimed
-        await vault.connect(user).redeem(utils.parseEther('80000'), user.address)
-        await updateOracle()
-        await vault.sync()
+        await vault.connect(user).redeem(utils.parseEther('0.8'), user.address)
+        await updateOracleAndSync()
 
         // 3. An oracle update makes the long position liquidatable, initiate take close
         await updateOracle(utils.parseEther('20000'))
@@ -1086,10 +776,8 @@ describe('BalancedVault', () => {
 
         // // 4. Settle the vault to recover and rebalance
         await updateOracle() // let take settle at high price
-        await updateOracle(utils.parseEther('1500')) // return to normal price to let vault rebalance
-        await vault.sync()
-        await updateOracle()
-        await vault.sync()
+        await updateOracleAndSync(utils.parseEther('1500')) // return to normal price to let vault rebalance
+        await updateOracleAndSync()
 
         // 5. Vault should no longer have enough collateral to cover claims, pro-rata claim should be enabled
         const finalPosition = BigNumber.from('0')

@@ -89,11 +89,18 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @param name_ ERC20 asset name
      * @param symbol_ ERC20 asset symbol
      */
-    function initialize(string memory name_, string memory symbol_) external initializer(1) {
+    function initialize(string memory name_, string memory symbol_) external initializer(2) {
         name = name_;
         symbol = symbol_;
 
         asset.approve(address(collateral));
+
+        // TODO: Add the ability to add more markets.
+        numberOfMarkets = 1;
+        totalWeight = 1;
+        marketAccounting[0].weight = 1;
+        marketAccounting[0].long = __unused1;
+        marketAccounting[0].short = __unused2;
     }
 
     /**
@@ -283,7 +290,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
         UFixed18 total = UFixed18Lib.ZERO;
         for (uint256 market = 0; market < numberOfMarkets; ++market) {
             (, VersionContext memory accountContext) = _loadContextForRead(market, account);
-            total = total.add(_totalUnclaimedAtVersion(accountContext));
+            total = total.add(_unclaimedAtVersion(accountContext, account));
         }
         return total;
     }
@@ -297,13 +304,14 @@ contract BalancedVault is IBalancedVault, UInitializable {
     function convertToAssets(UFixed18 proportion, address account) external view returns (UFixed18) {
         UFixed18 total = UFixed18Lib.ZERO;
         for (uint256 market = 0; market < numberOfMarkets; ++market) {
-            (VersionContext memory context, ) = _loadContextForRead(market, address(0));
+            (VersionContext memory context, VersionContext memory accountContext) = _loadContextForRead(market, account);
             (context.latestCollateral, context.latestShares) =
                 (_totalAssetsAtVersion(context), _totalSupplyAtVersion(context));
-            UFixed18 shares = marketAccounting[market].balanceOf[account].mul(proportion);
-            total = total.add(_convertToAssetsAtVersion(context, shares));
+            if (context.latestShares.gt(UFixed18Lib.ZERO)) {
+                total = total.add(_convertToAssetsAtVersion(context, context.latestShares).muldiv(_balanceOfAtVersion(accountContext, account), context.latestShares));
+            }
         }
-        return total;
+        return total.mul(proportion);
     }
 
     /**
@@ -314,9 +322,9 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @return accountContexts The current version contexts for each market for the given account
      */
     function _settle(address account) private returns (VersionContext[] memory contexts, VersionContext[] memory accountContexts) {
-        contexts = new VersionContext[](marketAccounting.length);
-        accountContexts = new VersionContext[](marketAccounting.length);
-        for (uint256 market = 0; market < marketAccounting.length; ++market) {
+        contexts = new VersionContext[](numberOfMarkets);
+        accountContexts = new VersionContext[](numberOfMarkets);
+        for (uint256 market = 0; market < numberOfMarkets; ++market) {
             (contexts[market], accountContexts[market]) = _loadContextForWrite(market, account);
             if (contexts[market].version > marketAccounting[market].latestVersion) {
                 _delayedMint(market, _totalSupplyAtVersion(contexts[market]).sub(marketAccounting[market].totalSupply));
@@ -354,7 +362,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
      */
     function _rebalance(VersionContext[] memory contexts, UFixed18 claimAmount) private {
         _rebalanceCollateral(claimAmount);
-        for (uint256 market = 0; market < marketAccounting.length; ++market) {
+        for (uint256 market = 0; market < numberOfMarkets; ++market) {
             _rebalancePosition(contexts[market], claimAmount);
         }
     }
@@ -368,7 +376,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
         UFixed18[] memory longCollaterals = new UFixed18[](numberOfMarkets);
         UFixed18[] memory shortCollaterals = new UFixed18[](numberOfMarkets);
         UFixed18 totalCollateral = UFixed18Lib.ZERO;
-        for (uint256 market = 0; market < marketAccounting.length; ++market) {
+        for (uint256 market = 0; market < numberOfMarkets; ++market) {
             UFixed18 idlecollateral;
             (longCollaterals[market], shortCollaterals[market], idlecollateral) = _collateral(market);
             totalCollateral = totalCollateral.add(longCollaterals[market]).add(shortCollaterals[market]).add(idlecollateral);
@@ -376,40 +384,51 @@ contract BalancedVault is IBalancedVault, UInitializable {
         totalCollateral = totalCollateral.sub(claimAmount);
 
         // 2. Get target collateral for each product
-        UFixed18 totalCollateralToWithdraw = UFixed18Lib.ZERO;
         UFixed18 totalCollateralToDeposit = UFixed18Lib.ZERO;
-        for (uint256 market = 0; market < marketAccounting.length; ++market) {
+        bool enoughCollateralForAllProducts = true;
+        for (uint256 market = 0; market < numberOfMarkets; ++market) {
             UFixed18 targetCollateral = totalCollateral.muldiv(marketAccounting[market].weight, totalWeight).div(TWO);
-            if (targetCollateral.lt(controller.minCollateral())) targetCollateral = UFixed18Lib.ZERO;
+            if (targetCollateral.lt(controller.minCollateral())) {
+                targetCollateral = UFixed18Lib.ZERO;
+                enoughCollateralForAllProducts = false;
+            }
 
             // 3. Best-effort withdrawal of collateral from products with too much collateral
             // TODO: Don't withdraw all if it would revert
             if (longCollaterals[market].gt(targetCollateral)) {
-                totalCollateralToWithdraw = totalCollateralToWithdraw.add(longCollaterals[market].sub(targetCollateral));
                 _updateCollateral(marketAccounting[market].long, longCollaterals[market], targetCollateral);
             } else {
                 totalCollateralToDeposit = totalCollateralToDeposit.add(targetCollateral.sub(longCollaterals[market]));
             }
             if (shortCollaterals[market].gt(targetCollateral)) {
-                totalCollateralToWithdraw = totalCollateralToWithdraw.add(shortCollaterals[market].sub(targetCollateral));
                 _updateCollateral(marketAccounting[market].short, shortCollaterals[market], targetCollateral);
             } else {
                 totalCollateralToDeposit = totalCollateralToDeposit.add(targetCollateral.sub(shortCollaterals[market]));
             }
         }
 
+        UFixed18 idleCollateral = asset.balanceOf();
+        UFixed18 depositProRataRatio = UFixed18Lib.ONE;
+        if (idleCollateral.lt(totalCollateralToDeposit)) {
+            depositProRataRatio = idleCollateral.div(totalCollateralToDeposit);
+        }
+
         // 4. Pro-rata deposit of collateral into products with too little collateral
-        for (uint256 market = 0; market < marketAccounting.length; ++market) {
+        if (!enoughCollateralForAllProducts) {
+            // Only deposit any collateral if we have enough collateral to meet minCollateral for all products.
+            return;
+        }
+        for (uint256 market = 0; market < numberOfMarkets; ++market) {
             UFixed18 targetCollateral = totalCollateral.muldiv(marketAccounting[market].weight, totalWeight).div(TWO);
             if (longCollaterals[market].lt(targetCollateral)) {
                 _updateCollateral(marketAccounting[market].long,
                                   longCollaterals[market],
-                                  longCollaterals[market].add(targetCollateral.sub(longCollaterals[market]).muldiv(totalCollateralToDeposit, totalCollateralToWithdraw)));
+                                  longCollaterals[market].add(targetCollateral.sub(longCollaterals[market]).mul(depositProRataRatio)));
             }
             if (shortCollaterals[market].lt(targetCollateral)) {
                 _updateCollateral(marketAccounting[market].short,
                                   shortCollaterals[market],
-                                  shortCollaterals[market].add(targetCollateral.sub(shortCollaterals[market]).muldiv(totalCollateralToDeposit, totalCollateralToWithdraw)));
+                                  shortCollaterals[market].add(targetCollateral.sub(shortCollaterals[market]).mul(depositProRataRatio)));
             }
         }
     }
@@ -418,14 +437,20 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @notice Rebalances the position of the vault
      */
     function _rebalancePosition(VersionContext memory context, UFixed18 claimAmount) private {
+        IProduct long = marketAccounting[context.market].long;
+        IProduct short = marketAccounting[context.market].short;
+        if (long.closed() || short.closed()) {
+            _updateMakerPosition(long, UFixed18Lib.ZERO);
+            _updateMakerPosition(short, UFixed18Lib.ZERO);
+            return;
+        }
+
         UFixed18 currentAssets = _totalAssetsAtVersion(context).sub(claimAmount);
         UFixed18 currentUtilized = marketAccounting[context.market].totalSupply.add(marketAccounting[context.market].redemption).isZero() ?
             marketAccounting[context.market].deposit.add(currentAssets) :
             marketAccounting[context.market].deposit.add(currentAssets.muldiv(marketAccounting[context.market].totalSupply, marketAccounting[context.market].totalSupply.add(marketAccounting[context.market].redemption)));
         if (currentUtilized.lt(controller.minCollateral().mul(TWO))) currentUtilized = UFixed18Lib.ZERO;
 
-        IProduct long = marketAccounting[context.market].long;
-        IProduct short = marketAccounting[context.market].short;
         UFixed18 currentPrice = long.atVersion(context.version).price.abs();
         UFixed18 targetPosition = currentUtilized.mul(targetLeverage).div(currentPrice).div(TWO);
 
