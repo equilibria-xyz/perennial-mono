@@ -56,7 +56,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     contract: 'TransparentUpgradeableProxy',
     args: [multiInvokerImpl.address, proxyAdminAddress, '0x'],
     from: deployer,
-    skipIfAlreadyDeployed: false,
+    skipIfAlreadyDeployed: true,
     log: true,
     autoMine: true,
   })
@@ -94,4 +94,4 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 }
 
 export default func
-func.tags = ['MultiInvokerRollup']
+func.tags = ['MultiInvoker']
