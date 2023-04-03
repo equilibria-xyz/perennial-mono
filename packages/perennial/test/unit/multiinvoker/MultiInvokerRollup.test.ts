@@ -110,6 +110,7 @@ describe('MultiInvokerRollup', () => {
 
   describe('#invoke', () => {
     let actions: { [action in InvokerAction]: { action: BigNumberish; payload: string } }
+    let zeroAction: { [action in InvokerAction]: { action: BigNumberish; payload: string } }
     const amount = utils.parseEther('100')
     const usdcAmount = 100e6
     const position = utils.parseEther('12')
@@ -130,6 +131,20 @@ describe('MultiInvokerRollup', () => {
         vaultAmount,
         programs,
       )
+
+      zeroAction = buildInvokerActionRollup(
+        BigNumber.from(0),
+        BigNumber.from(0),
+        BigNumber.from(0),
+        user.address,
+        product.address,
+        vault.address,
+        position,
+        0,
+        vaultAmount,
+        programs,
+      )
+
       dsu.transferFrom.whenCalledWith(user.address, multiInvokerRollup.address, amount).returns(true)
       usdc.transferFrom.whenCalledWith(user.address, multiInvokerRollup.address, usdcAmount).returns(true)
       usdc.transfer.whenCalledWith(user.address, usdcAmount).returns(true)
@@ -143,6 +158,17 @@ describe('MultiInvokerRollup', () => {
 
     it('does nothing on NOOP action', async () => {
       await expect(multiInvokerRollup.connect(user)).to.not.be.reverted
+    })
+
+    it(`decodes 0 as a value on any action`, async () => {
+      const res = user.sendTransaction(
+        buildTransactionRequest(user, multiInvokerRollup, '0x' + zeroAction.WRAP.payload),
+      )
+
+      console.log(zeroAction.WRAP.payload)
+
+      await expect(res).to.not.be.reverted
+      //expect(batcher.wrap).to.have.been.calledWith(BigNumber.from(0), user.address)
     })
 
     it('deposits on DEPOSIT action', async () => {
