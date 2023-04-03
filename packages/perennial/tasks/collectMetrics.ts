@@ -21,6 +21,7 @@ type QueryResult = {
 
 export default task('collectMetrics', 'Collects metrics for a given day')
   .addPositionalParam('dateString', 'Date string to collect stats for. YYYY-MM-DD format')
+  .addPositionalParam('market', 'Market to collect stats for. "eth" or "arb"')
   .addOptionalParam('output', 'Output file path')
   .addFlag('csv', 'Output as CSV')
   .setAction(async (args: TaskArguments, HRE: HardhatRuntimeEnvironment) => {
@@ -39,33 +40,50 @@ export default task('collectMetrics', 'Collects metrics for a given day')
       return
     }
 
+    const market = args.market
     const multicall = new providers.MulticallProvider(ethers.provider)
     const lens = (await ethers.getContractAt('IPerennialLens', (await get('PerennialLens_V01')).address)).connect(
       multicall,
     )
-    const longEther = (await get('Product_LongEther')).address
-    const shortEther = (await get('Product_ShortEther')).address
+    const longProduct =
+      market === 'arb' ? (await get('Product_LongArbitrum')).address : (await get('Product_LongEther')).address
+    const shortProduct =
+      market === 'arb' ? (await get('Product_ShortArbitrum')).address : (await get('Product_ShortEther')).address
+    const vault =
+      market === 'arb' ? (await get('PerennialVaultBravo')).address : (await get('PerennialVaultAlpha')).address
 
     const query = gql`
-      query getData($fromTs: BigInt!, $toTs: BigInt!, $first: Int!, $skip: Int!) {
-        takeOpeneds(first: $first, skip: $skip, where: { blockTimestamp_gte: $fromTs, blockTimestamp_lt: $toTs }) {
+      query getData($markets: [Bytes]!, $fromTs: BigInt!, $toTs: BigInt!, $first: Int!, $skip: Int!) {
+        takeOpeneds(
+          first: $first
+          skip: $skip
+          where: { product_in: $markets, blockTimestamp_gte: $fromTs, blockTimestamp_lt: $toTs }
+        ) {
           amount
           version
           fee
         }
-        takeCloseds(first: $first, skip: $skip, where: { blockTimestamp_gte: $fromTs, blockTimestamp_lt: $toTs }) {
+        takeCloseds(
+          first: $first
+          skip: $skip
+          where: { product_in: $markets, blockTimestamp_gte: $fromTs, blockTimestamp_lt: $toTs }
+        ) {
           amount
           version
           fee
         }
-        settles(first: $first, skip: $skip, where: { blockTimestamp_gte: $fromTs, blockTimestamp_lt: $toTs }) {
+        settles(
+          first: $first
+          skip: $skip
+          where: { product_in: $markets, blockTimestamp_gte: $fromTs, blockTimestamp_lt: $toTs }
+        ) {
           toVersion
           toVersionPrice
           preVersion
           preVersionPrice
         }
         lastSettle: settles(
-          where: { blockTimestamp_gte: $fromTs, blockTimestamp_lt: $toTs }
+          where: { product_in: $markets, blockTimestamp_gte: $fromTs, blockTimestamp_lt: $toTs }
           orderBy: blockTimestamp
           orderDirection: desc
           first: 1
@@ -77,6 +95,7 @@ export default task('collectMetrics', 'Collects metrics for a given day')
 
     let page = 0
     let res: QueryResult = await request(graphURL, query, {
+      markets: [longProduct, shortProduct],
       fromTs: Math.floor(startDate / 1000).toString(),
       toTs: Math.floor(endDate / 1000).toString(),
       first: QUERY_PAGE_SIZE,
@@ -90,6 +109,7 @@ export default task('collectMetrics', 'Collects metrics for a given day')
     ) {
       page += 1
       res = await request(graphURL, query, {
+        markets: [longProduct, shortProduct],
         fromTs: Math.floor(startDate / 1000).toString(),
         toTs: Math.floor(endDate / 1000).toString(),
         first: QUERY_PAGE_SIZE,
@@ -144,15 +164,19 @@ export default task('collectMetrics', 'Collects metrics for a given day')
     const totalVolume = openVolume.add(closeVolume)
 
     const endBlock = BigNumber.from(rawData.lastSettle[0].blockNumber)
-    const [longSnapshot, shortSnapshot] = await Promise.all([
-      lens.callStatic['snapshot(address)'](longEther, { blockTag: endBlock.toHexString() }),
-      lens.callStatic['snapshot(address)'](shortEther, { blockTag: endBlock.toHexString() }),
+    const [longSnapshot, shortSnapshot, vaultLongCollateral, vaultShortCollateral] = await Promise.all([
+      lens.callStatic['snapshot(address)'](longProduct, { blockTag: endBlock.toHexString() }),
+      lens.callStatic['snapshot(address)'](shortProduct, { blockTag: endBlock.toHexString() }),
+      lens.callStatic['collateral(address,address)'](vault, longProduct, { blockTag: endBlock.toHexString() }),
+      lens.callStatic['collateral(address,address)'](vault, shortProduct, { blockTag: endBlock.toHexString() }),
     ])
 
     const data = {
+      market: market,
       date: args.dateString,
       makerOI: formatEther(longSnapshot.openInterest.maker.add(shortSnapshot.openInterest.maker)),
       takerOI: formatEther(longSnapshot.openInterest.taker.add(shortSnapshot.openInterest.taker)),
+      vaultAssets: formatEther(vaultLongCollateral.add(vaultShortCollateral)),
       avgHourlyRate: formatEther(
         longSnapshot.rate
           .add(shortSnapshot.rate)
