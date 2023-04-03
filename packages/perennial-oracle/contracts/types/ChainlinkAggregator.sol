@@ -86,7 +86,7 @@ library ChainlinkAggregatorLib {
         ChainlinkRound memory lastSyncedRound = getRound(self, lastSyncedRoundId);
         uint16 phaseToSearch = lastSyncedRound.phaseId();
         while (nextPhaseStartingRoundId == 0) {
-            phaseToSearch += 1;
+            phaseToSearch++;
             nextPhaseStartingRoundId = getStartingRoundId(self, phaseToSearch, lastSyncedRound.timestamp);
         }
 
