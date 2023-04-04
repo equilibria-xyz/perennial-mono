@@ -104,23 +104,44 @@ contract BalancedVault is IBalancedVault, UInitializable {
     }
 
     /**
+     * @notice Returns the long and short products for a market
+     * @param market The market ID to get products for
+     * @return long The long product
+     * @return short The short product
+     */
+    function productsForMarket(uint256 market) external view returns (IProduct long, IProduct short, uint256 weight) {
+        long = marketAccounting[market].long;
+        short = marketAccounting[market].short;
+        weight = marketAccounting[market].weight;
+    }
+
+    function addMarket(IProduct long, IProduct short, uint256 weight) external onlyControllerOwner {
+        if (numberOfMarkets == marketAccounting.length) revert BalancedVaultTooManyMarkets();
+
+        marketAccounting[numberOfMarkets].long = long;
+        marketAccounting[numberOfMarkets].short = short;
+        marketAccounting[numberOfMarkets].weight = weight;
+        totalWeight += weight;
+        numberOfMarkets += 1;
+
+        emit MarketAdded(numberOfMarkets - 1, long, short, weight);
+    }
+
+    function updateWeight(uint256 market, uint256 weight) external onlyControllerOwner validMarket(market) {
+        totalWeight -= marketAccounting[market].weight;
+        marketAccounting[market].weight = weight;
+        totalWeight += weight;
+
+        emit WeightUpdated(market, weight);
+    }
+
+    /**
      * @notice Rebalances the collateral and position of the vault without a deposit or withdraw
      * @dev Should be called by a keeper when the vault approaches a liquidation state on either side
      */
     function sync() external {
         (VersionContext[] memory contexts, ) = _settle(address(0));
         _rebalance(contexts, UFixed18Lib.ZERO);
-    }
-
-    /**
-     * @notice Returns the long and short products for a market
-     * @param market The market ID to get products for
-     * @return long The long product
-     * @return short The short product
-     */
-    function productsForMarket(uint256 market) external view returns (IProduct long, IProduct short) {
-        long = marketAccounting[market].long;
-        short = marketAccounting[market].short;
     }
 
     /**
@@ -731,6 +752,14 @@ contract BalancedVault is IBalancedVault, UInitializable {
     /// @dev Verify that `market` is a valid market ID
     modifier validMarket(uint256 market) {
         if (market >= numberOfMarkets) revert InvalidMarket(market);
+
+        _;
+    }
+
+    /// @dev Verify that the caller is the owner of the controller
+    // TODO: Is this the right owner check?
+    modifier onlyControllerOwner() {
+        if (msg.sender != controller.owner()) revert BalancedVaultUnauthorized();
 
         _;
     }

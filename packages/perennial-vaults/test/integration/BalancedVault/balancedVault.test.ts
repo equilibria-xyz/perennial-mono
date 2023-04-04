@@ -1,5 +1,6 @@
 import HRE from 'hardhat'
 import { time, impersonate } from '../../../../common/testutil'
+import { deployProductOnMainnetFork } from '../helpers/setupHelpers'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { FakeContract, smock } from '@defi-wonderland/smock'
 import { expect, use } from 'chai'
@@ -30,6 +31,7 @@ describe('BalancedVault', () => {
   let oracle: FakeContract<IOracleProvider>
   let collateral: ICollateral
   let controller: IController
+  let controllerOwner: SignerWithAddress
   let owner: SignerWithAddress
   let user: SignerWithAddress
   let user2: SignerWithAddress
@@ -40,6 +42,8 @@ describe('BalancedVault', () => {
   let leverage: BigNumber
   let maxCollateral: BigNumber
   let originalOraclePrice: BigNumber
+  let btcLong: IProduct
+  let btcShort: IProduct
 
   async function updateOracle(newPrice?: BigNumber) {
     const [currentVersion, currentTimestamp, currentPrice] = await oracle.currentVersion()
@@ -84,6 +88,10 @@ describe('BalancedVault', () => {
 
     const dsu = IERC20Metadata__factory.connect('0x605D26FBd5be761089281d5cec2Ce86eeA667109', owner)
     controller = IController__factory.connect('0x9df509186b6d3b7D033359f94c8b1BB5544d51b3', owner)
+    controllerOwner = await impersonate.impersonateWithBalance(
+      await controller.callStatic['owner()'](),
+      utils.parseEther('10'),
+    )
     long = IProduct__factory.connect('0xdB60626FF6cDC9dB07d3625A93d21dDf0f8A688C', owner)
     short = IProduct__factory.connect('0xfeD3E166330341e0305594B8c6e6598F9f4Cbe9B', owner)
     collateral = ICollateral__factory.connect('0x2d264ebdb6632a06a1726193d4d37fef1e5dbdcd', owner)
@@ -124,6 +132,24 @@ describe('BalancedVault', () => {
     oracle.sync.returns(currentVersion)
     oracle.currentVersion.returns(currentVersion)
     oracle.atVersion.whenCalledWith(currentVersion[0]).returns(currentVersion)
+
+    btcLong = await deployProductOnMainnetFork({
+      owner: owner,
+      name: '1x Long BTC',
+      symbol: 'BTC-long',
+      baseCurrency: '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB',
+      quoteCurrency: '0x0000000000000000000000000000000000000348',
+      short: false,
+    })
+
+    btcShort = await deployProductOnMainnetFork({
+      owner: owner,
+      name: '1x Short BTC',
+      symbol: 'BTC-short',
+      baseCurrency: '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB',
+      quoteCurrency: '0x0000000000000000000000000000000000000348',
+      short: true,
+    })
   })
 
   describe('#initialize', () => {
@@ -150,6 +176,39 @@ describe('BalancedVault', () => {
   describe('#decimals', () => {
     it('is correct', async () => {
       expect(await vault.decimals()).to.equal(18)
+    })
+  })
+
+  describe('#addMarket', () => {
+    it('adds market correctly', async () => {
+      const weight = BigNumber.from(2)
+      await expect(vault.connect(controllerOwner).addMarket(btcLong.address, btcShort.address, weight))
+        .to.emit(vault, 'MarketAdded')
+        .withArgs(1, btcLong.address, btcShort.address, weight)
+
+      expect(await vault.productsForMarket(1)).to.deep.equal([btcLong.address, btcShort.address, weight])
+    })
+
+    it('reverts if unauthorized user tries to call', async () => {
+      await expect(vault.addMarket(btcLong.address, btcShort.address, 2)).to.revertedWithCustomError(
+        vault,
+        'BalancedVaultUnauthorized',
+      )
+    })
+  })
+
+  describe('#updateWeight', () => {
+    it('updates weight correctly', async () => {
+      const weight = BigNumber.from(2)
+      await expect(vault.connect(controllerOwner).updateWeight(0, weight))
+        .to.emit(vault, 'WeightUpdated')
+        .withArgs(0, weight)
+
+      expect(await vault.productsForMarket(0)).to.deep.equal([long.address, short.address, weight])
+    })
+
+    it('reverts if unauthorized user tries to call', async () => {
+      await expect(vault.updateWeight(0, 2)).to.revertedWithCustomError(vault, 'BalancedVaultUnauthorized')
     })
   })
 
