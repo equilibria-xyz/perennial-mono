@@ -13,8 +13,8 @@ const { formatEther } = utils
 const QUERY_PAGE_SIZE = 1000
 
 type QueryResult = {
-  takeOpeneds: { amount: string; version: string; fee: string }[]
-  takeCloseds: { amount: string; version: string; fee: string }[]
+  takeOpeneds: { product: string; amount: string; version: string; fee: string }[]
+  takeCloseds: { product: string; amount: string; version: string; fee: string }[]
   settles: { toVersion: string; toVersionPrice: string; preVersion: string; preVersionPrice: string }[]
   lastSettle: { blockNumber: string }[]
 }
@@ -59,6 +59,7 @@ export default task('collectMetrics', 'Collects metrics for a given day')
           skip: $skip
           where: { product_in: $markets, blockTimestamp_gte: $fromTs, blockTimestamp_lt: $toTs }
         ) {
+          product
           amount
           version
           fee
@@ -68,6 +69,7 @@ export default task('collectMetrics', 'Collects metrics for a given day')
           skip: $skip
           where: { product_in: $markets, blockTimestamp_gte: $fromTs, blockTimestamp_lt: $toTs }
         ) {
+          product
           amount
           version
           fee
@@ -120,12 +122,14 @@ export default task('collectMetrics', 'Collects metrics for a given day')
       rawData.settles = [...rawData.settles, ...res.settles]
     }
 
-    const takeOpeneds = rawData.takeOpeneds.map(({ amount, version, fee }) => ({
+    const takeOpeneds = rawData.takeOpeneds.map(({ product, amount, version, fee }) => ({
+      product: product.toLowerCase(),
       amount: BigNumber.from(amount),
       version: BigNumber.from(version),
       fee: BigNumber.from(fee),
     }))
-    const takeCloseds = rawData.takeCloseds.map(({ amount, version, fee }) => ({
+    const takeCloseds = rawData.takeCloseds.map(({ product, amount, version, fee }) => ({
+      product: product.toLowerCase(),
       amount: BigNumber.from(amount),
       version: BigNumber.from(version),
       fee: BigNumber.from(fee),
@@ -157,26 +161,46 @@ export default task('collectMetrics', 'Collects metrics for a given day')
       (acc, { amount, version }) => Big18Math.mul(getPrice(version), amount).add(acc),
       BigNumber.from(0),
     )
-    const fees = takeOpeneds
+    const longFees = takeOpeneds
+      .filter(({ product }) => product.toLowerCase() === longProduct.toLowerCase())
       .reduce((acc, { fee }) => fee.add(acc), BigNumber.from(0))
-      .add(takeCloseds.reduce((acc, { fee }) => fee.add(acc), BigNumber.from(0)))
+      .add(
+        takeCloseds
+          .filter(({ product }) => product.toLowerCase() === longProduct.toLowerCase())
+          .reduce((acc, { fee }) => fee.add(acc), BigNumber.from(0)),
+      )
+    const shortFees = takeOpeneds
+      .filter(({ product }) => product.toLowerCase() === shortProduct.toLowerCase())
+      .reduce((acc, { fee }) => fee.add(acc), BigNumber.from(0))
+      .add(
+        takeCloseds
+          .filter(({ product }) => product.toLowerCase() === shortProduct.toLowerCase())
+          .reduce((acc, { fee }) => fee.add(acc), BigNumber.from(0)),
+      )
 
     const totalVolume = openVolume.add(closeVolume)
 
     const endBlock = BigNumber.from(rawData.lastSettle[0].blockNumber)
-    const [longSnapshot, shortSnapshot, vaultLongCollateral, vaultShortCollateral] = await Promise.all([
+    const [longSnapshot, shortSnapshot, vaultLongSnapshot, vaultShortSnapshot] = await Promise.all([
       lens.callStatic['snapshot(address)'](longProduct, { blockTag: endBlock.toHexString() }),
       lens.callStatic['snapshot(address)'](shortProduct, { blockTag: endBlock.toHexString() }),
-      lens.callStatic['collateral(address,address)'](vault, longProduct, { blockTag: endBlock.toHexString() }),
-      lens.callStatic['collateral(address,address)'](vault, shortProduct, { blockTag: endBlock.toHexString() }),
+      lens.callStatic['snapshot(address,address)'](vault, longProduct, { blockTag: endBlock.toHexString() }),
+      lens.callStatic['snapshot(address,address)'](vault, shortProduct, { blockTag: endBlock.toHexString() }),
     ])
 
     const data = {
       market: market,
       date: args.dateString,
-      makerOI: formatEther(longSnapshot.openInterest.maker.add(shortSnapshot.openInterest.maker)),
-      takerOI: formatEther(longSnapshot.openInterest.taker.add(shortSnapshot.openInterest.taker)),
-      vaultAssets: formatEther(vaultLongCollateral.add(vaultShortCollateral)),
+      longMakerOI: formatEther(longSnapshot.openInterest.maker),
+      shortMakerOI: formatEther(shortSnapshot.openInterest.maker),
+      longTakerOI: formatEther(longSnapshot.openInterest.taker),
+      shortTakerOI: formatEther(shortSnapshot.openInterest.taker),
+      vaultAssets: formatEther(vaultLongSnapshot.collateral.add(vaultShortSnapshot.collateral)),
+      vaultLongOI: formatEther(vaultLongSnapshot.openInterest.maker),
+      vaultShortOI: formatEther(vaultShortSnapshot.openInterest.maker),
+      totalVolume: formatEther(totalVolume),
+      longFees: formatEther(longFees),
+      shortFees: formatEther(shortFees),
       avgHourlyRate: formatEther(
         longSnapshot.rate
           .add(shortSnapshot.rate)
@@ -184,8 +208,6 @@ export default task('collectMetrics', 'Collects metrics for a given day')
           .mul(100)
           .div(2),
       ),
-      totalVolume: formatEther(totalVolume),
-      totalFees: formatEther(fees),
     }
 
     const str = csv ? Object.values(data).join(',') : JSON.stringify(data, null, outputFile ? 0 : 2)
