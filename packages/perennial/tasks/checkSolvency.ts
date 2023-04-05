@@ -15,9 +15,8 @@ export default task('checkSolvency', 'Checks if Product is solvent')
     } = HRE
     const multicall = new providers.MulticallProvider(ethers.provider)
 
-    const collateral = (await ethers.getContractAt('ICollateral', (await get('Collateral_Proxy')).address)).connect(
-      multicall,
-    )
+    const collateralDeployment = await get('Collateral_Proxy')
+    const collateral = (await ethers.getContractAt('Collateral', collateralDeployment.address)).connect(multicall)
     const lens = (await ethers.getContractAt('IPerennialLens', (await get('PerennialLens_V01')).address)).connect(
       multicall,
     )
@@ -38,7 +37,8 @@ export default task('checkSolvency', 'Checks if Product is solvent')
           currentBlock - page * 2000000,
         )),
       )
-      hasMore = currentBlock - page * 2000000 > 62210833
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      hasMore = currentBlock - page * 2000000 > collateralDeployment.receipt!.blockNumber - 1
       page = page + 1
     }
 
