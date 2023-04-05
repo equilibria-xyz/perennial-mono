@@ -1,6 +1,6 @@
+import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { constants, utils, BigNumberish, BigNumber } from 'ethers'
-
-import { IMultiInvoker } from '../types/generated/contracts/interfaces/IMultiInvoker'
+import { IMultiInvoker, MultiInvokerRollup } from '../types/generated'
 
 export type InvokerAction =
   | 'NOOP'

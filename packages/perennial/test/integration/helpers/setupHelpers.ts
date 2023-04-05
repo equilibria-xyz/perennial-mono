@@ -37,6 +37,8 @@ import {
   MultiInvoker__factory,
   IEmptySetReserve,
   IEmptySetReserve__factory,
+  MultiInvokerRollup,
+  MultiInvokerRollup__factory,
 } from '../../../types/generated'
 import { ChainlinkContext } from './chainlinkHelpers'
 import { createPayoffDefinition } from '../../../../common/testutil/types'
@@ -76,6 +78,7 @@ export interface InstanceVars {
   productBeacon: IBeacon
   productImpl: Product
   multiInvoker: MultiInvoker
+  multiInvokerRollup: MultiInvokerRollup
   incentivizer: Incentivizer
   lens: PerennialLens
   batcher: Batcher
@@ -157,6 +160,20 @@ export async function deployProtocol(): Promise<InstanceVars> {
   const multiInvoker = await new MultiInvoker__factory(owner).attach(multiInvokerProxy.address)
   await multiInvoker.initialize()
 
+  const multiInvokerRollupImpl = await new MultiInvokerRollup__factory(owner).deploy(
+    usdc.address,
+    batcher.address,
+    reserve.address,
+    controllerProxy.address,
+  )
+  const multiInvokerRollupProxy = await new TransparentUpgradeableProxy__factory(owner).deploy(
+    multiInvokerRollupImpl.address,
+    proxyAdmin.address,
+    [],
+  )
+  const multiInvokerRollup = await new MultiInvokerRollup__factory(owner).attach(multiInvokerRollupProxy.address)
+  await multiInvokerRollup.initialize()
+
   // Params - TODO: finalize before launch
   await controller.updatePauser(pauser.address)
   await controller.updateCoordinatorTreasury(0, treasuryA.address)
@@ -204,6 +221,7 @@ export async function deployProtocol(): Promise<InstanceVars> {
     productBeacon,
     productImpl,
     multiInvoker,
+    multiInvokerRollup,
     incentivizer,
     collateral,
     lens,

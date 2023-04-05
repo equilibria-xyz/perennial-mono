@@ -601,7 +601,7 @@ describe('MultiInvokerRollup', () => {
   })
 })
 
-function buildTransactionRequest(
+export function buildTransactionRequest(
   user: SignerWithAddress,
   invoker: MultiInvokerRollup,
   payload: string,
