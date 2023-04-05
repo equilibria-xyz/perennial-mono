@@ -7,8 +7,6 @@ import {
   Collateral__factory,
   Controller,
   Controller__factory,
-  Forwarder,
-  Forwarder__factory,
   Incentivizer,
   Incentivizer__factory,
   PerennialLens,
@@ -32,7 +30,6 @@ describe('Core - Mainnet Verification', () => {
   let proxyAdmin: ProxyAdmin
   let upgradeableBeacon: UpgradeableBeacon
   let timelock: TimelockController
-  let forwarder: Forwarder
   let lens: PerennialLens
 
   beforeEach(async () => {
@@ -44,7 +41,6 @@ describe('Core - Mainnet Verification', () => {
     proxyAdmin = ProxyAdmin__factory.connect(deployments['ProxyAdmin'].address, signer)
     upgradeableBeacon = UpgradeableBeacon__factory.connect(deployments['UpgradeableBeacon'].address, signer)
     timelock = TimelockController__factory.connect(deployments['TimelockController'].address, signer)
-    forwarder = Forwarder__factory.connect(deployments['Forwarder'].address, signer)
     lens = PerennialLens__factory.connect(deployments['PerennialLens_V01'].address, signer)
   })
 
@@ -188,12 +184,4 @@ describe('Core - Mainnet Verification', () => {
       expect(await lens.callStatic.controller()).to.equal(controller.address)
     })
   })
-
-  /* describe('forwarder', () => {
-    it('has the correct configuration', async () => {
-      expect(await forwarder.DSU()).to.equal(deployments['DSU'].address)
-      expect(await forwarder.USDC()).to.equal(deployments['USDC'].address)
-      expect(await forwarder.batcher()).to.equal(deployments['Batcher'].address)
-    })
-  }) */
 })

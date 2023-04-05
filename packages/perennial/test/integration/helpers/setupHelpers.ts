@@ -23,8 +23,6 @@ import {
   UpgradeableBeacon__factory,
   PerennialLens,
   PerennialLens__factory,
-  Forwarder,
-  Forwarder__factory,
   Batcher,
   Batcher__factory,
   ERC20PresetMinterPauser,
@@ -80,7 +78,6 @@ export interface InstanceVars {
   lens: PerennialLens
   batcher: Batcher
   reserve: IEmptySetReserve
-  forwarder: Forwarder
   incentiveToken: ERC20PresetMinterPauser
 }
 
@@ -174,13 +171,6 @@ export async function deployProtocol(): Promise<InstanceVars> {
 
   const lens = await new PerennialLens__factory(owner).deploy(controller.address)
 
-  const forwarder = await new Forwarder__factory(owner).deploy(
-    usdc.address,
-    dsu.address,
-    batcher.address,
-    collateral.address,
-  )
-
   const incentiveToken = await new ERC20PresetMinterPauser__factory(owner).deploy('Incentive Token', 'ITKN')
 
   return {
@@ -209,7 +199,6 @@ export async function deployProtocol(): Promise<InstanceVars> {
     lens,
     batcher,
     reserve,
-    forwarder,
     incentiveToken,
   }
 }
