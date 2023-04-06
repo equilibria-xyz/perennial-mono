@@ -161,14 +161,12 @@ describe('MultiInvokerRollup', () => {
     })
 
     it(`decodes 0 as a value on any action`, async () => {
-      const res = user.sendTransaction(
-        buildTransactionRequest(user, multiInvokerRollup, '0x' + zeroAction.WRAP.payload),
-      )
+      usdc.transferFrom.whenCalledWith(user.address, multiInvokerRollup.address, 0).returns(true)
 
-      console.log(zeroAction.WRAP.payload)
-
-      await expect(res).to.not.be.reverted
-      //expect(batcher.wrap).to.have.been.calledWith(BigNumber.from(0), user.address)
+      await expect(
+        user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, '0x' + zeroAction.WRAP.payload)),
+      ).to.not.be.reverted
+      expect(batcher.wrap).to.have.been.calledWith(BigNumber.from(0), user.address)
     })
 
     it('deposits on DEPOSIT action', async () => {
@@ -574,11 +572,10 @@ describe('MultiInvokerRollup', () => {
 
       it('performs cached invoke on DEPOSIT', async () => {
         // 1) set state caching
-        let res = user.sendTransaction(
-          buildTransactionRequest(user, multiInvokerRollup, '0x' + actions.DEPOSIT.payload),
-        )
 
-        await expect(res).to.not.be.reverted
+        await expect(
+          user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, '0x' + actions.DEPOSIT.payload)),
+        ).to.not.be.reverted
         expect(dsu.transferFrom).to.have.been.calledWith(user.address, multiInvokerRollup.address, amount)
         expect(collateral.depositTo).to.have.been.calledWith(user.address, product.address, amount)
 
@@ -587,13 +584,10 @@ describe('MultiInvokerRollup', () => {
         expect(await multiInvokerRollup.connect(user).addressLookup(product.address)).to.eq(2)
 
         // 2) call contract with cached payload
-        console.log('pld', actionsCached.DEPOSIT.payload)
 
-        res = user.sendTransaction(
-          buildTransactionRequest(user, multiInvokerRollup, '0x' + actionsCached.DEPOSIT.payload),
-        )
-
-        await expect(res).to.not.be.reverted
+        await expect(
+          user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, '0x' + actionsCached.DEPOSIT.payload)),
+        ).to.not.be.reverted
         expect(dsu.transferFrom).to.have.been.calledWith(user.address, multiInvokerRollup.address, amount)
         expect(collateral.depositTo).to.have.been.calledWith(user.address, product.address, amount)
       })
