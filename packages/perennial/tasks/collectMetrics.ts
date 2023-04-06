@@ -13,9 +13,13 @@ const { formatEther } = utils
 const QUERY_PAGE_SIZE = 1000
 
 type QueryResult = {
-  takeOpeneds: { product: string; amount: string; version: string; fee: string }[]
-  takeCloseds: { product: string; amount: string; version: string; fee: string }[]
-  settles: { toVersion: string; toVersionPrice: string; preVersion: string; preVersionPrice: string }[]
+  hourlyVolumes: {
+    product: string
+    makerNotional: string
+    makerFees: string
+    takerNotional: string
+    takerFees: string
+  }[]
   lastSettle: { blockNumber: string }[]
 }
 
@@ -54,35 +58,19 @@ export default task('collectMetrics', 'Collects metrics for a given day')
 
     const query = gql`
       query getData($markets: [Bytes]!, $fromTs: BigInt!, $toTs: BigInt!, $first: Int!, $skip: Int!) {
-        takeOpeneds(
+        hourlyVolumes(
           first: $first
           skip: $skip
-          where: { product_in: $markets, blockTimestamp_gte: $fromTs, blockTimestamp_lt: $toTs }
+          where: { product_in: $markets, periodStartTimestamp_gte: $fromTs, periodStartTimestamp_lt: $toTs }
+          orderBy: periodStartBlock
+          orderDirection: desc
         ) {
+          periodStartTimestamp
           product
-          amount
-          version
-          fee
-        }
-        takeCloseds(
-          first: $first
-          skip: $skip
-          where: { product_in: $markets, blockTimestamp_gte: $fromTs, blockTimestamp_lt: $toTs }
-        ) {
-          product
-          amount
-          version
-          fee
-        }
-        settles(
-          first: $first
-          skip: $skip
-          where: { product_in: $markets, blockTimestamp_gte: $fromTs, blockTimestamp_lt: $toTs }
-        ) {
-          toVersion
-          toVersionPrice
-          preVersion
-          preVersionPrice
+          makerNotional
+          makerFees
+          takerNotional
+          takerFees
         }
         lastSettle: settles(
           where: { product_in: $markets, blockTimestamp_gte: $fromTs, blockTimestamp_lt: $toTs }
@@ -104,11 +92,7 @@ export default task('collectMetrics', 'Collects metrics for a given day')
       skip: page * QUERY_PAGE_SIZE,
     })
     const rawData = res
-    while (
-      res.takeOpeneds.length === QUERY_PAGE_SIZE ||
-      res.takeCloseds.length === QUERY_PAGE_SIZE ||
-      res.settles.length === QUERY_PAGE_SIZE
-    ) {
+    while (res.hourlyVolumes.length === QUERY_PAGE_SIZE) {
       page += 1
       res = await request(graphURL, query, {
         markets: [longProduct, shortProduct],
@@ -117,68 +101,26 @@ export default task('collectMetrics', 'Collects metrics for a given day')
         first: QUERY_PAGE_SIZE,
         skip: page * QUERY_PAGE_SIZE,
       })
-      rawData.takeOpeneds = [...rawData.takeOpeneds, ...res.takeOpeneds]
-      rawData.takeCloseds = [...rawData.takeCloseds, ...res.takeCloseds]
-      rawData.settles = [...rawData.settles, ...res.settles]
+      rawData.hourlyVolumes = [...rawData.hourlyVolumes, ...res.hourlyVolumes]
     }
 
-    const takeOpeneds = rawData.takeOpeneds.map(({ product, amount, version, fee }) => ({
-      product: product.toLowerCase(),
-      amount: BigNumber.from(amount),
-      version: BigNumber.from(version),
-      fee: BigNumber.from(fee),
-    }))
-    const takeCloseds = rawData.takeCloseds.map(({ product, amount, version, fee }) => ({
-      product: product.toLowerCase(),
-      amount: BigNumber.from(amount),
-      version: BigNumber.from(version),
-      fee: BigNumber.from(fee),
-    }))
-    const settles = rawData.settles.map(({ toVersion, toVersionPrice, preVersion, preVersionPrice }) => ({
-      toVersion: BigNumber.from(toVersion),
-      preVersion: BigNumber.from(preVersion),
-      toVersionPrice: BigNumber.from(toVersionPrice),
-      preVersionPrice: BigNumber.from(preVersionPrice),
-    }))
-    const versions = settles.reduce((acc, { toVersion, toVersionPrice, preVersion, preVersionPrice }) => {
-      if (!acc[toVersion.toString()]) {
-        acc[toVersion.toString()] = toVersionPrice
-      }
-      if (!acc[preVersion.toString()]) {
-        acc[preVersion.toString()] = preVersionPrice
-      }
-      return acc
-    }, {} as { [key: string]: BigNumber })
-
-    const getPrice = (version: BigNumber) =>
-      (versions[version.add(1).toString()] ? versions[version.add(1).toString()] : versions[version.toString()]).abs()
-
-    const openVolume = takeOpeneds.reduce(
-      (acc, { amount, version }) => Big18Math.mul(getPrice(version), amount).add(acc),
-      BigNumber.from(0),
+    const hourVolumes = rawData.hourlyVolumes.map(
+      ({ product, makerNotional, makerFees, takerNotional, takerFees }) => ({
+        product: product.toLowerCase(),
+        makerNotional: BigNumber.from(makerNotional),
+        makerFees: BigNumber.from(makerFees),
+        takerNotional: BigNumber.from(takerNotional),
+        takerFees: BigNumber.from(takerFees),
+      }),
     )
-    const closeVolume = takeCloseds.reduce(
-      (acc, { amount, version }) => Big18Math.mul(getPrice(version), amount).add(acc),
-      BigNumber.from(0),
-    )
-    const longFees = takeOpeneds
+
+    const totalVolume = hourVolumes.reduce((acc, { takerNotional }) => acc.add(takerNotional), BigNumber.from(0))
+    const longFees = hourVolumes
       .filter(({ product }) => product.toLowerCase() === longProduct.toLowerCase())
-      .reduce((acc, { fee }) => fee.add(acc), BigNumber.from(0))
-      .add(
-        takeCloseds
-          .filter(({ product }) => product.toLowerCase() === longProduct.toLowerCase())
-          .reduce((acc, { fee }) => fee.add(acc), BigNumber.from(0)),
-      )
-    const shortFees = takeOpeneds
+      .reduce((acc, { takerFees }) => acc.add(takerFees), BigNumber.from(0))
+    const shortFees = hourVolumes
       .filter(({ product }) => product.toLowerCase() === shortProduct.toLowerCase())
-      .reduce((acc, { fee }) => fee.add(acc), BigNumber.from(0))
-      .add(
-        takeCloseds
-          .filter(({ product }) => product.toLowerCase() === shortProduct.toLowerCase())
-          .reduce((acc, { fee }) => fee.add(acc), BigNumber.from(0)),
-      )
-
-    const totalVolume = openVolume.add(closeVolume)
+      .reduce((acc, { takerFees }) => acc.add(takerFees), BigNumber.from(0))
 
     const endBlock = BigNumber.from(rawData.lastSettle[0].blockNumber)
     const [longSnapshot, shortSnapshot, vaultLongSnapshot, vaultShortSnapshot] = await Promise.all([
