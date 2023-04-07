@@ -6,7 +6,7 @@ const eqPerennialDir = dirname(require.resolve('@equilibria/perennial/package.js
 const MINIMUM_CONTRACT_SIZE_SOLIDITY_OVERRIDES = {
   version: '0.8.17',
   settings: {
-    viaIR: OPTIMIZER_ENABLED,
+    viaIR: true,
     optimizer: OPTIMIZER_ENABLED
       ? {
           enabled: true,
@@ -35,7 +35,7 @@ const MINIMUM_CONTRACT_SIZE_SOLIDITY_OVERRIDES = {
 }
 
 const config = defaultConfig({
-  solidityVersion: '0.8.17',
+  solidityVersion: '0.8.15',
   solidityOverrides: {
     'contracts/BalancedVault.sol': MINIMUM_CONTRACT_SIZE_SOLIDITY_OVERRIDES,
   },
@@ -56,6 +56,7 @@ const config = defaultConfig({
   },
   dependencyPaths: [
     '@equilibria/perennial/contracts/interfaces/IController.sol',
+    '@equilibria/perennial-oracle/contracts/ChainlinkOracle.sol',
     '@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol',
   ],
 })
