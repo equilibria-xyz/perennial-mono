@@ -65,9 +65,9 @@ interface IBalancedVault is IBalancedVaultDefinition {
         UFixed18 latestShares;
     }
 
-    event MarketAdded(uint256 indexed market, IProduct long, IProduct short, uint256 weight);
-    event WeightUpdated(uint256 indexed market, uint256 weight);
-    // TODO: Should `market` be indexed?
+    event Approval(address indexed account, address indexed spender, bool approved);
+    event Mint(address indexed account, UFixed18 amount);
+    event Burn(address indexed account, UFixed18 amount);
     event Deposit(address indexed sender, address indexed account, uint256 indexed market, uint256 version, UFixed18 assets);
     event Redemption(address indexed sender, address indexed account, uint256 indexed market, uint256 version, UFixed18 proportion);
     event Claim(address indexed sender, address indexed account, UFixed18 assets);
@@ -81,6 +81,7 @@ interface IBalancedVault is IBalancedVaultDefinition {
     error InvalidMarket(uint256); //TODO: ?
     error BalancedVaultNotApproved();
 
+    function name() external view returns (string memory);
     function initialize(string memory name_, string memory symbol_) external;
     function sync() external;
     function unclaimed(address account) external view returns (UFixed18);
@@ -97,13 +98,4 @@ interface IBalancedVault is IBalancedVaultDefinition {
     function deposit(UFixed18 assets, address account) external;
     function maxRedeem(address account) external view returns (UFixed18);
     function redeem(UFixed18 proportion, address account) external;
-
-    event Transfer(address indexed from, address indexed to, UFixed18 value);
-    event Approval(address indexed account, address indexed spender, bool approved);
-
-    /* Partial ERC20 Interface */
-
-    function name() external view returns (string memory);
-    function symbol() external view returns (string memory);
-    function decimals() external view returns (uint8);
 }

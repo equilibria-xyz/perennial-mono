@@ -26,14 +26,14 @@ import "./BalancedVaultDefinition.sol";
 contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializable {
     UFixed18 constant private TWO = UFixed18.wrap(2e18);
 
-    /// @dev The ERC20 name of the vault
+    /// @dev The name of the vault
     string public name;
 
-    /// @dev The ERC20 symbol of the vault
-    string public symbol;
+    /// @dev Deprecated storage variable. Formerly `symbol`
+    string private __unused0;
 
     /// @dev Deprecated storage variable. Formerly `allowance`
-    uint256 private __unused3; // TODO: merge isApproved
+    uint256 private __unused1; // TODO: merge isApproved
 
     /// @dev Per-asset accounting state variables
     MarketAccounting[100] marketAccounting;
@@ -56,9 +56,9 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
      * @param name_ ERC20 asset name
      * @param symbol_ ERC20 asset symbol
      */
-    function initialize(string memory name_, string memory symbol_) external initializer(2) { //TODO: need to re-initialize?
+    function initialize(string memory name_, string memory symbol_) external initializer(2) {
         name = name_;
-        symbol = symbol_;
+        __unused0 = "";
 
         asset.approve(address(collateral));
     }
@@ -167,14 +167,6 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
     function setApproval(address spender, bool approved) external {
         isApproved[msg.sender][spender] = approved;
         emit Approval(msg.sender, spender, approved);
-    }
-
-    /**
-     * @notice Returns the decimals places of the share token
-     * @return Decimal places of the share share token
-     */
-    function decimals() external pure returns (uint8) {
-        return 18;
     }
 
     /**
@@ -449,7 +441,7 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
     function _burn(uint256 market, address from, UFixed18 amount) private validMarket(market) {
         marketAccounting[market].balanceOf[from] = marketAccounting[market].balanceOf[from].sub(amount);
         marketAccounting[market].totalSupply = marketAccounting[market].totalSupply.sub(amount);
-        emit Transfer(from, address(0), amount);
+        emit Burn(from, amount);
     }
 
     /**
@@ -469,7 +461,7 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
      */
     function _delayedMintAccount(uint256 market, address to, UFixed18 amount) private validMarket(market) {
         marketAccounting[market].balanceOf[to] = marketAccounting[market].balanceOf[to].add(amount);
-        emit Transfer(address(0), to, amount);
+        emit Mint(to, amount);
     }
 
     /**

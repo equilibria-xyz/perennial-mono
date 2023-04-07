@@ -166,18 +166,6 @@ describe('BalancedVault', () => {
     })
   })
 
-  describe('#symbol', () => {
-    it('is correct', async () => {
-      expect(await vault.symbol()).to.equal('PVA')
-    })
-  })
-
-  describe('#decimals', () => {
-    it('is correct', async () => {
-      expect(await vault.decimals()).to.equal(18)
-    })
-  })
-
   describe('#addMarket', () => {
     // it('adds market correctly', async () => {
     //   const weight = BigNumber.from(2)
@@ -264,8 +252,8 @@ describe('BalancedVault', () => {
 
       // User 2 hasn't deposited anything, so nothing should be redeemed.
       await expect(vault.connect(user2).redeem(utils.parseEther('1'), user2.address))
-        .to.emit(vault, 'Transfer')
-        .withArgs(user2.address, constants.AddressZero, 0)
+        .to.emit(vault, 'Burn')
+        .withArgs(user2.address, 0)
 
       expect(await vault.maxRedeem(user.address)).to.equal(utils.parseEther('1'))
       await vault.connect(user).redeem(await vault.maxRedeem(user.address), user.address)
