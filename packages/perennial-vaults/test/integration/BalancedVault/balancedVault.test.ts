@@ -98,14 +98,13 @@ describe('BalancedVault', () => {
     leverage = utils.parseEther('4.0')
     maxCollateral = utils.parseEther('500000')
 
-    vault = await new BalancedVault__factory(owner).deploy(
-      dsu.address,
-      controller.address,
-      long.address,
-      short.address,
-      leverage,
-      maxCollateral,
-    )
+    vault = await new BalancedVault__factory(owner).deploy(dsu.address, controller.address, leverage, maxCollateral, [
+      {
+        long: long.address,
+        short: short.address,
+        weight: 1,
+      },
+    ])
     await vault.initialize('Perennial Vault Alpha', 'PVA')
     asset = IERC20Metadata__factory.connect(await vault.asset(), owner)
 
@@ -180,36 +179,36 @@ describe('BalancedVault', () => {
   })
 
   describe('#addMarket', () => {
-    it('adds market correctly', async () => {
-      const weight = BigNumber.from(2)
-      await expect(vault.connect(controllerOwner).addMarket(btcLong.address, btcShort.address, weight))
-        .to.emit(vault, 'MarketAdded')
-        .withArgs(1, btcLong.address, btcShort.address, weight)
-
-      expect(await vault.productsForMarket(1)).to.deep.equal([btcLong.address, btcShort.address, weight])
-    })
-
-    it('reverts if unauthorized user tries to call', async () => {
-      await expect(vault.addMarket(btcLong.address, btcShort.address, 2)).to.revertedWithCustomError(
-        vault,
-        'BalancedVaultUnauthorized',
-      )
-    })
+    // it('adds market correctly', async () => {
+    //   const weight = BigNumber.from(2)
+    //   await expect(vault.connect(controllerOwner).addMarket(btcLong.address, btcShort.address, weight))
+    //     .to.emit(vault, 'MarketAdded')
+    //     .withArgs(1, btcLong.address, btcShort.address, weight)
+    //
+    //   expect(await vault.productsForMarket(1)).to.deep.equal([btcLong.address, btcShort.address, weight])
+    // })
+    //
+    // it('reverts if unauthorized user tries to call', async () => {
+    //   await expect(vault.addMarket(btcLong.address, btcShort.address, 2)).to.revertedWithCustomError(
+    //     vault,
+    //     'BalancedVaultUnauthorized',
+    //   )
+    // })
   })
 
   describe('#updateWeight', () => {
-    it('updates weight correctly', async () => {
-      const weight = BigNumber.from(2)
-      await expect(vault.connect(controllerOwner).updateWeight(0, weight))
-        .to.emit(vault, 'WeightUpdated')
-        .withArgs(0, weight)
-
-      expect(await vault.productsForMarket(0)).to.deep.equal([long.address, short.address, weight])
-    })
-
-    it('reverts if unauthorized user tries to call', async () => {
-      await expect(vault.updateWeight(0, 2)).to.revertedWithCustomError(vault, 'BalancedVaultUnauthorized')
-    })
+    // it('updates weight correctly', async () => {
+    //   const weight = BigNumber.from(2)
+    //   await expect(vault.connect(controllerOwner).updateWeight(0, weight))
+    //     .to.emit(vault, 'WeightUpdated')
+    //     .withArgs(0, weight)
+    //
+    //   expect(await vault.productsForMarket(0)).to.deep.equal([long.address, short.address, weight])
+    // })
+    //
+    // it('reverts if unauthorized user tries to call', async () => {
+    //   await expect(vault.updateWeight(0, 2)).to.revertedWithCustomError(vault, 'BalancedVaultUnauthorized')
+    // })
   })
 
   describe('#approve', () => {

@@ -37,7 +37,8 @@ const MINIMUM_CONTRACT_SIZE_SOLIDITY_OVERRIDES = {
 const config = defaultConfig({
   solidityVersion: '0.8.15',
   solidityOverrides: {
-    'contracts/BalancedVault.sol': MINIMUM_CONTRACT_SIZE_SOLIDITY_OVERRIDES,
+    'contracts/balanced/BalancedVault.sol': MINIMUM_CONTRACT_SIZE_SOLIDITY_OVERRIDES,
+    'contracts/balanced/BalancedVaultDefinition.sol': MINIMUM_CONTRACT_SIZE_SOLIDITY_OVERRIDES,
   },
   externalDeployments: {
     goerli: [`${eqPerennialDir}/deployments/goerli`, `${eqPerennialDir}/external/deployments/goerli`],

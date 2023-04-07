@@ -4,8 +4,9 @@ pragma solidity ^0.8.13;
 import "@equilibria/perennial/contracts/interfaces/IController.sol";
 import "@equilibria/perennial/contracts/interfaces/ICollateral.sol";
 import "@equilibria/root/number/types/UFixed18.sol";
+import "./IBalancedVaultDefinition.sol";
 
-interface IBalancedVault {
+interface IBalancedVault is IBalancedVaultDefinition {
 
     /* BalancedVault Interface */
 
@@ -44,15 +45,6 @@ interface IBalancedVault {
         /// @dev Mapping of versions of the vault state at a given oracle version
         mapping(uint256 => Version) versions;
 
-        /// @dev Weight of this asset in the vault
-        uint256 weight;
-
-        /// @dev The address of the Perennial product on the long side
-        IProduct long;
-
-        /// @dev The address of the Perennial product on the short side
-        IProduct short;
-
         /// @dev For extending the struct without breaking storage
         uint256[20] __gap;
     }
@@ -83,23 +75,14 @@ interface IBalancedVault {
     event CollateralUpdated(IProduct product, UFixed18 targetCollateral);
 
     error BalancedVaultUnauthorized();
-    error BalancedVaultTooManyMarkets();
     error BalancedVaultDepositLimitExceeded();
     error BalancedVaultRedemptionLimitExceeded();
     error BalancedVaultRedemptionInvalidProportion();
-    error InvalidMarket(uint256);
+    error InvalidMarket(uint256); //TODO: ?
     error BalancedVaultNotApproved();
 
     function initialize(string memory name_, string memory symbol_) external;
-    function numberOfMarkets() external view returns (uint256);
-    function productsForMarket(uint256 market) external view returns (IProduct, IProduct, uint256);
-    function addMarket(IProduct long, IProduct short, uint256 weight) external;
-    function updateWeight(uint256 market, uint256 weight) external;
     function sync() external;
-    function controller() external view returns (IController);
-    function collateral() external view returns (ICollateral);
-    function targetLeverage() external view returns (UFixed18);
-    function maxCollateral() external view returns (UFixed18);
     function unclaimed(address account) external view returns (UFixed18);
     function totalUnclaimed() external view returns (UFixed18);
     function claim(address account) external;
@@ -108,7 +91,6 @@ interface IBalancedVault {
 
     /* Partial ERC4626 Interface */
 
-    function asset() external view returns (Token18);
     function totalAssets() external view returns (UFixed18);
     function convertToAssets(UFixed18 proportion, address account) external view returns (UFixed18);
     function maxDeposit(address account) external view returns (UFixed18);

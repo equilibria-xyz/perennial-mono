@@ -1,9 +1,10 @@
 //SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.17;
 
-import "./interfaces/IBalancedVault.sol";
+import "../interfaces/IBalancedVault.sol";
 import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
+import "./BalancedVaultDefinition.sol";
 
 /**
  * @title BalancedVault
@@ -22,29 +23,8 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
  *      force settlement and rebalancing. This is most useful to prevent vault liquidation due to PnL changes
  *      causing the vault to be in an unhealthy state (far away from target leverage)
  */
-contract BalancedVault is IBalancedVault, UInitializable {
+contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializable {
     UFixed18 constant private TWO = UFixed18.wrap(2e18);
-
-    /// @dev The address of the Perennial controller contract
-    IController public immutable controller;
-
-    /// @dev The address of the Perennial collateral contract
-    ICollateral public immutable collateral;
-
-    /// @dev Deprecated storage variable. Formerly `long`
-    IProduct private immutable __unused1;
-
-    /// @dev Deprecated storage variable. Formerly `short`
-    IProduct private immutable __unused2;
-
-    /// @dev The target leverage amount for the vault
-    UFixed18 public immutable targetLeverage;
-
-    /// @dev The collateral cap for the vault
-    UFixed18 public immutable maxCollateral;
-
-    /// @dev The underlying asset of the vault
-    Token18 public immutable asset;
 
     /// @dev The ERC20 name of the vault
     string public name;
@@ -53,16 +33,10 @@ contract BalancedVault is IBalancedVault, UInitializable {
     string public symbol;
 
     /// @dev Deprecated storage variable. Formerly `allowance`
-    uint256 private __unused3;
+    uint256 private __unused3; // TODO: merge isApproved
 
     /// @dev Per-asset accounting state variables
     MarketAccounting[100] marketAccounting;
-
-    /// @dev The number of markets in the vault
-    uint256 public numberOfMarkets;
-
-    /// @dev The sum of the weights of all products in the vault
-    uint256 private totalWeight;
 
     /// @dev Mapping of account => spender => whether spender is approved to spend account's shares
     mapping(address => mapping(address => bool)) public isApproved;
@@ -70,69 +44,23 @@ contract BalancedVault is IBalancedVault, UInitializable {
     constructor(
         Token18 asset_,
         IController controller_,
-        IProduct long_,
-        IProduct short_,
         UFixed18 targetLeverage_,
-        UFixed18 maxCollateral_
-    ) {
-        asset = asset_;
-        controller = controller_;
-        collateral = controller_.collateral();
-        __unused1 = long_;
-        __unused2 = short_;
-        targetLeverage = targetLeverage_;
-        maxCollateral = maxCollateral_;
-    }
+        UFixed18 maxCollateral_,
+        MarketDefinition[1] memory marketDefinitions_
+    )
+    BalancedVaultDefinition(asset_, controller_, targetLeverage_, maxCollateral_, marketDefinitions_)
+    { }
 
     /**
      * @notice Initializes the contract state
      * @param name_ ERC20 asset name
      * @param symbol_ ERC20 asset symbol
      */
-    function initialize(string memory name_, string memory symbol_) external initializer(2) {
+    function initialize(string memory name_, string memory symbol_) external initializer(2) { //TODO: need to re-initialize?
         name = name_;
         symbol = symbol_;
 
         asset.approve(address(collateral));
-
-        // TODO: Add the ability to add more markets.
-        numberOfMarkets = 1;
-        totalWeight = 1;
-        marketAccounting[0].weight = 1;
-        marketAccounting[0].long = __unused1;
-        marketAccounting[0].short = __unused2;
-    }
-
-    /**
-     * @notice Returns the long and short products for a market
-     * @param market The market ID to get products for
-     * @return long The long product
-     * @return short The short product
-     */
-    function productsForMarket(uint256 market) external view returns (IProduct long, IProduct short, uint256 weight) {
-        long = marketAccounting[market].long;
-        short = marketAccounting[market].short;
-        weight = marketAccounting[market].weight;
-    }
-
-    function addMarket(IProduct long, IProduct short, uint256 weight) external onlyControllerOwner {
-        if (numberOfMarkets == marketAccounting.length) revert BalancedVaultTooManyMarkets();
-
-        marketAccounting[numberOfMarkets].long = long;
-        marketAccounting[numberOfMarkets].short = short;
-        marketAccounting[numberOfMarkets].weight = weight;
-        totalWeight += weight;
-        numberOfMarkets += 1;
-
-        emit MarketAdded(numberOfMarkets - 1, long, short, weight);
-    }
-
-    function updateWeight(uint256 market, uint256 weight) external onlyControllerOwner validMarket(market) {
-        totalWeight -= marketAccounting[market].weight;
-        marketAccounting[market].weight = weight;
-        totalWeight += weight;
-
-        emit WeightUpdated(market, weight);
     }
 
     /**
@@ -154,7 +82,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
         if (assets.gt(_maxDepositAtVersion(contexts))) revert BalancedVaultDepositLimitExceeded();
 
         for (uint256 market = 0; market < contexts.length; ++market) {
-            UFixed18 assetsToDeposit = assets.muldiv(marketAccounting[market].weight, totalWeight);
+            UFixed18 assetsToDeposit = assets.muldiv(markets(market).weight, totalWeight);
 
             marketAccounting[market].deposit = marketAccounting[market].deposit.add(assetsToDeposit);
             marketAccounting[market].latestVersion = contexts[market].version;
@@ -182,10 +110,10 @@ contract BalancedVault is IBalancedVault, UInitializable {
 
         (VersionContext[] memory contexts, VersionContext[] memory accountContexts) = _settle(account);
 
-        for (uint256 market = 0; market < numberOfMarkets; ++market) {
+        for (uint256 market = 0; market < totalMarkets; ++market) {
             UFixed18 shares = marketAccounting[market].balanceOf[account].mul(proportion);
             if (shares.gt(_maxRedeemAtVersion(contexts[market], accountContexts[market], account))) revert BalancedVaultRedemptionLimitExceeded();
-            UFixed18 sharesToRedeem = shares.muldiv(marketAccounting[market].weight, totalWeight);
+            UFixed18 sharesToRedeem = shares.muldiv(markets(market).weight, totalWeight);
 
             marketAccounting[market].redemption = marketAccounting[market].redemption.add(sharesToRedeem);
             marketAccounting[market].latestVersion = contexts[market].version;
@@ -209,7 +137,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
         UFixed18 claimAmount = UFixed18Lib.ZERO;
         UFixed18 unclaimedTotal = UFixed18Lib.ZERO;
         UFixed18 totalCollateral = UFixed18Lib.ZERO;
-        for (uint256 market = 0; market < numberOfMarkets; ++market) {
+        for (uint256 market = 0; market < totalMarkets; ++market) {
             UFixed18 unclaimedAmount = marketAccounting[market].unclaimed[account];
             claimAmount = claimAmount.add(unclaimedAmount);
             UFixed18 unclaimedTotalForProduct = marketAccounting[market].totalUnclaimed;
@@ -255,8 +183,8 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @return Maximum available deposit amount
      */
     function maxDeposit(address) external view returns (UFixed18) {
-        VersionContext[] memory contexts = new VersionContext[](numberOfMarkets);
-        for (uint256 market = 0; market < numberOfMarkets; ++market) {
+        VersionContext[] memory contexts = new VersionContext[](totalMarkets);
+        for (uint256 market = 0; market < totalMarkets; ++market) {
             (contexts[market], ) = _loadContextForRead(market, address(0));
         }
         return _maxDepositAtVersion(contexts);
@@ -269,7 +197,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @return Maximum available redeemable proportion
      */
     function maxRedeem(address account) external view returns (UFixed18) {
-        for (uint256 market = 0; market < numberOfMarkets; ++market) {
+        for (uint256 market = 0; market < totalMarkets; ++market) {
             (VersionContext memory context, ) = _loadContextForRead(market, account);
             if (_unhealthyAtVersion(context)) return UFixed18Lib.ZERO;
         }
@@ -282,7 +210,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
      */
     function totalAssets() external view returns (UFixed18) {
         UFixed18 total = UFixed18Lib.ZERO;
-        for (uint256 market = 0; market < numberOfMarkets; ++market) {
+        for (uint256 market = 0; market < totalMarkets; ++market) {
             (VersionContext memory context, ) = _loadContextForRead(market, address(0));
             total = total.add(_totalAssetsAtVersion(context));
         }
@@ -295,7 +223,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
      */
     function totalUnclaimed() external view returns (UFixed18) {
         UFixed18 total = UFixed18Lib.ZERO;
-        for (uint256 market = 0; market < numberOfMarkets; ++market) {
+        for (uint256 market = 0; market < totalMarkets; ++market) {
             (VersionContext memory context, ) = _loadContextForRead(market, address(0));
             total = total.add(_totalUnclaimedAtVersion(context));
         }
@@ -309,7 +237,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
      */
     function unclaimed(address account) external view returns (UFixed18) {
         UFixed18 total = UFixed18Lib.ZERO;
-        for (uint256 market = 0; market < numberOfMarkets; ++market) {
+        for (uint256 market = 0; market < totalMarkets; ++market) {
             (, VersionContext memory accountContext) = _loadContextForRead(market, account);
             total = total.add(_unclaimedAtVersion(accountContext, account));
         }
@@ -324,7 +252,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
      */
     function convertToAssets(UFixed18 proportion, address account) external view returns (UFixed18) {
         UFixed18 total = UFixed18Lib.ZERO;
-        for (uint256 market = 0; market < numberOfMarkets; ++market) {
+        for (uint256 market = 0; market < totalMarkets; ++market) {
             (VersionContext memory context, VersionContext memory accountContext) = _loadContextForRead(market, account);
             (context.latestCollateral, context.latestShares) =
                 (_totalAssetsAtVersion(context), _totalSupplyAtVersion(context));
@@ -343,9 +271,9 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @return accountContexts The current version contexts for each market for the given account
      */
     function _settle(address account) private returns (VersionContext[] memory contexts, VersionContext[] memory accountContexts) {
-        contexts = new VersionContext[](numberOfMarkets);
-        accountContexts = new VersionContext[](numberOfMarkets);
-        for (uint256 market = 0; market < numberOfMarkets; ++market) {
+        contexts = new VersionContext[](totalMarkets);
+        accountContexts = new VersionContext[](totalMarkets);
+        for (uint256 market = 0; market < totalMarkets; ++market) {
             (contexts[market], accountContexts[market]) = _loadContextForWrite(market, account);
             if (contexts[market].version > marketAccounting[market].latestVersion) {
                 _delayedMint(market, _totalSupplyAtVersion(contexts[market]).sub(marketAccounting[market].totalSupply));
@@ -354,8 +282,8 @@ contract BalancedVault is IBalancedVault, UInitializable {
                 marketAccounting[market].redemption = UFixed18Lib.ZERO;
                 marketAccounting[market].latestVersion = contexts[market].version;
 
-                IProduct long = marketAccounting[market].long;
-                IProduct short = marketAccounting[market].short;
+                IProduct long = markets(market).long;
+                IProduct short = markets(market).short;
                 marketAccounting[market].versions[contexts[market].version] = Version({
                     longPosition: long.position(address(this)).maker,
                     shortPosition: short.position(address(this)).maker,
@@ -383,7 +311,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
      */
     function _rebalance(VersionContext[] memory contexts, UFixed18 claimAmount) private {
         _rebalanceCollateral(claimAmount);
-        for (uint256 market = 0; market < numberOfMarkets; ++market) {
+        for (uint256 market = 0; market < totalMarkets; ++market) {
             _rebalancePosition(contexts[market], claimAmount);
         }
     }
@@ -394,10 +322,10 @@ contract BalancedVault is IBalancedVault, UInitializable {
      */
     function _rebalanceCollateral(UFixed18 claimAmount) private {
         // 1. Get total collateral
-        UFixed18[] memory longCollaterals = new UFixed18[](numberOfMarkets);
-        UFixed18[] memory shortCollaterals = new UFixed18[](numberOfMarkets);
+        UFixed18[] memory longCollaterals = new UFixed18[](totalMarkets);
+        UFixed18[] memory shortCollaterals = new UFixed18[](totalMarkets);
         UFixed18 totalCollateral = UFixed18Lib.ZERO;
-        for (uint256 market = 0; market < numberOfMarkets; ++market) {
+        for (uint256 market = 0; market < totalMarkets; ++market) {
             UFixed18 idlecollateral;
             (longCollaterals[market], shortCollaterals[market], idlecollateral) = _collateral(market);
             totalCollateral = totalCollateral.add(longCollaterals[market]).add(shortCollaterals[market]).add(idlecollateral);
@@ -407,8 +335,8 @@ contract BalancedVault is IBalancedVault, UInitializable {
         // 2. Get target collateral for each product
         UFixed18 totalCollateralToDeposit = UFixed18Lib.ZERO;
         bool enoughCollateralForAllProducts = true;
-        for (uint256 market = 0; market < numberOfMarkets; ++market) {
-            UFixed18 targetCollateral = totalCollateral.muldiv(marketAccounting[market].weight, totalWeight).div(TWO);
+        for (uint256 market = 0; market < totalMarkets; ++market) {
+            UFixed18 targetCollateral = totalCollateral.muldiv(markets(market).weight, totalWeight).div(TWO);
             if (targetCollateral.lt(controller.minCollateral())) {
                 targetCollateral = UFixed18Lib.ZERO;
                 enoughCollateralForAllProducts = false;
@@ -417,12 +345,12 @@ contract BalancedVault is IBalancedVault, UInitializable {
             // 3. Best-effort withdrawal of collateral from products with too much collateral
             // TODO: Don't withdraw all if it would revert
             if (longCollaterals[market].gt(targetCollateral)) {
-                _updateCollateral(marketAccounting[market].long, longCollaterals[market], targetCollateral);
+                _updateCollateral(markets(market).long, longCollaterals[market], targetCollateral);
             } else {
                 totalCollateralToDeposit = totalCollateralToDeposit.add(targetCollateral.sub(longCollaterals[market]));
             }
             if (shortCollaterals[market].gt(targetCollateral)) {
-                _updateCollateral(marketAccounting[market].short, shortCollaterals[market], targetCollateral);
+                _updateCollateral(markets(market).short, shortCollaterals[market], targetCollateral);
             } else {
                 totalCollateralToDeposit = totalCollateralToDeposit.add(targetCollateral.sub(shortCollaterals[market]));
             }
@@ -439,15 +367,15 @@ contract BalancedVault is IBalancedVault, UInitializable {
             // Only deposit any collateral if we have enough collateral to meet minCollateral for all products.
             return;
         }
-        for (uint256 market = 0; market < numberOfMarkets; ++market) {
-            UFixed18 targetCollateral = totalCollateral.muldiv(marketAccounting[market].weight, totalWeight).div(TWO);
+        for (uint256 market = 0; market < totalMarkets; ++market) {
+            UFixed18 targetCollateral = totalCollateral.muldiv(markets(market).weight, totalWeight).div(TWO);
             if (longCollaterals[market].lt(targetCollateral)) {
-                _updateCollateral(marketAccounting[market].long,
+                _updateCollateral(markets(market).long,
                                   longCollaterals[market],
                                   longCollaterals[market].add(targetCollateral.sub(longCollaterals[market]).mul(depositProRataRatio)));
             }
             if (shortCollaterals[market].lt(targetCollateral)) {
-                _updateCollateral(marketAccounting[market].short,
+                _updateCollateral(markets(market).short,
                                   shortCollaterals[market],
                                   shortCollaterals[market].add(targetCollateral.sub(shortCollaterals[market]).mul(depositProRataRatio)));
             }
@@ -458,8 +386,8 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @notice Rebalances the position of the vault
      */
     function _rebalancePosition(VersionContext memory context, UFixed18 claimAmount) private {
-        IProduct long = marketAccounting[context.market].long;
-        IProduct short = marketAccounting[context.market].short;
+        IProduct long = markets(context.market).long;
+        IProduct short = markets(context.market).short;
         if (long.closed() || short.closed()) {
             _updateMakerPosition(long, UFixed18Lib.ZERO);
             _updateMakerPosition(short, UFixed18Lib.ZERO);
@@ -552,9 +480,9 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @return account version context
      */
     function _loadContextForWrite(uint256 market, address account) private validMarket(market) returns (VersionContext memory, VersionContext memory) {
-        marketAccounting[market].long.settleAccount(address(this));
-        marketAccounting[market].short.settleAccount(address(this));
-        uint256 currentVersion = marketAccounting[market].long.latestVersion(address(this));
+        markets(market).long.settleAccount(address(this));
+        markets(market).short.settleAccount(address(this));
+        uint256 currentVersion = markets(market).long.latestVersion(address(this));
 
         return (
             VersionContext(market, currentVersion, _assetsAt(market, marketAccounting[market].latestVersion), _sharesAt(market, marketAccounting[market].latestVersion)),
@@ -570,7 +498,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @return account version context
      */
     function _loadContextForRead(uint256 market, address account) private view validMarket(market) returns (VersionContext memory, VersionContext memory) {
-        uint256 currentVersion = Math.min(marketAccounting[market].long.latestVersion(), marketAccounting[market].short.latestVersion()); // latest version that both products are settled to
+        uint256 currentVersion = Math.min(markets(market).long.latestVersion(), markets(market).short.latestVersion()); // latest version that both products are settled to
 
         return (
             VersionContext(market, currentVersion, _assetsAt(market, marketAccounting[market].latestVersion), _sharesAt(market, marketAccounting[market].latestVersion)),
@@ -584,8 +512,8 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @return bool true if unhealthy, false if healthy
      */
     function _unhealthyAtVersion(VersionContext memory context) private view returns (bool) {
-        IProduct long = marketAccounting[context.market].long;
-        IProduct short = marketAccounting[context.market].short;
+        IProduct long = markets(context.market).long;
+        IProduct short = markets(context.market).short;
         return collateral.liquidatable(address(this), long)
             || collateral.liquidatable(address(this), short)
             || long.isLiquidating(address(this))
@@ -685,9 +613,9 @@ contract BalancedVault is IBalancedVault, UInitializable {
      */
     function _collateral(uint256 market) private view validMarket(market) returns (UFixed18, UFixed18, UFixed18) {
         return (
-            collateral.collateral(address(this), marketAccounting[market].long),
-            collateral.collateral(address(this), marketAccounting[market].short),
-            asset.balanceOf().muldiv(marketAccounting[market].weight, totalWeight)
+            collateral.collateral(address(this), markets(market).long),
+            collateral.collateral(address(this), markets(market).short),
+            asset.balanceOf().muldiv(markets(market).weight, totalWeight)
         );
     }
 
@@ -699,8 +627,8 @@ contract BalancedVault is IBalancedVault, UInitializable {
      * @return Total assets in the vault at the given version
      */
     function _assetsAt(uint256 market, uint256 version) private view validMarket(market) returns (UFixed18) {
-        IProduct long = marketAccounting[market].long;
-        IProduct short = marketAccounting[market].short;
+        IProduct long = markets(market).long;
+        IProduct short = markets(market).short;
 
         Fixed18 longAccumulated = long.valueAtVersion(version + 1).maker.sub(long.valueAtVersion(version).maker)
             .mul(Fixed18Lib.from(marketAccounting[market].versions[version].longPosition))
@@ -751,15 +679,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
 
     /// @dev Verify that `market` is a valid market ID
     modifier validMarket(uint256 market) {
-        if (market >= numberOfMarkets) revert InvalidMarket(market);
-
-        _;
-    }
-
-    /// @dev Verify that the caller is the owner of the controller
-    // TODO: Is this the right owner check?
-    modifier onlyControllerOwner() {
-        if (msg.sender != controller.owner()) revert BalancedVaultUnauthorized();
+        if (market >= totalMarkets) revert InvalidMarket(market);
 
         _;
     }
