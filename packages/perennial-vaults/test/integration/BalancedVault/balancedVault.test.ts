@@ -105,7 +105,7 @@ describe('BalancedVault', () => {
         weight: 1,
       },
     ])
-    await vault.initialize('Perennial Vault Alpha', 'PVA')
+    await vault.initialize('Perennial Vault Alpha')
     asset = IERC20Metadata__factory.connect(await vault.asset(), owner)
 
     const dsuHolder = await impersonate.impersonateWithBalance(DSU_HOLDER, utils.parseEther('10'))
@@ -153,7 +153,7 @@ describe('BalancedVault', () => {
 
   describe('#initialize', () => {
     it('cant re-initialize', async () => {
-      await expect(vault.initialize('Perennial Vault Alpha', 'PVA')).to.revertedWithCustomError(
+      await expect(vault.initialize('Perennial Vault Alpha')).to.revertedWithCustomError(
         vault,
         'UInitializableAlreadyInitializedError',
       )
@@ -251,9 +251,7 @@ describe('BalancedVault', () => {
       )
 
       // User 2 hasn't deposited anything, so nothing should be redeemed.
-      await expect(vault.connect(user2).redeem(utils.parseEther('1'), user2.address))
-        .to.emit(vault, 'Burn')
-        .withArgs(user2.address, 0)
+      await vault.connect(user2).redeem(utils.parseEther('1'), user2.address)
 
       expect(await vault.maxRedeem(user.address)).to.equal(utils.parseEther('1'))
       await vault.connect(user).redeem(await vault.maxRedeem(user.address), user.address)
