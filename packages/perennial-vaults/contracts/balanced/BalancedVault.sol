@@ -6,6 +6,7 @@ import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "./BalancedVaultDefinition.sol";
 import "./types/MarketAccount.sol";
+import "../PerennialLib.sol";
 
 /**
  * @title BalancedVault
@@ -348,12 +349,12 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
             // 3. Best-effort withdrawal of collateral from products with too much collateral
             // TODO: Don't withdraw all if it would revert
             if (longCollaterals[market].gt(targetCollateral)) {
-                _updateCollateral(markets(market).long, longCollaterals[market], targetCollateral);
+                PerennialLib.updateCollateral(collateral, markets(market).long, targetCollateral);
             } else {
                 totalCollateralToDeposit = totalCollateralToDeposit.add(targetCollateral.sub(longCollaterals[market]));
             }
             if (shortCollaterals[market].gt(targetCollateral)) {
-                _updateCollateral(markets(market).short, shortCollaterals[market], targetCollateral);
+                PerennialLib.updateCollateral(collateral, markets(market).short, targetCollateral);
             } else {
                 totalCollateralToDeposit = totalCollateralToDeposit.add(targetCollateral.sub(shortCollaterals[market]));
             }
@@ -373,14 +374,18 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
         for (uint256 market = 0; market < totalMarkets; ++market) {
             UFixed18 targetCollateral = totalCollateral.muldiv(markets(market).weight, totalWeight).div(TWO);
             if (longCollaterals[market].lt(targetCollateral)) {
-                _updateCollateral(markets(market).long,
-                                  longCollaterals[market],
-                                  longCollaterals[market].add(targetCollateral.sub(longCollaterals[market]).mul(depositProRataRatio)));
+                PerennialLib.updateCollateral(
+                    collateral,
+                    markets(market).long,
+                    longCollaterals[market].add(targetCollateral.sub(longCollaterals[market]).mul(depositProRataRatio))
+                );
             }
             if (shortCollaterals[market].lt(targetCollateral)) {
-                _updateCollateral(markets(market).short,
-                                  shortCollaterals[market],
-                                  shortCollaterals[market].add(targetCollateral.sub(shortCollaterals[market]).mul(depositProRataRatio)));
+                PerennialLib.updateCollateral(
+                    collateral,
+                    markets(market).short,
+                    shortCollaterals[market].add(targetCollateral.sub(shortCollaterals[market]).mul(depositProRataRatio))
+                );
             }
         }
     }
@@ -391,9 +396,9 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
     function _rebalancePosition(VersionContext memory context, UFixed18 claimAmount) private {
         IProduct long = markets(context.market).long;
         IProduct short = markets(context.market).short;
-        if (long.closed() || short.closed()) {
-            _updateMakerPosition(long, UFixed18Lib.ZERO);
-            _updateMakerPosition(short, UFixed18Lib.ZERO);
+        if (long.closed() || short.closed()) { //TODO: need this??
+            PerennialLib.updateMakerPosition(long, UFixed18Lib.ZERO);
+            PerennialLib.updateMakerPosition(short, UFixed18Lib.ZERO);
             return;
         }
 
@@ -406,42 +411,8 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
         UFixed18 currentPrice = long.atVersion(context.version).price.abs();
         UFixed18 targetPosition = currentUtilized.mul(targetLeverage).div(currentPrice).div(TWO);
 
-        _updateMakerPosition(long, targetPosition);
-        _updateMakerPosition(short, targetPosition);
-    }
-
-    /**
-     * @notice Adjusts the collateral on `product` to `targetCollateral`
-     * @param product The product to adjust the vault's collateral on
-     * @param currentCollateral The current collateral of the product
-     * @param targetCollateral The new collateral to target
-     */
-    function _updateCollateral(IProduct product, UFixed18 currentCollateral, UFixed18 targetCollateral) private {
-        if (currentCollateral.gt(targetCollateral))
-            collateral.withdrawTo(address(this), product, currentCollateral.sub(targetCollateral));
-        if (currentCollateral.lt(targetCollateral))
-            collateral.depositTo(address(this), product, targetCollateral.sub(currentCollateral));
-
-        emit CollateralUpdated(product, targetCollateral);
-    }
-
-    /**
-     * @notice Adjusts the position on `product` to `targetPosition`
-     * @param product The product to adjust the vault's position on
-     * @param targetPosition The new position to target
-     */
-    function _updateMakerPosition(IProduct product, UFixed18 targetPosition) private {
-        UFixed18 currentPosition = product.position(address(this)).next(product.pre(address(this))).maker;
-        UFixed18 currentMaker = product.positionAtVersion(product.latestVersion()).next(product.pre()).maker;
-        UFixed18 makerLimit = product.makerLimit();
-        UFixed18 makerAvailable = makerLimit.gt(currentMaker) ? makerLimit.sub(currentMaker) : UFixed18Lib.ZERO;
-
-        if (targetPosition.lt(currentPosition))
-            product.closeMake(currentPosition.sub(targetPosition));
-        if (targetPosition.gt(currentPosition))
-            product.openMake(targetPosition.sub(currentPosition).min(makerAvailable));
-
-        emit PositionUpdated(product, targetPosition);
+        PerennialLib.updateMakerPosition(long, targetPosition);
+        PerennialLib.updateMakerPosition(short, targetPosition);
     }
 
     /**
