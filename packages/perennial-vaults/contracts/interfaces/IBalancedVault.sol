@@ -8,11 +8,23 @@ import "./IBalancedVaultDefinition.sol";
 
 interface IBalancedVault is IBalancedVaultDefinition {
 
-    event Approval(address indexed account, address indexed spender, bool approved);
+    struct EpochContext {
+        uint256 epoch;
+        UFixed18 latestCollateral;
+        UFixed18 latestShares;
+    }
+
+    struct Epoch {
+        UFixed18 totalShares;
+        UFixed18 idleAssets;
+    }
+
+    //TODO: review these
+    event Approval(address indexed account, address indexed spender, UFixed18 amount);
     event Mint(address indexed account, UFixed18 amount);
     event Burn(address indexed account, UFixed18 amount);
-    event Deposit(address indexed sender, address indexed account, uint256 indexed market, uint256 version, UFixed18 assets);
-    event Redemption(address indexed sender, address indexed account, uint256 indexed market, uint256 version, UFixed18 proportion);
+    event Deposit(address indexed sender, address indexed account, uint256 version, UFixed18 assets);
+    event Redemption(address indexed sender, address indexed account, uint256 version, UFixed18 shares);
     event Claim(address indexed sender, address indexed account, UFixed18 assets);
     event PositionUpdated(IProduct product, UFixed18 targetPosition);
     event CollateralUpdated(IProduct product, UFixed18 targetCollateral);
@@ -21,7 +33,6 @@ interface IBalancedVault is IBalancedVaultDefinition {
     error BalancedVaultDepositLimitExceeded();
     error BalancedVaultRedemptionLimitExceeded();
     error BalancedVaultRedemptionInvalidProportion();
-    error InvalidMarket(uint256); //TODO: ?
     error BalancedVaultNotApproved();
 
     function name() external view returns (string memory);
@@ -30,15 +41,16 @@ interface IBalancedVault is IBalancedVaultDefinition {
     function unclaimed(address account) external view returns (UFixed18);
     function totalUnclaimed() external view returns (UFixed18);
     function claim(address account) external;
-    function isApproved(address account, address spender) external view returns (bool);
-    function setApproval(address spender, bool approved) external;
 
     /* Partial ERC4626 Interface */
 
     function totalAssets() external view returns (UFixed18);
-    function convertToAssets(UFixed18 proportion, address account) external view returns (UFixed18);
+    function convertToAssets(UFixed18 shares) external view returns (UFixed18);
+    function convertToShares(UFixed18 assets) external view returns (UFixed18);
     function maxDeposit(address account) external view returns (UFixed18);
     function deposit(UFixed18 assets, address account) external;
     function maxRedeem(address account) external view returns (UFixed18);
     function redeem(UFixed18 proportion, address account) external;
+
+    //TODO: put back some functions
 }

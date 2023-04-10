@@ -42,6 +42,9 @@ contract BalancedVaultDefinition is IBalancedVaultDefinition {
     /// @dev The sum of the weights of all products in the vault
     uint256 public immutable totalWeight;
 
+    /// @dev The minimum of the weights of all products in the vault
+    uint256 public immutable minWeight;
+
     /// @dev The product corresponding to the long of each payoff
     IProduct private immutable long0;
     // IProduct private immutable long1;
@@ -69,18 +72,22 @@ contract BalancedVaultDefinition is IBalancedVaultDefinition {
 
         totalMarkets = marketDefinitions_.length;
         uint256 totalWeight_;
+        uint256 minWeight_ = type(uint256).max;
 
         long0 = marketDefinitions_[0].long;
         short0 = marketDefinitions_[0].short;
         weight0 = marketDefinitions_[0].weight;
         totalWeight_ += marketDefinitions_[0].weight;
+        if (minWeight_ > marketDefinitions_[0].weight) minWeight_ = marketDefinitions_[0].weight;
 
 //        long1 = marketDefinitions_[1].long;
 //        short1 = marketDefinitions_[1].short;
 //        weight1 = marketDefinitions_[1].weight;
 //        totalWeight_ += marketDefinitions_[1].weight;
+//        if (minWeight_ > marketDefinitions_[1].weight) minWeight_ = marketDefinitions_[1].weight;
 
         totalWeight = totalWeight_;
+        minWeight = minWeight_;
     }
 
     /**
