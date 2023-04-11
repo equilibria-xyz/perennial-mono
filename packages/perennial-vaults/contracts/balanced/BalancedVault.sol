@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
 import "./BalancedVaultDefinition.sol";
 import "./types/MarketAccount.sol";
 import "../PerennialLib.sol";
+import "hardhat/console.sol";
 
 /**
  * @title BalancedVault
@@ -250,6 +251,14 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
      */
     function unclaimed(address account) external view returns (UFixed18) {
         (, EpochContext memory accountContext) = _loadContextForRead(account);
+
+        UFixed18 claimAmount = _unclaimedAtEpoch(accountContext, account).sub(_unclaimed[account]);
+        console.log("account: %s", account);
+        console.log("latestShares: %s", UFixed18.unwrap(accountContext.latestShares));
+        console.log("latestCollateral: %s", UFixed18.unwrap(accountContext.latestCollateral));
+        console.log("claimAmount: %s", UFixed18.unwrap(claimAmount));
+        console.log("");
+
         return _unclaimedAtEpoch(accountContext, account);
     }
 
@@ -309,6 +318,15 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
         }
 
         if (account != address(0) && accountContext.epoch > _latestEpochs[account]) {
+            UFixed18 balanceAmount = _balanceOfAtEpoch(accountContext, account).sub(_balanceOf[account]);
+            UFixed18 claimAmount = _unclaimedAtEpoch(accountContext, account).sub(_unclaimed[account]);
+            console.log("account: %s", account);
+            console.log("latestShares: %s", UFixed18.unwrap(accountContext.latestShares));
+            console.log("latestCollateral: %s", UFixed18.unwrap(accountContext.latestCollateral));
+            console.log("balanceAmount: %s", UFixed18.unwrap(balanceAmount));
+            console.log("claimAmount: %s", UFixed18.unwrap(claimAmount));
+            console.log("");
+
             _delayedMintAccount(account, _balanceOfAtEpoch(accountContext, account).sub(_balanceOf[account]));
             _unclaimed[account] = _unclaimedAtEpoch(accountContext, account);
             _deposits[account] = UFixed18Lib.ZERO;
@@ -448,12 +466,25 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
      * @return account epoch context
      */
     function _loadContextForRead(address account) private view returns (EpochContext memory, EpochContext memory) {
-        // TODO: current epoch should calculate if we're ready to increment the latest, then return that value
-        uint256 currentEpoch = _latestEpoch;
+        uint256 _currentEpoch = currentEpoch();
         return (
-            EpochContext(currentEpoch, _assetsAtEpoch(_latestEpoch), _sharesAtEpoch(_latestEpoch)),
-            EpochContext(currentEpoch, _assetsAtEpoch(_latestEpochs[account]), _sharesAtEpoch(_latestEpochs[account]))
+            EpochContext(_currentEpoch, _assetsAtEpoch(_latestEpoch), _sharesAtEpoch(_latestEpoch)),
+            EpochContext(_currentEpoch, _assetsAtEpoch(_latestEpochs[account]), _sharesAtEpoch(_latestEpochs[account]))
         );
+    }
+
+    /**
+     * @notice Returns the current epoch given the state of each underlying market
+     * @return The current epoch
+     */
+    function currentEpoch() public view returns (uint256) {
+        for (uint256 marketId; marketId < totalMarkets; marketId++) {
+            if (
+                Math.min(markets(marketId).long.latestVersion(), markets(marketId).short.latestVersion()) >
+                _marketAccounts[marketId].versionOf[_latestEpoch]
+            ) return _latestEpoch + 1;
+        }
+        return _latestEpoch;
     }
 
     /**

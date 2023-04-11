@@ -42,6 +42,8 @@ library PerennialLib {
     function updateCollateral(ICollateral collateral, IProduct product, UFixed18 targetCollateral) internal {
         UFixed18 currentCollateral = collateral.collateral(address(this), product);
 
+        //TODO: compute if we're withdrawing more than maintenance
+
         if (currentCollateral.gt(targetCollateral))
             collateral.withdrawTo(address(this), product, currentCollateral.sub(targetCollateral));
         if (currentCollateral.lt(targetCollateral))
