@@ -19,21 +19,15 @@ interface IBalancedVault is IBalancedVaultDefinition {
         UFixed18 idleAssets;
     }
 
-    //TODO: review these
     event Approval(address indexed account, address indexed spender, UFixed18 amount);
     event Mint(address indexed account, UFixed18 amount);
     event Burn(address indexed account, UFixed18 amount);
     event Deposit(address indexed sender, address indexed account, uint256 version, UFixed18 assets);
     event Redemption(address indexed sender, address indexed account, uint256 version, UFixed18 shares);
     event Claim(address indexed sender, address indexed account, UFixed18 assets);
-    event PositionUpdated(IProduct product, UFixed18 targetPosition);
-    event CollateralUpdated(IProduct product, UFixed18 targetCollateral);
 
-    error BalancedVaultUnauthorized();
     error BalancedVaultDepositLimitExceeded();
     error BalancedVaultRedemptionLimitExceeded();
-    error BalancedVaultRedemptionInvalidProportion();
-    error BalancedVaultNotApproved();
 
     function name() external view returns (string memory);
     function initialize(string memory name_) external;

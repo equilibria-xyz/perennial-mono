@@ -301,7 +301,8 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
                 marketEpoch.shortPosition = markets(marketId).short.position(address(this)).maker;
                 marketEpoch.longAssets = collateral.collateral(address(this), markets(marketId).long);
                 marketEpoch.shortAssets = collateral.collateral(address(this), markets(marketId).short);
-                //TODO: stamp version?
+
+                _marketAccounts[marketId].versionOf[context.epoch] = markets(marketId).long.latestVersion();
             }
             _epochs[context.epoch].totalShares = _totalSupply;
             _epochs[context.epoch].idleAssets = asset.balanceOf();
@@ -392,7 +393,7 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
     function _burn(address from, UFixed18 amount) private {
         _balanceOf[from] = _balanceOf[from].sub(amount);
         _totalSupply = _totalSupply.sub(amount);
-        // TODO: burn event
+        emit Burn(from, amount);
     }
 
     /**
@@ -410,7 +411,7 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
      */
     function _delayedMintAccount(address to, UFixed18 amount) private {
         _balanceOf[to] = _balanceOf[to].add(amount);
-        // TODO: delayed mint event
+        emit Mint(to, amount);
     }
 
     /**
@@ -447,10 +448,11 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
      * @return account epoch context
      */
     function _loadContextForRead(address account) private view returns (EpochContext memory, EpochContext memory) {
-        // TODO: what should currentEpoch be?
+        // TODO: current epoch should calculate if we're ready to increment the latest, then return that value
+        uint256 currentEpoch = _latestEpoch;
         return (
-            EpochContext(_latestEpoch, _assetsAtEpoch(_latestEpoch), _sharesAtEpoch(_latestEpoch)),
-            EpochContext(_latestEpoch, _assetsAtEpoch(_latestEpochs[account]), _sharesAtEpoch(_latestEpochs[account]))
+            EpochContext(currentEpoch, _assetsAtEpoch(_latestEpoch), _sharesAtEpoch(_latestEpoch)),
+            EpochContext(currentEpoch, _assetsAtEpoch(_latestEpochs[account]), _sharesAtEpoch(_latestEpochs[account]))
         );
     }
 
