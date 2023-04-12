@@ -1,7 +1,7 @@
 import { expect } from 'chai'
 import { BigNumber, constants, utils } from 'ethers'
 import { MultiInvoker__factory, Product, TestnetVault, TestnetVault__factory } from '../../../types/generated'
-import { IMultiInvoker } from '../../../types/generated/contracts/interfaces/IMultiInvoker'
+import { IMultiInvoker } from '../../../types/generated/contracts/interfaces/IMultiInvoker.sol/IMultiInvoker'
 import { buildInvokerActions, InvokerAction } from '../../util'
 
 import {

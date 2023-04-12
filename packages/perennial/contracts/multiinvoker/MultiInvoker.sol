@@ -152,6 +152,12 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
                 (address account, IPerennialVault vault, UFixed18 amount) = abi.decode(invocation.args, (address, IPerennialVault, UFixed18));
                 _vaultWrapAndDeposit(account, vault, amount);
             }
+
+            else if (invocation.action == PerennialAction.CHARGE_FEE) {
+                (address _interface, UFixed18 amount) = abi.decode(invocation.args, (address, UFixed18));
+
+                _sendDSU(_interface, amount);
+            }
         }
     }
 
@@ -257,7 +263,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
         // Pull USDC from the `msg.sender`
         USDC.pull(msg.sender, amount, true);
 
-        _wrap(address(this), amount);
+        _handleWrap(address(this), amount);
 
         // Deposit the amount to the collateral account
         collateral.depositTo(account, product, amount);
@@ -273,7 +279,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
         // Withdraw the amount from the collateral account
         collateral.withdrawFrom(msg.sender, address(this), product, amount);
 
-        _unwrap(receiver, amount);
+        _handleUnwrap(receiver, amount);
     }
 
     /**
@@ -362,5 +368,9 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
             // Unwrap the DSU into USDC and return to the receiver
             batcher.unwrap(amount, receiver);
         }
+    }
+
+    function _sendDSU(address to, UFixed18 amount) internal {
+        DSU.transferFrom(msg.sender, to, amount);
     }
 }

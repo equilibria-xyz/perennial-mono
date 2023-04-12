@@ -16,7 +16,7 @@ import {
   IBatcher,
   TestnetVault,
 } from '../../../types/generated'
-import { IMultiInvoker } from '../../../types/generated/contracts/interfaces/IMultiInvoker'
+import { IMultiInvoker } from '../../../types/generated/contracts/interfaces/IMultiInvoker.sol/IMultiInvoker'
 import { InvokerAction, buildInvokerActions } from '../../util'
 import { loadFixture } from '@nomicfoundation/hardhat-network-helpers'
 

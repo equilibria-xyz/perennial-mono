@@ -141,8 +141,12 @@ describe('MultiInvokerRollup', () => {
 
       await usdc.connect(usdcHolder).transfer(user.address, 1_000_000e6)
 
+      console.log(customActions.WRAP.payload)
+
       await expect(
-        await user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, customActions.WRAP.payload)),
+        await user.sendTransaction(
+          buildTransactionRequest(user, multiInvokerRollup, `0x` + customActions.WRAP.payload),
+        ),
       )
         .to.emit(usdc, 'Transfer')
         .withArgs(user.address, multiInvokerRollup.address, 2_000_000e6)
@@ -516,7 +520,7 @@ describe('MultiInvokerRollup', () => {
         await usdc.connect(usdcHolder).transfer(user.address, 1_000_000e6)
 
         await expect(
-          user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, customActions.WRAP.payload)),
+          user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, `0x` + customActions.WRAP.payload)),
         )
           .to.emit(usdc, 'Transfer')
           .withArgs(user.address, multiInvokerRollup.address, 2_000_000e6)

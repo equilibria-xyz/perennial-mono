@@ -147,6 +147,11 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
                 (address account, address vault, UFixed18 amount) =
                     (_readAndCacheAddress(input, ptr), _readAndCacheAddress(input, ptr), _readUFixed18(input, ptr));
                 _vaultWrapAndDeposit(account, IPerennialVault(vault), amount);
+            } else if (action == 16) { // CHARGE_FEE
+                (address _interface, UFixed18 amount) = 
+                    (_readAndCacheAddress(input, ptr), _readUFixed18(input, ptr));
+                
+                _sendDSU(_interface, amount);
             }
         }
     }
