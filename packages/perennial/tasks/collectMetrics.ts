@@ -7,7 +7,6 @@ import { providers } from '@0xsequence/multicall'
 import { request, gql } from 'graphql-request'
 import { isArbitrum } from '../../common/testutil/network'
 import { BigNumber, utils } from 'ethers'
-import { Big18Math } from '../../common/testutil/types'
 
 const { formatEther } = utils
 const QUERY_PAGE_SIZE = 1000
@@ -109,7 +108,7 @@ export default task('collectMetrics', 'Collects metrics for a given day')
       rawData.bucketedVolumes = [...rawData.bucketedVolumes, ...res.bucketedVolumes]
     }
 
-    const hourVolumes = rawData.bucketedVolumes.map(
+    const hourlyVolumes = rawData.bucketedVolumes.map(
       ({ product, makerNotional, makerFees, takerNotional, takerFees }) => ({
         product: product.toLowerCase(),
         makerNotional: BigNumber.from(makerNotional),
@@ -119,11 +118,11 @@ export default task('collectMetrics', 'Collects metrics for a given day')
       }),
     )
 
-    const totalVolume = hourVolumes.reduce((acc, { takerNotional }) => acc.add(takerNotional), BigNumber.from(0))
-    const longFees = hourVolumes
+    const totalVolume = hourlyVolumes.reduce((acc, { takerNotional }) => acc.add(takerNotional), BigNumber.from(0))
+    const longFees = hourlyVolumes
       .filter(({ product }) => product.toLowerCase() === longProduct.toLowerCase())
       .reduce((acc, { takerFees }) => acc.add(takerFees), BigNumber.from(0))
-    const shortFees = hourVolumes
+    const shortFees = hourlyVolumes
       .filter(({ product }) => product.toLowerCase() === shortProduct.toLowerCase())
       .reduce((acc, { takerFees }) => acc.add(takerFees), BigNumber.from(0))
 
