@@ -3,9 +3,14 @@ pragma solidity ^0.8.13;
 
 import "@equilibria/perennial/contracts/interfaces/IProduct.sol";
 import "@equilibria/perennial/contracts/interfaces/IController.sol";
-import "./types/MarketDefinition.sol";
 
 interface IBalancedVaultDefinition {
+    struct MarketDefinition {
+        IProduct long;
+        IProduct short;
+        uint256 weight;
+    }
+
     error BalancedVaultDefinitionInvalidMarketIdError();
 
     function asset() external view returns (Token18);

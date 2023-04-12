@@ -19,6 +19,21 @@ interface IBalancedVault is IBalancedVaultDefinition {
         UFixed18 totalAssets;
     }
 
+    struct MarketEpoch {
+        UFixed18 longPosition;
+        UFixed18 shortPosition;
+        UFixed18 __deprecated0__;
+        UFixed18 longAssets;
+        UFixed18 shortAssets;
+        UFixed18 __deprecated1__;
+    }
+
+    struct MarketAccount {
+        mapping(uint256 => MarketEpoch) epochs;
+        mapping(uint256 => uint256) versionOf;
+        uint256[20] __gap;
+    }
+
     event Approval(address indexed account, address indexed spender, UFixed18 amount);
     event Mint(address indexed account, UFixed18 amount);
     event Burn(address indexed account, UFixed18 amount);

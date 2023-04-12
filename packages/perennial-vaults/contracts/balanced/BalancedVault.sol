@@ -5,8 +5,6 @@ import "../interfaces/IBalancedVault.sol";
 import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "./BalancedVaultDefinition.sol";
-import "./types/MarketAccount.sol";
-import "../PerennialLib.sol";
 
 /**
  * @title BalancedVault
@@ -341,18 +339,18 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
         for (uint256 marketId; marketId < totalMarkets; marketId++) {
             UFixed18 marketCollateral = targetCollateral.muldiv(markets(marketId).weight, totalWeight);
             if (collateral.collateral(address(this), markets(marketId).long).gt(marketCollateral))
-                PerennialLib.updateCollateral(collateral, markets(marketId).long, marketCollateral);
+                _updateCollateral(markets(marketId).long, marketCollateral);
             if (collateral.collateral(address(this), markets(marketId).short).gt(marketCollateral))
-                PerennialLib.updateCollateral(collateral, markets(marketId).short, marketCollateral);
+                _updateCollateral(markets(marketId).short, marketCollateral);
         }
 
         // Deposit collateral to markets below target
         for (uint256 marketId; marketId < totalMarkets; marketId++) {
             UFixed18 marketCollateral = targetCollateral.muldiv(markets(marketId).weight, totalWeight);
             if (collateral.collateral(address(this), markets(marketId).long).lt(marketCollateral))
-                PerennialLib.updateCollateral(collateral, markets(marketId).long, marketCollateral);
+                _updateCollateral(markets(marketId).long, marketCollateral);
             if (collateral.collateral(address(this), markets(marketId).short).lt(marketCollateral))
-                PerennialLib.updateCollateral(collateral, markets(marketId).short, marketCollateral);
+                _updateCollateral(markets(marketId).short, marketCollateral);
         }
 
         // TODO: Don't withdraw all if it would revert
@@ -380,9 +378,53 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
             UFixed18 currentPrice = markets(marketId).long.atVersion(version).price.abs();
             UFixed18 targetPosition = marketCollateral.mul(targetLeverage).div(currentPrice);
 
-            PerennialLib.updateMakerPosition(markets(marketId).long, targetPosition);
-            PerennialLib.updateMakerPosition(markets(marketId).short, targetPosition);
+            _updateMakerPosition(markets(marketId).long, targetPosition);
+            _updateMakerPosition(markets(marketId).short, targetPosition);
         }
+    }
+
+    /**
+     * @notice Adjusts the position on `product` to `targetPosition`
+     * @param product The product to adjust the vault's position on
+     * @param targetPosition The new position to target
+     */
+    function _updateMakerPosition(IProduct product, UFixed18 targetPosition) private {
+        UFixed18 accountPosition = product.position(address(this)).next(product.pre(address(this))).maker;
+
+        if (targetPosition.lt(accountPosition)) {
+            // compute headroom until hitting taker amount
+            Position memory position = product.positionAtVersion(product.latestVersion()).next(product.pre());
+            UFixed18 makerAvailable = position.maker.gt(position.taker) ?
+            position.maker.sub(position.taker) :
+            UFixed18Lib.ZERO;
+
+            product.closeMake(accountPosition.sub(targetPosition).min(makerAvailable));
+        }
+
+        if (targetPosition.gt(accountPosition)) {
+            // compute headroom until hitting makerLimit
+            UFixed18 currentMaker = product.positionAtVersion(product.latestVersion()).next(product.pre()).maker;
+            UFixed18 makerLimit = product.makerLimit();
+            UFixed18 makerAvailable = makerLimit.gt(currentMaker) ? makerLimit.sub(currentMaker) : UFixed18Lib.ZERO;
+
+            product.openMake(targetPosition.sub(accountPosition).min(makerAvailable));
+        }
+    }
+
+    /**
+     * @notice Adjusts the collateral on `product` to `targetCollateral`
+     * @param product The product to adjust the vault's collateral on
+     * @param targetCollateral The new collateral to target
+     */
+    function _updateCollateral(IProduct product, UFixed18 targetCollateral) private {
+        UFixed18 currentCollateral = collateral.collateral(address(this), product);
+
+        //TODO: compute if we're withdrawing more than maintenance
+
+        if (currentCollateral.gt(targetCollateral))
+            collateral.withdrawTo(address(this), product, currentCollateral.sub(targetCollateral));
+        if (currentCollateral.lt(targetCollateral))
+            collateral.depositTo(address(this), product, targetCollateral.sub(currentCollateral));
     }
 
     /**
@@ -477,9 +519,22 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
     function _unhealthyAtEpoch(EpochContext memory context) private view returns (bool) {
         if (!context.latestShares.isZero() && context.latestCollateral.isZero()) return true;
         for (uint256 marketId; marketId < totalMarkets; marketId++) {
-            if (markets(marketId).unhealthy(collateral)) return true;
+            if (_unhealthy(markets(marketId))) return true;
         }
         return false;
+    }
+
+    /**
+     * @notice Determines whether the market pair is currently in an unhealthy state
+     * @dev market is unhealthy if either the long or short markets are liquidating or liquidatable
+     * @param marketDefinition The configuration of the market
+     * @return bool true if unhealthy, false if healthy
+     */
+    function _unhealthy(MarketDefinition memory marketDefinition) internal view returns (bool) {
+        return collateral.liquidatable(address(this), marketDefinition.long)
+            || collateral.liquidatable(address(this), marketDefinition.short)
+            || marketDefinition.long.isLiquidating(address(this))
+            || marketDefinition.short.isLiquidating(address(this));
     }
 
     /**
@@ -605,7 +660,7 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
     function _assetsAtEpoch(uint256 epoch) private view returns (UFixed18) {
         Fixed18 assets = Fixed18Lib.from(_epochs[epoch].totalAssets);
         for (uint256 marketId; marketId < totalMarkets; marketId++) {
-            assets = assets.add(_marketAccounts[marketId].accumulatedAtEpoch(markets(marketId), epoch));
+            assets = assets.add(_accumulatedAtEpoch(marketId, epoch));
         }
 
         // collateral can't go negative within the vault, socializes into unclaimed if triggered
@@ -619,5 +674,33 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
      */
     function _sharesAtEpoch(uint256 epoch) private view returns (UFixed18) {
         return _epochs[epoch].totalShares;
+    }
+
+    /**
+     * @notice The total assets accumulated at the given epoch for a market pair
+     * @dev Calculates accumulated PnL for `version` to `version + 1`
+     * @param marketId The market ID to accumulate for
+     * @param epoch Epoch to get total assets at
+     * @return Total assets accumulated
+     */
+    function _accumulatedAtEpoch(uint256 marketId, uint256 epoch) private view returns (Fixed18) {
+        MarketEpoch memory marketEpoch = _marketAccounts[marketId].epochs[epoch];
+        uint256 version = _marketAccounts[marketId].versionOf[epoch];
+
+        // accumulate value from version n + 1
+        (Fixed18 longAccumulated, Fixed18 shortAccumulated) = (
+            markets(marketId).long.valueAtVersion(version + 1).maker
+                .sub(markets(marketId).long.valueAtVersion(version).maker)
+                .mul(Fixed18Lib.from(marketEpoch.longPosition)),
+            markets(marketId).short.valueAtVersion(version + 1).maker
+                .sub(markets(marketId).short.valueAtVersion(version).maker)
+                .mul(Fixed18Lib.from(marketEpoch.shortPosition))
+        );
+
+        // collateral can't go negative on a product
+        longAccumulated = longAccumulated.max(Fixed18Lib.from(marketEpoch.longAssets).mul(Fixed18Lib.NEG_ONE));
+        shortAccumulated = shortAccumulated.max(Fixed18Lib.from(marketEpoch.shortAssets).mul(Fixed18Lib.NEG_ONE));
+
+        return longAccumulated.add(shortAccumulated);
     }
 }
