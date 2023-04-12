@@ -61,7 +61,7 @@ export default task('collectMetrics', 'Collects metrics for a given day')
           first: $first
           skip: $skip
           where: {
-            bucket: hourly
+            bucket: daily
             product_in: $markets
             periodStartTimestamp_gte: $fromTs
             periodStartTimestamp_lt: $toTs
