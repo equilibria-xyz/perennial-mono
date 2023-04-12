@@ -13,7 +13,7 @@ const { formatEther } = utils
 const QUERY_PAGE_SIZE = 1000
 
 type QueryResult = {
-  hourlyVolumes: {
+  bucketedVolumes: {
     product: string
     makerNotional: string
     makerFees: string
@@ -58,10 +58,15 @@ export default task('collectMetrics', 'Collects metrics for a given day')
 
     const query = gql`
       query getData($markets: [Bytes]!, $fromTs: BigInt!, $toTs: BigInt!, $first: Int!, $skip: Int!) {
-        hourlyVolumes(
+        bucketedVolumes(
           first: $first
           skip: $skip
-          where: { product_in: $markets, periodStartTimestamp_gte: $fromTs, periodStartTimestamp_lt: $toTs }
+          where: {
+            bucket: hourly
+            product_in: $markets
+            periodStartTimestamp_gte: $fromTs
+            periodStartTimestamp_lt: $toTs
+          }
           orderBy: periodStartBlock
           orderDirection: desc
         ) {
@@ -92,7 +97,7 @@ export default task('collectMetrics', 'Collects metrics for a given day')
       skip: page * QUERY_PAGE_SIZE,
     })
     const rawData = res
-    while (res.hourlyVolumes.length === QUERY_PAGE_SIZE) {
+    while (res.bucketedVolumes.length === QUERY_PAGE_SIZE) {
       page += 1
       res = await request(graphURL, query, {
         markets: [longProduct, shortProduct],
@@ -101,10 +106,10 @@ export default task('collectMetrics', 'Collects metrics for a given day')
         first: QUERY_PAGE_SIZE,
         skip: page * QUERY_PAGE_SIZE,
       })
-      rawData.hourlyVolumes = [...rawData.hourlyVolumes, ...res.hourlyVolumes]
+      rawData.bucketedVolumes = [...rawData.bucketedVolumes, ...res.bucketedVolumes]
     }
 
-    const hourVolumes = rawData.hourlyVolumes.map(
+    const hourVolumes = rawData.bucketedVolumes.map(
       ({ product, makerNotional, makerFees, takerNotional, takerFees }) => ({
         product: product.toLowerCase(),
         makerNotional: BigNumber.from(makerNotional),
