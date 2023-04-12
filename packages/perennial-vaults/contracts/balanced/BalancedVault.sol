@@ -365,7 +365,7 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
     function _rebalancePosition(EpochContext memory context, UFixed18 claimAmount) private {
         // Compute target collateral
         UFixed18 targetCollateral = _totalAssetsAtEpoch(context).sub(claimAmount)     // TODO: why is this not symmetrical?
-            .mul(_totalSupply).unsafeDiv(_totalSupply.add(_redemption))                    // TODO: add buffer
+            .mul(_totalSupply.unsafeDiv(_totalSupply.add(_redemption)))               // TODO: add buffer
             .add(_deposit)
             .div(TWO);
         if (targetCollateral.muldiv(minWeight, totalWeight).lt(controller.minCollateral()))

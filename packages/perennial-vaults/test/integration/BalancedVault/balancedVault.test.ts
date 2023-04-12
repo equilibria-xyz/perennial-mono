@@ -25,6 +25,10 @@ use(smock.matchers)
 
 const DSU_HOLDER = '0xaef566ca7e84d1e736f999765a804687f39d9094'
 
+//TODO: add test for >=taker limitation
+//TODO: add multi-asset tests
+//TODO: add upgrade storage test
+
 describe('BalancedVault', () => {
   let vault: BalancedVault
   let asset: IERC20Metadata
@@ -284,10 +288,8 @@ describe('BalancedVault', () => {
       expect(await shortPosition()).to.equal(
         smallDeposit.add(largeDeposit).mul(leverage).div(2).div(originalOraclePrice),
       )
-      // const fundingAmount0 = BigNumber.from(156261444735)
-      const fundingAmount0 = BigNumber.from(156417278140)
-      // const balanceOf2 = BigNumber.from('9999999998437385552894')
-      const balanceOf2 = BigNumber.from('9999999998435827218844')
+      const fundingAmount0 = BigNumber.from(156261444735)
+      const balanceOf2 = BigNumber.from('9999999998437385552894')
       expect(await vault.balanceOf(user.address)).to.equal(utils.parseEther('1000'))
       expect(await vault.balanceOf(user2.address)).to.equal(balanceOf2)
       expect(await vault.totalAssets()).to.equal(utils.parseEther('11000').add(fundingAmount0))
@@ -314,7 +316,7 @@ describe('BalancedVault', () => {
       expect(await shortPosition()).to.equal(0)
 
       // We should have withdrawn all of our collateral.
-      const fundingAmount = BigNumber.from('308477746571')
+      const fundingAmount = BigNumber.from('308321913166')
       const fundingAmount2 = BigNumber.from('3045329143208')
       expect(await totalCollateralInVault()).to.equal(utils.parseEther('11000').add(fundingAmount).add(fundingAmount2))
       expect(await vault.balanceOf(user.address)).to.equal(0)
