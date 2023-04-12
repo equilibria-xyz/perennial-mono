@@ -22,7 +22,7 @@ type QueryResult = {
   lastSettle: { blockNumber: string }[]
 }
 
-export default task('collectMetrics', 'Collects metrics for a given day')
+export default task('collectDailyMetrics', 'Collects metrics for a given day')
   .addPositionalParam('dateString', 'Date string to collect stats for. YYYY-MM-DD format')
   .addPositionalParam('market', 'Market to collect stats for. "eth" or "arb"')
   .addOptionalParam('output', 'Output file path')
