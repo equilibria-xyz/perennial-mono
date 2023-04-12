@@ -28,18 +28,18 @@ using MarketAccountLib for MarketAccount global;
 
 library MarketAccountLib {
     /**
-     * @notice The total assets at the given version
-     * @dev Calculates and adds accumulated PnL for `version` + 1
+     * @notice The total assets accumulated at the given epoch
+     * @dev Calculates accumulated PnL for `version` to `version + 1`
      * @param marketAccount The market account to operate on
      * @param marketDefinition The configuration of the market
      * @param epoch Epoch to get total assets at
-     * @return Total assets in the vault at the given version
+     * @return Total assets accumulated
      */
-    function assetsAtEpoch(
+    function accumulatedAtEpoch(
         MarketAccount storage marketAccount,
         MarketDefinition memory marketDefinition,
         uint256 epoch
-    ) internal view returns (UFixed18) {
+    ) internal view returns (Fixed18) {
         MarketEpoch memory marketEpoch = marketAccount.epochs[epoch];
         uint256 version = marketAccount.versionOf[epoch];
 
@@ -57,12 +57,6 @@ library MarketAccountLib {
         longAccumulated = longAccumulated.max(Fixed18Lib.from(marketEpoch.longAssets).mul(Fixed18Lib.NEG_ONE));
         shortAccumulated = shortAccumulated.max(Fixed18Lib.from(marketEpoch.shortAssets).mul(Fixed18Lib.NEG_ONE));
 
-        // collateral can't go negative within the vault, socializes into unclaimed if triggered
-        return UFixed18Lib.from(
-            Fixed18Lib.from(marketEpoch.longAssets.add(marketEpoch.shortAssets))
-                .add(longAccumulated)
-                .add(shortAccumulated)
-                .max(Fixed18Lib.ZERO)
-        );
+        return longAccumulated.add(shortAccumulated);
     }
 }

@@ -10,13 +10,13 @@ interface IBalancedVault is IBalancedVaultDefinition {
 
     struct EpochContext {
         uint256 epoch;
-        UFixed18 latestCollateral;
+        UFixed18 latestCollateral; //TODO: rename
         UFixed18 latestShares;
     }
 
     struct Epoch {
         UFixed18 totalShares;
-        UFixed18 idleAssets;
+        UFixed18 totalAssets;
     }
 
     event Approval(address indexed account, address indexed spender, UFixed18 amount);

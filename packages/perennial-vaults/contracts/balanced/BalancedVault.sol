@@ -7,7 +7,6 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
 import "./BalancedVaultDefinition.sol";
 import "./types/MarketAccount.sol";
 import "../PerennialLib.sol";
-import "hardhat/console.sol";
 
 /**
  * @title BalancedVault
@@ -251,14 +250,6 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
      */
     function unclaimed(address account) external view returns (UFixed18) {
         (, EpochContext memory accountContext) = _loadContextForRead(account);
-
-        UFixed18 claimAmount = _unclaimedAtEpoch(accountContext, account).sub(_unclaimed[account]);
-        console.log("account: %s", account);
-        console.log("latestShares: %s", UFixed18.unwrap(accountContext.latestShares));
-        console.log("latestCollateral: %s", UFixed18.unwrap(accountContext.latestCollateral));
-        console.log("claimAmount: %s", UFixed18.unwrap(claimAmount));
-        console.log("");
-
         return _unclaimedAtEpoch(accountContext, account);
     }
 
@@ -314,19 +305,10 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
                 _marketAccounts[marketId].versionOf[context.epoch] = markets(marketId).long.latestVersion();
             }
             _epochs[context.epoch].totalShares = _totalSupply;
-            _epochs[context.epoch].idleAssets = asset.balanceOf();
+            _epochs[context.epoch].totalAssets = _totalAssetsAtEpoch(context);
         }
 
         if (account != address(0) && accountContext.epoch > _latestEpochs[account]) {
-            UFixed18 balanceAmount = _balanceOfAtEpoch(accountContext, account).sub(_balanceOf[account]);
-            UFixed18 claimAmount = _unclaimedAtEpoch(accountContext, account).sub(_unclaimed[account]);
-            console.log("account: %s", account);
-            console.log("latestShares: %s", UFixed18.unwrap(accountContext.latestShares));
-            console.log("latestCollateral: %s", UFixed18.unwrap(accountContext.latestCollateral));
-            console.log("balanceAmount: %s", UFixed18.unwrap(balanceAmount));
-            console.log("claimAmount: %s", UFixed18.unwrap(claimAmount));
-            console.log("");
-
             _delayedMintAccount(account, _balanceOfAtEpoch(accountContext, account).sub(_balanceOf[account]));
             _unclaimed[account] = _unclaimedAtEpoch(accountContext, account);
             _deposits[account] = UFixed18Lib.ZERO;
@@ -480,11 +462,24 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
     function currentEpoch() public view returns (uint256) {
         for (uint256 marketId; marketId < totalMarkets; marketId++) {
             if (
-                Math.min(markets(marketId).long.latestVersion(), markets(marketId).short.latestVersion()) >
+                Math.min(markets(marketId).long.latestVersion(), markets(marketId).short.latestVersion()) ==
                 _marketAccounts[marketId].versionOf[_latestEpoch]
-            ) return _latestEpoch + 1;
+            ) return _latestEpoch;
         }
-        return _latestEpoch;
+        return _latestEpoch + 1;
+    }
+
+    /**
+     * @notice Calculates whether or not the vault is in an unhealthy state at the provided version
+     * @param context Version context to calculate health
+     * @return bool true if unhealthy, false if healthy
+     */
+    function _unhealthyAtEpoch(EpochContext memory context) private view returns (bool) {
+        if (!context.latestShares.isZero() && context.latestCollateral.isZero()) return true;
+        for (uint256 marketId; marketId < totalMarkets; marketId++) {
+            if (markets(marketId).unhealthy(collateral)) return true;
+        }
+        return false;
     }
 
     /**
@@ -512,19 +507,6 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
     ) private view returns (UFixed18) {
         if (_unhealthyAtEpoch(context)) return UFixed18Lib.ZERO;
         return _balanceOfAtEpoch(accountContext, account);
-    }
-
-    /**
-     * @notice Calculates whether or not the vault is in an unhealthy state at the provided version
-     * @param context Version context to calculate health
-     * @return bool true if unhealthy, false if healthy
-     */
-    function _unhealthyAtEpoch(EpochContext memory context) private view returns (bool) {
-        if (!context.latestShares.isZero() && context.latestCollateral.isZero()) return true;
-        for (uint256 marketId; marketId < totalMarkets; marketId++) {
-            if (markets(marketId).unhealthy(collateral)) return true;
-        }
-        return false;
     }
 
     /**
@@ -620,11 +602,14 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
      * @param epoch Epoch to get total assets at
      * @return assets Total assets in the vault at the given version
      */
-    function _assetsAtEpoch(uint256 epoch) private view returns (UFixed18 assets) {
-        assets = _epochs[epoch].idleAssets;
+    function _assetsAtEpoch(uint256 epoch) private view returns (UFixed18) {
+        Fixed18 assets = Fixed18Lib.from(_epochs[epoch].totalAssets);
         for (uint256 marketId; marketId < totalMarkets; marketId++) {
-            assets = assets.add(_marketAccounts[marketId].assetsAtEpoch(markets(marketId), epoch));
+            assets = assets.add(_marketAccounts[marketId].accumulatedAtEpoch(markets(marketId), epoch));
         }
+
+        // collateral can't go negative within the vault, socializes into unclaimed if triggered
+        return UFixed18Lib.from(assets.max(Fixed18Lib.ZERO));
     }
 
     /**

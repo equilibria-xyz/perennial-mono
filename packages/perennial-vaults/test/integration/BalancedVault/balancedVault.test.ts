@@ -262,7 +262,7 @@ describe('BalancedVault', () => {
       expect(await vault.totalUnclaimed()).to.equal(0)
     })
 
-    it.only('multiple users', async () => {
+    it('multiple users', async () => {
       expect(await vault.convertToAssets(utils.parseEther('1'))).to.equal(utils.parseEther('1'))
       expect(await vault.convertToShares(utils.parseEther('1'))).to.equal(utils.parseEther('1'))
 
@@ -316,7 +316,7 @@ describe('BalancedVault', () => {
       // We should have withdrawn all of our collateral.
       const fundingAmount = BigNumber.from('308477746571')
       const fundingAmount2 = BigNumber.from('3045329143208')
-      //expect(await totalCollateralInVault()).to.equal(utils.parseEther('11000').add(fundingAmount).add(fundingAmount2))
+      expect(await totalCollateralInVault()).to.equal(utils.parseEther('11000').add(fundingAmount).add(fundingAmount2))
       expect(await vault.balanceOf(user.address)).to.equal(0)
       expect(await vault.balanceOf(user2.address)).to.equal(0)
       expect(await vault.totalAssets()).to.equal(0)
