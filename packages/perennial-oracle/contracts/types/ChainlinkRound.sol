@@ -27,4 +27,13 @@ library ChainlinkRoundLib {
     function phaseId(ChainlinkRound memory self) internal pure returns (uint16) {
         return uint16(self.roundId >> PHASE_OFFSET);
     }
+
+    /**
+     * @notice Computes the chainlink aggregator round ID from a round
+     * @param self Round to compute from
+     * @return Chainlink aggregator round ID
+     */
+    function aggregatorRoundId(ChainlinkRound memory self) internal pure returns (uint64) {
+        return uint64(self.roundId);
+    }
 }
