@@ -154,9 +154,9 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
             }
 
             else if (invocation.action == PerennialAction.CHARGE_FEE) {
-                (address _interface, UFixed18 amount) = abi.decode(invocation.args, (address, UFixed18));
+                (address _interface, UFixed18 amount, bool wrapped) = abi.decode(invocation.args, (address, UFixed18, bool));
 
-                _sendDSU(_interface, amount);
+                _chargeFee(_interface, amount, wrapped);
             }
         }
     }
@@ -370,7 +370,13 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
         }
     }
 
-    function _sendDSU(address to, UFixed18 amount) internal {
-        DSU.pullTo(msg.sender, to, amount);
+    function _chargeFee(address receiver, UFixed18 amount, bool wrapped) internal {
+        if (wrapped) {
+            USDC.pullTo(msg.sender, receiver, amount);
+        } else {
+            USDC.pull(msg.sender, amount);
+            _wrap(receiver, amount);
+            DSU.push(receiver);
+        }
     }
 }

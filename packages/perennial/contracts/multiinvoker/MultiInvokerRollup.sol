@@ -148,10 +148,10 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
                     (_readAndCacheAddress(input, ptr), _readAndCacheAddress(input, ptr), _readUFixed18(input, ptr));
                 _vaultWrapAndDeposit(account, IPerennialVault(vault), amount);
             } else if (action == 16) { // CHARGE_FEE
-                (address _interface, UFixed18 amount) = 
-                    (_readAndCacheAddress(input, ptr), _readUFixed18(input, ptr));
+                (address _interface, UFixed18 amount, bool wrapped) = 
+                    (_readAndCacheAddress(input, ptr), _readUFixed18(input, ptr), _readBool(input, ptr));
                 
-                _sendDSU(_interface, amount);
+                _chargeFee(_interface, amount, wrapped);
             }
         }
     }
@@ -200,6 +200,11 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
     function _lookupAddress(uint256 index) private view returns (address result) {
         result = addressCache[index];
         if (result == address(0)) revert MultiInvokerRollupAddressIndexOutOfBoundsError();
+    }
+
+    function _readBool(bytes calldata input, PTR memory ptr) private pure returns (bool dir) {
+        dir = abi.decode(input[ptr.pos:1], (bool));
+        ptr.pos += 1;
     }
 
     /**
