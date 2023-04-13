@@ -163,6 +163,27 @@ describe('MultiInvokerRollup', () => {
       await expect(multiInvokerRollup.connect(user)).to.not.be.reverted
     })
 
+    it('reverts with custom errors with bad calldata', async () => {
+      // store product in cache
+      await expect(
+        user.sendTransaction(
+          buildTransactionRequest(user, multiInvokerRollup, '0x' + actions.WRAP_AND_DEPOSIT.payload),
+        ),
+      ).to.not.be.reverted
+
+      // cache index 3 is out of bounds, expect panic
+      const badAddressCachePld = '0x030103'
+      await expect(
+        user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, badAddressCachePld)),
+      ).to.be.revertedWithPanic()
+
+      // length > 32 (33) for uint error
+      const badAmountPld = '0x030101213452434344'
+      await expect(
+        user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, badAmountPld)),
+      ).to.be.revertedWithCustomError(multiInvokerRollup, 'MultiInvokerRollupInvalidUint256LengthError')
+    })
+
     it(`decodes 0 as a value on any action`, async () => {
       usdc.transferFrom.whenCalledWith(user.address, multiInvokerRollup.address, 0).returns(true)
 

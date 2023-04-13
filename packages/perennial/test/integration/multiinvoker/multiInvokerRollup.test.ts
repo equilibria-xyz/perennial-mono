@@ -145,17 +145,17 @@ describe('MultiInvokerRollup', () => {
 
       await expect(
         await user.sendTransaction(
-          buildTransactionRequest(user, multiInvokerRollup, `0x` + customActions.WRAP.payload),
+          buildTransactionRequest(user, multiInvokerRollup, '0x' + customActions.WRAP.payload),
         ),
       )
         .to.emit(usdc, 'Transfer')
         .withArgs(user.address, multiInvokerRollup.address, 2_000_000e6)
         .to.emit(reserve, 'Mint')
-        .withArgs(multiInvokerRollup.address, amount, 2_000_000e6)
+        .withArgs(multiInvokerRollup.address, utils.parseEther('2000000'), 2_000_000e6)
         .to.emit(dsu, 'Transfer')
-        .withArgs(reserve.address, multiInvokerRollup.address, amount)
+        .withArgs(reserve.address, multiInvokerRollup.address, utils.parseEther('2000000'))
         .to.emit(dsu, 'Transfer')
-        .withArgs(multiInvokerRollup.address, user.address, amount)
+        .withArgs(multiInvokerRollup.address, user.address, utils.parseEther('2000000'))
     })
 
     it('performs a WRAP, DEPOSIT, and OPEN_MAKE chain', async () => {
@@ -520,16 +520,16 @@ describe('MultiInvokerRollup', () => {
         await usdc.connect(usdcHolder).transfer(user.address, 1_000_000e6)
 
         await expect(
-          user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, `0x` + customActions.WRAP.payload)),
+          user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, '0x' + customActions.WRAP.payload)),
         )
           .to.emit(usdc, 'Transfer')
           .withArgs(user.address, multiInvokerRollup.address, 2_000_000e6)
           .to.emit(reserve, 'Mint')
-          .withArgs(multiInvokerRollup.address, amount, 2_000_000e6)
+          .withArgs(multiInvokerRollup.address, utils.parseEther('2000000'), 2_000_000e6)
           .to.emit(dsu, 'Transfer')
-          .withArgs(reserve.address, multiInvokerRollup.address, amount)
+          .withArgs(reserve.address, multiInvokerRollup.address, utils.parseEther('2000000'))
           .to.emit(dsu, 'Transfer')
-          .withArgs(multiInvokerRollup.address, user.address, amount)
+          .withArgs(multiInvokerRollup.address, user.address, utils.parseEther('2000000'))
       })
 
       it('calls the reserve directly on UNWRAP', async () => {

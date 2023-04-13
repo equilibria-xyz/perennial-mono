@@ -251,6 +251,7 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
      */
     function _readUint256(bytes calldata input, PTR memory ptr) private pure returns (uint256 result) {
         uint8 len = _readUint8(input, ptr);
+        if (len > UINT256_LENGTH) revert MultiInvokerRollupInvalidUint256LengthError();
 
         result = _bytesToUint256(input[ptr.pos:ptr.pos + len]);
         ptr.pos += len;
@@ -287,7 +288,6 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
      */
     function _bytesToUint256(bytes memory input) private pure returns (uint256 result) {
         uint256 len = input.length;
-        if (len > UINT256_LENGTH) revert MultiInvokerRollupInvalidUint256LengthError();
 
         assembly {
             result := mload(add(input, UINT256_LENGTH))
