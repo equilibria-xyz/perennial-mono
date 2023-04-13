@@ -76,7 +76,7 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
         IController controller_,
         UFixed18 targetLeverage_,
         UFixed18 maxCollateral_,
-        MarketDefinition[1] memory marketDefinitions_
+        MarketDefinition[] memory marketDefinitions_
     )
     BalancedVaultDefinition(asset_, controller_, targetLeverage_, maxCollateral_, marketDefinitions_)
     { }

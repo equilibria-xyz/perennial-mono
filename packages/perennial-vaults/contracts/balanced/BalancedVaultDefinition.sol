@@ -21,6 +21,10 @@ import "../interfaces/IBalancedVaultDefinition.sol";
  *      causing the vault to be in an unhealthy state (far away from target leverage)
  */
 contract BalancedVaultDefinition is IBalancedVaultDefinition {
+    uint256 private MAX_MARKETS = 2;
+    IProduct private constant DEFAULT_PRODUCT = IProduct(address(0));
+    uint256 private constant DEFAULT_WEIGHT = 0;
+
     /// @dev The address of the Perennial controller contract
     IController public immutable controller;
 
@@ -47,22 +51,22 @@ contract BalancedVaultDefinition is IBalancedVaultDefinition {
 
     /// @dev The product corresponding to the long of each payoff
     IProduct private immutable long0;
-    // IProduct private immutable long1;
+    IProduct private immutable long1;
 
     /// @dev The product corresponding to the short of each payoff
     IProduct private immutable short0;
-    // IProduct private immutable short1;
+    IProduct private immutable short1;
 
     /// @dev The the weight of each given payoff in the vault
     uint256 private immutable weight0;
-    // uint256 private immutable weight1;
+    uint256 private immutable weight1;
 
     constructor(
         Token18 asset_,
         IController controller_,
         UFixed18 targetLeverage_,
         UFixed18 maxCollateral_,
-        MarketDefinition[1] memory marketDefinitions_
+        MarketDefinition[] memory marketDefinitions_
     ) {
         asset = asset_;
         controller = controller_;
@@ -70,22 +74,24 @@ contract BalancedVaultDefinition is IBalancedVaultDefinition {
         targetLeverage = targetLeverage_;
         maxCollateral = maxCollateral_;
 
-        totalMarkets = marketDefinitions_.length;
+        uint256 totalMarkets_ = Math.min(marketDefinitions_.length, MAX_MARKETS);
         uint256 totalWeight_;
         uint256 minWeight_ = type(uint256).max;
 
-        long0 = marketDefinitions_[0].long;
-        short0 = marketDefinitions_[0].short;
-        weight0 = marketDefinitions_[0].weight;
-        totalWeight_ += marketDefinitions_[0].weight;
-        if (minWeight_ > marketDefinitions_[0].weight) minWeight_ = marketDefinitions_[0].weight;
+        long0 = (totalMarkets_ > 0) ? marketDefinitions_[0].long : DEFAULT_PRODUCT;
+        short0 = (totalMarkets_ > 0) ? marketDefinitions_[0].short : DEFAULT_PRODUCT;
+        weight0 = (totalMarkets_ > 0) ? marketDefinitions_[0].weight : DEFAULT_WEIGHT;
 
-//        long1 = marketDefinitions_[1].long;
-//        short1 = marketDefinitions_[1].short;
-//        weight1 = marketDefinitions_[1].weight;
-//        totalWeight_ += marketDefinitions_[1].weight;
-//        if (minWeight_ > marketDefinitions_[1].weight) minWeight_ = marketDefinitions_[1].weight;
+        long1 = (totalMarkets_ > 1) ? marketDefinitions_[1].long : DEFAULT_PRODUCT;
+        short1 = (totalMarkets_ > 1) ? marketDefinitions_[1].short : DEFAULT_PRODUCT;
+        weight1 = (totalMarkets_ > 1) ? marketDefinitions_[1].weight : DEFAULT_WEIGHT;
 
+        for (uint256 marketId; marketId < totalMarkets_; marketId++) {
+            totalWeight_ += marketDefinitions_[marketId].weight;
+            if (minWeight_ > marketDefinitions_[marketId].weight) minWeight_ = marketDefinitions_[marketId].weight;
+        }
+
+        totalMarkets = totalMarkets_;
         totalWeight = totalWeight_;
         minWeight = minWeight_;
     }
@@ -96,16 +102,9 @@ contract BalancedVaultDefinition is IBalancedVaultDefinition {
      * @return market The market definition
      */
     function markets(uint256 marketId) public view returns (MarketDefinition memory market) {
-        if (marketId == 0) {
-            market.long = long0;
-            market.short = short0;
-            market.weight = weight0;
-//        } else if (marketId == 1) {
-//            market.long = long1;
-//            market.short = short1;
-//            market.weight = weight1;
-        } else {
-            revert BalancedVaultDefinitionInvalidMarketIdError();
-        }
+        if (totalMarkets > 0 && marketId == 0) return MarketDefinition(long0, short0, weight0);
+        if (totalMarkets > 1 && marketId == 1) return MarketDefinition(long1, short1, weight1);
+
+        revert BalancedVaultDefinitionInvalidMarketIdError();
     }
 }
