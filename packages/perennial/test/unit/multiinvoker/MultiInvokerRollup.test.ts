@@ -112,6 +112,7 @@ describe('MultiInvokerRollup', () => {
     let actions: { [action in InvokerAction]: { action: BigNumberish; payload: string } }
     let zeroAction: { [action in InvokerAction]: { action: BigNumberish; payload: string } }
     const amount = utils.parseEther('100')
+    const dsuFEE = utils.parseEther('10')
     const usdcAmount = 100e6
     const position = utils.parseEther('12')
     const programs = [1, 2, 3]
@@ -129,6 +130,7 @@ describe('MultiInvokerRollup', () => {
         position,
         amount,
         vaultAmount,
+        dsuFEE,
         programs,
       )
 
@@ -142,6 +144,7 @@ describe('MultiInvokerRollup', () => {
         position,
         0,
         vaultAmount,
+        dsuFEE,
         programs,
       )
 
@@ -241,7 +244,7 @@ describe('MultiInvokerRollup', () => {
 
     it(`wrpas USDC to DSU on WRAP action and sends fee to interface`, async () => {
       const res = user.sendTransaction(
-        buildTransactionRequest(user, multiInvokerRollup, `0x` + actions.DEPOSIT.payload + `0E088AC7230489E80000`),
+        buildTransactionRequest(user, multiInvokerRollup, `0x` + actions.WRAP.payload + actions.CHARGE_FEE.payload),
       )
 
       await expect(res).to.not.be.reverted

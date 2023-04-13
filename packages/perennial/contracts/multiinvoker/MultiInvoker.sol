@@ -371,6 +371,6 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
     }
 
     function _sendDSU(address to, UFixed18 amount) internal {
-        DSU.transferFrom(msg.sender, to, amount);
+        DSU.pullTo(msg.sender, to, amount);
     }
 }
