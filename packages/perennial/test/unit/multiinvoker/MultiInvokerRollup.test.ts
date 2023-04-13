@@ -471,6 +471,7 @@ describe('MultiInvokerRollup', () => {
       const usdcAmount = 100e6
       const position = utils.parseEther('12')
       const VaultAmount = utils.parseEther('567')
+      const dsuFEE = utils.parseEther('10')
       const programs = [1, 2, 3]
 
       beforeEach(() => {
@@ -484,6 +485,7 @@ describe('MultiInvokerRollup', () => {
           position,
           amount,
           VaultAmount,
+          dsuFEE,
           programs,
         )
         dsu.transferFrom.whenCalledWith(user.address, multiInvokerRollup.address, amount).returns(true)
@@ -548,6 +550,7 @@ describe('MultiInvokerRollup', () => {
       const usdcAmount = 100e6
       const position = utils.parseEther('12')
       const VaultAmount = utils.parseEther('567')
+      const dsuFEE = utils.parseEther('10')
       const programs = [1, 2, 3]
 
       beforeEach(() => {
@@ -561,6 +564,7 @@ describe('MultiInvokerRollup', () => {
           position,
           amount,
           VaultAmount,
+          dsuFEE,
           programs,
         )
         actionsCached = buildInvokerActionRollup(
@@ -573,6 +577,7 @@ describe('MultiInvokerRollup', () => {
           position,
           amount,
           VaultAmount,
+          dsuFEE,
           programs,
         )
 

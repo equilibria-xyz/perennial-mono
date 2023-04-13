@@ -280,6 +280,9 @@ export const encodeAddressOrCacheIndex = (
 }
 
 export const encodeProgramIds = (programs: number[]) => {
+  console.log('programs')
+  console.log(programs)
+
   let encoded = toHex(BigNumber.from(programs.length))
 
   programs.forEach(program => {
