@@ -1,5 +1,6 @@
 import HRE from 'hardhat'
 import { time, impersonate } from '../../../../common/testutil'
+import { deployProductOnMainnetFork } from '../helpers/setupHelpers'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { FakeContract, smock } from '@defi-wonderland/smock'
 import { expect, use } from 'chai'
@@ -16,6 +17,7 @@ import {
   IOracleProvider,
   ICollateral,
   ICollateral__factory,
+  ChainlinkOracle__factory,
 } from '../../../types/generated'
 import { BigNumber, constants, utils } from 'ethers'
 
@@ -45,8 +47,12 @@ describe('BalancedVault', () => {
   let leverage: BigNumber
   let maxCollateral: BigNumber
   let originalOraclePrice: BigNumber
+  let btcOriginalOraclePrice: BigNumber
+  let btcOracle: FakeContract<IOracleProvider>
+  let btcLong: IProduct
+  let btcShort: IProduct
 
-  async function updateOracle(newPrice?: BigNumber) {
+  async function updateOracle(newPrice?: BigNumber, newPriceBtc?: BigNumber) {
     const [currentVersion, currentTimestamp, currentPrice] = await oracle.currentVersion()
     const newVersion = {
       version: currentVersion.add(1),
@@ -56,6 +62,16 @@ describe('BalancedVault', () => {
     oracle.sync.returns(newVersion)
     oracle.currentVersion.returns(newVersion)
     oracle.atVersion.whenCalledWith(newVersion.version).returns(newVersion)
+
+    const [btcCurrentVersion, btcCurrentTimestamp, btcCurrentPrice] = await btcOracle.currentVersion()
+    const btcNewVersion = {
+      version: btcCurrentVersion.add(1),
+      timestamp: btcCurrentTimestamp.add(13),
+      price: newPriceBtc ?? btcCurrentPrice,
+    }
+    btcOracle.sync.returns(btcNewVersion)
+    btcOracle.currentVersion.returns(btcNewVersion)
+    btcOracle.atVersion.whenCalledWith(btcNewVersion.version).returns(btcNewVersion)
   }
 
   async function updateOracleAndSync(newPrice?: BigNumber) {
@@ -71,6 +87,14 @@ describe('BalancedVault', () => {
     return (await short.position(vault.address)).maker
   }
 
+  async function btcLongPosition() {
+    return (await btcLong.position(vault.address)).maker
+  }
+
+  async function btcShortPosition() {
+    return (await btcShort.position(vault.address)).maker
+  }
+
   async function longCollateralInVault() {
     return await collateral['collateral(address,address)'](vault.address, long.address)
   }
@@ -79,8 +103,20 @@ describe('BalancedVault', () => {
     return await collateral['collateral(address,address)'](vault.address, short.address)
   }
 
+  async function btcLongCollateralInVault() {
+    return await collateral['collateral(address,address)'](vault.address, btcLong.address)
+  }
+
+  async function btcShortCollateralInVault() {
+    return await collateral['collateral(address,address)'](vault.address, btcShort.address)
+  }
+
   async function totalCollateralInVault() {
-    return (await longCollateralInVault()).add(await shortCollateralInVault()).add(await asset.balanceOf(vault.address))
+    return (await longCollateralInVault())
+      .add(await shortCollateralInVault())
+      .add(await btcLongCollateralInVault())
+      .add(await btcShortCollateralInVault())
+      .add(await asset.balanceOf(vault.address))
   }
 
   beforeEach(async () => {
@@ -95,6 +131,30 @@ describe('BalancedVault', () => {
     )
     long = IProduct__factory.connect('0xdB60626FF6cDC9dB07d3625A93d21dDf0f8A688C', owner)
     short = IProduct__factory.connect('0xfeD3E166330341e0305594B8c6e6598F9f4Cbe9B', owner)
+    const btcOracleToMock = await new ChainlinkOracle__factory(owner).deploy(
+      '0x47Fb2585D2C56Fe188D0E6ec628a38b74fCeeeDf',
+      '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB',
+      '0x0000000000000000000000000000000000000348',
+    )
+    btcLong = await deployProductOnMainnetFork({
+      owner: owner,
+      name: '1x Long BTC',
+      symbol: 'BTC-long',
+      baseCurrency: '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB',
+      quoteCurrency: '0x0000000000000000000000000000000000000348',
+      oracle: btcOracleToMock.address,
+      short: false,
+    })
+    btcShort = await deployProductOnMainnetFork({
+      owner: owner,
+      name: '1x Short BTC',
+      symbol: 'BTC-short',
+      baseCurrency: '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB',
+      quoteCurrency: '0x0000000000000000000000000000000000000348',
+      oracle: btcOracleToMock.address,
+      short: true,
+    })
+    //TODO: seed these btc markets with usage
     collateral = ICollateral__factory.connect('0x2d264ebdb6632a06a1726193d4d37fef1e5dbdcd', owner)
     leverage = utils.parseEther('4.0')
     maxCollateral = utils.parseEther('500000')
@@ -103,6 +163,11 @@ describe('BalancedVault', () => {
       {
         long: long.address,
         short: short.address,
+        weight: 1,
+      },
+      {
+        long: btcLong.address,
+        short: btcShort.address,
         weight: 1,
       },
     ])
@@ -132,6 +197,21 @@ describe('BalancedVault', () => {
     oracle.sync.returns(currentVersion)
     oracle.currentVersion.returns(currentVersion)
     oracle.atVersion.whenCalledWith(currentVersion[0]).returns(currentVersion)
+
+    const realBtcOracle = await new ChainlinkOracle__factory(owner).deploy(
+      '0x47Fb2585D2C56Fe188D0E6ec628a38b74fCeeeDf',
+      '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB',
+      '0x0000000000000000000000000000000000000348',
+    )
+    const btcCurrentVersion = await realBtcOracle.currentVersion()
+    btcOriginalOraclePrice = btcCurrentVersion[2]
+
+    btcOracle = await smock.fake<IOracleProvider>('IOracleProvider', {
+      address: btcOracleToMock.address,
+    })
+    btcOracle.sync.returns(btcCurrentVersion)
+    btcOracle.currentVersion.returns(btcCurrentVersion)
+    btcOracle.atVersion.whenCalledWith(btcCurrentVersion[0]).returns(btcCurrentVersion)
   })
 
   describe('#initialize', () => {
@@ -187,8 +267,10 @@ describe('BalancedVault', () => {
 
       const largeDeposit = utils.parseEther('10000')
       await vault.connect(user).deposit(largeDeposit, user.address)
-      expect(await longCollateralInVault()).to.equal(utils.parseEther('5005'))
-      expect(await shortCollateralInVault()).to.equal(utils.parseEther('5005'))
+      expect(await longCollateralInVault()).to.equal(utils.parseEther('2502.5'))
+      expect(await shortCollateralInVault()).to.equal(utils.parseEther('2502.5'))
+      expect(await btcLongCollateralInVault()).to.equal(utils.parseEther('2502.5'))
+      expect(await btcShortCollateralInVault()).to.equal(utils.parseEther('2502.5'))
       expect(await vault.balanceOf(user.address)).to.equal(smallDeposit)
       expect(await vault.totalSupply()).to.equal(smallDeposit)
       expect(await vault.totalAssets()).to.equal(smallDeposit)
@@ -206,10 +288,16 @@ describe('BalancedVault', () => {
       // Now we should have opened positions.
       // The positions should be equal to (smallDeposit + largeDeposit) * leverage / 2 / originalOraclePrice.
       expect(await longPosition()).to.equal(
-        smallDeposit.add(largeDeposit).mul(leverage).div(2).div(originalOraclePrice),
+        smallDeposit.add(largeDeposit).mul(leverage).div(2).div(2).div(originalOraclePrice),
       )
       expect(await shortPosition()).to.equal(
-        smallDeposit.add(largeDeposit).mul(leverage).div(2).div(originalOraclePrice),
+        smallDeposit.add(largeDeposit).mul(leverage).div(2).div(2).div(originalOraclePrice),
+      )
+      expect(await btcLongPosition()).to.equal(
+        smallDeposit.add(largeDeposit).mul(leverage).div(2).div(2).div(btcOriginalOraclePrice),
+      )
+      expect(await btcShortPosition()).to.equal(
+        smallDeposit.add(largeDeposit).mul(leverage).div(2).div(2).div(btcOriginalOraclePrice),
       )
 
       // User 2 should not be able to withdraw; they haven't deposited anything.
@@ -228,7 +316,7 @@ describe('BalancedVault', () => {
       expect(await shortPosition()).to.equal(0)
 
       // We should have withdrawn all of our collateral.
-      const fundingAmount = BigNumber.from('1526207855124')
+      const fundingAmount = BigNumber.from('773558162192')
       expect(await totalCollateralInVault()).to.equal(utils.parseEther('10010').add(fundingAmount))
       expect(await vault.balanceOf(user.address)).to.equal(0)
       expect(await vault.totalSupply()).to.equal(0)

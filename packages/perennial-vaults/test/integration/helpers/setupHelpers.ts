@@ -1,9 +1,9 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
-import { utils } from 'ethers'
+import { constants, utils } from 'ethers'
 import { createPayoffDefinition } from '../../../../common/testutil/types'
-import { ChainlinkOracle__factory, IController__factory, IProduct, IProduct__factory } from '../../../types/generated'
+import { IController__factory, IProduct, IProduct__factory } from '../../../types/generated'
 
-export interface DeployProductParams extends Partial<Omit<IProduct.ProductInfoStruct, 'payoffDefinition' | 'oracle'>> {
+export interface DeployProductParams extends Partial<Omit<IProduct.ProductInfoStruct, 'payoffDefinition'>> {
   name: string
   symbol: string
   owner: SignerWithAddress
@@ -18,8 +18,7 @@ export async function deployProductOnMainnetFork({
   name,
   symbol,
   owner,
-  baseCurrency,
-  quoteCurrency,
+  oracle,
   short,
   maintenance,
   fundingFee,
@@ -29,15 +28,12 @@ export async function deployProductOnMainnetFork({
   makerLimit,
   utilizationCurve,
 }: DeployProductParams): Promise<IProduct> {
-  const chainlinkFeedRegistry = '0x47Fb2585D2C56Fe188D0E6ec628a38b74fCeeeDf'
-  const oracle = await new ChainlinkOracle__factory(owner).deploy(chainlinkFeedRegistry, baseCurrency, quoteCurrency)
-
   const productInfo: IProduct.ProductInfoStruct = {
     name: name,
     symbol: symbol,
     payoffDefinition: createPayoffDefinition({ short: short }),
-    oracle: oracle.address,
-    maintenance: maintenance ?? utils.parseEther('0.5'),
+    oracle: oracle ?? constants.AddressZero,
+    maintenance: maintenance ?? utils.parseEther('0.10'),
     fundingFee: fundingFee ?? utils.parseEther('0.10'),
     makerFee: makerFee ?? utils.parseEther('0.0'),
     takerFee: takerFee ?? utils.parseEther('0.0'),
