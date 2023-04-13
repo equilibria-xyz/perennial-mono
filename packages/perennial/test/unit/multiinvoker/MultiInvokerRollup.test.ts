@@ -242,7 +242,7 @@ describe('MultiInvokerRollup', () => {
       expect(batcher.wrap).to.have.been.calledWith(amount, user.address)
     })
 
-    it(`wrpas USDC to DSU on WRAP action and sends fee to interface`, async () => {
+    it(`wraps USDC to DSU on WRAP action and sends fee to interface`, async () => {
       const res = user.sendTransaction(
         buildTransactionRequest(user, multiInvokerRollup, `0x` + actions.WRAP.payload + actions.CHARGE_FEE.payload),
       )
