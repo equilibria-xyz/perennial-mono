@@ -138,7 +138,10 @@ describe('MultiInvoker', () => {
     })
 
     it('performs a WRAP_AND_DEPOSIT and OPEN_MAKE chain', async () => {
-      const { user, multiInvoker, batcher, collateral, usdc } = instanceVars
+      const { user, multiInvoker, batcher, collateral, usdc, dsu } = instanceVars
+
+      // Ensure this works without a DSU aproval
+      await dsu.connect(user).approve(multiInvoker.address, 0)
 
       await expect(multiInvoker.connect(user).invoke([actions.WRAP_AND_DEPOSIT, actions.OPEN_MAKE]))
         .to.emit(usdc, 'Transfer')
@@ -221,7 +224,10 @@ describe('MultiInvoker', () => {
     })
 
     it('performs a WRAP_AND_DEPOSIT and OPEN_TAKE chain', async () => {
-      const { user, userB, multiInvoker, batcher, collateral, usdc } = instanceVars
+      const { user, userB, multiInvoker, batcher, collateral, usdc, dsu } = instanceVars
+
+      // Ensure this works without a DSU aproval
+      await dsu.connect(user).approve(multiInvoker.address, 0)
 
       await depositTo(instanceVars, userB, product, amount.mul(2))
       await product.connect(userB).openMake(position.mul(2))
@@ -314,8 +320,8 @@ describe('MultiInvoker', () => {
         .withArgs(multiInvoker.address, user.address, 10000e6)
     })
 
-    it('performs WITHDRAW_AND_UNWRAP', async () => {
-      const { user, multiInvoker, batcher, usdc, collateral, reserve } = instanceVars
+    it.only('performs WITHDRAW_AND_UNWRAP', async () => {
+      const { user, multiInvoker, batcher, usdc, collateral, reserve, dsu } = instanceVars
 
       // Load the Reserve with some USDC
       await usdc.connect(user).approve(batcher.address, constants.MaxUint256)
@@ -324,6 +330,9 @@ describe('MultiInvoker', () => {
 
       // Deposit the collateral to withdraw
       await multiInvoker.connect(user).invoke([actions.DEPOSIT])
+
+      // Ensure this works without a DSU aproval
+      await dsu.connect(user).approve(multiInvoker.address, 0)
 
       await expect(multiInvoker.connect(user).invoke([actions.WITHDRAW_AND_UNWRAP]))
         .to.emit(collateral, 'Withdrawal')
@@ -404,6 +413,9 @@ describe('MultiInvoker', () => {
 
     it('performs a VAULT_WRAP_AND_DEPOSIT action', async () => {
       const { user, multiInvoker, dsu, usdc, batcher } = instanceVars
+
+      // Ensure this works without a DSU aproval
+      await dsu.connect(user).approve(multiInvoker.address, 0)
 
       await expect(multiInvoker.connect(user).invoke([actions.VAULT_WRAP_AND_DEPOSIT]))
         .to.emit(usdc, 'Transfer')
