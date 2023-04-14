@@ -14,18 +14,13 @@ interface IBalancedVault is IBalancedVaultDefinition {
         UFixed18 latestShares;
     }
 
-    struct Epoch {
-        UFixed18 totalShares;
-        UFixed18 totalAssets;
-    }
-
     struct MarketEpoch {
         UFixed18 longPosition;
         UFixed18 shortPosition;
-        UFixed18 __deprecated0__;
+        UFixed18 totalShares; // @dev: index-0 is used globally for compatibility with previous implementation
         UFixed18 longAssets;
         UFixed18 shortAssets;
-        UFixed18 __deprecated1__;
+        UFixed18 totalAssets; // @dev: index-0 is used globally for compatibility with previous implementation
     }
 
     struct MarketAccount {

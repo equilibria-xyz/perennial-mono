@@ -68,9 +68,6 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
     /// @dev Per-asset accounting state variables
     MarketAccount[100] private _marketAccounts;
 
-    /// @dev Mapping of the global vault state for each epoch
-    mapping(uint256 => Epoch) private _epochs;
-
     constructor(
         Token18 asset_,
         IController controller_,
@@ -89,7 +86,7 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
         name = name_;
         __unused0 = "";
 
-        // TODO: convert versions to epochs
+        //TODO: finalize
 
         asset.approve(address(collateral), UFixed18Lib.ZERO);
         asset.approve(address(collateral));
@@ -302,8 +299,8 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
 
                 _marketAccounts[marketId].versionOf[context.epoch] = markets(marketId).long.latestVersion();
             }
-            _epochs[context.epoch].totalShares = _totalSupply;
-            _epochs[context.epoch].totalAssets = _totalAssetsAtEpoch(context);
+            _marketAccounts[0].epochs[context.epoch].totalShares = _totalSupply;
+            _marketAccounts[0].epochs[context.epoch].totalAssets = _totalAssetsAtEpoch(context);
         }
 
         if (account != address(0) && accountContext.epoch > _latestEpochs[account]) {
@@ -374,7 +371,7 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
             UFixed18 marketCollateral = targetCollateral.muldiv(markets(marketId).weight, totalWeight);
             if (markets(marketId).long.closed() || markets(marketId).short.closed()) marketCollateral = UFixed18Lib.ZERO;
 
-            uint256 version = _marketAccounts[marketId].versionOf[context.epoch];
+            uint256 version = _versionAtEpoch(marketId, context.epoch);
             UFixed18 currentPrice = markets(marketId).long.atVersion(version).price.abs();
             UFixed18 targetPosition = marketCollateral.mul(targetLeverage).div(currentPrice);
 
@@ -505,7 +502,7 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
         for (uint256 marketId; marketId < totalMarkets; marketId++) {
             if (
                 Math.min(markets(marketId).long.latestVersion(), markets(marketId).short.latestVersion()) ==
-                _marketAccounts[marketId].versionOf[_latestEpoch]
+                _versionAtEpoch(marketId, _latestEpoch)
             ) return _latestEpoch;
         }
         return _latestEpoch + 1;
@@ -658,7 +655,7 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
      * @return assets Total assets in the vault at the given version
      */
     function _assetsAtEpoch(uint256 epoch) private view returns (UFixed18) {
-        Fixed18 assets = Fixed18Lib.from(_epochs[epoch].totalAssets);
+        Fixed18 assets = Fixed18Lib.from(_marketAccounts[0].epochs[epoch].totalAssets);
         for (uint256 marketId; marketId < totalMarkets; marketId++) {
             assets = assets.add(_accumulatedAtEpoch(marketId, epoch));
         }
@@ -673,7 +670,7 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
      * @return Total shares at `version`
      */
     function _sharesAtEpoch(uint256 epoch) private view returns (UFixed18) {
-        return _epochs[epoch].totalShares;
+        return _marketAccounts[0].epochs[epoch].totalShares;
     }
 
     /**
@@ -685,7 +682,7 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
      */
     function _accumulatedAtEpoch(uint256 marketId, uint256 epoch) private view returns (Fixed18) {
         MarketEpoch memory marketEpoch = _marketAccounts[marketId].epochs[epoch];
-        uint256 version = _marketAccounts[marketId].versionOf[epoch];
+        uint256 version = _versionAtEpoch(marketId, epoch);
 
         // accumulate value from version n + 1
         (Fixed18 longAccumulated, Fixed18 shortAccumulated) = (
@@ -702,5 +699,20 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
         shortAccumulated = shortAccumulated.max(Fixed18Lib.from(marketEpoch.shortAssets).mul(Fixed18Lib.NEG_ONE));
 
         return longAccumulated.add(shortAccumulated);
+    }
+
+    /**
+     * @notice Finds the version of a market and a specific epoch
+     * @dev This latest implementation of the BalanceVault introduces the concept of "epochs" to enable
+     *      multi-payoff vaults. In order to maintain upgrade compatibility with previous version-based instances,
+     *      we maintain the invariant that version == epoch prior to the upgrade switchover.
+     * @param marketId The market ID to accumulate for
+     * @param epoch Epoch to get total assets at
+     * @return The version at epoch
+     */
+    function _versionAtEpoch(uint256 marketId, uint256 epoch) private view returns (uint256) {
+        if (epoch > _latestEpoch) return 0;
+        uint256 version = _marketAccounts[marketId].versionOf[epoch];
+        return (version == 0) ? epoch : version;
     }
 }
