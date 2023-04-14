@@ -320,7 +320,7 @@ describe('MultiInvoker', () => {
         .withArgs(multiInvoker.address, user.address, 10000e6)
     })
 
-    it.only('performs WITHDRAW_AND_UNWRAP', async () => {
+    it('performs WITHDRAW_AND_UNWRAP', async () => {
       const { user, multiInvoker, batcher, usdc, collateral, reserve, dsu } = instanceVars
 
       // Load the Reserve with some USDC
