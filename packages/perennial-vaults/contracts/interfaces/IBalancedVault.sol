@@ -10,7 +10,7 @@ interface IBalancedVault is IBalancedVaultDefinition {
 
     struct EpochContext {
         uint256 epoch;
-        UFixed18 latestCollateral; //TODO: rename
+        UFixed18 latestAssets;
         UFixed18 latestShares;
     }
 
@@ -29,7 +29,6 @@ interface IBalancedVault is IBalancedVaultDefinition {
         uint256[20] __gap;
     }
 
-    event Approval(address indexed account, address indexed spender, UFixed18 amount);
     event Mint(address indexed account, UFixed18 amount);
     event Burn(address indexed account, UFixed18 amount);
     event Deposit(address indexed sender, address indexed account, uint256 version, UFixed18 assets);
@@ -49,12 +48,19 @@ interface IBalancedVault is IBalancedVaultDefinition {
     /* Partial ERC4626 Interface */
 
     function totalAssets() external view returns (UFixed18);
-    function convertToAssets(UFixed18 shares) external view returns (UFixed18);
     function convertToShares(UFixed18 assets) external view returns (UFixed18);
+    function convertToAssets(UFixed18 shares) external view returns (UFixed18);
     function maxDeposit(address account) external view returns (UFixed18);
     function deposit(UFixed18 assets, address account) external;
     function maxRedeem(address account) external view returns (UFixed18);
-    function redeem(UFixed18 proportion, address account) external;
+    function redeem(UFixed18 shares, address account) external;
 
-    //TODO: put back some functions
+    /* Partial ERC20 Interface */
+
+    event Approval(address indexed account, address indexed spender, UFixed18 amount);
+
+    function totalSupply() external view returns (UFixed18);
+    function balanceOf(address account) external view returns (UFixed18);
+    function allowance(address account, address spender) external view returns (UFixed18);
+    function approve(address spender, UFixed18 amount) external returns (bool);
 }

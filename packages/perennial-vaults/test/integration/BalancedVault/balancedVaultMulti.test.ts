@@ -27,10 +27,6 @@ use(smock.matchers)
 
 const DSU_MINTER = '0xD05aCe63789cCb35B9cE71d01e4d632a0486Da4B'
 
-//TODO: add test for >=taker limitation
-//TODO: add multi-asset tests
-//TODO: add upgrade storage test
-
 describe.only('BalancedVault (Multi-Payoff)', () => {
   let vault: BalancedVault
   let asset: IERC20Metadata
@@ -189,6 +185,9 @@ describe.only('BalancedVault (Multi-Payoff)', () => {
     await setUpWalletWithDSU(user)
     await setUpWalletWithDSU(user2)
     await setUpWalletWithDSU(liquidator)
+    await setUpWalletWithDSU(perennialUser)
+    await setUpWalletWithDSU(perennialUser)
+    await setUpWalletWithDSU(perennialUser)
     await setUpWalletWithDSU(perennialUser)
     await setUpWalletWithDSU(perennialUser)
     await setUpWalletWithDSU(btcUser1)
@@ -755,6 +754,62 @@ describe.only('BalancedVault (Multi-Payoff)', () => {
       expect(await shortPosition()).to.equal(makerLimitDelta)
       expect(await btcLongPosition()).to.equal(largeDeposit.mul(leverage).div(5).div(2).div(btcOriginalOraclePrice))
       expect(await btcShortPosition()).to.equal(largeDeposit.mul(leverage).div(5).div(2).div(btcOriginalOraclePrice))
+    })
+
+    it('exactly at makerLimit', async () => {
+      // Get maker product very close to the makerLimit
+      await asset.connect(perennialUser).approve(collateral.address, constants.MaxUint256)
+      await collateral
+        .connect(perennialUser)
+        .depositTo(perennialUser.address, short.address, utils.parseEther('400000'))
+      const makerAvailable = (await short.makerLimit()).sub(
+        (await short.positionAtVersion(await short['latestVersion()']())).maker,
+      )
+
+      await short.connect(perennialUser).openMake(makerAvailable)
+      await updateOracle()
+      await vault.sync()
+
+      // Deposit should create a greater position than what's available
+      const largeDeposit = utils.parseEther('10000')
+      await vault.connect(user).deposit(largeDeposit, user.address)
+      await updateOracle()
+      await vault.sync()
+
+      // Now we should have opened positions.
+      // The positions should be equal to (smallDeposit + largeDeposit) * leverage / 2 / originalOraclePrice.
+      expect(await longPosition()).to.equal(largeDeposit.mul(leverage).mul(4).div(5).div(2).div(originalOraclePrice))
+      expect(await shortPosition()).to.equal(0)
+      expect(await btcLongPosition()).to.equal(largeDeposit.mul(leverage).div(5).div(2).div(btcOriginalOraclePrice))
+      expect(await btcShortPosition()).to.equal(largeDeposit.mul(leverage).div(5).div(2).div(btcOriginalOraclePrice))
+    })
+
+    it('close to taker', async () => {
+      // Deposit should create a greater position than what's available
+      const largeDeposit = utils.parseEther('10000')
+      await vault.connect(user).deposit(largeDeposit, user.address)
+      await updateOracle()
+      await vault.sync()
+
+      // Get taker product very close to the maker
+      await asset.connect(perennialUser).approve(collateral.address, constants.MaxUint256)
+      await collateral
+        .connect(perennialUser)
+        .depositTo(perennialUser.address, short.address, utils.parseEther('1000000'))
+      await short.connect(perennialUser).openTake(utils.parseEther('1280'))
+      await updateOracle()
+      await vault.sync()
+
+      // Redeem should create a greater position delta than what's available
+      await vault.connect(user).redeem(utils.parseEther('4000'), user.address)
+      await updateOracle()
+      await vault.sync()
+
+      const takerMinimum = BigNumber.from('6692251470872433151')
+      expect(await shortPosition()).to.equal(takerMinimum)
+      expect((await short.positionAtVersion(await short['latestVersion()']()))[0]).to.equal(
+        (await short.positionAtVersion(await short['latestVersion()']()))[1],
+      )
     })
 
     it('exactly at makerLimit', async () => {

@@ -83,11 +83,10 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
      * @param name_ ERC20 asset name
      */
     function initialize(string memory name_) external initializer(2) {
-        name = name_;
-        __unused0 = "";
+        name = name_;   // allow `name` to be reset
+        __unused0 = ""; // deprecate `symbol`
 
-        //TODO: finalize
-
+        // set or reset allowance compliant with both an initial deployment or an upgrade
         asset.approve(address(collateral), UFixed18Lib.ZERO);
         asset.approve(address(collateral));
     }
@@ -255,7 +254,7 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
      */
     function convertToShares(UFixed18 assets) external view returns (UFixed18) {
         (EpochContext memory context, ) = _loadContextForRead(address(0));
-        (context.latestCollateral, context.latestShares) =
+        (context.latestAssets, context.latestShares) =
             (_totalAssetsAtEpoch(context), _totalSupplyAtEpoch(context));
         return _convertToSharesAtEpoch(context, assets);
     }
@@ -267,7 +266,7 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
      */
     function convertToAssets(UFixed18 shares) external view returns (UFixed18) {
         (EpochContext memory context, ) = _loadContextForRead(address(0));
-        (context.latestCollateral, context.latestShares) =
+        (context.latestAssets, context.latestShares) =
             (_totalAssetsAtEpoch(context), _totalSupplyAtEpoch(context));
         return _convertToAssetsAtEpoch(context, shares);
     }
@@ -349,8 +348,6 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
             if (collateral.collateral(address(this), markets(marketId).short).lt(marketCollateral))
                 _updateCollateral(markets(marketId).short, marketCollateral);
         }
-
-        // TODO: Don't withdraw all if it would revert
     }
 
     /**
@@ -360,8 +357,8 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
      */
     function _rebalancePosition(EpochContext memory context, UFixed18 claimAmount) private {
         // Compute target collateral
-        UFixed18 targetCollateral = _totalAssetsAtEpoch(context).sub(claimAmount)     // TODO: why is this not symmetrical?
-            .mul(_totalSupply.unsafeDiv(_totalSupply.add(_redemption)))               // TODO: add buffer
+        UFixed18 targetCollateral = _totalAssetsAtEpoch(context).sub(claimAmount)
+            .mul(_totalSupply.unsafeDiv(_totalSupply.add(_redemption)))
             .add(_deposit)
             .div(TWO);
         if (targetCollateral.muldiv(minWeight, totalWeight).lt(controller.minCollateral()))
@@ -416,8 +413,6 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
      */
     function _updateCollateral(IProduct product, UFixed18 targetCollateral) private {
         UFixed18 currentCollateral = collateral.collateral(address(this), product);
-
-        //TODO: compute if we're withdrawing more than maintenance
 
         if (currentCollateral.gt(targetCollateral))
             collateral.withdrawTo(address(this), product, currentCollateral.sub(targetCollateral));
@@ -515,7 +510,7 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
      * @return bool true if unhealthy, false if healthy
      */
     function _unhealthyAtEpoch(EpochContext memory context) private view returns (bool) {
-        if (!context.latestShares.isZero() && context.latestCollateral.isZero()) return true;
+        if (!context.latestShares.isZero() && context.latestAssets.isZero()) return true;
         for (uint256 marketId; marketId < totalMarkets; marketId++) {
             if (_unhealthy(markets(marketId))) return true;
         }
@@ -634,8 +629,8 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
      * @return Amount of shares for the given assets at epoch
      */
     function _convertToSharesAtEpoch(EpochContext memory context, UFixed18 assets) private pure returns (UFixed18) {
-        if (context.latestCollateral.isZero()) return assets;
-        return assets.muldiv(context.latestShares, context.latestCollateral);
+        if (context.latestAssets.isZero()) return assets;
+        return assets.muldiv(context.latestShares, context.latestAssets);
     }
 
     /**
@@ -646,7 +641,7 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
      */
     function _convertToAssetsAtEpoch(EpochContext memory context, UFixed18 shares) private pure returns (UFixed18) {
         if (context.latestShares.isZero()) return shares;
-        return shares.muldiv(context.latestCollateral, context.latestShares);
+        return shares.muldiv(context.latestAssets, context.latestShares);
     }
 
     /**
