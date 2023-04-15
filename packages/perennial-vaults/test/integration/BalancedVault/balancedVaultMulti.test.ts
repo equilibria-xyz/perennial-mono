@@ -20,17 +20,18 @@ import {
   ChainlinkOracle__factory,
 } from '../../../types/generated'
 import { BigNumber, constants, utils } from 'ethers'
+import { product } from '@equilibria/perennial/types/generated/contracts'
 
 const { config, ethers } = HRE
 use(smock.matchers)
 
-const DSU_HOLDER = '0xaef566ca7e84d1e736f999765a804687f39d9094'
+const DSU_MINTER = '0xD05aCe63789cCb35B9cE71d01e4d632a0486Da4B'
 
 //TODO: add test for >=taker limitation
 //TODO: add multi-asset tests
 //TODO: add upgrade storage test
 
-describe('BalancedVault', () => {
+describe.only('BalancedVault (Multi-Payoff)', () => {
   let vault: BalancedVault
   let asset: IERC20Metadata
   let oracle: FakeContract<IOracleProvider>
@@ -121,7 +122,8 @@ describe('BalancedVault', () => {
 
   beforeEach(async () => {
     await time.reset(config)
-    ;[owner, user, user2, liquidator, perennialUser] = await ethers.getSigners()
+    let btcUser1, btcUser2
+    ;[owner, user, user2, liquidator, perennialUser, btcUser1, btcUser2] = await ethers.getSigners()
 
     const dsu = IERC20Metadata__factory.connect('0x605D26FBd5be761089281d5cec2Ce86eeA667109', owner)
     controller = IController__factory.connect('0x9df509186b6d3b7D033359f94c8b1BB5544d51b3', owner)
@@ -138,8 +140,8 @@ describe('BalancedVault', () => {
     )
     btcLong = await deployProductOnMainnetFork({
       owner: owner,
-      name: '1x Long BTC',
-      symbol: 'BTC-long',
+      name: 'Bitcoin',
+      symbol: 'BTC',
       baseCurrency: '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB',
       quoteCurrency: '0x0000000000000000000000000000000000000348',
       oracle: btcOracleToMock.address,
@@ -147,14 +149,13 @@ describe('BalancedVault', () => {
     })
     btcShort = await deployProductOnMainnetFork({
       owner: owner,
-      name: '1x Short BTC',
-      symbol: 'BTC-short',
+      name: 'Bitcoin',
+      symbol: 'BTC',
       baseCurrency: '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB',
       quoteCurrency: '0x0000000000000000000000000000000000000348',
       oracle: btcOracleToMock.address,
       short: true,
     })
-    //TODO: seed these btc markets with usage
     collateral = ICollateral__factory.connect('0x2d264ebdb6632a06a1726193d4d37fef1e5dbdcd', owner)
     leverage = utils.parseEther('4.0')
     maxCollateral = utils.parseEther('500000')
@@ -163,7 +164,7 @@ describe('BalancedVault', () => {
       {
         long: long.address,
         short: short.address,
-        weight: 1,
+        weight: 4,
       },
       {
         long: btcLong.address,
@@ -174,9 +175,15 @@ describe('BalancedVault', () => {
     await vault.initialize('Perennial Vault Alpha')
     asset = IERC20Metadata__factory.connect(await vault.asset(), owner)
 
-    const dsuHolder = await impersonate.impersonateWithBalance(DSU_HOLDER, utils.parseEther('10'))
+    const dsuMinter = await impersonate.impersonateWithBalance(DSU_MINTER, utils.parseEther('10'))
     const setUpWalletWithDSU = async (wallet: SignerWithAddress) => {
-      await dsu.connect(dsuHolder).transfer(wallet.address, utils.parseEther('200000'))
+      const dsuIface = new utils.Interface(['function mint(uint256)'])
+      await dsuMinter.sendTransaction({
+        to: dsu.address,
+        value: 0,
+        data: dsuIface.encodeFunctionData('mint', [utils.parseEther('200000')]),
+      })
+      await dsu.connect(dsuMinter).transfer(wallet.address, utils.parseEther('200000'))
       await dsu.connect(wallet).approve(vault.address, ethers.constants.MaxUint256)
     }
     await setUpWalletWithDSU(user)
@@ -184,6 +191,20 @@ describe('BalancedVault', () => {
     await setUpWalletWithDSU(liquidator)
     await setUpWalletWithDSU(perennialUser)
     await setUpWalletWithDSU(perennialUser)
+    await setUpWalletWithDSU(btcUser1)
+    await setUpWalletWithDSU(btcUser2)
+
+    // Seed BTC markets with some activity
+    await dsu.connect(btcUser1).approve(collateral.address, ethers.constants.MaxUint256)
+    await dsu.connect(btcUser2).approve(collateral.address, ethers.constants.MaxUint256)
+    await collateral.connect(btcUser1).depositTo(btcUser1.address, btcLong.address, utils.parseEther('100000'))
+    await btcLong.connect(btcUser1).openMake(utils.parseEther('20'))
+    await collateral.connect(btcUser1).depositTo(btcUser1.address, btcShort.address, utils.parseEther('100000'))
+    await btcShort.connect(btcUser1).openMake(utils.parseEther('20'))
+    await collateral.connect(btcUser2).depositTo(btcUser2.address, btcLong.address, utils.parseEther('100000'))
+    await btcLong.connect(btcUser2).openTake(utils.parseEther('10'))
+    await collateral.connect(btcUser2).depositTo(btcUser2.address, btcShort.address, utils.parseEther('100000'))
+    await btcShort.connect(btcUser2).openTake(utils.parseEther('10'))
 
     // Unfortunately, we can't make mocks of existing contracts.
     // So, we make a fake and initialize it with the values that the real contract had at this block.
@@ -256,6 +277,8 @@ describe('BalancedVault', () => {
       await vault.connect(user).deposit(smallDeposit, user.address)
       expect(await longCollateralInVault()).to.equal(0)
       expect(await shortCollateralInVault()).to.equal(0)
+      expect(await btcLongCollateralInVault()).to.equal(0)
+      expect(await btcShortCollateralInVault()).to.equal(0)
       expect(await vault.totalSupply()).to.equal(0)
       expect(await vault.totalAssets()).to.equal(0)
       await updateOracle()
@@ -264,21 +287,23 @@ describe('BalancedVault', () => {
       // We're underneath the collateral minimum, so we shouldn't have opened any positions.
       expect(await longPosition()).to.equal(0)
       expect(await shortPosition()).to.equal(0)
+      expect(await btcLongPosition()).to.equal(0)
+      expect(await btcShortPosition()).to.equal(0)
 
       const largeDeposit = utils.parseEther('10000')
       await vault.connect(user).deposit(largeDeposit, user.address)
-      expect(await longCollateralInVault()).to.equal(utils.parseEther('2502.5'))
-      expect(await shortCollateralInVault()).to.equal(utils.parseEther('2502.5'))
-      expect(await btcLongCollateralInVault()).to.equal(utils.parseEther('2502.5'))
-      expect(await btcShortCollateralInVault()).to.equal(utils.parseEther('2502.5'))
+      expect(await longCollateralInVault()).to.equal(utils.parseEther('4004'))
+      expect(await shortCollateralInVault()).to.equal(utils.parseEther('4004'))
+      expect(await btcLongCollateralInVault()).to.equal(utils.parseEther('1001'))
+      expect(await btcShortCollateralInVault()).to.equal(utils.parseEther('1001'))
       expect(await vault.balanceOf(user.address)).to.equal(smallDeposit)
       expect(await vault.totalSupply()).to.equal(smallDeposit)
       expect(await vault.totalAssets()).to.equal(smallDeposit)
       expect(await vault.convertToAssets(utils.parseEther('10'))).to.equal(utils.parseEther('10'))
       expect(await vault.convertToShares(utils.parseEther('10'))).to.equal(utils.parseEther('10'))
       await updateOracle()
-
       await vault.sync()
+
       expect(await vault.balanceOf(user.address)).to.equal(utils.parseEther('10010'))
       expect(await vault.totalSupply()).to.equal(utils.parseEther('10010'))
       expect(await vault.totalAssets()).to.equal(utils.parseEther('10010'))
@@ -288,16 +313,16 @@ describe('BalancedVault', () => {
       // Now we should have opened positions.
       // The positions should be equal to (smallDeposit + largeDeposit) * leverage / 2 / originalOraclePrice.
       expect(await longPosition()).to.equal(
-        smallDeposit.add(largeDeposit).mul(leverage).div(2).div(2).div(originalOraclePrice),
+        smallDeposit.add(largeDeposit).mul(leverage).mul(4).div(5).div(2).div(originalOraclePrice),
       )
       expect(await shortPosition()).to.equal(
-        smallDeposit.add(largeDeposit).mul(leverage).div(2).div(2).div(originalOraclePrice),
+        smallDeposit.add(largeDeposit).mul(leverage).mul(4).div(5).div(2).div(originalOraclePrice),
       )
       expect(await btcLongPosition()).to.equal(
-        smallDeposit.add(largeDeposit).mul(leverage).div(2).div(2).div(btcOriginalOraclePrice),
+        smallDeposit.add(largeDeposit).mul(leverage).div(5).div(2).div(btcOriginalOraclePrice),
       )
       expect(await btcShortPosition()).to.equal(
-        smallDeposit.add(largeDeposit).mul(leverage).div(2).div(2).div(btcOriginalOraclePrice),
+        smallDeposit.add(largeDeposit).mul(leverage).div(5).div(2).div(btcOriginalOraclePrice),
       )
 
       // User 2 should not be able to withdraw; they haven't deposited anything.
@@ -314,9 +339,11 @@ describe('BalancedVault', () => {
       // We should have closed all positions.
       expect(await longPosition()).to.equal(0)
       expect(await shortPosition()).to.equal(0)
+      expect(await btcLongPosition()).to.equal(0)
+      expect(await btcShortPosition()).to.equal(0)
 
       // We should have withdrawn all of our collateral.
-      const fundingAmount = BigNumber.from('773558162192')
+      const fundingAmount = BigNumber.from('824939190034966')
       expect(await totalCollateralInVault()).to.equal(utils.parseEther('10010').add(fundingAmount))
       expect(await vault.balanceOf(user.address)).to.equal(0)
       expect(await vault.totalSupply()).to.equal(0)
@@ -350,13 +377,19 @@ describe('BalancedVault', () => {
       // Now we should have opened positions.
       // The positions should be equal to (smallDeposit + largeDeposit) * leverage / 2 / originalOraclePrice.
       expect(await longPosition()).to.be.equal(
-        smallDeposit.add(largeDeposit).mul(leverage).div(2).div(originalOraclePrice),
+        smallDeposit.add(largeDeposit).mul(leverage).mul(4).div(5).div(2).div(originalOraclePrice),
       )
       expect(await shortPosition()).to.equal(
-        smallDeposit.add(largeDeposit).mul(leverage).div(2).div(originalOraclePrice),
+        smallDeposit.add(largeDeposit).mul(leverage).mul(4).div(5).div(2).div(originalOraclePrice),
       )
-      const fundingAmount0 = BigNumber.from(156261444735)
-      const balanceOf2 = BigNumber.from('9999999998437385552894')
+      expect(await btcLongPosition()).to.be.equal(
+        smallDeposit.add(largeDeposit).mul(leverage).div(5).div(2).div(btcOriginalOraclePrice),
+      )
+      expect(await btcShortPosition()).to.equal(
+        smallDeposit.add(largeDeposit).mul(leverage).div(5).div(2).div(btcOriginalOraclePrice),
+      )
+      const fundingAmount0 = BigNumber.from(83666424963960)
+      const balanceOf2 = BigNumber.from('9999999163335820361100')
       expect(await vault.balanceOf(user.address)).to.equal(utils.parseEther('1000'))
       expect(await vault.balanceOf(user2.address)).to.equal(balanceOf2)
       expect(await vault.totalAssets()).to.equal(utils.parseEther('11000').add(fundingAmount0))
@@ -381,10 +414,12 @@ describe('BalancedVault', () => {
       // We should have closed all positions.
       expect(await longPosition()).to.equal(0)
       expect(await shortPosition()).to.equal(0)
+      expect(await btcLongPosition()).to.equal(0)
+      expect(await btcShortPosition()).to.equal(0)
 
       // We should have withdrawn all of our collateral.
-      const fundingAmount = BigNumber.from('308321913166')
-      const fundingAmount2 = BigNumber.from('3045329143208')
+      const fundingAmount = BigNumber.from('165941798239422')
+      const fundingAmount2 = BigNumber.from('1646882507931229')
       expect(await totalCollateralInVault()).to.equal(utils.parseEther('11000').add(fundingAmount).add(fundingAmount2))
       expect(await vault.balanceOf(user.address)).to.equal(0)
       expect(await vault.balanceOf(user2.address)).to.equal(0)
@@ -425,16 +460,54 @@ describe('BalancedVault', () => {
       // Now we should have opened positions.
       // The positions should be equal to (smallDeposit + largeDeposit) * leverage / 2 / originalOraclePrice.
       expect(await longPosition()).to.be.equal(
-        smallDeposit.add(largeDeposit).sub(utils.parseEther('400')).mul(leverage).div(2).div(originalOraclePrice),
+        smallDeposit
+          .add(largeDeposit)
+          .sub(utils.parseEther('400'))
+          .mul(4)
+          .div(5)
+          .mul(leverage)
+          .div(2)
+          .div(originalOraclePrice),
       )
       expect(await shortPosition()).to.equal(
-        smallDeposit.add(largeDeposit).sub(utils.parseEther('400')).mul(leverage).div(2).div(originalOraclePrice),
+        smallDeposit
+          .add(largeDeposit)
+          .sub(utils.parseEther('400'))
+          .mul(4)
+          .div(5)
+          .mul(leverage)
+          .div(2)
+          .div(originalOraclePrice),
       )
-      const fundingAmount0 = BigNumber.from('93756866841')
-      const balanceOf2 = BigNumber.from('1999999999687477110578')
+      expect(await btcLongPosition()).to.be.equal(
+        smallDeposit
+          .add(largeDeposit)
+          .sub(utils.parseEther('400'))
+          .div(5)
+          .mul(leverage)
+          .div(2)
+          .div(btcOriginalOraclePrice),
+      )
+      expect(await btcShortPosition()).to.equal(
+        smallDeposit
+          .add(largeDeposit)
+          .sub(utils.parseEther('400'))
+          .div(5)
+          .mul(leverage)
+          .div(2)
+          .div(btcOriginalOraclePrice),
+      )
+      const fundingAmount0 = BigNumber.from('50199854978376')
+      const balanceOf2 = BigNumber.from('1999999832667164072220')
       expect(await vault.balanceOf(user.address)).to.equal(utils.parseEther('600'))
       expect(await vault.balanceOf(user2.address)).to.equal(balanceOf2)
       expect(await vault.totalAssets()).to.equal(utils.parseEther('2600').add(fundingAmount0))
+      expect(await totalCollateralInVault()).to.equal(
+        utils
+          .parseEther('2600')
+          .add(fundingAmount0)
+          .add(await vault.totalUnclaimed()),
+      )
       expect(await vault.totalSupply()).to.equal(utils.parseEther('600').add(balanceOf2))
       expect(await vault.convertToAssets(utils.parseEther('600').add(balanceOf2))).to.equal(
         utils.parseEther('2600').add(fundingAmount0),
@@ -456,10 +529,12 @@ describe('BalancedVault', () => {
       // We should have closed all positions.
       expect(await longPosition()).to.equal(0)
       expect(await shortPosition()).to.equal(0)
+      expect(await btcLongPosition()).to.equal(0)
+      expect(await btcShortPosition()).to.equal(0)
 
       // We should have withdrawn all of our collateral.
-      const fundingAmount = BigNumber.from('249607634342')
-      const fundingAmount2 = BigNumber.from('622820158534')
+      const fundingAmount = BigNumber.from('133731306363245')
+      const fundingAmount2 = BigNumber.from('333934356519138')
       expect(await totalCollateralInVault()).to.equal(utils.parseEther('3000').add(fundingAmount).add(fundingAmount2))
       expect(await vault.balanceOf(user.address)).to.equal(0)
       expect(await vault.balanceOf(user2.address)).to.equal(0)
@@ -483,12 +558,12 @@ describe('BalancedVault', () => {
     })
 
     it('maxWithdraw', async () => {
-      const smallDeposit = utils.parseEther('500')
+      const smallDeposit = utils.parseEther('1000')
       await vault.connect(user).deposit(smallDeposit, user.address)
       await updateOracle()
       await vault.sync()
 
-      const shareAmount = BigNumber.from(utils.parseEther('500'))
+      const shareAmount = BigNumber.from(utils.parseEther('1000'))
       expect(await vault.maxRedeem(user.address)).to.equal(shareAmount)
 
       const largeDeposit = utils.parseEther('10000')
@@ -496,7 +571,7 @@ describe('BalancedVault', () => {
       await updateOracle()
       await vault.sync()
 
-      const shareAmount2 = BigNumber.from('9999999998435236774264')
+      const shareAmount2 = BigNumber.from('9999999163335820361100')
       expect(await vault.maxRedeem(user.address)).to.equal(shareAmount.add(shareAmount2))
 
       // We shouldn't be able to withdraw more than maxWithdraw.
@@ -516,6 +591,8 @@ describe('BalancedVault', () => {
 
       expect(await longPosition()).to.equal(0)
       expect(await shortPosition()).to.equal(0)
+      expect(await btcLongPosition()).to.equal(0)
+      expect(await btcShortPosition()).to.equal(0)
 
       // Our collateral should be less than the fixedFloat and greater than 0.
       await vault.claim(user.address)
@@ -551,6 +628,7 @@ describe('BalancedVault', () => {
 
       // Collaterals should be equal.
       expect(await longCollateralInVault()).to.equal(await shortCollateralInVault())
+      expect(await btcLongCollateralInVault()).to.equal(await btcShortCollateralInVault())
 
       await updateOracle(utils.parseEther('1300'))
       await long.connect(user).settleAccount(vault.address)
@@ -558,17 +636,19 @@ describe('BalancedVault', () => {
 
       // Collaterals should not be equal any more.
       expect(await longCollateralInVault()).to.not.equal(await shortCollateralInVault())
+      expect(await btcLongCollateralInVault()).to.equal(await btcShortCollateralInVault())
 
       await vault.sync()
 
       // Collaterals should be equal again!
       expect(await longCollateralInVault()).to.equal(await shortCollateralInVault())
+      expect(await btcLongCollateralInVault()).to.equal(await btcShortCollateralInVault())
 
       await updateOracle(originalOraclePrice)
       await vault.sync()
 
       // Since the price changed then went back to the original, the total collateral should have increased.
-      const fundingAmount = BigNumber.from(21517482108955)
+      const fundingAmount = BigNumber.from('14258756963781699')
       expect(await totalCollateralInVault()).to.eq(originalTotalCollateral.add(fundingAmount))
       expect(await vault.totalAssets()).to.eq(originalTotalCollateral.add(fundingAmount))
     })
@@ -577,18 +657,23 @@ describe('BalancedVault', () => {
       const collateralDifference = async () => {
         return (await longCollateralInVault()).sub(await shortCollateralInVault()).abs()
       }
+      const btcCollateralDifference = async () => {
+        return (await btcLongCollateralInVault()).sub(await btcShortCollateralInVault()).abs()
+      }
       const oddDepositAmount = utils.parseEther('10000').add(1) // 10K + 1 wei
 
       await vault.connect(user).deposit(oddDepositAmount, user.address)
       await updateOracle()
       await vault.sync()
       expect(await collateralDifference()).to.equal(0)
+      expect(await btcCollateralDifference()).to.equal(0)
       expect(await asset.balanceOf(vault.address)).to.equal(1)
 
       await vault.connect(user).deposit(oddDepositAmount, user.address)
       await updateOracle()
       await vault.sync()
       expect(await collateralDifference()).to.equal(0)
+      expect(await btcCollateralDifference()).to.equal(0)
     })
 
     it('deposit on behalf', async () => {
@@ -612,7 +697,7 @@ describe('BalancedVault', () => {
       await vault.sync()
 
       // We should have withdrawn all of our collateral.
-      const fundingAmount = BigNumber.from('1524724459128')
+      const fundingAmount = BigNumber.from('824128844013458')
       await vault.connect(user).claim(user.address)
       expect(await totalCollateralInVault()).to.equal(0)
       expect(await vault.totalAssets()).to.equal(0)
@@ -641,7 +726,7 @@ describe('BalancedVault', () => {
       await vault.sync()
 
       // We should have withdrawn all of our collateral.
-      const fundingAmount = BigNumber.from('1524724459128')
+      const fundingAmount = BigNumber.from('824128844013458')
       await vault.connect(user).claim(user.address)
       expect(await totalCollateralInVault()).to.equal(0)
       expect(await asset.balanceOf(user.address)).to.equal(utils.parseEther('200000').add(fundingAmount))
@@ -665,9 +750,11 @@ describe('BalancedVault', () => {
 
       // Now we should have opened positions.
       // The positions should be equal to (smallDeposit + largeDeposit) * leverage / 2 / originalOraclePrice.
-      expect(await longPosition()).to.equal(largeDeposit.mul(leverage).div(2).div(originalOraclePrice))
+      expect(await longPosition()).to.equal(largeDeposit.mul(leverage).mul(4).div(5).div(2).div(originalOraclePrice))
       const makerLimitDelta = BigNumber.from('8282802043703935198')
       expect(await shortPosition()).to.equal(makerLimitDelta)
+      expect(await btcLongPosition()).to.equal(largeDeposit.mul(leverage).div(5).div(2).div(btcOriginalOraclePrice))
+      expect(await btcShortPosition()).to.equal(largeDeposit.mul(leverage).div(5).div(2).div(btcOriginalOraclePrice))
     })
 
     it('exactly at makerLimit', async () => {
@@ -692,8 +779,10 @@ describe('BalancedVault', () => {
 
       // Now we should have opened positions.
       // The positions should be equal to (smallDeposit + largeDeposit) * leverage / 2 / originalOraclePrice.
-      expect(await longPosition()).to.equal(largeDeposit.mul(leverage).div(2).div(originalOraclePrice))
+      expect(await longPosition()).to.equal(largeDeposit.mul(leverage).mul(4).div(5).div(2).div(originalOraclePrice))
       expect(await shortPosition()).to.equal(0)
+      expect(await btcLongPosition()).to.equal(largeDeposit.mul(leverage).div(5).div(2).div(btcOriginalOraclePrice))
+      expect(await btcShortPosition()).to.equal(largeDeposit.mul(leverage).div(5).div(2).div(btcOriginalOraclePrice))
     })
 
     it('product closing closes all positions', async () => {
@@ -703,25 +792,33 @@ describe('BalancedVault', () => {
 
       expect(await longPosition()).to.be.greaterThan(0)
       expect(await shortPosition()).to.be.greaterThan(0)
+      expect(await btcLongPosition()).to.be.greaterThan(0)
+      expect(await btcShortPosition()).to.be.greaterThan(0)
       const productOwner = await impersonate.impersonateWithBalance(
         await controller['owner(address)'](long.address),
         utils.parseEther('10'),
       )
       await long.connect(productOwner).updateClosed(true)
+      await btcLong.connect(owner).updateClosed(true)
       await updateOracleAndSync()
       await updateOracleAndSync()
 
       // We should have closed all positions
       expect(await longPosition()).to.equal(0)
       expect(await shortPosition()).to.equal(0)
+      expect(await btcLongPosition()).to.equal(0)
+      expect(await btcShortPosition()).to.equal(0)
 
       await long.connect(productOwner).updateClosed(false)
+      await btcLong.connect(owner).updateClosed(false)
       await updateOracleAndSync()
       await updateOracleAndSync()
 
       // Positions should be opened back up again
       expect(await longPosition()).to.be.greaterThan(0)
       expect(await shortPosition()).to.be.greaterThan(0)
+      expect(await btcLongPosition()).to.be.greaterThan(0)
+      expect(await btcShortPosition()).to.be.greaterThan(0)
     })
 
     context('liquidation', () => {
@@ -760,7 +857,7 @@ describe('BalancedVault', () => {
           // 3. Sync the vault before it has a chance to get liquidated, it will work and no longer be liquidatable
           // We should still be able to deposit.
           await vault.sync()
-          expect(await vault.maxDeposit(user.address)).to.equal('402312347065256226909035')
+          expect(await vault.maxDeposit(user.address)).to.equal('401972181441895951577804')
           await vault.connect(user).deposit(2, user.address)
         })
 
@@ -816,12 +913,18 @@ describe('BalancedVault', () => {
           await updateOracle()
           await vault.sync()
 
-          const finalPosition = BigNumber.from('62621983855221267778')
-          const finalCollateral = BigNumber.from('46966487895388362252059')
+          const finalPosition = BigNumber.from('50707668091779666592')
+          const finalCollateral = BigNumber.from('38030753919602731122977')
+          const btcFinalPosition = BigNumber.from('1633897468743456266')
+          const btcFinalCollateral = BigNumber.from('9507688479900682780744')
           expect(await longPosition()).to.equal(finalPosition)
           expect(await shortPosition()).to.equal(finalPosition)
           expect(await longCollateralInVault()).to.equal(finalCollateral)
           expect(await shortCollateralInVault()).to.equal(finalCollateral)
+          expect(await btcLongPosition()).to.equal(btcFinalPosition)
+          expect(await btcShortPosition()).to.equal(btcFinalPosition)
+          expect(await btcLongCollateralInVault()).to.equal(btcFinalCollateral)
+          expect(await btcShortCollateralInVault()).to.equal(btcFinalCollateral)
         })
       })
 
@@ -875,7 +978,7 @@ describe('BalancedVault', () => {
           // 3. Sync the vault before it has a chance to get liquidated, it will work and no longer be liquidatable
           // We should still be able to deposit.
           await vault.sync()
-          expect(await vault.maxDeposit(user.address)).to.equal('396604778052719336340483')
+          expect(await vault.maxDeposit(user.address)).to.equal('396777266765732414363890')
           await vault.connect(user).deposit(2, user.address)
         })
 
@@ -931,12 +1034,18 @@ describe('BalancedVault', () => {
           await updateOracle()
           await vault.sync()
 
-          const finalPosition = BigNumber.from('169949012636167808676')
-          const finalCollateral = BigNumber.from('50984710404199215353605')
+          const finalPosition = BigNumber.from('136109459011782740553')
+          const finalCollateral = BigNumber.from('40832846402925697101225')
+          const btcFinalPosition = BigNumber.from('1754282213481988093')
+          const btcFinalCollateral = BigNumber.from('10208211600731424275306')
           expect(await longPosition()).to.equal(finalPosition)
           expect(await shortPosition()).to.equal(finalPosition)
           expect(await longCollateralInVault()).to.equal(finalCollateral)
           expect(await shortCollateralInVault()).to.equal(finalCollateral)
+          expect(await btcLongPosition()).to.equal(btcFinalPosition)
+          expect(await btcShortPosition()).to.equal(btcFinalPosition)
+          expect(await btcLongCollateralInVault()).to.equal(btcFinalCollateral)
+          expect(await btcShortCollateralInVault()).to.equal(btcFinalCollateral)
         })
       })
     })
@@ -980,12 +1089,18 @@ describe('BalancedVault', () => {
 
         // 5. Vault should no longer have enough collateral to cover claims, pro-rata claim should be enabled
         const finalPosition = BigNumber.from('0')
-        const finalCollateral = BigNumber.from('24937450010257810297106')
-        const finalUnclaimed = BigNumber.from('80000014845946136115820')
+        const finalCollateral = BigNumber.from('23959832378187916303296')
+        const btcFinalPosition = BigNumber.from('0')
+        const btcFinalCollateral = BigNumber.from('5989958094546979075824')
+        const finalUnclaimed = BigNumber.from('80000022114229307040353')
         expect(await longPosition()).to.equal(finalPosition)
         expect(await shortPosition()).to.equal(finalPosition)
         expect(await longCollateralInVault()).to.equal(finalCollateral)
         expect(await shortCollateralInVault()).to.equal(finalCollateral)
+        expect(await btcLongPosition()).to.equal(btcFinalPosition)
+        expect(await btcShortPosition()).to.equal(btcFinalPosition)
+        expect(await btcLongCollateralInVault()).to.equal(btcFinalCollateral)
+        expect(await btcShortCollateralInVault()).to.equal(btcFinalCollateral)
         expect(await vault.unclaimed(user.address)).to.equal(finalUnclaimed)
         expect(await vault.totalUnclaimed()).to.equal(finalUnclaimed)
         await expect(vault.connect(user).deposit(2, user.address)).to.revertedWithCustomError(
@@ -998,9 +1113,13 @@ describe('BalancedVault', () => {
         await vault.claim(user.address)
         expect(await longCollateralInVault()).to.equal(0)
         expect(await shortCollateralInVault()).to.equal(0)
+        expect(await btcLongCollateralInVault()).to.equal(0)
+        expect(await btcShortCollateralInVault()).to.equal(0)
         expect(await vault.unclaimed(user.address)).to.equal(0)
         expect(await vault.totalUnclaimed()).to.equal(0)
-        expect(await asset.balanceOf(user.address)).to.equal(initialBalanceOf.add(finalCollateral.mul(2)))
+        expect(await asset.balanceOf(user.address)).to.equal(
+          initialBalanceOf.add(finalCollateral.add(btcFinalCollateral).mul(2)).add(1),
+        )
 
         // 7. Should no longer be able to deposit, vault is closed
         await expect(vault.connect(user).deposit(2, user.address)).to.revertedWithCustomError(

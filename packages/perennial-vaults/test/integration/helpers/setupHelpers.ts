@@ -34,17 +34,16 @@ export async function deployProductOnMainnetFork({
     payoffDefinition: createPayoffDefinition({ short: short }),
     oracle: oracle ?? constants.AddressZero,
     maintenance: maintenance ?? utils.parseEther('0.10'),
-    fundingFee: fundingFee ?? utils.parseEther('0.10'),
+    fundingFee: fundingFee ?? utils.parseEther('0.00'),
     makerFee: makerFee ?? utils.parseEther('0.0'),
     takerFee: takerFee ?? utils.parseEther('0.0'),
-    positionFee: positionFee ?? utils.parseEther('0.5'),
+    positionFee: positionFee ?? utils.parseEther('0.0'),
     makerLimit: makerLimit ?? utils.parseEther('100'),
     utilizationCurve: utilizationCurve ?? {
-      // Force a 0.10 rate to make tests simpler
-      minRate: utils.parseEther('0.10'),
-      maxRate: utils.parseEther('0.10'),
-      targetRate: utils.parseEther('0.10'),
-      targetUtilization: utils.parseEther('1'),
+      minRate: utils.parseEther('0.02'),
+      maxRate: utils.parseEther('0.08'),
+      targetRate: utils.parseEther('0.80'),
+      targetUtilization: utils.parseEther('0.80'),
     },
   }
 

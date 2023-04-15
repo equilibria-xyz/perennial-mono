@@ -53,7 +53,7 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
     /// @dev Redemptions that have not been settled, or have been settled but not yet processed by this contract
     UFixed18 private _redemption;
 
-    /// @dev The latest version that a pending deposit or redemption has been placed
+    /// @dev The latest epoch that a pending deposit or redemption has been placed
     uint256 private _latestEpoch;
 
     /// @dev Mapping of pending (not yet converted to shares) per user
@@ -62,7 +62,7 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
     /// @dev Mapping of pending (not yet withdrawn) per user
     mapping(address => UFixed18) private _redemptions;
 
-    /// @dev Mapping of the latest version that a pending deposit or redemption has been placed per user
+    /// @dev Mapping of the latest epoch that a pending deposit or redemption has been placed per user
     mapping(address => uint256) private _latestEpochs;
 
     /// @dev Per-asset accounting state variables
@@ -276,8 +276,8 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
      * @notice Hook that is called before every stateful operation
      * @dev Settles the vault's account on both the long and short product, along with any global or user-specific deposits/redemptions
      * @param account The account that called the operation, or 0 if called by a keeper.
-     * @return context The current version contexts for each market
-     * @return accountContext The current version contexts for each market for the given account
+     * @return context The current epoch contexts for each market
+     * @return accountContext The current epoch contexts for each market for the given account
      */
     function _settle(address account) private returns (EpochContext memory context, EpochContext memory accountContext) {
         (context, accountContext) = _loadContextForWrite(account);
@@ -353,9 +353,10 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
         // TODO: Don't withdraw all if it would revert
     }
 
-    //TODO: natspec
     /**
      * @notice Rebalances the position of the vault
+     * @param context Epoch context to use in calculation
+     * @param claimAmount The amount of assets that will be withdrawn from the vault at the end of the operation
      */
     function _rebalancePosition(EpochContext memory context, UFixed18 claimAmount) private {
         // Compute target collateral
@@ -509,8 +510,8 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
     }
 
     /**
-     * @notice Calculates whether or not the vault is in an unhealthy state at the provided version
-     * @param context Version context to calculate health
+     * @notice Calculates whether or not the vault is in an unhealthy state at the provided epoch
+     * @param context Epoch context to calculate health
      * @return bool true if unhealthy, false if healthy
      */
     function _unhealthyAtEpoch(EpochContext memory context) private view returns (bool) {
@@ -535,9 +536,9 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
     }
 
     /**
-     * @notice The maximum available deposit amount at the given version
-     * @param context Version context to use in calculation
-     * @return Maximum available deposit amount at version
+     * @notice The maximum available deposit amount at the given epoch
+     * @param context Epoch context to use in calculation
+     * @return Maximum available deposit amount at epoch
      */
     function _maxDepositAtEpoch(EpochContext memory context) private view returns (UFixed18) {
         if (_unhealthyAtEpoch(context)) return UFixed18Lib.ZERO;
@@ -546,11 +547,11 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
     }
 
     /**
-     * @notice The maximum available redeemable amount at the given version for `account`
-     * @param context Version context to use in calculation
-     * @param accountContext Account version context to use in calculation
+     * @notice The maximum available redeemable amount at the given epoch for `account`
+     * @param context Epoch context to use in calculation
+     * @param accountContext Account epoch context to use in calculation
      * @param account Account to calculate redeemable amount
-     * @return Maximum available redeemable amount at version
+     * @return Maximum available redeemable amount at epoch
      */
     function _maxRedeemAtEpoch(
         EpochContext memory context,
@@ -562,9 +563,9 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
     }
 
     /**
-     * @notice The total assets at the given version
-     * @param context Version context to use in calculation
-     * @return Total assets amount at version
+     * @notice The total assets at the given epoch
+     * @param context Epoch context to use in calculation
+     * @return Total assets amount at epoch
      */
     function _totalAssetsAtEpoch(EpochContext memory context) private view returns (UFixed18) {
         (UFixed18 totalCollateral, UFixed18 totalDebt) = (_assets(), _totalUnclaimedAtEpoch(context).add(_deposit));
@@ -572,9 +573,9 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
     }
 
     /**
-     * @notice The total supply at the given version
-     * @param context Version context to use in calculation
-     * @return Total supply amount at version
+     * @notice The total supply at the given epoch
+     * @param context Epoch context to use in calculation
+     * @return Total supply amount at epoch
      */
     function _totalSupplyAtEpoch(EpochContext memory context) private view returns (UFixed18) {
         if (context.epoch == _latestEpoch) return _totalSupply;
@@ -582,10 +583,10 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
     }
 
     /**
-     * @notice The balance of `account` at the given version
-     * @param accountContext Account version context to use in calculation
+     * @notice The balance of `account` at the given epoch
+     * @param accountContext Account epoch context to use in calculation
      * @param account Account to calculate balance of amount
-     * @return Account balance at version
+     * @return Account balance at epoch
      */
     function _balanceOfAtEpoch(EpochContext memory accountContext, address account) private view returns (UFixed18) {
         if (accountContext.epoch == _latestEpochs[account]) return _balanceOf[account];
@@ -593,9 +594,9 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
     }
 
     /**
-     * @notice The total unclaimed assets at the given version
-     * @param context Version context to use in calculation
-     * @return Total unclaimed asset amount at version
+     * @notice The total unclaimed assets at the given epoch
+     * @param context Epoch context to use in calculation
+     * @return Total unclaimed asset amount at epoch
      */
     function _totalUnclaimedAtEpoch(EpochContext memory context) private view returns (UFixed18) {
         if (context.epoch == _latestEpoch) return _totalUnclaimed;
@@ -603,10 +604,10 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
     }
 
     /**
-     * @notice The total unclaimed assets at the given version for `account`
-     * @param accountContext Account version context to use in calculation
+     * @notice The total unclaimed assets at the given epoch for `account`
+     * @param accountContext Account epoch context to use in calculation
      * @param account Account to calculate unclaimed assets for
-     * @return Total unclaimed asset amount for `account` at version
+     * @return Total unclaimed asset amount for `account` at epoch
      */
     function _unclaimedAtEpoch(EpochContext memory accountContext, address account) private view returns (UFixed18) {
         if (accountContext.epoch == _latestEpochs[account]) return _unclaimed[account];
@@ -627,10 +628,10 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
     }
 
     /**
-     * @notice Converts a given amount of assets to shares at version
-     * @param context Version context to use in calculation
+     * @notice Converts a given amount of assets to shares at epoch
+     * @param context Epoch context to use in calculation
      * @param assets Number of assets to convert to shares
-     * @return Amount of shares for the given assets at version
+     * @return Amount of shares for the given assets at epoch
      */
     function _convertToSharesAtEpoch(EpochContext memory context, UFixed18 assets) private pure returns (UFixed18) {
         if (context.latestCollateral.isZero()) return assets;
@@ -638,10 +639,10 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
     }
 
     /**
-     * @notice Converts a given amount of shares to assets at version
-     * @param context Version context to use in calculation
+     * @notice Converts a given amount of shares to assets at epoch
+     * @param context Epoch context to use in calculation
      * @param shares Number of shares to convert to shares
-     * @return Amount of assets for the given shares at version
+     * @return Amount of assets for the given shares at epoch
      */
     function _convertToAssetsAtEpoch(EpochContext memory context, UFixed18 shares) private pure returns (UFixed18) {
         if (context.latestShares.isZero()) return shares;
@@ -649,10 +650,10 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
     }
 
     /**
-     * @notice The total assets at the given version
+     * @notice The total assets at the given epoch
      * @dev Calculates and adds accumulated PnL for `version` + 1
      * @param epoch Epoch to get total assets at
-     * @return assets Total assets in the vault at the given version
+     * @return assets Total assets in the vault at the given epoch
      */
     function _assetsAtEpoch(uint256 epoch) private view returns (UFixed18) {
         Fixed18 assets = Fixed18Lib.from(_marketAccounts[0].epochs[epoch].totalAssets);
@@ -665,9 +666,9 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
     }
 
     /**
-     * @notice The total shares at the given version
+     * @notice The total shares at the given epoch
      * @param epoch Epoch to get total shares at
-     * @return Total shares at `version`
+     * @return Total shares at `epoch`
      */
     function _sharesAtEpoch(uint256 epoch) private view returns (UFixed18) {
         return _marketAccounts[0].epochs[epoch].totalShares;
