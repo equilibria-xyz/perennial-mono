@@ -329,7 +329,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
         // Pull USDC from the `msg.sender`
         USDC.pull(msg.sender, amount, true);
 
-        _wrap(address(this), amount);
+        _handleWrap(address(this), amount);
 
         // Just-in-time approval to the vault for the amount being deposited
         DSU.approve(address(vault), amount);
