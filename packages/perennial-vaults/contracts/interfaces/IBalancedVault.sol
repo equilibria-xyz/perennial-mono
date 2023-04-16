@@ -41,6 +41,7 @@ interface IBalancedVault is IBalancedVaultDefinition {
     function name() external view returns (string memory);
     function initialize(string memory name_) external;
     function sync() external;
+    function syncAccount(address account) external;
     function unclaimed(address account) external view returns (UFixed18);
     function totalUnclaimed() external view returns (UFixed18);
     function claim(address account) external;
