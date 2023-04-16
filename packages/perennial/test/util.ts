@@ -107,7 +107,7 @@ export const buildInvokerActions = ({
     },
     CHARGE_FEE: {
       action: 16,
-      args: utils.defaultAbiCoder.encode(['address', 'uint'], [vaultAddress, dsuFEE]),
+      args: utils.defaultAbiCoder.encode(['address', 'uint', 'bool'], [vaultAddress, dsuFEE, true]),
     },
   }
 }
@@ -257,7 +257,7 @@ export const buildInvokerActionRollup = (
     },
     CHARGE_FEE: {
       action: 16,
-      payload: `10` + encodeAddressOrCacheIndex(vaultCache, vaultAddress) + encodeUint(BigNumber.from(dsuFEE)),
+      payload: `10` + encodeAddressOrCacheIndex(vaultCache, vaultAddress) + encodeUint(BigNumber.from(dsuFEE)) + `01`,
     },
   }
 }
@@ -280,9 +280,6 @@ export const encodeAddressOrCacheIndex = (
 }
 
 export const encodeProgramIds = (programs: number[]) => {
-  console.log('programs')
-  console.log(programs)
-
   let encoded = toHex(BigNumber.from(programs.length))
 
   programs.forEach(program => {

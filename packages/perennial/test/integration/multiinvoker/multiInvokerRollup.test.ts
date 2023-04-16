@@ -71,7 +71,6 @@ describe('MultiInvokerRollup', () => {
 
     beforeEach(async () => {
       const { owner, user, dsu, usdc, usdcHolder, multiInvokerRollup } = instanceVars
-
       await usdc.connect(usdcHolder).transfer(user.address, 1_000_000e6)
       await usdc.connect(user).approve(multiInvokerRollup.address, constants.MaxUint256)
       await dsu.connect(user).approve(multiInvokerRollup.address, constants.MaxUint256)
@@ -83,6 +82,7 @@ describe('MultiInvokerRollup', () => {
 
       position = utils.parseEther('0.001')
       amount = utils.parseEther('10000')
+      const dsuFee = utils.parseEther('10')
       programs = [PROGRAM_ID.toNumber()]
       vaultAmount = amount
       actions = buildInvokerActionRollup(
@@ -95,6 +95,7 @@ describe('MultiInvokerRollup', () => {
         position,
         amount,
         vaultAmount,
+        dsuFee,
         programs,
       )
 
@@ -108,6 +109,7 @@ describe('MultiInvokerRollup', () => {
         position.div(2),
         amount.div(2),
         vaultAmount,
+        dsuFee,
         programs,
       )
 
@@ -121,6 +123,7 @@ describe('MultiInvokerRollup', () => {
         position,
         utils.parseEther('2000000'),
         vaultAmount,
+        dsuFee,
         programs,
       )
     })
@@ -140,8 +143,6 @@ describe('MultiInvokerRollup', () => {
       const { user, dsu, usdc, usdcHolder, multiInvokerRollup, reserve } = instanceVars
 
       await usdc.connect(usdcHolder).transfer(user.address, 1_000_000e6)
-
-      console.log(customActions.WRAP.payload)
 
       await expect(
         await user.sendTransaction(
@@ -380,6 +381,39 @@ describe('MultiInvokerRollup', () => {
         .withArgs(reserve.address, multiInvokerRollup.address, 10000e6)
         .to.emit(usdc, 'Transfer')
         .withArgs(multiInvokerRollup.address, user.address, 10000e6)
+    })
+
+    it(`wraps USDC to DSU on WRAP action and sends fee to interface`, async () => {
+      const { user, multiInvokerRollup, dsu, usdc } = instanceVars
+
+      expect(await usdc.balanceOf(vault.address)).to.eq('0')
+
+      const res = user.sendTransaction(
+        buildTransactionRequest(user, multiInvokerRollup, `0x` + actions.WRAP.payload + actions.CHARGE_FEE.payload),
+      )
+
+      await expect(res).to.not.be.reverted
+
+      expect(await usdc.balanceOf(vault.address)).to.eq(utils.parseEther('10').div(1e12))
+    })
+
+    it(`sends unwrapped USDC in CHARGE_FEE action`, async () => {
+      const { user, multiInvokerRollup, usdc, dsu } = instanceVars
+
+      // set
+      await user.sendTransaction(
+        buildTransactionRequest(user, multiInvokerRollup, '0x' + actions.WRAP.payload + actions.UNWRAP.payload),
+      )
+
+      const res = user.sendTransaction(
+        buildTransactionRequest(
+          user,
+          multiInvokerRollup,
+          '0x1000' + vault.address.substring(2) + '088AC7230489E8000000',
+        ),
+      )
+      await expect(res).to.not.be.reverted
+      expect(await dsu.balanceOf(vault.address)).to.eq(utils.parseEther('10'))
     })
 
     it('performs WITHDRAW_AND_UNWRAP', async () => {

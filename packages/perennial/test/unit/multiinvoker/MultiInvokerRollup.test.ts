@@ -263,14 +263,6 @@ describe('MultiInvokerRollup', () => {
       expect(batcher.wrap).to.have.been.calledWith(amount, user.address)
     })
 
-    it(`wraps USDC to DSU on WRAP action and sends fee to interface`, async () => {
-      const res = user.sendTransaction(
-        buildTransactionRequest(user, multiInvokerRollup, `0x` + actions.WRAP.payload + actions.CHARGE_FEE.payload),
-      )
-
-      await expect(res).to.not.be.reverted
-    })
-
     it('wraps USDC to DSU using RESERVE on WRAP action if amount is greater than batcher balance', async () => {
       dsu.balanceOf.whenCalledWith(batcher.address).returns(0)
       dsu.transfer.whenCalledWith(user.address, amount).returns(true)

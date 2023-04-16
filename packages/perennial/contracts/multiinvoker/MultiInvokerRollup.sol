@@ -202,9 +202,13 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
         if (result == address(0)) revert MultiInvokerRollupAddressIndexOutOfBoundsError();
     }
 
-    function _readBool(bytes calldata input, PTR memory ptr) private pure returns (bool dir) {
-        dir = abi.decode(input[ptr.pos:1], (bool));
-        ptr.pos += 1;
+    function _readBool(bytes calldata input, PTR memory ptr) private pure returns (bool) {
+        uint8 dir = _readUint8(input, ptr);
+        if (dir > 0) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     /**
