@@ -383,7 +383,7 @@ describe('MultiInvokerRollup', () => {
         .withArgs(multiInvokerRollup.address, user.address, 10000e6)
     })
 
-    it(`wraps USDC to DSU on WRAP action and sends fee to interface`, async () => {
+    it(`wraps USDC to DSU on WRAP action and invokes CHARGE_FEE to interface`, async () => {
       const { user, multiInvokerRollup, dsu, usdc } = instanceVars
 
       expect(await usdc.balanceOf(vault.address)).to.eq('0')

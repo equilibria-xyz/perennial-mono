@@ -370,6 +370,12 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
         }
     }
 
+    /**
+     * @notice Helper function to include an interface fee 
+     * @param receiver The interface receiving the fee
+     * @param amount The amount of DSU to credit the interface
+     * @param wrapped Bool to specify is USDC is wrapped to DSU 
+     */
     function _chargeFee(address receiver, UFixed18 amount, bool wrapped) internal {
         if (wrapped) {
             USDC.pullTo(msg.sender, receiver, amount);
