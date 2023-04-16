@@ -20,6 +20,7 @@ export type InvokerAction =
   | 'VAULT_CLAIM'
   | 'VAULT_WRAP_AND_DEPOSIT'
   | 'CHARGE_FEE'
+  | 'CHARGE_FEE_UNWRAPPED'
 
 export const buildInvokerActions = ({
   userAddress,
@@ -108,6 +109,10 @@ export const buildInvokerActions = ({
     CHARGE_FEE: {
       action: 16,
       args: utils.defaultAbiCoder.encode(['address', 'uint', 'bool'], [vaultAddress, dsuFEE, true]),
+    },
+    CHARGE_FEE_UNWRAPPED: {
+      action: 16,
+      args: utils.defaultAbiCoder.encode(['address', 'uint', 'bool'], [vaultAddress, dsuFEE, false]),
     },
   }
 }
@@ -258,6 +263,10 @@ export const buildInvokerActionRollup = (
     CHARGE_FEE: {
       action: 16,
       payload: `10` + encodeAddressOrCacheIndex(vaultCache, vaultAddress) + encodeUint(BigNumber.from(dsuFEE)) + `01`,
+    },
+    CHARGE_FEE_UNWRAPPED: {
+      action: 16,
+      payload: `10` + encodeAddressOrCacheIndex(vaultCache, vaultAddress) + encodeUint(BigNumber.from(dsuFEE)) + `00`,
     },
   }
 }

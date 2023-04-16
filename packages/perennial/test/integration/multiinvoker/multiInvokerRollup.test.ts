@@ -406,12 +406,9 @@ describe('MultiInvokerRollup', () => {
       )
 
       const res = user.sendTransaction(
-        buildTransactionRequest(
-          user,
-          multiInvokerRollup,
-          '0x1000' + vault.address.substring(2) + '088AC7230489E8000000',
-        ),
+        buildTransactionRequest(user, multiInvokerRollup, '0x' + actions.CHARGE_FEE_UNWRAPPED.payload),
       )
+
       await expect(res).to.not.be.reverted
       expect(await dsu.balanceOf(vault.address)).to.eq(utils.parseEther('10'))
     })

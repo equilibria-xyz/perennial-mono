@@ -396,8 +396,11 @@ describe('MultiInvokerRollup', () => {
     })
 
     it('performs a multi invoke', async () => {
+      // do not attempt charge fee in unit tests
+      const actionsLessChargeFee = Object.values(actions).slice(0, -2)
+
       const res = user.sendTransaction(
-        buildTransactionRequest(user, multiInvokerRollup, buildAllActionsRollup(Object.values(actions))),
+        buildTransactionRequest(user, multiInvokerRollup, buildAllActionsRollup(actionsLessChargeFee)),
       )
 
       await expect(res).to.not.be.reverted
