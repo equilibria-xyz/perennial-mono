@@ -3,7 +3,7 @@ import '@nomiclabs/hardhat-ethers'
 import { BigNumber, utils } from 'ethers'
 import { task } from 'hardhat/config'
 import { HardhatRuntimeEnvironment, TaskArguments } from 'hardhat/types'
-import { DepositEvent } from '../types/generated/contracts/interfaces/ICollateral'
+import { DepositEvent, ICollateral } from '../types/generated/contracts/interfaces/ICollateral'
 import { chunk } from './checkLiquidatable'
 
 export default task('checkSolvency', 'Checks if Product is solvent')
@@ -22,25 +22,12 @@ export default task('checkSolvency', 'Checks if Product is solvent')
     )
     const currentBlock = await multicall.getBlockNumber()
 
-    const deposits: DepositEvent[] = []
-    let hasMore = true
-    let page = 0
-
-    while (hasMore) {
-      console.log(
-        `Fetching deposits from block ${currentBlock - (page + 1) * 2000000} to ${currentBlock - page * 2000000}...`,
-      )
-      deposits.push(
-        ...(await collateral.queryFilter(
-          collateral.filters.Deposit(null, args.product),
-          currentBlock - (page + 1) * 2000000,
-          currentBlock - page * 2000000,
-        )),
-      )
+    const deposits = await getDeposits(
+      collateral,
+      args.product,
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      hasMore = currentBlock - page * 2000000 > collateralDeployment.receipt!.blockNumber - 1
-      page = page + 1
-    }
+      collateralDeployment.receipt!.blockNumber,
+    )
 
     const users = Array.from(new Set([...deposits].map(e => e.args.user.toLowerCase())))
     const usersChunked = chunk<string>(users, 200)
@@ -70,3 +57,31 @@ export default task('checkSolvency', 'Checks if Product is solvent')
 
     console.log('done.')
   })
+
+export async function getDeposits(
+  collateral: ICollateral,
+  productAddress: string,
+  deploymentBlockNumber: number,
+): Promise<DepositEvent[]> {
+  const currentBlock = await collateral.provider.getBlockNumber()
+  const deposits: DepositEvent[] = []
+  let hasMore = true
+  let page = 0
+
+  while (hasMore) {
+    console.log(
+      `Fetching deposits from block ${currentBlock - (page + 1) * 2000000} to ${currentBlock - page * 2000000}...`,
+    )
+    deposits.push(
+      ...(await collateral.queryFilter(
+        collateral.filters.Deposit(null, productAddress),
+        currentBlock - (page + 1) * 2000000,
+        currentBlock - page * 2000000,
+      )),
+    )
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    hasMore = currentBlock - page * 2000000 > deploymentBlockNumber - 1
+    page = page + 1
+  }
+  return deposits
+}
