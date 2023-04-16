@@ -68,11 +68,21 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
     /// @dev Per-asset accounting state variables (reserve space for maximum 50 assets due to storage pattern)
     MarketAccount[50] private _marketAccounts;
 
+    //TODO: natspec
     /// @dev Deposits that have not been settled, or have been settled but not yet processed by this contract
     UFixed18 private _pendingDeposit;
 
     /// @dev Redemptions that have not been settled, or have been settled but not yet processed by this contract
     UFixed18 private _pendingRedemption;
+
+    /// @dev Mapping of pending (not yet converted to shares) per user
+    mapping(address => UFixed18) private _pendingDeposits;
+
+    /// @dev Mapping of pending (not yet withdrawn) per user
+    mapping(address => UFixed18) private _pendingRedemptions;
+
+    /// @dev Mapping of the latest epoch that a pending deposit or redemption has been placed per user
+    mapping(address => uint256) private _pendingEpochs;
 
     constructor(
         Token18 asset_,
@@ -95,6 +105,14 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
         // set or reset allowance compliant with both an initial deployment or an upgrade
         asset.approve(address(collateral), UFixed18Lib.ZERO);
         asset.approve(address(collateral));
+
+        // Stamp new market's data for first epoch
+        (EpochContext memory context, )  = _settle(address(0));
+        for (uint256 marketId = 1; marketId < totalMarkets; marketId++) {
+            if (_marketAccounts[marketId].versionOf[context.epoch] == 0) {
+                _marketAccounts[marketId].versionOf[context.epoch] = markets(marketId).long.latestVersion();
+            }
+        }
     }
 
     /**
@@ -117,9 +135,9 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
 
         if (currentEpochStale()) {
             _pendingDeposit = _pendingDeposit.add(assets);
-            _deposits[account] = _deposits[account].add(assets);
-            _latestEpochs[account] = context.epoch + 1;
-            emit Deposit(msg.sender, account, context.epoch, assets);
+            _pendingDeposits[account] = _pendingDeposits[account].add(assets);
+            _pendingEpochs[account] = context.epoch + 1;
+            emit Deposit(msg.sender, account, context.epoch + 1, assets);
         } else {
             _deposit = _deposit.add(assets);
             _deposits[account] = _deposits[account].add(assets);
@@ -147,9 +165,9 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
 
         if (currentEpochStale()) {
             _pendingRedemption = _pendingRedemption.add(shares);
-            _redemptions[account] = _redemptions[account].add(shares);
-            _latestEpochs[account] = context.epoch + 1;
-            emit Redemption(msg.sender, account, context.epoch, shares);
+            _pendingRedemptions[account] = _pendingRedemptions[account].add(shares);
+            _pendingEpochs[account] = context.epoch + 1;
+            emit Redemption(msg.sender, account, context.epoch + 1, shares);
         } else {
             _redemption = _redemption.add(shares);
             _redemptions[account] = _redemptions[account].add(shares);
@@ -352,12 +370,21 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
             _marketAccounts[0].epochs[context.epoch].totalAssets = _totalAssetsAtEpoch(context);
         }
 
-        if (account != address(0) && accountContext.epoch > _latestEpochs[account]) {
-            _delayedMintAccount(account, _balanceOfAtEpoch(accountContext, account).sub(_balanceOf[account]));
-            _unclaimed[account] = _unclaimedAtEpoch(accountContext, account);
-            _deposits[account] = UFixed18Lib.ZERO;
-            _redemptions[account] = UFixed18Lib.ZERO;
-            _latestEpochs[account] = accountContext.epoch;
+        if (account != address(0)) {
+            if (accountContext.epoch > _latestEpochs[account]) {
+                _delayedMintAccount(account, _balanceOfAtEpoch(accountContext, account).sub(_balanceOf[account]));
+                _unclaimed[account] = _unclaimedAtEpoch(accountContext, account);
+                _deposits[account] = UFixed18Lib.ZERO;
+                _redemptions[account] = UFixed18Lib.ZERO;
+                _latestEpochs[account] = accountContext.epoch;
+            }
+            if (accountContext.epoch > _pendingEpochs[account]) {
+                _deposits[account] = _pendingDeposits[account];
+                _redemptions[account] = _pendingRedemptions[account];
+                _pendingDeposits[account] = UFixed18Lib.ZERO;
+                _pendingRedemptions[account] = UFixed18Lib.ZERO;
+                _pendingEpochs[account] = accountContext.epoch;
+            }
         }
     }
 
@@ -384,6 +411,7 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
         // Remove collateral from markets above target
         for (uint256 marketId; marketId < totalMarkets; marketId++) {
             UFixed18 marketCollateral = targetCollateral.muldiv(markets(marketId).weight, totalWeight);
+
             if (collateral.collateral(address(this), markets(marketId).long).gt(marketCollateral))
                 _updateCollateral(markets(marketId).long, marketCollateral);
             if (collateral.collateral(address(this), markets(marketId).short).gt(marketCollateral))
@@ -393,6 +421,7 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
         // Deposit collateral to markets below target
         for (uint256 marketId; marketId < totalMarkets; marketId++) {
             UFixed18 marketCollateral = targetCollateral.muldiv(markets(marketId).weight, totalWeight);
+
             if (collateral.collateral(address(this), markets(marketId).long).lt(marketCollateral))
                 _updateCollateral(markets(marketId).long, marketCollateral);
             if (collateral.collateral(address(this), markets(marketId).short).lt(marketCollateral))
@@ -573,7 +602,7 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
      */
     function _maxDepositAtEpoch(EpochContext memory context) private view returns (UFixed18) {
         if (_unhealthyAtEpoch(context)) return UFixed18Lib.ZERO;
-        UFixed18 currentCollateral = _totalAssetsAtEpoch(context).add(_deposit);
+        UFixed18 currentCollateral = _totalAssetsAtEpoch(context).add(_deposit).add(_pendingDeposit);
         return maxCollateral.gt(currentCollateral) ? maxCollateral.sub(currentCollateral) : UFixed18Lib.ZERO;
     }
 
@@ -599,7 +628,10 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
      * @return Total assets amount at epoch
      */
     function _totalAssetsAtEpoch(EpochContext memory context) private view returns (UFixed18) {
-        (UFixed18 totalCollateral, UFixed18 totalDebt) = (_assets(), _totalUnclaimedAtEpoch(context).add(_deposit));
+        (UFixed18 totalCollateral, UFixed18 totalDebt) = (
+            _assets(),
+            _totalUnclaimedAtEpoch(context).add(_deposit).add(_pendingDeposit)
+        );
         return totalCollateral.gt(totalDebt) ? totalCollateral.sub(totalDebt) : UFixed18Lib.ZERO;
     }
 

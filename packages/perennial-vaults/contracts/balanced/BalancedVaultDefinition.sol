@@ -21,10 +21,9 @@ import "../interfaces/IBalancedVaultDefinition.sol";
  *      causing the vault to be in an unhealthy state (far away from target leverage)
  */
 contract BalancedVaultDefinition is IBalancedVaultDefinition {
-    uint256 private constant MAX_MARKETS = 2;
-
     IProduct private constant DEFAULT_PRODUCT = IProduct(address(0));
     uint256 private constant DEFAULT_WEIGHT = 0;
+    uint256 private constant MAX_MARKETS = 2;
 
     /// @dev The address of the Perennial controller contract
     IController public immutable controller;
