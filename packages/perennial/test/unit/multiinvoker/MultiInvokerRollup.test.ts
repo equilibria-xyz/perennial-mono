@@ -112,7 +112,7 @@ describe('MultiInvokerRollup', () => {
     let actions: { [action in InvokerAction]: { action: BigNumberish; payload: string } }
     let zeroAction: { [action in InvokerAction]: { action: BigNumberish; payload: string } }
     const amount = utils.parseEther('100')
-    const dsuFEE = utils.parseEther('10')
+    const feeAmount = utils.parseEther('10')
     const usdcAmount = 100e6
     const position = utils.parseEther('12')
     const programs = [1, 2, 3]
@@ -130,7 +130,8 @@ describe('MultiInvokerRollup', () => {
         position,
         amount,
         vaultAmount,
-        dsuFEE,
+        feeAmount,
+        false,
         programs,
       )
 
@@ -144,7 +145,8 @@ describe('MultiInvokerRollup', () => {
         position,
         0,
         vaultAmount,
-        dsuFEE,
+        feeAmount,
+        false,
         programs,
       )
 
@@ -487,7 +489,7 @@ describe('MultiInvokerRollup', () => {
       const usdcAmount = 100e6
       const position = utils.parseEther('12')
       const VaultAmount = utils.parseEther('567')
-      const dsuFEE = utils.parseEther('10')
+      const feeAmount = utils.parseEther('10')
       const programs = [1, 2, 3]
 
       beforeEach(() => {
@@ -501,7 +503,8 @@ describe('MultiInvokerRollup', () => {
           position,
           amount,
           VaultAmount,
-          dsuFEE,
+          feeAmount,
+          false,
           programs,
         )
         dsu.transferFrom.whenCalledWith(user.address, multiInvokerRollup.address, amount).returns(true)
@@ -566,7 +569,7 @@ describe('MultiInvokerRollup', () => {
       const usdcAmount = 100e6
       const position = utils.parseEther('12')
       const VaultAmount = utils.parseEther('567')
-      const dsuFEE = utils.parseEther('10')
+      const feeAmount = utils.parseEther('10')
       const programs = [1, 2, 3]
 
       beforeEach(() => {
@@ -580,7 +583,8 @@ describe('MultiInvokerRollup', () => {
           position,
           amount,
           VaultAmount,
-          dsuFEE,
+          feeAmount,
+          false,
           programs,
         )
         actionsCached = buildInvokerActionRollup(
@@ -593,7 +597,8 @@ describe('MultiInvokerRollup', () => {
           position,
           amount,
           VaultAmount,
-          dsuFEE,
+          feeAmount,
+          false,
           programs,
         )
 

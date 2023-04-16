@@ -82,7 +82,7 @@ describe('MultiInvokerRollup', () => {
 
       position = utils.parseEther('0.001')
       amount = utils.parseEther('10000')
-      const dsuFee = utils.parseEther('10')
+      const feeAmount = utils.parseEther('10')
       programs = [PROGRAM_ID.toNumber()]
       vaultAmount = amount
       actions = buildInvokerActionRollup(
@@ -95,7 +95,8 @@ describe('MultiInvokerRollup', () => {
         position,
         amount,
         vaultAmount,
-        dsuFee,
+        feeAmount,
+        true,
         programs,
       )
 
@@ -109,7 +110,8 @@ describe('MultiInvokerRollup', () => {
         position.div(2),
         amount.div(2),
         vaultAmount,
-        dsuFee,
+        feeAmount,
+        false,
         programs,
       )
 
@@ -123,7 +125,8 @@ describe('MultiInvokerRollup', () => {
         position,
         utils.parseEther('2000000'),
         vaultAmount,
-        dsuFee,
+        feeAmount,
+        false,
         programs,
       )
     })
@@ -394,19 +397,19 @@ describe('MultiInvokerRollup', () => {
 
       await expect(res).to.not.be.reverted
 
-      expect(await usdc.balanceOf(vault.address)).to.eq(utils.parseEther('10').div(1e12))
+      expect(await usdc.balanceOf(vault.address)).to.eq(10e6)
     })
 
     it(`sends unwrapped USDC in CHARGE_FEE action`, async () => {
       const { user, multiInvokerRollup, usdc, dsu } = instanceVars
 
-      // set
-      await user.sendTransaction(
-        buildTransactionRequest(user, multiInvokerRollup, '0x' + actions.WRAP.payload + actions.UNWRAP.payload),
-      )
+      // // set
+      // await user.sendTransaction(
+      //   buildTransactionRequest(user, multiInvokerRollup, '0x' + actions.WRAP.payload + actions.UNWRAP.payload),
+      // )
 
       const res = user.sendTransaction(
-        buildTransactionRequest(user, multiInvokerRollup, '0x' + actions.CHARGE_FEE_UNWRAPPED.payload),
+        buildTransactionRequest(user, multiInvokerRollup, '0x' + customActions.CHARGE_FEE.payload),
       )
       // test commit
 

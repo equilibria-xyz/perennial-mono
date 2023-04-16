@@ -53,12 +53,13 @@ describe('MultiInvoker', () => {
     let product: Product
     let actions: { [action in InvokerAction]: IMultiInvoker.InvocationStruct }
     let partialActions: { [action in InvokerAction]: IMultiInvoker.InvocationStruct }
+    let actionsUnwrapped: { [action in InvokerAction]: IMultiInvoker.InvocationStruct }
     let position: BigNumber
     let amount: BigNumber
     let programs: number[]
     let vault: TestnetVault
     let vaultAmount: BigNumber
-    let dsuFEE: BigNumber
+    let feeAmount: BigNumber
 
     beforeEach(async () => {
       const { owner, user, dsu, usdc, usdcHolder, multiInvoker } = instanceVars
@@ -76,7 +77,7 @@ describe('MultiInvoker', () => {
       amount = utils.parseEther('10000')
       programs = [PROGRAM_ID.toNumber()]
       vaultAmount = amount
-      dsuFEE = utils.parseEther('10')
+      feeAmount = utils.parseEther('10')
 
       actions = buildInvokerActions({
         userAddress: user.address,
@@ -86,15 +87,29 @@ describe('MultiInvoker', () => {
         programs,
         vaultAddress: vault.address,
         vaultAmount,
-        dsuFEE: dsuFEE,
+        feeAmount: feeAmount,
+        wrappedFee: true,
       })
+
       partialActions = buildInvokerActions({
         userAddress: user.address,
         productAddress: product.address,
         position: position.div(2),
         amount: amount.div(2),
         programs,
-        dsuFEE: dsuFEE,
+        feeAmount: feeAmount,
+      })
+
+      actionsUnwrapped = buildInvokerActions({
+        userAddress: user.address,
+        productAddress: product.address,
+        position,
+        amount,
+        programs,
+        vaultAddress: vault.address,
+        vaultAmount,
+        feeAmount: feeAmount,
+        wrappedFee: false,
       })
     })
 
@@ -332,16 +347,16 @@ describe('MultiInvoker', () => {
 
       await expect(multiInvoker.connect(user).invoke([actions.WRAP, actions.CHARGE_FEE])).to.not.be.reverted
 
-      expect(await usdc.balanceOf(vault.address)).to.eq(utils.parseEther('10').div(1e12))
+      expect(await usdc.balanceOf(vault.address)).to.eq(10e6)
     })
 
     it(`sends unwrapped USDC in CHARGE_FEE action`, async () => {
       const { user, multiInvoker, usdc, dsu } = instanceVars
 
-      // set
-      await multiInvoker.connect(user).invoke([actions.WRAP, actions.UNWRAP])
+      // // set
+      // await multiInvoker.connect(user).invoke([actionsUnwrapped.WRAP, actionsUnwrapped.UNWRAP])
 
-      await expect(multiInvoker.connect(user).invoke([actions.CHARGE_FEE_UNWRAPPED])).to.not.be.reverted
+      await expect(multiInvoker.connect(user).invoke([actionsUnwrapped.CHARGE_FEE])).to.not.be.reverted
 
       expect(await dsu.balanceOf(vault.address)).to.eq(utils.parseEther('10'))
     })

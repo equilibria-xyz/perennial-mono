@@ -20,7 +20,6 @@ export type InvokerAction =
   | 'VAULT_CLAIM'
   | 'VAULT_WRAP_AND_DEPOSIT'
   | 'CHARGE_FEE'
-  | 'CHARGE_FEE_UNWRAPPED'
 
 export const buildInvokerActions = ({
   userAddress,
@@ -30,7 +29,8 @@ export const buildInvokerActions = ({
   programs,
   vaultAddress = constants.AddressZero,
   vaultAmount = 0,
-  dsuFEE,
+  feeAmount,
+  wrappedFee,
 }: {
   userAddress: string
   productAddress: string
@@ -39,7 +39,8 @@ export const buildInvokerActions = ({
   programs: number[]
   vaultAddress?: string
   vaultAmount?: BigNumberish
-  dsuFEE?: BigNumberish
+  feeAmount?: BigNumberish
+  wrappedFee?: boolean
 }): { [action in InvokerAction]: IMultiInvoker.InvocationStruct } => {
   return {
     NOOP: {
@@ -108,11 +109,7 @@ export const buildInvokerActions = ({
     },
     CHARGE_FEE: {
       action: 16,
-      args: utils.defaultAbiCoder.encode(['address', 'uint', 'bool'], [vaultAddress, dsuFEE, true]),
-    },
-    CHARGE_FEE_UNWRAPPED: {
-      action: 16,
-      args: utils.defaultAbiCoder.encode(['address', 'uint', 'bool'], [vaultAddress, dsuFEE, false]),
+      args: utils.defaultAbiCoder.encode(['address', 'uint', 'bool'], [vaultAddress, feeAmount, wrappedFee]),
     },
   }
 }
@@ -156,7 +153,8 @@ export const buildInvokerActionRollup = (
   position?: BigNumberish,
   amount?: BigNumberish,
   vaultAmount?: BigNumberish,
-  dsuFEE?: BigNumberish,
+  feeAmount?: BigNumberish,
+  wrappedFee?: boolean,
   programs?: number[],
 ): { [action in InvokerAction]: { action: BigNumberish; payload: string } } => {
   return {
@@ -262,11 +260,11 @@ export const buildInvokerActionRollup = (
     },
     CHARGE_FEE: {
       action: 16,
-      payload: `10` + encodeAddressOrCacheIndex(vaultCache, vaultAddress) + encodeUint(BigNumber.from(dsuFEE)) + `01`,
-    },
-    CHARGE_FEE_UNWRAPPED: {
-      action: 16,
-      payload: `10` + encodeAddressOrCacheIndex(vaultCache, vaultAddress) + encodeUint(BigNumber.from(dsuFEE)) + `00`,
+      payload:
+        `10` +
+        encodeAddressOrCacheIndex(vaultCache, vaultAddress) +
+        encodeUint(BigNumber.from(feeAmount)) +
+        (wrappedFee ? `01` : `00`),
     },
   }
 }

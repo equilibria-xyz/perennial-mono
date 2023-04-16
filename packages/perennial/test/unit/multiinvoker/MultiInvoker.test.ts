@@ -116,7 +116,7 @@ describe('MultiInvoker', () => {
     let actions: { [action in InvokerAction]: IMultiInvoker.InvocationStruct }
     const amount = utils.parseEther('100')
     const usdcAmount = 100e6
-    const dsuFEE = utils.parseEther('10')
+    const feeAmount = utils.parseEther('10')
     const position = utils.parseEther('12')
     const programs = [1, 2, 3]
     const vaultAmount = utils.parseEther('567')
@@ -131,7 +131,7 @@ describe('MultiInvoker', () => {
         programs,
         vaultAddress: vault.address,
         vaultAmount,
-        dsuFEE: dsuFEE,
+        feeAmount: feeAmount,
       })
       dsu.transferFrom.whenCalledWith(user.address, multiInvoker.address, amount).returns(true)
       usdc.transferFrom.whenCalledWith(user.address, multiInvoker.address, usdcAmount).returns(true)
@@ -394,7 +394,7 @@ describe('MultiInvoker', () => {
       let actions: { [action in InvokerAction]: IMultiInvoker.InvocationStruct }
       const amount = utils.parseEther('100')
       const usdcAmount = 100e6
-      const dsuFEE = utils.parseEther('10')
+      const feeAmount = utils.parseEther('10')
       const position = utils.parseEther('12')
       const programs = [1, 2, 3]
 
@@ -405,7 +405,7 @@ describe('MultiInvoker', () => {
           position,
           amount,
           programs,
-          dsuFEE: dsuFEE,
+          feeAmount: feeAmount,
         })
         dsu.transferFrom.whenCalledWith(user.address, multiInvoker.address, amount).returns(true)
         usdc.transferFrom.whenCalledWith(user.address, multiInvoker.address, usdcAmount).returns(true)
