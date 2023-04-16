@@ -27,7 +27,7 @@ use(smock.matchers)
 
 const DSU_MINTER = '0xD05aCe63789cCb35B9cE71d01e4d632a0486Da4B'
 
-describe.only('BalancedVault (Multi-Payoff)', () => {
+describe('BalancedVault (Multi-Payoff)', () => {
   let vault: BalancedVault
   let asset: IERC20Metadata
   let oracle: FakeContract<IOracleProvider>
@@ -662,7 +662,7 @@ describe.only('BalancedVault (Multi-Payoff)', () => {
       expect(await vault.totalUnclaimed()).to.equal(0)
     })
 
-    it.only('oracles offset during pending', async () => {
+    it('oracles offset during pending', async () => {
       expect(await vault.convertToAssets(utils.parseEther('1'))).to.equal(utils.parseEther('1'))
       expect(await vault.convertToShares(utils.parseEther('1'))).to.equal(utils.parseEther('1'))
 

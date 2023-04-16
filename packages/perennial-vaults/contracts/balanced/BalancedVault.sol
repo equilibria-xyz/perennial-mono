@@ -68,20 +68,19 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
     /// @dev Per-asset accounting state variables (reserve space for maximum 50 assets due to storage pattern)
     MarketAccount[50] private _marketAccounts;
 
-    //TODO: natspec
-    /// @dev Deposits that have not been settled, or have been settled but not yet processed by this contract
+    /// @dev Deposits that are queued for the following epoch due to the current epoch being stale
     UFixed18 private _pendingDeposit;
 
-    /// @dev Redemptions that have not been settled, or have been settled but not yet processed by this contract
+    /// @dev Redemptions that are queued for the following epoch due to the current epoch being stale
     UFixed18 private _pendingRedemption;
 
-    /// @dev Mapping of pending (not yet converted to shares) per user
+    /// @dev Mapping of queued deposits (due to stale epoch) per user
     mapping(address => UFixed18) private _pendingDeposits;
 
-    /// @dev Mapping of pending (not yet withdrawn) per user
+    /// @dev Mapping of queued redemptions (due to stale epoch) per user
     mapping(address => UFixed18) private _pendingRedemptions;
 
-    /// @dev Mapping of the latest epoch that a pending deposit or redemption has been placed per user
+    /// @dev Mapping of the latest epoch for any queued deposit / redemption per user
     mapping(address => uint256) private _pendingEpochs;
 
     constructor(
@@ -117,13 +116,17 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
 
     /**
      * @notice Rebalances the collateral and position of the vault without a deposit or withdraw
-     * @dev Should be called by a keeper when the vault approaches a liquidation state on either side
+     * @dev Should be called by a keeper when a new epoch is available, and there are pending deposits / redemptions
      */
     function sync() external {
         syncAccount(address(0));
     }
 
-    //TODO: natspec
+    /**
+     * @notice Syncs `account`'s state up to current
+     * @dev Also rebalances the collateral and position of the vault without a deposit or withdraw
+     * @param account The account that should be synced
+     */
     function syncAccount(address account) public {
         (EpochContext memory context, ) = _settle(account);
         _rebalance(context, UFixed18Lib.ZERO);

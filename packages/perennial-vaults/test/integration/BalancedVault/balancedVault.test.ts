@@ -24,10 +24,6 @@ use(smock.matchers)
 
 const DSU_HOLDER = '0xaef566ca7e84d1e736f999765a804687f39d9094'
 
-//TODO: add test for >=taker limitation
-//TODO: add multi-asset tests
-//TODO: add upgrade storage test
-
 describe('BalancedVault', () => {
   let vault: BalancedVault
   let asset: IERC20Metadata
