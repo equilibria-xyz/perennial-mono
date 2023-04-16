@@ -202,12 +202,18 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
         if (result == address(0)) revert MultiInvokerRollupAddressIndexOutOfBoundsError();
     }
 
-    function _readBool(bytes calldata input, PTR memory ptr) private pure returns (bool) {
+    /**
+     * @notice Helper function to get bool from calldata
+     * @param input Full calldata payload
+     * @param ptr Current index of input to start decoding
+     * @return result The decoded bool
+     */
+    function _readBool(bytes calldata input, PTR memory ptr) private pure returns (bool result) {
         uint8 dir = _readUint8(input, ptr);
         if (dir > 0) {
-            return true;
+            result = true;
         } else {
-            return false;
+            result = false;
         }
     }
 
@@ -215,7 +221,7 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
      * @notice Wraps next length of bytes as UFixed18
      * @param input Full calldata payload
      * @param ptr Current index of input to start decoding
-     * @param ptr Current index of input to start decoding
+     * @return result The decoded UFixed18
      */
      function _readUFixed18(bytes calldata input, PTR memory ptr) private pure returns (UFixed18 result) {
         return UFixed18.wrap(_readUint256(input, ptr));
