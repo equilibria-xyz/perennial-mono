@@ -11,7 +11,7 @@ import {
 } from '../../../types/generated'
 import { IMultiInvokerRollup } from '../../../types/generated/contracts/interfaces/IMultiInvokerRollup'
 import { buildInvokerActions, InvokerAction, buildInvokerActionRollup, buildAllActionsRollup } from '../../util'
-// test commit
+
 import {
   InstanceVars,
   deployProtocol,
