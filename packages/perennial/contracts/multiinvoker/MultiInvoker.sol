@@ -381,7 +381,7 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
             USDC.pullTo(msg.sender, receiver, amount);
         } else {
             USDC.pull(msg.sender, amount);
-            _wrap(receiver, amount);
+            _handleWrap(receiver, amount);
             DSU.push(receiver);
         }
     }
