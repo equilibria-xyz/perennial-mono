@@ -310,7 +310,7 @@ describe('MultiInvoker', () => {
 
     it('performs a multi invoke', async () => {
       // do not attemp to chage fee in unit tests
-      const actionsLessChargeFee = Object.values(actions).slice(0, -2)
+      const actionsLessChargeFee = Object.values(actions).slice(0, -1)
 
       await expect(multiInvoker.connect(user).invoke(actionsLessChargeFee)).to.not.be.reverted
 
