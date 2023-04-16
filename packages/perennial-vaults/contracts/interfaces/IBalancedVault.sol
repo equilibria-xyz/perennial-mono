@@ -26,7 +26,7 @@ interface IBalancedVault is IBalancedVaultDefinition {
     struct MarketAccount {
         mapping(uint256 => MarketEpoch) epochs;
         mapping(uint256 => uint256) versionOf;
-        uint256[20] __gap;
+        uint256[50] __reserved__;
     }
 
     event Mint(address indexed account, UFixed18 amount);

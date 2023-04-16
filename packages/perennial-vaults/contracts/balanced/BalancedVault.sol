@@ -65,8 +65,14 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
     /// @dev Mapping of the latest epoch that a pending deposit or redemption has been placed per user
     mapping(address => uint256) private _latestEpochs;
 
-    /// @dev Per-asset accounting state variables
-    MarketAccount[100] private _marketAccounts;
+    /// @dev Per-asset accounting state variables (reserve space for maximum 50 assets due to storage pattern)
+    MarketAccount[50] private _marketAccounts;
+
+    /// @dev Deposits that have not been settled, or have been settled but not yet processed by this contract
+    UFixed18 private _pendingDeposit;
+
+    /// @dev Redemptions that have not been settled, or have been settled but not yet processed by this contract
+    UFixed18 private _pendingRedemption;
 
     constructor(
         Token18 asset_,
@@ -109,11 +115,17 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
         (EpochContext memory context, ) = _settle(account);
         if (assets.gt(_maxDepositAtEpoch(context))) revert BalancedVaultDepositLimitExceeded();
 
-        _deposit = _deposit.add(assets);
-        _latestEpoch = context.epoch;
-        _deposits[account] = _deposits[account].add(assets);
-        _latestEpochs[account] = context.epoch;
-        emit Deposit(msg.sender, account, context.epoch, assets);
+        if (currentEpochStale()) {
+            _pendingDeposit = _pendingDeposit.add(assets);
+            _deposits[account] = _deposits[account].add(assets);
+            _latestEpochs[account] = context.epoch + 1;
+            emit Deposit(msg.sender, account, context.epoch, assets);
+        } else {
+            _deposit = _deposit.add(assets);
+            _deposits[account] = _deposits[account].add(assets);
+            _latestEpochs[account] = context.epoch;
+            emit Deposit(msg.sender, account, context.epoch, assets);
+        }
 
         asset.pull(msg.sender, assets);
 
@@ -133,11 +145,17 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
         (EpochContext memory context, EpochContext memory accountContext) = _settle(account);
         if (shares.gt(_maxRedeemAtEpoch(context, accountContext, account))) revert BalancedVaultRedemptionLimitExceeded();
 
-        _redemption = _redemption.add(shares);
-        _latestEpoch = context.epoch;
-        _redemptions[account] = _redemptions[account].add(shares);
-        _latestEpochs[account] = context.epoch;
-        emit Redemption(msg.sender, account, context.epoch, shares);
+        if (currentEpochStale()) {
+            _pendingRedemption = _pendingRedemption.add(shares);
+            _redemptions[account] = _redemptions[account].add(shares);
+            _latestEpochs[account] = context.epoch + 1;
+            emit Redemption(msg.sender, account, context.epoch, shares);
+        } else {
+            _redemption = _redemption.add(shares);
+            _redemptions[account] = _redemptions[account].add(shares);
+            _latestEpochs[account] = context.epoch;
+            emit Redemption(msg.sender, account, context.epoch, shares);
+        }
 
         _burn(account, shares);
 
@@ -272,6 +290,36 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
     }
 
     /**
+     * @notice Returns the whether the current epoch is currently complete
+     * @dev An epoch is "complete" when all of the underlying oracles have advanced a version
+     * @return Whether the current epoch is complete
+     */
+    function currentEpochComplete() public view returns (bool) {
+        for (uint256 marketId; marketId < totalMarkets; marketId++) {
+            if (
+                Math.min(markets(marketId).long.latestVersion(), markets(marketId).short.latestVersion()) ==
+                _versionAtEpoch(marketId, _latestEpoch)
+            ) return false;
+        }
+        return true;
+    }
+
+    /**
+     * @notice Returns the whether the current epoch is currently stale
+     * @dev An epoch is "stale" when any one of the underlying oracles have advanced a version
+     * @return Whether the current epoch is stale
+     */
+    function currentEpochStale() public view returns (bool) {
+        for (uint256 marketId; marketId < totalMarkets; marketId++) {
+            if (
+                Math.max(markets(marketId).long.latestVersion(), markets(marketId).short.latestVersion()) >
+                _versionAtEpoch(marketId, _latestEpoch)
+            ) return true;
+        }
+        return false;
+    }
+
+    /**
      * @notice Hook that is called before every stateful operation
      * @dev Settles the vault's account on both the long and short product, along with any global or user-specific deposits/redemptions
      * @param account The account that called the operation, or 0 if called by a keeper.
@@ -284,8 +332,10 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
         if (context.epoch > _latestEpoch) {
             _delayedMint(_totalSupplyAtEpoch(context).sub(_totalSupply));
             _totalUnclaimed = _totalUnclaimedAtEpoch(context);
-            _deposit = UFixed18Lib.ZERO;
-            _redemption = UFixed18Lib.ZERO;
+            _deposit = _pendingDeposit;
+            _redemption = _pendingRedemption;
+            _pendingDeposit = UFixed18Lib.ZERO;
+            _pendingRedemption = UFixed18Lib.ZERO;
             _latestEpoch = context.epoch;
 
             for (uint256 marketId; marketId < totalMarkets; marketId++) {
@@ -483,25 +533,11 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
      * @return account epoch context
      */
     function _loadContextForRead(address account) private view returns (EpochContext memory, EpochContext memory) {
-        uint256 _currentEpoch = currentEpoch();
+        uint256 _currentEpoch = currentEpochComplete() ? _latestEpoch + 1 : _latestEpoch;
         return (
             EpochContext(_currentEpoch, _assetsAtEpoch(_latestEpoch), _sharesAtEpoch(_latestEpoch)),
             EpochContext(_currentEpoch, _assetsAtEpoch(_latestEpochs[account]), _sharesAtEpoch(_latestEpochs[account]))
         );
-    }
-
-    /**
-     * @notice Returns the current epoch given the state of each underlying market
-     * @return The current epoch
-     */
-    function currentEpoch() public view returns (uint256) {
-        for (uint256 marketId; marketId < totalMarkets; marketId++) {
-            if (
-                Math.min(markets(marketId).long.latestVersion(), markets(marketId).short.latestVersion()) ==
-                _versionAtEpoch(marketId, _latestEpoch)
-            ) return _latestEpoch;
-        }
-        return _latestEpoch + 1;
     }
 
     /**
