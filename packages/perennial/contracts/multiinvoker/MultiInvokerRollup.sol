@@ -77,7 +77,7 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
      */
     function _decodeFallbackAndInvoke(bytes calldata input) internal {
         PTR memory ptr;
-    
+
         while (ptr.pos < input.length) {
             uint8 action = _readUint8(input, ptr);
 
@@ -99,7 +99,7 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
                 (address product, UFixed18 amount) = (_readAndCacheAddress(input, ptr), _readUFixed18(input, ptr));
                 _closeTake(IProduct(product), amount);
 
-            } else if (action == 5) { // OPEN_MAKE 
+            } else if (action == 5) { // OPEN_MAKE
                 (address product, UFixed18 amount) = (_readAndCacheAddress(input, ptr), _readUFixed18(input, ptr));
                 _openMake(IProduct(product), amount);
 
@@ -107,12 +107,12 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
                 (address product, UFixed18 amount) = (_readAndCacheAddress(input, ptr), _readUFixed18(input, ptr));
                 _closeMake(IProduct(product), amount);
 
-            } else if (action == 7) { // CLAIM 
-                (address product, uint256[] memory programIds) = 
+            } else if (action == 7) { // CLAIM
+                (address product, uint256[] memory programIds) =
                     (_readAndCacheAddress(input, ptr), _readUint256Array(input, ptr));
                 _claim(IProduct(product), programIds);
 
-            } else if (action == 8) { // WRAP 
+            } else if (action == 8) { // WRAP
                 (address receiver, UFixed18 amount) = (_readAndCacheAddress(input, ptr), _readUFixed18(input, ptr));
                 _wrap(receiver, amount);
 
@@ -121,7 +121,7 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
                 _unwrap(receiver, amount);
 
             } else if (action == 10) { // WRAP_AND_DEPOSIT
-                (address account, address product, UFixed18 amount) = 
+                (address account, address product, UFixed18 amount) =
                     (_readAndCacheAddress(input, ptr), _readAndCacheAddress(input, ptr), _readUFixed18(input, ptr));
                 _wrapAndDeposit(account, IProduct(product), amount);
 
@@ -143,14 +143,13 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
                 (address owner, address vault) = (_readAndCacheAddress(input, ptr), _readAndCacheAddress(input, ptr));
                 _vaultClaim(IPerennialVault(vault), owner);
 
-            } else if (action == 15) { // VAULT_WRAP_AND_DEPOSIT 
+            } else if (action == 15) { // VAULT_WRAP_AND_DEPOSIT
                 (address account, address vault, UFixed18 amount) =
                     (_readAndCacheAddress(input, ptr), _readAndCacheAddress(input, ptr), _readUFixed18(input, ptr));
                 _vaultWrapAndDeposit(account, IPerennialVault(vault), amount);
             } else if (action == 16) { // CHARGE_FEE
-                (address _interface, UFixed18 amount, bool wrapped) = 
+                (address _interface, UFixed18 amount, bool wrapped) =
                     (_readAndCacheAddress(input, ptr), _readUFixed18(input, ptr), _readBool(input, ptr));
-                
                 _chargeFee(_interface, amount, wrapped);
             }
         }
@@ -223,7 +222,7 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
      * @param ptr Current index of input to start decoding
      * @return result The decoded UFixed18
      */
-     function _readUFixed18(bytes calldata input, PTR memory ptr) private pure returns (UFixed18 result) {
+    function _readUFixed18(bytes calldata input, PTR memory ptr) private pure returns (UFixed18 result) {
         return UFixed18.wrap(_readUint256(input, ptr));
     }
 
@@ -279,7 +278,7 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
     }
 
     /**
-     * @dev This is called in decodeAccount and decodeProduct which both only pass 20 byte slices 
+     * @dev This is called in decodeAccount and decodeProduct which both only pass 20 byte slices
      * @notice Unchecked force of 20 bytes into address
      * @param input The 20 bytes to be converted to address
      * @return result Address representation of `input`
@@ -289,8 +288,8 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
             result := mload(add(input, ADDRESS_LENGTH))
         }
     }
-    
-    /** 
+
+    /**
      * @notice Unchecked loads arbitrarily-sized bytes into a uint
      * @dev Bytes length enforced as < max word size
      * @param input The bytes to convert to uint256
