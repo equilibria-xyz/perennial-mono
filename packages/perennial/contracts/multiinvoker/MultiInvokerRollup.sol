@@ -148,9 +148,9 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
                     (_readAndCacheAddress(input, ptr), _readAndCacheAddress(input, ptr), _readUFixed18(input, ptr));
                 _vaultWrapAndDeposit(account, IPerennialVault(vault), amount);
             } else if (action == 16) { // CHARGE_FEE
-                (address _interface, UFixed18 amount, bool wrapped) =
+                (address receiver, UFixed18 amount, bool wrapped) =
                     (_readAndCacheAddress(input, ptr), _readUFixed18(input, ptr), _readBool(input, ptr));
-                _chargeFee(_interface, amount, wrapped);
+                _chargeFee(receiver, amount, wrapped);
             }
         }
     }
@@ -209,11 +209,7 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
      */
     function _readBool(bytes calldata input, PTR memory ptr) private pure returns (bool result) {
         uint8 dir = _readUint8(input, ptr);
-        if (dir > 0) {
-            result = true;
-        } else {
-            result = false;
-        }
+        result = dir > 0;
     }
 
     /**
