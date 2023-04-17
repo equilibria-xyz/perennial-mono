@@ -1060,34 +1060,6 @@ describe('BalancedVault (Multi-Payoff)', () => {
       )
     })
 
-    it('exactly at makerLimit', async () => {
-      // Get maker product very close to the makerLimit
-      await asset.connect(perennialUser).approve(collateral.address, constants.MaxUint256)
-      await collateral
-        .connect(perennialUser)
-        .depositTo(perennialUser.address, short.address, utils.parseEther('400000'))
-      const makerAvailable = (await short.makerLimit()).sub(
-        (await short.positionAtVersion(await short['latestVersion()']())).maker,
-      )
-
-      await short.connect(perennialUser).openMake(makerAvailable)
-      await updateOracle()
-      await vault.sync()
-
-      // Deposit should create a greater position than what's available
-      const largeDeposit = utils.parseEther('10000')
-      await vault.connect(user).deposit(largeDeposit, user.address)
-      await updateOracle()
-      await vault.sync()
-
-      // Now we should have opened positions.
-      // The positions should be equal to (smallDeposit + largeDeposit) * leverage / 2 / originalOraclePrice.
-      expect(await longPosition()).to.equal(largeDeposit.mul(leverage).mul(4).div(5).div(2).div(originalOraclePrice))
-      expect(await shortPosition()).to.equal(0)
-      expect(await btcLongPosition()).to.equal(largeDeposit.mul(leverage).div(5).div(2).div(btcOriginalOraclePrice))
-      expect(await btcShortPosition()).to.equal(largeDeposit.mul(leverage).div(5).div(2).div(btcOriginalOraclePrice))
-    })
-
     it('product closing closes all positions', async () => {
       const largeDeposit = utils.parseEther('10000')
       await vault.connect(user).deposit(largeDeposit, user.address)

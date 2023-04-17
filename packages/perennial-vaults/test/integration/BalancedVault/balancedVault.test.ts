@@ -22,7 +22,7 @@ import { BigNumber, constants, utils } from 'ethers'
 const { config, ethers } = HRE
 use(smock.matchers)
 
-const DSU_HOLDER = '0xaef566ca7e84d1e736f999765a804687f39d9094'
+const DSU_MINTER = '0xD05aCe63789cCb35B9cE71d01e4d632a0486Da4B'
 
 describe('BalancedVault', () => {
   let vault: BalancedVault
@@ -105,14 +105,23 @@ describe('BalancedVault', () => {
     await vault.initialize('Perennial Vault Alpha')
     asset = IERC20Metadata__factory.connect(await vault.asset(), owner)
 
-    const dsuHolder = await impersonate.impersonateWithBalance(DSU_HOLDER, utils.parseEther('10'))
+    const dsuMinter = await impersonate.impersonateWithBalance(DSU_MINTER, utils.parseEther('10'))
     const setUpWalletWithDSU = async (wallet: SignerWithAddress) => {
-      await dsu.connect(dsuHolder).transfer(wallet.address, utils.parseEther('200000'))
+      const dsuIface = new utils.Interface(['function mint(uint256)'])
+      await dsuMinter.sendTransaction({
+        to: dsu.address,
+        value: 0,
+        data: dsuIface.encodeFunctionData('mint', [utils.parseEther('200000')]),
+      })
+      await dsu.connect(dsuMinter).transfer(wallet.address, utils.parseEther('200000'))
       await dsu.connect(wallet).approve(vault.address, ethers.constants.MaxUint256)
     }
     await setUpWalletWithDSU(user)
     await setUpWalletWithDSU(user2)
     await setUpWalletWithDSU(liquidator)
+    await setUpWalletWithDSU(perennialUser)
+    await setUpWalletWithDSU(perennialUser)
+    await setUpWalletWithDSU(perennialUser)
     await setUpWalletWithDSU(perennialUser)
     await setUpWalletWithDSU(perennialUser)
 
@@ -602,6 +611,34 @@ describe('BalancedVault', () => {
       // The positions should be equal to (smallDeposit + largeDeposit) * leverage / 2 / originalOraclePrice.
       expect(await longPosition()).to.equal(largeDeposit.mul(leverage).div(2).div(originalOraclePrice))
       expect(await shortPosition()).to.equal(0)
+    })
+
+    it('close to taker', async () => {
+      // Deposit should create a greater position than what's available
+      const largeDeposit = utils.parseEther('10000')
+      await vault.connect(user).deposit(largeDeposit, user.address)
+      await updateOracle()
+      await vault.sync()
+
+      // Get taker product very close to the maker
+      await asset.connect(perennialUser).approve(collateral.address, constants.MaxUint256)
+      await collateral
+        .connect(perennialUser)
+        .depositTo(perennialUser.address, short.address, utils.parseEther('1000000'))
+      await short.connect(perennialUser).openTake(utils.parseEther('1280'))
+      await updateOracle()
+      await vault.sync()
+
+      // Redeem should create a greater position delta than what's available
+      await vault.connect(user).redeem(utils.parseEther('5000'), user.address)
+      await updateOracle()
+      await vault.sync()
+
+      const takerMinimum = BigNumber.from('6692251470872433151')
+      expect(await shortPosition()).to.equal(takerMinimum)
+      expect((await short.positionAtVersion(await short['latestVersion()']()))[0]).to.equal(
+        (await short.positionAtVersion(await short['latestVersion()']()))[1],
+      )
     })
 
     it('product closing closes all positions', async () => {
