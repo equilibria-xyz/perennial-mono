@@ -152,6 +152,12 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
                 (address account, IPerennialVault vault, UFixed18 amount) = abi.decode(invocation.args, (address, IPerennialVault, UFixed18));
                 _vaultWrapAndDeposit(account, vault, amount);
             }
+
+            else if (invocation.action == PerennialAction.CHARGE_FEE) {
+                (address receiver, UFixed18 amount, bool wrapped) = abi.decode(invocation.args, (address, UFixed18, bool));
+
+                _chargeFee(receiver, amount, wrapped);
+            }
         }
     }
 
@@ -361,6 +367,21 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
         } else {
             // Unwrap the DSU into USDC and return to the receiver
             batcher.unwrap(amount, receiver);
+        }
+    }
+
+    /**
+     * @notice Helper function to include an interface fee 
+     * @param receiver The interface receiving the fee
+     * @param amount The amount of DSU to credit the interface
+     * @param wrapped Bool to specify is USDC is wrapped to DSU 
+     */
+    function _chargeFee(address receiver, UFixed18 amount, bool wrapped) internal {
+        if (wrapped) {
+            USDC.pull(msg.sender, amount);
+            _handleWrap(receiver, amount);
+        } else {
+            USDC.pullTo(msg.sender, receiver, amount);
         }
     }
 }

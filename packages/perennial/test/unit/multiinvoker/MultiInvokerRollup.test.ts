@@ -112,6 +112,7 @@ describe('MultiInvokerRollup', () => {
     let actions: { [action in InvokerAction]: { action: BigNumberish; payload: string } }
     let zeroAction: { [action in InvokerAction]: { action: BigNumberish; payload: string } }
     const amount = utils.parseEther('100')
+    const feeAmount = utils.parseEther('10')
     const usdcAmount = 100e6
     const position = utils.parseEther('12')
     const programs = [1, 2, 3]
@@ -129,6 +130,8 @@ describe('MultiInvokerRollup', () => {
         position,
         amount,
         vaultAmount,
+        feeAmount,
+        false,
         programs,
       )
 
@@ -142,6 +145,8 @@ describe('MultiInvokerRollup', () => {
         position,
         0,
         vaultAmount,
+        feeAmount,
+        false,
         programs,
       )
 
@@ -162,6 +167,7 @@ describe('MultiInvokerRollup', () => {
 
     it('reverts with custom errors with bad calldata', async () => {
       // store product in cache
+
       await expect(
         user.sendTransaction(
           buildTransactionRequest(user, multiInvokerRollup, '0x' + actions.WRAP_AND_DEPOSIT.payload),
@@ -393,8 +399,11 @@ describe('MultiInvokerRollup', () => {
     })
 
     it('performs a multi invoke', async () => {
+      // do not attempt charge fee in unit tests
+      const actionsLessChargeFee = Object.values(actions).slice(0, -1)
+
       const res = user.sendTransaction(
-        buildTransactionRequest(user, multiInvokerRollup, buildAllActionsRollup(Object.values(actions))),
+        buildTransactionRequest(user, multiInvokerRollup, buildAllActionsRollup(actionsLessChargeFee)),
       )
 
       await expect(res).to.not.be.reverted
@@ -481,6 +490,7 @@ describe('MultiInvokerRollup', () => {
       const usdcAmount = 100e6
       const position = utils.parseEther('12')
       const VaultAmount = utils.parseEther('567')
+      const feeAmount = utils.parseEther('10')
       const programs = [1, 2, 3]
 
       beforeEach(() => {
@@ -494,6 +504,8 @@ describe('MultiInvokerRollup', () => {
           position,
           amount,
           VaultAmount,
+          feeAmount,
+          false,
           programs,
         )
         dsu.transferFrom.whenCalledWith(user.address, multiInvokerRollup.address, amount).returns(true)
@@ -558,6 +570,7 @@ describe('MultiInvokerRollup', () => {
       const usdcAmount = 100e6
       const position = utils.parseEther('12')
       const VaultAmount = utils.parseEther('567')
+      const feeAmount = utils.parseEther('10')
       const programs = [1, 2, 3]
 
       beforeEach(() => {
@@ -571,6 +584,8 @@ describe('MultiInvokerRollup', () => {
           position,
           amount,
           VaultAmount,
+          feeAmount,
+          false,
           programs,
         )
         actionsCached = buildInvokerActionRollup(
@@ -583,6 +598,8 @@ describe('MultiInvokerRollup', () => {
           position,
           amount,
           VaultAmount,
+          feeAmount,
+          false,
           programs,
         )
 

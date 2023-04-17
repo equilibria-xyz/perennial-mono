@@ -19,6 +19,7 @@ export type InvokerAction =
   | 'VAULT_REDEEM'
   | 'VAULT_CLAIM'
   | 'VAULT_WRAP_AND_DEPOSIT'
+  | 'CHARGE_FEE'
 
 export const buildInvokerActions = ({
   userAddress,
@@ -28,6 +29,8 @@ export const buildInvokerActions = ({
   programs,
   vaultAddress = constants.AddressZero,
   vaultAmount = 0,
+  feeAmount,
+  wrappedFee,
 }: {
   userAddress: string
   productAddress: string
@@ -36,6 +39,8 @@ export const buildInvokerActions = ({
   programs: number[]
   vaultAddress?: string
   vaultAmount?: BigNumberish
+  feeAmount?: BigNumberish
+  wrappedFee?: boolean
 }): { [action in InvokerAction]: IMultiInvoker.InvocationStruct } => {
   return {
     NOOP: {
@@ -102,6 +107,10 @@ export const buildInvokerActions = ({
       action: 15,
       args: utils.defaultAbiCoder.encode(['address', 'address', 'uint'], [userAddress, vaultAddress, vaultAmount]),
     },
+    CHARGE_FEE: {
+      action: 16,
+      args: utils.defaultAbiCoder.encode(['address', 'uint', 'bool'], [vaultAddress, feeAmount, wrappedFee]),
+    },
   }
 }
 
@@ -144,6 +153,8 @@ export const buildInvokerActionRollup = (
   position?: BigNumberish,
   amount?: BigNumberish,
   vaultAmount?: BigNumberish,
+  feeAmount?: BigNumberish,
+  wrappedFee?: boolean,
   programs?: number[],
 ): { [action in InvokerAction]: { action: BigNumberish; payload: string } } => {
   return {
@@ -246,6 +257,14 @@ export const buildInvokerActionRollup = (
         encodeAddressOrCacheIndex(userCache, userAddress) +
         encodeAddressOrCacheIndex(vaultCache, vaultAddress) +
         encodeUint(BigNumber.from(vaultAmount)),
+    },
+    CHARGE_FEE: {
+      action: 16,
+      payload:
+        `10` +
+        encodeAddressOrCacheIndex(vaultCache, vaultAddress) +
+        encodeUint(BigNumber.from(feeAmount)) +
+        (wrappedFee ? `01` : `00`),
     },
   }
 }

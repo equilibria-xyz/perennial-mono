@@ -16,7 +16,7 @@ import {
   IBatcher,
   TestnetVault,
 } from '../../../types/generated'
-import { IMultiInvoker } from '../../../types/generated/contracts/interfaces/IMultiInvoker'
+import { IMultiInvoker } from '../../../types/generated/contracts/interfaces/IMultiInvoker.sol/IMultiInvoker'
 import { InvokerAction, buildInvokerActions } from '../../util'
 import { loadFixture } from '@nomicfoundation/hardhat-network-helpers'
 
@@ -116,6 +116,7 @@ describe('MultiInvoker', () => {
     let actions: { [action in InvokerAction]: IMultiInvoker.InvocationStruct }
     const amount = utils.parseEther('100')
     const usdcAmount = 100e6
+    const feeAmount = utils.parseEther('10')
     const position = utils.parseEther('12')
     const programs = [1, 2, 3]
     const vaultAmount = utils.parseEther('567')
@@ -130,6 +131,7 @@ describe('MultiInvoker', () => {
         programs,
         vaultAddress: vault.address,
         vaultAmount,
+        feeAmount: feeAmount,
       })
       dsu.transferFrom.whenCalledWith(user.address, multiInvoker.address, amount).returns(true)
       usdc.transferFrom.whenCalledWith(user.address, multiInvoker.address, usdcAmount).returns(true)
@@ -307,7 +309,10 @@ describe('MultiInvoker', () => {
     })
 
     it('performs a multi invoke', async () => {
-      await expect(multiInvoker.connect(user).invoke(Object.values(actions))).to.not.be.reverted
+      // do not attemp to chage fee in unit tests
+      const actionsLessChargeFee = Object.values(actions).slice(0, -1)
+
+      await expect(multiInvoker.connect(user).invoke(actionsLessChargeFee)).to.not.be.reverted
 
       // Deposit/Withdraw
       expect(collateral.depositTo).to.have.been.calledWith(user.address, product.address, amount)
@@ -389,6 +394,7 @@ describe('MultiInvoker', () => {
       let actions: { [action in InvokerAction]: IMultiInvoker.InvocationStruct }
       const amount = utils.parseEther('100')
       const usdcAmount = 100e6
+      const feeAmount = utils.parseEther('10')
       const position = utils.parseEther('12')
       const programs = [1, 2, 3]
 
@@ -399,6 +405,7 @@ describe('MultiInvoker', () => {
           position,
           amount,
           programs,
+          feeAmount: feeAmount,
         })
         dsu.transferFrom.whenCalledWith(user.address, multiInvoker.address, amount).returns(true)
         usdc.transferFrom.whenCalledWith(user.address, multiInvoker.address, usdcAmount).returns(true)
