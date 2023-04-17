@@ -2,8 +2,14 @@ import { HardhatRuntimeEnvironment } from 'hardhat/types'
 import { DeployFunction } from 'hardhat-deploy/types'
 import { Deployment } from 'hardhat-deploy/dist/types'
 import { getMultisigAddress } from '../../common/testutil/constants'
-import { Controller__factory, IERC20__factory, MultiInvoker__factory } from '../types/generated'
+import {
+  Controller__factory,
+  IERC20__factory,
+  MultiInvokerRollup__factory,
+  MultiInvoker__factory,
+} from '../types/generated'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
+import { isRollup } from '../../common/testutil/network'
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployments, getNamedAccounts, ethers } = hre
@@ -34,8 +40,11 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const usdc = await IERC20__factory.connect(usdcAddress, deployerSigner)
 
+  const rollup = isRollup(networkName)
+  const contractName = rollup ? 'MultiInvokerRollup' : 'MultiInvoker'
+
   const multiInvokerImpl: Deployment = await deploy('MultiInvoker_Impl', {
-    contract: 'MultiInvoker',
+    contract: contractName,
     args: [usdcAddress, batcherAddress, reserveAddress, controllerAddress],
     from: deployer,
     skipIfAlreadyDeployed: true,
@@ -53,7 +62,16 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   })
 
   // INITIALIZE
-  const multiInvoker = await new MultiInvoker__factory(deployerSigner).attach((await get('MultiInvoker_Proxy')).address)
+  let multiInvoker: any
+  if (!rollup) {
+    multiInvoker = await new MultiInvoker__factory(deployerSigner).attach((await get('MultiInvoker_Proxy')).address)
+  } else {
+    multiInvoker = await new MultiInvokerRollup__factory(deployerSigner).attach(
+      (
+        await get('MultiInvoker_Proxy')
+      ).address,
+    )
+  }
 
   if ((await usdc.callStatic.allowance(multiInvoker.address, reserveAddress)).eq(ethers.constants.MaxUint256)) {
     console.log('MultiInvoker already initialized.')
