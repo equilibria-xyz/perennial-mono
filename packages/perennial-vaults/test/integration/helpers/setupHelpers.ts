@@ -1,9 +1,9 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
-import { utils } from 'ethers'
+import { constants, utils } from 'ethers'
 import { createPayoffDefinition } from '../../../../common/testutil/types'
-import { ChainlinkOracle__factory, IController__factory, IProduct } from '../../../types/generated'
+import { IController__factory, IProduct, IProduct__factory } from '../../../types/generated'
 
-export interface DeployProductParams extends Partial<Omit<IProduct.ProductInfoStruct, 'payoffDefinition' | 'oracle'>> {
+export interface DeployProductParams extends Partial<Omit<IProduct.ProductInfoStruct, 'payoffDefinition'>> {
   name: string
   symbol: string
   owner: SignerWithAddress
@@ -18,8 +18,7 @@ export async function deployProductOnMainnetFork({
   name,
   symbol,
   owner,
-  baseCurrency,
-  quoteCurrency,
+  oracle,
   short,
   maintenance,
   fundingFee,
@@ -28,27 +27,23 @@ export async function deployProductOnMainnetFork({
   positionFee,
   makerLimit,
   utilizationCurve,
-}: DeployProductParams): Promise<string> {
-  const chainlinkFeedRegistry = '0x47Fb2585D2C56Fe188D0E6ec628a38b74fCeeeDf'
-  const oracle = await new ChainlinkOracle__factory(owner).deploy(chainlinkFeedRegistry, baseCurrency, quoteCurrency)
-
+}: DeployProductParams): Promise<IProduct> {
   const productInfo: IProduct.ProductInfoStruct = {
     name: name,
     symbol: symbol,
     payoffDefinition: createPayoffDefinition({ short: short }),
-    oracle: oracle.address,
-    maintenance: maintenance ?? utils.parseEther('0.5'),
-    fundingFee: fundingFee ?? utils.parseEther('0.10'),
+    oracle: oracle ?? constants.AddressZero,
+    maintenance: maintenance ?? utils.parseEther('0.10'),
+    fundingFee: fundingFee ?? utils.parseEther('0.00'),
     makerFee: makerFee ?? utils.parseEther('0.0'),
     takerFee: takerFee ?? utils.parseEther('0.0'),
-    positionFee: positionFee ?? utils.parseEther('0.5'),
+    positionFee: positionFee ?? utils.parseEther('0.0'),
     makerLimit: makerLimit ?? utils.parseEther('100'),
     utilizationCurve: utilizationCurve ?? {
-      // Force a 0.10 rate to make tests simpler
-      minRate: utils.parseEther('0.10'),
-      maxRate: utils.parseEther('0.10'),
-      targetRate: utils.parseEther('0.10'),
-      targetUtilization: utils.parseEther('1'),
+      minRate: utils.parseEther('0.02'),
+      maxRate: utils.parseEther('0.08'),
+      targetRate: utils.parseEther('0.80'),
+      targetUtilization: utils.parseEther('0.80'),
     },
   }
 
@@ -61,5 +56,5 @@ export async function deployProductOnMainnetFork({
   const productAddress = await controller.connect(owner).callStatic.createProduct(coordinatorId, productInfo)
   await controller.connect(owner).createProduct(coordinatorId, productInfo)
 
-  return productAddress
+  return IProduct__factory.connect(productAddress, owner)
 }

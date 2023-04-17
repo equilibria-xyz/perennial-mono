@@ -51,7 +51,7 @@
     "ethers": "^5.7.2",
     "graphql": "^16.6.0",
     "graphql-request": "^5.2.0",
-    "hardhat": "^2.12.2",
+    "hardhat": "^2.13.0",
     "hardhat-contract-sizer": "^2.4.0",
     "hardhat-dependency-compiler": "^1.1.2",
     "hardhat-deploy": "^0.11.4",
