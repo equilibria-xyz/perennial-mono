@@ -27,7 +27,7 @@ use(smock.matchers)
 
 const DSU_MINTER = '0xD05aCe63789cCb35B9cE71d01e4d632a0486Da4B'
 
-describe('BalancedVault (Multi-Payoff)', () => {
+describe.only('BalancedVault (Multi-Payoff)', () => {
   let vault: BalancedVault
   let asset: IERC20Metadata
   let oracle: FakeContract<IOracleProvider>

@@ -319,6 +319,14 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
     }
 
     /**
+     * @notice Returns the current epoch
+     * @return The current epoch
+     */
+    function currentEpoch() public view returns (uint256) {
+        return currentEpochComplete() ? _latestEpoch + 1 : _latestEpoch;
+    }
+
+    /**
      * @notice Returns the whether the current epoch is currently complete
      * @dev An epoch is "complete" when all of the underlying oracles have advanced a version
      * @return Whether the current epoch is complete
@@ -580,7 +588,7 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
      * @return account epoch context
      */
     function _loadContextForRead(address account) private view returns (EpochContext memory, EpochContext memory) {
-        uint256 _currentEpoch = currentEpochComplete() ? _latestEpoch + 1 : _latestEpoch;
+        uint256 _currentEpoch = currentEpoch();
         return (
             EpochContext(_currentEpoch, _assetsAtEpoch(_latestEpoch), _sharesAtEpoch(_latestEpoch)),
             EpochContext(_currentEpoch, _assetsAtEpoch(_latestEpochs[account]), _sharesAtEpoch(_latestEpochs[account]))

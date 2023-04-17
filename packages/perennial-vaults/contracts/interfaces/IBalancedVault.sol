@@ -45,6 +45,9 @@ interface IBalancedVault is IBalancedVaultDefinition {
     function unclaimed(address account) external view returns (UFixed18);
     function totalUnclaimed() external view returns (UFixed18);
     function claim(address account) external;
+    function currentEpoch() external view returns (uint256);
+    function currentEpochStale() external view returns (bool);
+    function currentEpochComplete() external view returns (bool);
 
     /* Partial ERC4626 Interface */
 
