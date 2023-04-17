@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity ^0.8.15;
+pragma solidity 0.8.17;
 
 import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@equilibria/root/control/unstructured/UReentrancyGuard.sol";
@@ -94,7 +94,6 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
 
         // Get settle oracle version
         uint256 _settleVersion = _position.pre.settleVersion(currentOracleVersion.version);
-        if (_settleVersion < _latestVersion) _settleVersion = currentOracleVersion.version;
         IOracleProvider.OracleVersion memory settleOracleVersion = _settleVersion == currentOracleVersion.version
             ? currentOracleVersion // if b == c, don't re-call provider for oracle version
             : atVersion(_settleVersion);
