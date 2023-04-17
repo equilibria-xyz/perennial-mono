@@ -7,19 +7,17 @@ const MINIMUM_CONTRACT_SIZE_SOLIDITY_OVERRIDES = {
   version: '0.8.17',
   settings: {
     viaIR: true,
-    optimizer: OPTIMIZER_ENABLED
-      ? {
-          enabled: true,
-          runs: 1,
-          details: {
-            yulDetails: {
-              // We checked with the Compound team to confirm that this should be safe to use to other projects
-              optimizerSteps:
-                'dhfoDgvulfnTUtnIf [xa[r]scLM cCTUtTOntnfDIul Lcul Vcul [j] Tpeul xa[rul] xa[r]cL gvif CTUca[r]LsTOtfDnca[r]Iulc] jmul[jul] VcTOcul jmul',
-            },
-          },
-        }
-      : { enabled: false },
+    optimizer: {
+      enabled: true,
+      runs: 1,
+      details: {
+        yulDetails: {
+          // We checked with the Compound team to confirm that this should be safe to use to other projects
+          optimizerSteps:
+            'dhfoDgvulfnTUtnIf [xa[r]scLM cCTUtTOntnfDIul Lcul Vcul [j] Tpeul xa[rul] xa[r]cL gvif CTUca[r]LsTOtfDnca[r]Iulc] jmul[jul] VcTOcul jmul',
+        },
+      },
+    },
     outputSelection: OPTIMIZER_ENABLED
       ? {
           '*': {
