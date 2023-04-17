@@ -378,11 +378,11 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
      */
     function _chargeFee(address receiver, UFixed18 amount, bool wrapped) internal {
         if (wrapped) {
-            USDC.pullTo(msg.sender, receiver, amount);
-        } else {
             USDC.pull(msg.sender, amount);
             _handleWrap(receiver, amount);
             DSU.push(receiver);
+        } else {
+            USDC.pullTo(msg.sender, receiver, amount);
         }
     }
 }

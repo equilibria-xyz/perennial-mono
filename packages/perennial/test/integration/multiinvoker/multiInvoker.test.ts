@@ -340,23 +340,23 @@ describe('MultiInvoker', () => {
         .withArgs(multiInvoker.address, user.address, 10000e6)
     })
 
-    it(`wraps USDC to DSU on WRAP action and invokes CHARGE_FEE to interface`, async () => {
+    it(`sends unwrapped USDC in CHARGE_FEE action`, async () => {
       const { user, multiInvoker, dsu, usdc } = instanceVars
 
       expect(await usdc.balanceOf(vault.address)).to.eq('0')
 
-      await expect(multiInvoker.connect(user).invoke([actions.WRAP, actions.CHARGE_FEE])).to.not.be.reverted
+      await expect(multiInvoker.connect(user).invoke([actions.WRAP, actionsUnwrapped.CHARGE_FEE])).to.not.be.reverted
 
       expect(await usdc.balanceOf(vault.address)).to.eq(10e6)
     })
 
-    it(`sends unwrapped USDC in CHARGE_FEE action`, async () => {
+    it(`wraps USDC to DSU on WRAP action and invokes CHARGE_FEE to interface`, async () => {
       const { user, multiInvoker, usdc, dsu } = instanceVars
 
       // // set
       // await multiInvoker.connect(user).invoke([actionsUnwrapped.WRAP, actionsUnwrapped.UNWRAP])
 
-      await expect(multiInvoker.connect(user).invoke([actionsUnwrapped.CHARGE_FEE])).to.not.be.reverted
+      await expect(multiInvoker.connect(user).invoke([actions.CHARGE_FEE])).to.not.be.reverted
 
       expect(await dsu.balanceOf(vault.address)).to.eq(utils.parseEther('10'))
     })

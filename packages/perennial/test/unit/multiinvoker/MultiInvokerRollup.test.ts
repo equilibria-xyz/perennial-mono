@@ -167,6 +167,9 @@ describe('MultiInvokerRollup', () => {
 
     it('reverts with custom errors with bad calldata', async () => {
       // store product in cache
+      console.log(actions.WRAP_AND_DEPOSIT.payload)
+      console.log(actions.UNWRAP.payload)
+
       await expect(
         user.sendTransaction(
           buildTransactionRequest(user, multiInvokerRollup, '0x' + actions.WRAP_AND_DEPOSIT.payload),

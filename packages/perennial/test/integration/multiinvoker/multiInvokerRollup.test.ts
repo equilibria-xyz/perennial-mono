@@ -386,13 +386,17 @@ describe('MultiInvokerRollup', () => {
         .withArgs(multiInvokerRollup.address, user.address, 10000e6)
     })
 
-    it(`wraps USDC to DSU on WRAP action and invokes CHARGE_FEE to interface`, async () => {
+    it(`sends unwrapped USDC in CHARGE_FEE action`, async () => {
       const { user, multiInvokerRollup, dsu, usdc } = instanceVars
 
       expect(await usdc.balanceOf(vault.address)).to.eq('0')
 
       const res = user.sendTransaction(
-        buildTransactionRequest(user, multiInvokerRollup, `0x` + actions.WRAP.payload + actions.CHARGE_FEE.payload),
+        buildTransactionRequest(
+          user,
+          multiInvokerRollup,
+          `0x` + actions.WRAP.payload + customActions.CHARGE_FEE.payload,
+        ),
       )
 
       await expect(res).to.not.be.reverted
@@ -400,18 +404,12 @@ describe('MultiInvokerRollup', () => {
       expect(await usdc.balanceOf(vault.address)).to.eq(10e6)
     })
 
-    it(`sends unwrapped USDC in CHARGE_FEE action`, async () => {
+    it(`wraps USDC to DSU on WRAP action and invokes CHARGE_FEE to interface `, async () => {
       const { user, multiInvokerRollup, usdc, dsu } = instanceVars
 
-      // // set
-      // await user.sendTransaction(
-      //   buildTransactionRequest(user, multiInvokerRollup, '0x' + actions.WRAP.payload + actions.UNWRAP.payload),
-      // )
-
       const res = user.sendTransaction(
-        buildTransactionRequest(user, multiInvokerRollup, '0x' + customActions.CHARGE_FEE.payload),
+        buildTransactionRequest(user, multiInvokerRollup, '0x' + actions.CHARGE_FEE.payload),
       )
-      // test commit
 
       await expect(res).to.not.be.reverted
       expect(await dsu.balanceOf(vault.address)).to.eq(utils.parseEther('10'))
