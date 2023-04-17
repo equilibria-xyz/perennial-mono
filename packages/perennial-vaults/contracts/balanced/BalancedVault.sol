@@ -22,6 +22,9 @@ import "./BalancedVaultDefinition.sol";
  *      In the event that there is not a settlement for a long period of time, keepers can call the `sync` method to
  *      force settlement and rebalancing. This is most useful to prevent vault liquidation due to PnL changes
  *      causing the vault to be in an unhealthy state (far away from target leverage)
+ *
+ *      This implementation is designed to be upgrade-compatible with instances of the previous single-payoff
+ *      BalancedVault, here: https://github.com/equilibria-xyz/perennial-mono/blob/d970debe95e41598228e8c4ae52fb816797820fb/packages/perennial-vaults/contracts/BalancedVault.sol.
  */
 contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializable {
     UFixed18 constant private TWO = UFixed18.wrap(2e18);
