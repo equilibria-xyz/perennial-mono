@@ -119,3 +119,8 @@ export function isLocalhost(networkName: string): boolean {
       return false
   }
 }
+
+export function isRollup(networkName: string): boolean {
+  if (isBase(networkName) || isArbitrum(networkName) || isOptimism(networkName)) return true
+  return false
+}
