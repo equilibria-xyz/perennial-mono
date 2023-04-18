@@ -7,13 +7,12 @@ import { providers } from '@0xsequence/multicall'
 import { request, gql } from 'graphql-request'
 import { isArbitrum } from '../../common/testutil/network'
 import { BigNumber, utils } from 'ethers'
-import { Big18Math } from '../../common/testutil/types'
 
 const { formatEther } = utils
 const QUERY_PAGE_SIZE = 1000
 
 type QueryResult = {
-  hourlyVolumes: {
+  bucketedVolumes: {
     product: string
     makerNotional: string
     makerFees: string
@@ -23,7 +22,7 @@ type QueryResult = {
   lastSettle: { blockNumber: string }[]
 }
 
-export default task('collectMetrics', 'Collects metrics for a given day')
+export default task('collectDailyMetrics', 'Collects metrics for a given day')
   .addPositionalParam('dateString', 'Date string to collect stats for. YYYY-MM-DD format')
   .addPositionalParam('market', 'Market to collect stats for. "eth" or "arb"')
   .addOptionalParam('output', 'Output file path')
@@ -58,10 +57,15 @@ export default task('collectMetrics', 'Collects metrics for a given day')
 
     const query = gql`
       query getData($markets: [Bytes]!, $fromTs: BigInt!, $toTs: BigInt!, $first: Int!, $skip: Int!) {
-        hourlyVolumes(
+        bucketedVolumes(
           first: $first
           skip: $skip
-          where: { product_in: $markets, periodStartTimestamp_gte: $fromTs, periodStartTimestamp_lt: $toTs }
+          where: {
+            bucket: daily
+            product_in: $markets
+            periodStartTimestamp_gte: $fromTs
+            periodStartTimestamp_lt: $toTs
+          }
           orderBy: periodStartBlock
           orderDirection: desc
         ) {
@@ -92,7 +96,7 @@ export default task('collectMetrics', 'Collects metrics for a given day')
       skip: page * QUERY_PAGE_SIZE,
     })
     const rawData = res
-    while (res.hourlyVolumes.length === QUERY_PAGE_SIZE) {
+    while (res.bucketedVolumes.length === QUERY_PAGE_SIZE) {
       page += 1
       res = await request(graphURL, query, {
         markets: [longProduct, shortProduct],
@@ -101,10 +105,10 @@ export default task('collectMetrics', 'Collects metrics for a given day')
         first: QUERY_PAGE_SIZE,
         skip: page * QUERY_PAGE_SIZE,
       })
-      rawData.hourlyVolumes = [...rawData.hourlyVolumes, ...res.hourlyVolumes]
+      rawData.bucketedVolumes = [...rawData.bucketedVolumes, ...res.bucketedVolumes]
     }
 
-    const hourVolumes = rawData.hourlyVolumes.map(
+    const hourlyVolumes = rawData.bucketedVolumes.map(
       ({ product, makerNotional, makerFees, takerNotional, takerFees }) => ({
         product: product.toLowerCase(),
         makerNotional: BigNumber.from(makerNotional),
@@ -114,11 +118,11 @@ export default task('collectMetrics', 'Collects metrics for a given day')
       }),
     )
 
-    const totalVolume = hourVolumes.reduce((acc, { takerNotional }) => acc.add(takerNotional), BigNumber.from(0))
-    const longFees = hourVolumes
+    const totalVolume = hourlyVolumes.reduce((acc, { takerNotional }) => acc.add(takerNotional), BigNumber.from(0))
+    const longFees = hourlyVolumes
       .filter(({ product }) => product.toLowerCase() === longProduct.toLowerCase())
       .reduce((acc, { takerFees }) => acc.add(takerFees), BigNumber.from(0))
-    const shortFees = hourVolumes
+    const shortFees = hourlyVolumes
       .filter(({ product }) => product.toLowerCase() === shortProduct.toLowerCase())
       .reduce((acc, { takerFees }) => acc.add(takerFees), BigNumber.from(0))
 
