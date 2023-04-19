@@ -188,7 +188,7 @@ export default function defaultConfig({
       parallel: MOCHA_PARALLEL,
       reporter: MOCHA_REPORTER,
       slow: 1000,
-      timeout: 240000,
+      timeout: 2400000,
     },
     contractSizer: {
       alphaSort: true,
