@@ -14,7 +14,8 @@ export async function impersonate(address: string): Promise<SignerWithAddress> {
 export async function impersonateWithBalance(address: string, balance: BigNumberish): Promise<SignerWithAddress> {
   await HRE.network.provider.request({
     method: 'hardhat_setBalance',
-    params: [address, BigNumber.from(balance).toHexString()],
+    // Replace is necessary because leading 0s are not allowed
+    params: [address, BigNumber.from(balance).toHexString().replace('0x0', '0x')],
   })
   await HRE.network.provider.request({
     method: 'hardhat_impersonateAccount',
