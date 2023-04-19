@@ -1,9 +1,9 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import HRE from 'hardhat'
-import { BigNumber, constants, utils } from 'ethers'
+import { BigNumber, utils } from 'ethers'
 import { CHAINLINK_CUSTOM_CURRENCIES, buildChainlinkRoundId } from '@equilibria/perennial-oracle/util'
 
-import { time, impersonate } from '../../../../common/testutil'
+import { time } from '../../../../common/testutil'
 import {
   Collateral,
   Controller,
@@ -40,19 +40,12 @@ import {
 } from '../../../types/generated'
 import { ChainlinkContext } from './chainlinkHelpers'
 import { createPayoffDefinition } from '../../../../common/testutil/types'
+import { setupTokenHolders } from '../../../../common/testutil/impersonate'
 const { config, deployments, ethers } = HRE
 
 export const INITIAL_PHASE_ID = 1
 export const INITIAL_AGGREGATOR_ROUND_ID = 10000
 export const INITIAL_VERSION = INITIAL_AGGREGATOR_ROUND_ID - 7528 // registry's phase 1 starts at aggregatorRoundID 7528
-export const DSU_HOLDER = {
-  mainnet: '0x0B663CeaCEF01f2f88EB7451C70Aa069f19dB997',
-  arbitrum: '',
-}
-export const USDC_HOLDER = {
-  mainnet: '0x0A59649758aa4d66E25f08Dd01271e891fe52199',
-  arbitrum: '0x8b8149dd385955dc1ce77a4be7700ccd6a212e65',
-}
 
 export interface InstanceVars {
   owner: SignerWithAddress
@@ -306,29 +299,4 @@ export async function depositTo(
   const { dsu, collateral } = instanceVars
   await dsu.connect(user).approve(collateral.address, position)
   await collateral.connect(user).depositTo(user.address, product.address, position)
-}
-
-export async function setupTokenHolders(
-  dsu: IERC20Metadata,
-  usdc: IERC20Metadata,
-  reserve: IEmptySetReserve,
-  users: SignerWithAddress[],
-  network: 'mainnet' | 'arbitrum' = 'mainnet',
-): Promise<{ dsuHolder: SignerWithAddress; usdcHolder: SignerWithAddress }> {
-  const usdcHolderAddress = USDC_HOLDER[network]
-  const dsuHolderAddress = DSU_HOLDER[network] || usdcHolderAddress
-  const usdcHolder = await impersonate.impersonateWithBalance(usdcHolderAddress, utils.parseEther('10'))
-  const dsuHolder = await impersonate.impersonateWithBalance(dsuHolderAddress, utils.parseEther('10'))
-
-  await usdc.connect(usdcHolder).approve(reserve.address, constants.MaxUint256)
-  await reserve.connect(usdcHolder).mint(utils.parseEther('1000000'))
-  await dsu.connect(usdcHolder).transfer(dsuHolder.address, utils.parseEther('1000000'))
-
-  await Promise.all(
-    users.map(async user => {
-      await dsu.connect(dsuHolder).transfer(user.address, utils.parseEther('20000'))
-    }),
-  )
-
-  return { dsuHolder, usdcHolder }
 }

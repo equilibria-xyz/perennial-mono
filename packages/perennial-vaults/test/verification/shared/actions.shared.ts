@@ -2,10 +2,10 @@ import { expect } from 'chai'
 import { constants, utils } from 'ethers'
 import HRE from 'hardhat'
 import { pushPrice } from '../../../../common/testutil/oracle'
-import { setupTokenHolders } from '../../../../perennial/test/integration/helpers/setupHelpers'
 import { BalancedVault, IEmptySetReserve__factory, IERC20Metadata__factory } from '../../../types/generated'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { Deployment } from 'hardhat-deploy/types'
+import { setupTokenHolders } from '../../../../common/testutil/impersonate'
 
 const { ethers } = HRE
 
