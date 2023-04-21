@@ -8,6 +8,7 @@ import { chunk } from './checkLiquidatable'
 
 export default task('checkSolvency', 'Checks if Product is solvent')
   .addPositionalParam('product', 'Product Address to Check')
+  .addFlag('findShortfall', 'Finds the users causing a shortfall')
   .setAction(async (args: TaskArguments, HRE: HardhatRuntimeEnvironment) => {
     const {
       ethers,
@@ -33,26 +34,68 @@ export default task('checkSolvency', 'Checks if Product is solvent')
     const usersChunked = chunk<string>(users, 200)
 
     let totalUserCollateral = BigNumber.from(0)
-    console.log(`Checking if Product is solvent. Total users ${users.length}. Groups ${usersChunked.length}`)
+    console.log(
+      `Checking if Product ${args.product} is solvent. Total users ${users.length}. Groups ${usersChunked.length}`,
+    )
+    if (args.findShortfall) console.log('Finding shortfall users, may take longer...')
+
+    const allUserCollaterals: { account: string; shortfall: BigNumber; after: BigNumber }[] = []
 
     for (let i = 0; i < usersChunked.length; i++) {
       console.log(`Checking group ${i + 1} of ${usersChunked.length}...`)
       const userGroup = usersChunked[i]
+      let groupHasShortfall = false
       const userCollaterals = await Promise.all(
-        userGroup.map(account =>
-          lens.callStatic['collateral(address,address)'](account, args.product, { blockTag: currentBlock }),
-        ),
+        userGroup.map(async account => {
+          const [after, shortfall] = await Promise.all([
+            lens.callStatic['collateral(address,address)'](account, args.product, {
+              blockTag: currentBlock,
+            }),
+            lens.callStatic.shortfall(args.product, {
+              blockTag: currentBlock,
+            }),
+          ])
+          if (shortfall.gt(0)) groupHasShortfall = true
+          return {
+            account,
+            after,
+            shortfall,
+          }
+        }),
       )
-      totalUserCollateral = totalUserCollateral.add(userCollaterals.reduce((a, b) => a.add(b), BigNumber.from(0)))
+
+      if (groupHasShortfall && args.findShortfall) {
+        console.log('Shortfall found in group. Searching each user...')
+        for (const account of userGroup) {
+          const [, shortfall] = await Promise.all([
+            lens.callStatic['collateral(address,address)'](account, args.product, {
+              blockTag: currentBlock,
+            }),
+            lens.callStatic.shortfall(args.product, {
+              blockTag: currentBlock,
+            }),
+          ])
+          if (shortfall.gt(0)) {
+            console.log(`User ${account} has shortfall of $${utils.formatEther(shortfall)}`)
+          }
+        }
+      }
+
+      totalUserCollateral = totalUserCollateral.add(userCollaterals.reduce((a, b) => a.add(b.after), BigNumber.from(0)))
+      allUserCollaterals.push(...userCollaterals)
     }
 
     const productCollateral = await lens.callStatic['collateral(address)'](args.product, { blockTag: currentBlock })
     const delta = productCollateral.sub(totalUserCollateral)
 
     if (!delta.isZero()) {
-      if (delta.isNegative()) console.log('Product Insolvent')
-      else console.log('Product solvent')
-      console.log(`Delta: ${utils.formatEther(delta)}`)
+      if (delta.isNegative()) {
+        console.log('Product Insolvent')
+      } else {
+        console.log('Product solvent')
+      }
+
+      console.log(`Delta: $${utils.formatEther(delta)}`)
     }
 
     console.log('done.')
