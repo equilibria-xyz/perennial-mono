@@ -40,6 +40,8 @@ export default task('checkSolvency', 'Checks if Product is solvent')
     if (args.findShortfall) console.log('Finding shortfall users, may take longer...')
 
     const allUserCollaterals: { account: string; shortfall: BigNumber; after: BigNumber }[] = []
+    const startingShortfall = await lens.callStatic.shortfall(args.product, { blockTag: currentBlock })
+    console.log(`Starting shortfall: $${utils.formatEther(startingShortfall)}`)
 
     for (let i = 0; i < usersChunked.length; i++) {
       console.log(`Checking group ${i + 1} of ${usersChunked.length}...`)
@@ -55,7 +57,7 @@ export default task('checkSolvency', 'Checks if Product is solvent')
               blockTag: currentBlock,
             }),
           ])
-          if (shortfall.gt(0)) groupHasShortfall = true
+          if (shortfall.gt(startingShortfall)) groupHasShortfall = true
           return {
             account,
             after,
@@ -75,7 +77,7 @@ export default task('checkSolvency', 'Checks if Product is solvent')
               blockTag: currentBlock,
             }),
           ])
-          if (shortfall.gt(0)) {
+          if (shortfall.gt(startingShortfall)) {
             console.log(`User ${account} has shortfall of $${utils.formatEther(shortfall)}`)
           }
         }
