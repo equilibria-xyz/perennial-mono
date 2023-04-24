@@ -208,18 +208,11 @@ library VersionedAccumulatorLib {
         positionFee = positionFee.sub(protocolFee);
         fee = protocolFee.sum();
 
-        // If there are makers to distribute the taker's position fee to, distribute. Otherwise give it to the protocol
+        // If there are makers to distribute the position fee to, distribute. Otherwise give it to the protocol
         if (!latestPosition.maker.isZero()) {
-            accumulatedPosition.maker = Fixed18Lib.from(positionFee.taker.div(latestPosition.maker));
+            accumulatedPosition.maker = Fixed18Lib.from(positionFee.sum().div(latestPosition.maker));
         } else {
-            fee = fee.add(positionFee.taker);
-        }
-
-        // If there are takers to distribute the maker's position fee to, distribute. Otherwise give it to the protocol
-        if (!latestPosition.taker.isZero()) {
-            accumulatedPosition.taker = Fixed18Lib.from(positionFee.maker.div(latestPosition.taker));
-        } else {
-            fee = fee.add(positionFee.maker);
+            fee = fee.add(positionFee.sum());
         }
     }
 
