@@ -115,13 +115,12 @@ library VersionedAccumulatorLib {
         IOracleProvider.OracleVersion memory latestOracleVersion,
         IOracleProvider.OracleVersion memory toOracleVersion
     ) private view returns (Accumulator memory accumulatedFunding, UFixed18 accumulatedFee) {
-        if (_product().closed()) return (Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO), UFixed18Lib.ZERO);
-        if (latestPosition.taker.isZero()) return (Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO), UFixed18Lib.ZERO);
-        if (latestPosition.maker.isZero()) return (Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO), UFixed18Lib.ZERO);
+        if (_product().closed() || latestPosition.taker.isZero() || latestPosition.maker.isZero())
+            return (Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO), UFixed18Lib.ZERO);
 
         uint256 elapsed = toOracleVersion.timestamp - latestOracleVersion.timestamp;
 
-        UFixed18 takerNotional = Fixed18Lib.from(latestPosition.taker).mul(latestOracleVersion.price).abs();
+        UFixed18 takerNotional = latestPosition.taker.mul(latestOracleVersion.price.abs());
         UFixed18 socializedNotional = takerNotional.mul(latestPosition.socializationFactor());
 
         Fixed18 rateAccumulated = _product().rate(latestPosition)
@@ -157,9 +156,8 @@ library VersionedAccumulatorLib {
         IOracleProvider.OracleVersion memory latestOracleVersion,
         IOracleProvider.OracleVersion memory toOracleVersion
     ) private view returns (Accumulator memory accumulatedPosition) {
-        if (_product().closed()) return Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO);
-        if (latestPosition.taker.isZero()) return Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO);
-        if (latestPosition.maker.isZero()) return Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO);
+        if (_product().closed() || latestPosition.taker.isZero() || latestPosition.maker.isZero())
+            return Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO);
 
         Fixed18 oracleDelta = toOracleVersion.price.sub(latestOracleVersion.price);
         Fixed18 totalTakerDelta = oracleDelta.mul(Fixed18Lib.from(latestPosition.taker));
