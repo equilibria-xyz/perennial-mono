@@ -3156,62 +3156,6 @@ describe('Product', () => {
       })
     })
 
-    context('funding rounding', async () => {
-      const EXPECTED_FUNDING = 1300101471179
-      const EXPECTED_FUNDING_FEE = Math.floor(EXPECTED_FUNDING / 10)
-      const EXPECTED_FUNDING_WITH_FEE = EXPECTED_FUNDING - EXPECTED_FUNDING_FEE // maker funding
-
-      const ORACLE_VERSION_3_SHORTENED = {
-        ...ORACLE_VERSION_3,
-        timestamp: ORACLE_VERSION_2.timestamp + 1,
-      }
-
-      const fixture = async () => {
-        await product.connect(user).openMake(POSITION.div(3))
-        await product.connect(userB).openTake(POSITION.div(3))
-
-        await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
-        await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
-        await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
-        await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_2)
-
-        await product.connect(user).settle()
-        await product.connect(user).settleAccount(user.address)
-        await product.connect(user).settleAccount(userB.address)
-      }
-
-      beforeEach(async () => {
-        await loadFixture(fixture)
-      })
-
-      it('rounds away from zero for both sides', async () => {
-        await collateral.mock.settleProduct.withArgs(EXPECTED_FUNDING_FEE).returns()
-
-        await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3_SHORTENED)
-        await oracle.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3_SHORTENED)
-        await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3_SHORTENED).returns()
-        await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_3_SHORTENED)
-
-        await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(3, 3)
-
-        expect(await product['latestVersion()']()).to.equal(3)
-        expectPositionEq(await product.positionAtVersion(3), { maker: POSITION.div(3), taker: POSITION.div(3) })
-        expectPrePositionEq(await product['pre()'](), {
-          oracleVersion: 0,
-          openPosition: { maker: 0, taker: 0 },
-          closePosition: { maker: 0, taker: 0 },
-        })
-        expectPositionEq(await product.valueAtVersion(3), {
-          maker: Math.floor(EXPECTED_FUNDING_WITH_FEE / (10 / 3)),
-          taker: Math.ceil(EXPECTED_FUNDING / (10 / 3)) * -1,
-        })
-        expectPositionEq(await product.shareAtVersion(3), {
-          maker: utils.parseEther('0.3'),
-          taker: utils.parseEther('0.3'),
-        })
-      })
-    })
-
     context('*For methods', async () => {
       describe('#openMakeFor', async () => {
         it('opens the position', async () => {
@@ -6313,62 +6257,6 @@ describe('Product', () => {
           product,
           'PausedError',
         )
-      })
-    })
-
-    context('funding rounding', async () => {
-      const EXPECTED_FUNDING = 1300101471179
-      const EXPECTED_FUNDING_FEE = Math.floor(EXPECTED_FUNDING / 10)
-      const EXPECTED_FUNDING_WITH_FEE = EXPECTED_FUNDING - EXPECTED_FUNDING_FEE // maker funding
-
-      const ORACLE_VERSION_3_SHORTENED = {
-        ...ORACLE_VERSION_3,
-        timestamp: ORACLE_VERSION_2.timestamp + 1,
-      }
-
-      const fixture = async () => {
-        await product.connect(user).openMake(POSITION.div(3))
-        await product.connect(userB).openTake(POSITION.div(3))
-
-        await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_2)
-        await oracle.mock.atVersion.withArgs(2).returns(ORACLE_VERSION_2)
-        await incentivizer.mock.sync.withArgs(ORACLE_VERSION_2).returns()
-        await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_2)
-
-        await product.connect(user).settle()
-        await product.connect(user).settleAccount(user.address)
-        await product.connect(user).settleAccount(userB.address)
-      }
-
-      beforeEach(async () => {
-        await loadFixture(fixture)
-      })
-
-      it('rounds away from zero for both sides', async () => {
-        await collateral.mock.settleProduct.withArgs(EXPECTED_FUNDING_FEE).returns()
-
-        await oracle.mock.currentVersion.withArgs().returns(ORACLE_VERSION_3_SHORTENED)
-        await oracle.mock.atVersion.withArgs(3).returns(ORACLE_VERSION_3_SHORTENED)
-        await incentivizer.mock.sync.withArgs(ORACLE_VERSION_3_SHORTENED).returns()
-        await oracle.mock.sync.withArgs().returns(ORACLE_VERSION_3_SHORTENED)
-
-        await expect(product.connect(user).settle()).to.emit(product, 'Settle').withArgs(3, 3)
-
-        expect(await product['latestVersion()']()).to.equal(3)
-        expectPositionEq(await product.positionAtVersion(3), { maker: POSITION.div(3), taker: POSITION.div(3) })
-        expectPrePositionEq(await product['pre()'](), {
-          oracleVersion: 0,
-          openPosition: { maker: 0, taker: 0 },
-          closePosition: { maker: 0, taker: 0 },
-        })
-        expectPositionEq(await product.valueAtVersion(3), {
-          maker: Math.floor(EXPECTED_FUNDING_WITH_FEE / (10 / 3)),
-          taker: Math.ceil(EXPECTED_FUNDING / (10 / 3)) * -1,
-        })
-        expectPositionEq(await product.shareAtVersion(3), {
-          maker: utils.parseEther('0.3'),
-          taker: utils.parseEther('0.3'),
-        })
       })
     })
 

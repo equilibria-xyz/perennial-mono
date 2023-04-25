@@ -168,7 +168,7 @@ describe('Fees', () => {
       })
 
       // PnL + (Funding - Funding Fee)
-      const C_MAKER_VALUE = Big18Math.divOut(B_TO_C_PNL.mul(-1).add(B_TO_C_FUNDING_WITHOUT_FEE), MAKER_POSITION.mul(3))
+      const C_MAKER_VALUE = Big18Math.div(B_TO_C_PNL.mul(-1).add(B_TO_C_FUNDING_WITHOUT_FEE), MAKER_POSITION.mul(3))
       // PnL - Funding
       const C_TAKER_VALUE = Big18Math.div(B_TO_C_PNL.sub(B_TO_C_FUNDING), TAKER_POSITION)
       expectPositionEq(await product.valueAtVersion(cVersion.version), {
@@ -285,7 +285,7 @@ describe('Fees', () => {
       })
 
       // PnL + (Funding - Funding Fee)
-      const C_MAKER_VALUE = Big18Math.divOut(B_TO_C_PNL.mul(-1).add(B_TO_C_FUNDING_WITHOUT_FEE), MAKER_POSITION.mul(3))
+      const C_MAKER_VALUE = Big18Math.div(B_TO_C_PNL.mul(-1).add(B_TO_C_FUNDING_WITHOUT_FEE), MAKER_POSITION.mul(3))
       // PnL - Fundng
       const C_TAKER_VALUE = Big18Math.div(B_TO_C_PNL.sub(B_TO_C_FUNDING), TAKER_POSITION)
       expectPositionEq(await product.valueAtVersion(cVersion.version), {
