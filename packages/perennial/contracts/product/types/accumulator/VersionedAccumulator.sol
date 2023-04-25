@@ -128,20 +128,16 @@ library VersionedAccumulatorLib {
         Fixed18 fundingAccumulated = rateAccumulated.mul(Fixed18Lib.from(socializedNotional));
         accumulatedFee = fundingAccumulated.abs().mul(fundingFee);
 
-        Fixed18 fundingAccumulatedMinusFee = Fixed18Lib.from(
+        Fixed18 fundingAccumulatedWithoutFee = Fixed18Lib.from(
             fundingAccumulated.sign(),
             fundingAccumulated.abs().sub(accumulatedFee)
         );
 
         bool makerPaysFunding = fundingAccumulated.sign() < 0;
-        accumulatedFunding.maker = _accumulatedDiv(
-            makerPaysFunding ? fundingAccumulated : fundingAccumulatedMinusFee,
-            latestPosition.maker
-        );
-        accumulatedFunding.taker = _accumulatedDiv(
-            (makerPaysFunding ? fundingAccumulatedMinusFee : fundingAccumulated).mul(Fixed18Lib.NEG_ONE),
-            latestPosition.taker
-        );
+        accumulatedFunding.maker = (makerPaysFunding ? fundingAccumulated : fundingAccumulatedWithoutFee)
+            .div(Fixed18Lib.from(latestPosition.maker));
+        accumulatedFunding.taker = (makerPaysFunding ? fundingAccumulatedWithoutFee : fundingAccumulated)
+            .div(Fixed18Lib.from(latestPosition.taker)).mul(Fixed18Lib.NEG_ONE);
     }
 
     /**
@@ -163,23 +159,8 @@ library VersionedAccumulatorLib {
         Fixed18 totalTakerDelta = oracleDelta.mul(Fixed18Lib.from(latestPosition.taker));
         Fixed18 socializedTakerDelta = totalTakerDelta.mul(Fixed18Lib.from(latestPosition.socializationFactor()));
 
-        accumulatedPosition.maker = _accumulatedDiv(socializedTakerDelta.mul(Fixed18Lib.NEG_ONE), latestPosition.maker);
-        accumulatedPosition.taker = _accumulatedDiv(socializedTakerDelta, latestPosition.taker);
-    }
-
-    /**
-     * @notice Divides signed fixed-decimal `a` by `b`, rounding the result away from zero if a < 0 and there is a remainder
-     * @param a Signed fixed-decimal to divide
-     * @param b Unsigned fixed-decimal to divide by
-     * @return Resulting divided signed fixed-decimal
-     */
-    function _accumulatedDiv(Fixed18 a, UFixed18 b) internal pure returns (Fixed18) {
-        if (a.sign() == -1) // Divide outwards
-            return Fixed18Lib.from(
-                -1,
-                UFixed18.wrap(Math.ceilDiv(UFixed18.unwrap(a.abs()) * 1e18, UFixed18.unwrap(b)))
-            );
-        return a.div(Fixed18Lib.from(b));
+        accumulatedPosition.maker = socializedTakerDelta.div(Fixed18Lib.from(latestPosition.maker)).mul(Fixed18Lib.NEG_ONE);
+        accumulatedPosition.taker = socializedTakerDelta.div(Fixed18Lib.from(latestPosition.taker));
     }
 
     /**
