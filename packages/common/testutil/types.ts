@@ -78,4 +78,12 @@ export class Big18Math {
   public static div(a: BigNumber, b: BigNumber): BigNumber {
     return a.mul(this.BASE).div(b)
   }
+
+  // Rounds away from 0
+  public static divOut(a: BigNumber, b: BigNumber): BigNumber {
+    if (a.eq(0)) return BigNumber.from(0)
+    const sign = a.mul(b).lt(0) ? -1 : 1
+    const ceilDiv = a.abs().mul(this.BASE).add(b.abs()).sub(1).div(b.abs()).add(1)
+    return ceilDiv.mul(sign)
+  }
 }
