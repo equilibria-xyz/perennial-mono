@@ -90,10 +90,11 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
         Token18 asset_,
         IController controller_,
         UFixed18 targetLeverage_,
+        UFixed18 maxLeverage_,
         UFixed18 maxCollateral_,
         MarketDefinition[] memory marketDefinitions_
     )
-    BalancedVaultDefinition(asset_, controller_, targetLeverage_, maxCollateral_, marketDefinitions_)
+    BalancedVaultDefinition(asset_, controller_, targetLeverage_, maxLeverage_, maxCollateral_, marketDefinitions_)
     { }
 
     /**
@@ -478,8 +479,8 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
             UFixed18 currentPrice = markets(marketId).long.atVersion(version).price.abs();
             UFixed18 targetPosition = marketCollateral.mul(targetLeverage).div(currentPrice);
 
-            _updateMakerPosition(markets(marketId).long, targetPosition);
-            _updateMakerPosition(markets(marketId).short, targetPosition);
+            _updateMakerPosition(markets(marketId).long, targetPosition, marketCollateral, currentPrice);
+            _updateMakerPosition(markets(marketId).short, targetPosition, marketCollateral, currentPrice);
         }
     }
 
@@ -488,17 +489,21 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
      * @param product The product to adjust the vault's position on
      * @param targetPosition The new position to target
      */
-    function _updateMakerPosition(IProduct product, UFixed18 targetPosition) private {
+    function _updateMakerPosition(IProduct product, UFixed18 targetPosition, UFixed18 targetCollateral, UFixed18 currentPrice) private {
         UFixed18 accountPosition = product.position(address(this)).next(product.pre(address(this))).maker;
 
         if (targetPosition.lt(accountPosition)) {
             // compute headroom until hitting taker amount
             Position memory position = product.positionAtVersion(product.latestVersion()).next(product.pre());
             UFixed18 makerAvailable = position.maker.gt(position.taker) ?
-            position.maker.sub(position.taker) :
-            UFixed18Lib.ZERO;
+                position.maker.sub(position.taker) : UFixed18Lib.ZERO;
 
-            product.closeMake(accountPosition.sub(targetPosition).min(makerAvailable));
+            UFixed18 closeAmount = accountPosition.sub(targetPosition).min(makerAvailable);
+            if (targetCollateral.gt(UFixed18Lib.ZERO) &&
+                    accountPosition.sub(closeAmount).muldiv(currentPrice, targetCollateral).gt(maxLeverage))
+                revert BalancedVaultMaxLeverageExceeded();
+
+            product.closeMake(closeAmount);
         }
 
         if (targetPosition.gt(accountPosition)) {
@@ -710,7 +715,7 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
     function _assets() public view returns (UFixed18 value) {
         value = asset.balanceOf();
         for (uint256 marketId; marketId < totalMarkets; marketId++) {
-           value = value
+            value = value
                 .add(collateral.collateral(address(this), markets(marketId).long))
                 .add(collateral.collateral(address(this), markets(marketId).short));
         }

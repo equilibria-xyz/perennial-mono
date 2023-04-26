@@ -20,20 +20,18 @@ import {
   ChainlinkOracle__factory,
 } from '../../../types/generated'
 import { BigNumber, constants, utils } from 'ethers'
-import { product } from '@equilibria/perennial/types/generated/contracts'
 
 const { config, ethers } = HRE
 use(smock.matchers)
 
 const DSU_MINTER = '0xD05aCe63789cCb35B9cE71d01e4d632a0486Da4B'
 
-describe.only('BalancedVault (Multi-Payoff)', () => {
+describe('BalancedVault (Multi-Payoff)', () => {
   let vault: BalancedVault
   let asset: IERC20Metadata
   let oracle: FakeContract<IOracleProvider>
   let collateral: ICollateral
   let controller: IController
-  let controllerOwner: SignerWithAddress
   let owner: SignerWithAddress
   let user: SignerWithAddress
   let user2: SignerWithAddress
@@ -42,6 +40,7 @@ describe.only('BalancedVault (Multi-Payoff)', () => {
   let long: IProduct
   let short: IProduct
   let leverage: BigNumber
+  let maxLeverage: BigNumber
   let maxCollateral: BigNumber
   let originalOraclePrice: BigNumber
   let btcOriginalOraclePrice: BigNumber
@@ -130,10 +129,6 @@ describe.only('BalancedVault (Multi-Payoff)', () => {
 
     const dsu = IERC20Metadata__factory.connect('0x605D26FBd5be761089281d5cec2Ce86eeA667109', owner)
     controller = IController__factory.connect('0x9df509186b6d3b7D033359f94c8b1BB5544d51b3', owner)
-    controllerOwner = await impersonate.impersonateWithBalance(
-      await controller.callStatic['owner()'](),
-      utils.parseEther('10'),
-    )
     long = IProduct__factory.connect('0xdB60626FF6cDC9dB07d3625A93d21dDf0f8A688C', owner)
     short = IProduct__factory.connect('0xfeD3E166330341e0305594B8c6e6598F9f4Cbe9B', owner)
     const btcOracleToMock = await new ChainlinkOracle__factory(owner).deploy(
@@ -161,20 +156,28 @@ describe.only('BalancedVault (Multi-Payoff)', () => {
     })
     collateral = ICollateral__factory.connect('0x2d264ebdb6632a06a1726193d4d37fef1e5dbdcd', owner)
     leverage = utils.parseEther('4.0')
+    maxLeverage = utils.parseEther('5.0')
     maxCollateral = utils.parseEther('500000')
 
-    vault = await new BalancedVault__factory(owner).deploy(dsu.address, controller.address, leverage, maxCollateral, [
-      {
-        long: long.address,
-        short: short.address,
-        weight: 4,
-      },
-      {
-        long: btcLong.address,
-        short: btcShort.address,
-        weight: 1,
-      },
-    ])
+    vault = await new BalancedVault__factory(owner).deploy(
+      dsu.address,
+      controller.address,
+      leverage,
+      maxLeverage,
+      maxCollateral,
+      [
+        {
+          long: long.address,
+          short: short.address,
+          weight: 4,
+        },
+        {
+          long: btcLong.address,
+          short: btcShort.address,
+          weight: 1,
+        },
+      ],
+    )
     await vault.initialize('Perennial Vault Alpha')
     asset = IERC20Metadata__factory.connect(await vault.asset(), owner)
 

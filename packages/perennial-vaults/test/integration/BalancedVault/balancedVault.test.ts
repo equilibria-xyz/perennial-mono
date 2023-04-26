@@ -39,6 +39,7 @@ describe('BalancedVault', () => {
   let long: IProduct
   let short: IProduct
   let leverage: BigNumber
+  let maxLeverage: BigNumber
   let maxCollateral: BigNumber
   let originalOraclePrice: BigNumber
 
@@ -85,45 +86,45 @@ describe('BalancedVault', () => {
 
     const dsu = IERC20Metadata__factory.connect('0x605D26FBd5be761089281d5cec2Ce86eeA667109', owner)
     controller = IController__factory.connect('0x9df509186b6d3b7D033359f94c8b1BB5544d51b3', owner)
-    controllerOwner = await impersonate.impersonateWithBalance(
-      await controller.callStatic['owner()'](),
-      utils.parseEther('10'),
-    )
     long = IProduct__factory.connect('0xdB60626FF6cDC9dB07d3625A93d21dDf0f8A688C', owner)
     short = IProduct__factory.connect('0xfeD3E166330341e0305594B8c6e6598F9f4Cbe9B', owner)
     collateral = ICollateral__factory.connect('0x2d264ebdb6632a06a1726193d4d37fef1e5dbdcd', owner)
     leverage = utils.parseEther('4.0')
+    maxLeverage = utils.parseEther('5.0')
     maxCollateral = utils.parseEther('500000')
 
-    vault = await new BalancedVault__factory(owner).deploy(dsu.address, controller.address, leverage, maxCollateral, [
-      {
-        long: long.address,
-        short: short.address,
-        weight: 1,
-      },
-    ])
+    vault = await new BalancedVault__factory(owner).deploy(
+      dsu.address,
+      controller.address,
+      leverage,
+      maxLeverage,
+      maxCollateral,
+      [
+        {
+          long: long.address,
+          short: short.address,
+          weight: 1,
+        },
+      ],
+    )
     await vault.initialize('Perennial Vault Alpha')
     asset = IERC20Metadata__factory.connect(await vault.asset(), owner)
 
     const dsuMinter = await impersonate.impersonateWithBalance(DSU_MINTER, utils.parseEther('10'))
-    const setUpWalletWithDSU = async (wallet: SignerWithAddress) => {
+    const setUpWalletWithDSU = async (wallet: SignerWithAddress, amount?: BigNumber) => {
       const dsuIface = new utils.Interface(['function mint(uint256)'])
       await dsuMinter.sendTransaction({
         to: dsu.address,
         value: 0,
-        data: dsuIface.encodeFunctionData('mint', [utils.parseEther('200000')]),
+        data: dsuIface.encodeFunctionData('mint', [amount ?? utils.parseEther('200000')]),
       })
-      await dsu.connect(dsuMinter).transfer(wallet.address, utils.parseEther('200000'))
+      await dsu.connect(dsuMinter).transfer(wallet.address, amount ?? utils.parseEther('200000'))
       await dsu.connect(wallet).approve(vault.address, ethers.constants.MaxUint256)
     }
     await setUpWalletWithDSU(user)
     await setUpWalletWithDSU(user2)
     await setUpWalletWithDSU(liquidator)
-    await setUpWalletWithDSU(perennialUser)
-    await setUpWalletWithDSU(perennialUser)
-    await setUpWalletWithDSU(perennialUser)
-    await setUpWalletWithDSU(perennialUser)
-    await setUpWalletWithDSU(perennialUser)
+    await setUpWalletWithDSU(perennialUser, utils.parseEther('1000000'))
 
     // Unfortunately, we can't make mocks of existing contracts.
     // So, we make a fake and initialize it with the values that the real contract had at this block.
@@ -488,6 +489,62 @@ describe('BalancedVault', () => {
       const fundingAmount = BigNumber.from(21517482108955)
       expect(await totalCollateralInVault()).to.eq(originalTotalCollateral.add(fundingAmount))
       expect(await vault.totalAssets()).to.eq(originalTotalCollateral.add(fundingAmount))
+    })
+
+    it('does not exceed max leverage', async () => {
+      expect(await vault.convertToAssets(utils.parseEther('1'))).to.equal(utils.parseEther('1'))
+      expect(await vault.convertToShares(utils.parseEther('1'))).to.equal(utils.parseEther('1'))
+
+      // We're underneath the collateral minimum, so we shouldn't have opened any positions.
+      expect(await longPosition()).to.equal(0)
+      expect(await shortPosition()).to.equal(0)
+
+      const largeDeposit = utils.parseEther('10010')
+      await vault.connect(user).deposit(largeDeposit, user.address)
+      expect(await longCollateralInVault()).to.equal(utils.parseEther('5005'))
+      expect(await shortCollateralInVault()).to.equal(utils.parseEther('5005'))
+      expect(await vault.convertToAssets(utils.parseEther('10'))).to.equal(utils.parseEther('10'))
+      expect(await vault.convertToShares(utils.parseEther('10'))).to.equal(utils.parseEther('10'))
+      await updateOracle()
+
+      await vault.sync()
+      expect(await vault.balanceOf(user.address)).to.equal(utils.parseEther('10010'))
+      expect(await vault.totalSupply()).to.equal(utils.parseEther('10010'))
+      expect(await vault.totalAssets()).to.equal(utils.parseEther('10010'))
+      expect(await vault.convertToAssets(utils.parseEther('10010'))).to.equal(utils.parseEther('10010'))
+      expect(await vault.convertToShares(utils.parseEther('10010'))).to.equal(utils.parseEther('10010'))
+
+      // Now we should have opened positions.
+      // The positions should be equal to largeDeposit * leverage / 2 / originalOraclePrice.
+      expect(await longPosition()).to.equal(largeDeposit.mul(leverage).div(2).div(originalOraclePrice))
+      expect(await shortPosition()).to.equal(largeDeposit.mul(leverage).div(2).div(originalOraclePrice))
+
+      const globalPosition = await long.positionAtVersion(await long['latestVersion()']())
+      // Open taker position up to 100% utilization
+      await asset.connect(perennialUser).approve(collateral.address, constants.MaxUint256)
+      await collateral
+        .connect(perennialUser)
+        .depositTo(perennialUser.address, long.address, utils.parseEther('1000000'))
+      await long.connect(perennialUser).openTake(globalPosition.maker.sub(globalPosition.taker))
+
+      // Redeeming a large amount will revert due to the max leverage check
+      await expect(vault.connect(user).redeem(utils.parseEther('9000'), user.address)).to.be.revertedWithCustomError(
+        vault,
+        'BalancedVaultMaxLeverageExceeded',
+      )
+
+      // Redeeming a smaller amount is fine
+      await expect(vault.connect(user).redeem(utils.parseEther('1000'), user.address)).to.not.be.reverted
+
+      await updateOracle()
+      await vault.sync()
+
+      await vault.connect(user).claim(user.address)
+
+      // the vault's leverage will be slightly above target, but below max
+      const vaultLeverage = (await longPosition()).mul(originalOraclePrice).div(await longCollateralInVault())
+      expect(vaultLeverage).to.be.greaterThan(utils.parseEther('4'))
+      expect(vaultLeverage).to.be.lessThanOrEqual(utils.parseEther('5'))
     })
 
     it('rounds deposits correctly', async () => {

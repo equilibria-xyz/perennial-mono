@@ -34,6 +34,9 @@ contract BalancedVaultDefinition is IBalancedVaultDefinition {
     /// @dev The target leverage amount for the vault
     UFixed18 public immutable targetLeverage;
 
+    /// @dev The maximum leverage the vault will allow before disabling withdrawals
+    UFixed18 public immutable maxLeverage;
+
     /// @dev The collateral cap for the vault
     UFixed18 public immutable maxCollateral;
 
@@ -65,6 +68,7 @@ contract BalancedVaultDefinition is IBalancedVaultDefinition {
         Token18 asset_,
         IController controller_,
         UFixed18 targetLeverage_,
+        UFixed18 maxLeverage_,
         UFixed18 maxCollateral_,
         MarketDefinition[] memory marketDefinitions_
     ) {
@@ -72,6 +76,9 @@ contract BalancedVaultDefinition is IBalancedVaultDefinition {
         controller = controller_;
         collateral = controller_.collateral();
         targetLeverage = targetLeverage_;
+        maxLeverage = maxLeverage_;
+        if (maxLeverage.lt(targetLeverage)) revert BalancedVaultDefinitionInvalidMaxLeverageError();
+
         maxCollateral = maxCollateral_;
 
         uint256 totalMarkets_ = Math.min(marketDefinitions_.length, MAX_MARKETS);
