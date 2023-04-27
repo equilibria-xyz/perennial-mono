@@ -223,7 +223,7 @@ describe('Fees', () => {
       await product.connect(userB).openMake(MAKER_POSITION.mul(2))
     })
 
-    it('credits the takers with the maker position fee on open', async () => {
+    it('credits the existing makers with the maker position fee on open', async () => {
       const { user, userB, userC, collateral, chainlink, treasuryA, treasuryB } = instanceVars
       const aVersion = await product.currentVersion()
 
@@ -259,8 +259,11 @@ describe('Fees', () => {
       const A_TO_B_FUNDING_WITHOUT_FEE = A_TO_B_FUNDING.sub(A_TO_B_FUNDING_FEE)
       const A_TO_B_PNL = Big18Math.mul(bVersion.price.sub(aVersion.price), TAKER_POSITION)
       const A_TO_B_MAKER_FEE = Big18Math.mul(Big18Math.mul(aVersion.price, MAKER_FEE_RATE), MAKER_POSITION.mul(2))
-      const B_MAKER_VALUE = Big18Math.div(A_TO_B_PNL.mul(-1).add(A_TO_B_FUNDING_WITHOUT_FEE), MAKER_POSITION)
-      const B_TAKER_VALUE = Big18Math.div(A_TO_B_PNL.sub(A_TO_B_FUNDING).add(A_TO_B_MAKER_FEE.div(2)), TAKER_POSITION)
+      const B_MAKER_VALUE = Big18Math.div(
+        A_TO_B_PNL.mul(-1).add(A_TO_B_FUNDING_WITHOUT_FEE).add(A_TO_B_MAKER_FEE.div(2)),
+        MAKER_POSITION,
+      )
+      const B_TAKER_VALUE = Big18Math.div(A_TO_B_PNL.sub(A_TO_B_FUNDING), TAKER_POSITION)
 
       expectPositionEq(await product.valueAtVersion(bVersion.version), {
         maker: B_MAKER_VALUE,
@@ -322,7 +325,7 @@ describe('Fees', () => {
       )
     })
 
-    it('credits both sides on position closes', async () => {
+    it('credits makers on position closes', async () => {
       const { user, userB, userC, collateral, chainlink, treasuryA, treasuryB } = instanceVars
       const aVersion = await product.currentVersion()
       await product.connect(user).closeMake(MAKER_POSITION)
@@ -362,13 +365,13 @@ describe('Fees', () => {
       const A_TO_B_MAKER_FEE = Big18Math.mul(Big18Math.mul(aVersion.price, MAKER_FEE_RATE), MAKER_POSITION.mul(3))
       const A_TO_B_TAKER_FEE = Big18Math.mul(Big18Math.mul(aVersion.price, TAKER_FEE_RATE), TAKER_POSITION)
       const B_MAKER_VALUE = Big18Math.div(
-        A_TO_B_PNL.mul(-1).add(A_TO_B_FUNDING_WITHOUT_FEE).add(A_TO_B_TAKER_FEE.div(2)),
+        A_TO_B_PNL.mul(-1)
+          .add(A_TO_B_FUNDING_WITHOUT_FEE)
+          .add(A_TO_B_TAKER_FEE.div(2))
+          .add(A_TO_B_MAKER_FEE.sub(A_TO_B_MAKER_FEE.div(2))),
         MAKER_POSITION,
       )
-      const B_TAKER_VALUE = Big18Math.div(
-        A_TO_B_PNL.sub(A_TO_B_FUNDING).add(A_TO_B_MAKER_FEE.sub(A_TO_B_MAKER_FEE.div(2))),
-        TAKER_POSITION,
-      )
+      const B_TAKER_VALUE = Big18Math.div(A_TO_B_PNL.sub(A_TO_B_FUNDING), TAKER_POSITION)
 
       expectPositionEq(await product.valueAtVersion(bVersion.version), {
         maker: B_MAKER_VALUE,
