@@ -227,8 +227,9 @@ export async function createProduct(
     oracle = chainlinkOracle
   }
 
+  const id = await controller.callStatic.createCoordinator()
   await controller.createCoordinator()
-  await controller.updateCoordinatorTreasury(1, treasuryB.address)
+  await controller.updateCoordinatorTreasury(id, treasuryB.address)
 
   const productInfo = {
     name: 'Squeeth',
@@ -248,8 +249,8 @@ export async function createProduct(
       targetUtilization: utils.parseEther('0.80'),
     },
   }
-  const productAddress = await controller.callStatic.createProduct(1, productInfo)
-  await controller.createProduct(1, productInfo)
+  const productAddress = await controller.callStatic.createProduct(id, productInfo)
+  await controller.createProduct(id, productInfo)
 
   return Product__factory.connect(productAddress, owner)
 }
