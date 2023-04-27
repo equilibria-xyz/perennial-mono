@@ -758,8 +758,10 @@ describe('Product', () => {
         await product.updateMakerFee(utils.parseEther('0.01'))
 
         const EXPECTED_FUNDING_WITH_FEE = EXPECTED_FUNDING.sub(EXPECTED_FUNDING_FEE) // maker funding
-        await collateral.mock.settleAccount.withArgs(user.address, MAKER_FEE.mul(-1)).returns()
-        await collateral.mock.settleAccount.withArgs(user.address, EXPECTED_FUNDING_WITH_FEE).returns()
+        await collateral.mock.settleAccount.withArgs(user.address, MAKER_FEE.mul(-1)).returns() // charge fee
+        await collateral.mock.settleAccount
+          .withArgs(user.address, EXPECTED_FUNDING_WITH_FEE.add(MAKER_FEE.div(2)))
+          .returns()
 
         await expect(await product.connect(user).openMake(POSITION))
           .to.emit(product, 'MakeOpened')
@@ -781,8 +783,8 @@ describe('Product', () => {
           closePosition: { maker: 0, taker: 0 },
         })
         expectPositionEq(await product.valueAtVersion(3), {
-          maker: EXPECTED_FUNDING_WITH_FEE.div(10),
-          taker: MAKER_FEE.div(2).sub(EXPECTED_FUNDING).div(5),
+          maker: MAKER_FEE.div(2).add(EXPECTED_FUNDING_WITH_FEE).div(10),
+          taker: EXPECTED_FUNDING.mul(-1).div(5),
         })
         expectPositionEq(await product.shareAtVersion(3), {
           maker: utils.parseEther('360'),
@@ -1226,8 +1228,9 @@ describe('Product', () => {
           await product.updateMakerFee(utils.parseEther('0.01'))
 
           const MAKER_FEE = utils.parseEther('12.3') // position * maker fee * price
-          await collateral.mock.settleProduct.withArgs(MAKER_FEE).returns()
-          await collateral.mock.settleAccount.withArgs(user.address, MAKER_FEE.mul(-1)).returns()
+          await collateral.mock.settleProduct.withArgs(MAKER_FEE.div(2)).returns()
+          await collateral.mock.settleAccount.withArgs(user.address, MAKER_FEE.mul(-1)).returns() // Charge fee
+          await collateral.mock.settleAccount.withArgs(user.address, MAKER_FEE.div(2)).returns()
 
           await expect(product.connect(user).closeMake(POSITION))
             .to.emit(product, 'MakeClosed')
@@ -1251,7 +1254,7 @@ describe('Product', () => {
             openPosition: { maker: 0, taker: 0 },
             closePosition: { maker: 0, taker: 0 },
           })
-          expectPositionEq(await product.valueAtVersion(4), { maker: 0, taker: 0 })
+          expectPositionEq(await product.valueAtVersion(4), { maker: MAKER_FEE.div(2).div(10), taker: 0 })
           expectPositionEq(await product.shareAtVersion(4), { maker: utils.parseEther('360'), taker: 0 })
 
           await expect(product.connect(user).settleAccount(user.address))
@@ -2319,7 +2322,7 @@ describe('Product', () => {
 
     context('#settle / #settleAccount', async () => {
       // rate * elapsed * utilization * maker * price
-      // ( 0.1 * 10^18 / 365 / 24 / 60 / 60 ) * 3600 * 0.5 * 10 * 123 = 7020547945205480
+      // (0.1 * 10^18 / 365 / 24 / 60 / 60 ) * 3600 * 0.5 * 10 * 123 = 7020547944372000
       const EXPECTED_FUNDING = 7020547944372000
       const EXPECTED_FUNDING_FEE = EXPECTED_FUNDING / 10
       const EXPECTED_FUNDING_WITH_FEE = EXPECTED_FUNDING - EXPECTED_FUNDING_FEE // maker funding
@@ -2404,9 +2407,6 @@ describe('Product', () => {
       it('same price same timestamp settle', async () => {
         await collateral.mock.settleProduct.withArgs(EXPECTED_FUNDING_FEE).returns()
         await collateral.mock.settleAccount.withArgs(user.address, EXPECTED_FUNDING_WITH_FEE).returns()
-        await collateral.mock.settleAccount
-          .withArgs(userB.address, -1 * (EXPECTED_FUNDING - EXPECTED_FUNDING_FEE))
-          .returns()
 
         const oracleVersionSameTimestamp = {
           price: PRICE,
@@ -3364,8 +3364,9 @@ describe('Product', () => {
 
           await product.updateMakerFee(utils.parseEther('0.01'))
           const MAKER_FEE = utils.parseEther('24.6') // 2 * position * maker fee * price
-          await collateral.mock.settleProduct.withArgs(MAKER_FEE).returns()
-          await collateral.mock.settleAccount.withArgs(user.address, MAKER_FEE.div(-2)).returns()
+          await collateral.mock.settleProduct.withArgs(MAKER_FEE.div(2)).returns()
+          await collateral.mock.settleAccount.withArgs(user.address, MAKER_FEE.div(-2)).returns() // charge fee
+          await collateral.mock.settleAccount.withArgs(user.address, MAKER_FEE.div(2)).returns() // user's portion of maker fees
           await collateral.mock.settleAccount.withArgs(userB.address, MAKER_FEE.div(-2)).returns()
 
           await expect(product.connect(user).closeMake(POSITION))
@@ -3856,7 +3857,9 @@ describe('Product', () => {
 
         const EXPECTED_FUNDING_WITH_FEE = EXPECTED_FUNDING.sub(EXPECTED_FUNDING_FEE) // maker funding
         await collateral.mock.settleAccount.withArgs(user.address, MAKER_FEE.mul(-1)).returns()
-        await collateral.mock.settleAccount.withArgs(user.address, EXPECTED_FUNDING_WITH_FEE).returns()
+        await collateral.mock.settleAccount
+          .withArgs(user.address, EXPECTED_FUNDING_WITH_FEE.add(MAKER_FEE.div(2)))
+          .returns()
 
         await expect(await product.connect(user).openMake(POSITION))
           .to.emit(product, 'MakeOpened')
@@ -3878,8 +3881,8 @@ describe('Product', () => {
           closePosition: { maker: 0, taker: 0 },
         })
         expectPositionEq(await product.valueAtVersion(3), {
-          maker: EXPECTED_FUNDING_WITH_FEE.div(10),
-          taker: MAKER_FEE.div(2).sub(EXPECTED_FUNDING).div(5),
+          maker: MAKER_FEE.div(2).add(EXPECTED_FUNDING_WITH_FEE).div(10),
+          taker: EXPECTED_FUNDING.mul(-1).div(5),
         })
         expectPositionEq(await product.shareAtVersion(3), {
           maker: utils.parseEther('360'),
@@ -4321,8 +4324,9 @@ describe('Product', () => {
           await product.updateMakerFee(utils.parseEther('0.01'))
 
           const MAKER_FEE = utils.parseEther('12.3') // position * maker fee * price
-          await collateral.mock.settleProduct.withArgs(MAKER_FEE).returns()
+          await collateral.mock.settleProduct.withArgs(MAKER_FEE.div(2)).returns()
           await collateral.mock.settleAccount.withArgs(user.address, MAKER_FEE.mul(-1)).returns()
+          await collateral.mock.settleAccount.withArgs(user.address, MAKER_FEE.div(2)).returns()
 
           await expect(product.connect(user).closeMake(POSITION))
             .to.emit(product, 'MakeClosed')
@@ -4345,7 +4349,7 @@ describe('Product', () => {
             openPosition: { maker: 0, taker: 0 },
             closePosition: { maker: 0, taker: 0 },
           })
-          expectPositionEq(await product.valueAtVersion(4), { maker: 0, taker: 0 })
+          expectPositionEq(await product.valueAtVersion(4), { maker: MAKER_FEE.div(2).div(10), taker: 0 })
           expectPositionEq(await product.shareAtVersion(4), { maker: utils.parseEther('360'), taker: 0 })
 
           await expect(product.connect(user).settleAccount(user.address))
@@ -6319,8 +6323,9 @@ describe('Product', () => {
 
           await product.updateMakerFee(utils.parseEther('0.01'))
           const MAKER_FEE = utils.parseEther('24.6') // 2 * position * maker fee * price
-          await collateral.mock.settleProduct.withArgs(MAKER_FEE).returns()
-          await collateral.mock.settleAccount.withArgs(user.address, MAKER_FEE.div(-2)).returns()
+          await collateral.mock.settleProduct.withArgs(MAKER_FEE.div(2)).returns()
+          await collateral.mock.settleAccount.withArgs(user.address, MAKER_FEE.div(-2)).returns() // charge fee
+          await collateral.mock.settleAccount.withArgs(user.address, MAKER_FEE.div(2)).returns() // user's portion of maker fees
           await collateral.mock.settleAccount.withArgs(userB.address, MAKER_FEE.div(-2)).returns()
 
           await expect(product.connect(user).closeMake(POSITION))
