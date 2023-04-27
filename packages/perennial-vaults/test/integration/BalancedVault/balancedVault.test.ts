@@ -400,7 +400,7 @@ describe('BalancedVault', () => {
       expect(await vault.totalUnclaimed()).to.equal(0)
     })
 
-    it('maxWithdraw', async () => {
+    it('maxRedeem', async () => {
       const smallDeposit = utils.parseEther('500')
       await vault.connect(user).deposit(smallDeposit, user.address)
       await updateOracle()
@@ -417,12 +417,12 @@ describe('BalancedVault', () => {
       const shareAmount2 = BigNumber.from('9999999998435236774264')
       expect(await vault.maxRedeem(user.address)).to.equal(shareAmount.add(shareAmount2))
 
-      // We shouldn't be able to withdraw more than maxWithdraw.
+      // We shouldn't be able to withdraw more than maxRedeem.
       await expect(
         vault.connect(user).redeem((await vault.maxRedeem(user.address)).add(1), user.address),
       ).to.be.revertedWithCustomError(vault, 'BalancedVaultRedemptionLimitExceeded')
 
-      // But we should be able to withdraw exactly maxWithdraw.
+      // But we should be able to withdraw exactly maxRedeem.
       await vault.connect(user).redeem(await vault.maxRedeem(user.address), user.address)
 
       // The oracle price hasn't changed yet, so we shouldn't be able to withdraw any more.
@@ -439,6 +439,46 @@ describe('BalancedVault', () => {
       await vault.claim(user.address)
       expect(await totalCollateralInVault()).to.eq(0)
       expect(await vault.totalAssets()).to.equal(0)
+    })
+
+    it('maxRedeem with maxLeverage', async () => {
+      const largeDeposit = utils.parseEther('10000')
+      await vault.connect(user).deposit(largeDeposit, user.address)
+      await updateOracle()
+      await vault.sync()
+
+      const globalPre = await long['pre()']()
+      const globalPosition = await long.positionAtVersion(await long['latestVersion()']())
+      const globalNext = {
+        maker: globalPosition.maker.add(globalPre.openPosition.maker.sub(globalPre.closePosition.maker)),
+        taker: globalPosition.taker.add(globalPre.openPosition.taker.sub(globalPre.closePosition.taker)),
+      }
+      // Open taker position up to 100% utilization
+      await asset.connect(perennialUser).approve(collateral.address, constants.MaxUint256)
+      await collateral
+        .connect(perennialUser)
+        .depositTo(perennialUser.address, long.address, utils.parseEther('1000000'))
+      await long.connect(perennialUser).openTake(globalNext.maker.sub(globalNext.taker))
+
+      // Settle the take position
+      await updateOracle()
+      await long.settle()
+
+      // Since the vault can't close any maker positions in the long market, the vault should only
+      // be able to withdraw enough collateral to bring it to maxLeverage
+      const expectedMaxRedeem = await vault.convertToShares(
+        (await longPosition()).mul(originalOraclePrice).div(maxLeverage),
+      )
+      expect(await vault.maxRedeem(user.address)).to.equal(expectedMaxRedeem)
+
+      console.log('syncing')
+      await vault.sync()
+      const redeemAmount = (await vault.maxRedeem(user.address)).add(1)
+      console.log('redeeming')
+      await expect(vault.connect(user).redeem(redeemAmount, user.address)).to.be.revertedWithCustomError(
+        vault,
+        'BalancedVaultRedemptionLimitExceeded',
+      )
     })
 
     it('maxDeposit', async () => {
@@ -489,62 +529,6 @@ describe('BalancedVault', () => {
       const fundingAmount = BigNumber.from(21517482108955)
       expect(await totalCollateralInVault()).to.eq(originalTotalCollateral.add(fundingAmount))
       expect(await vault.totalAssets()).to.eq(originalTotalCollateral.add(fundingAmount))
-    })
-
-    it('does not exceed max leverage', async () => {
-      expect(await vault.convertToAssets(utils.parseEther('1'))).to.equal(utils.parseEther('1'))
-      expect(await vault.convertToShares(utils.parseEther('1'))).to.equal(utils.parseEther('1'))
-
-      // We're underneath the collateral minimum, so we shouldn't have opened any positions.
-      expect(await longPosition()).to.equal(0)
-      expect(await shortPosition()).to.equal(0)
-
-      const largeDeposit = utils.parseEther('10010')
-      await vault.connect(user).deposit(largeDeposit, user.address)
-      expect(await longCollateralInVault()).to.equal(utils.parseEther('5005'))
-      expect(await shortCollateralInVault()).to.equal(utils.parseEther('5005'))
-      expect(await vault.convertToAssets(utils.parseEther('10'))).to.equal(utils.parseEther('10'))
-      expect(await vault.convertToShares(utils.parseEther('10'))).to.equal(utils.parseEther('10'))
-      await updateOracle()
-
-      await vault.sync()
-      expect(await vault.balanceOf(user.address)).to.equal(utils.parseEther('10010'))
-      expect(await vault.totalSupply()).to.equal(utils.parseEther('10010'))
-      expect(await vault.totalAssets()).to.equal(utils.parseEther('10010'))
-      expect(await vault.convertToAssets(utils.parseEther('10010'))).to.equal(utils.parseEther('10010'))
-      expect(await vault.convertToShares(utils.parseEther('10010'))).to.equal(utils.parseEther('10010'))
-
-      // Now we should have opened positions.
-      // The positions should be equal to largeDeposit * leverage / 2 / originalOraclePrice.
-      expect(await longPosition()).to.equal(largeDeposit.mul(leverage).div(2).div(originalOraclePrice))
-      expect(await shortPosition()).to.equal(largeDeposit.mul(leverage).div(2).div(originalOraclePrice))
-
-      const globalPosition = await long.positionAtVersion(await long['latestVersion()']())
-      // Open taker position up to 100% utilization
-      await asset.connect(perennialUser).approve(collateral.address, constants.MaxUint256)
-      await collateral
-        .connect(perennialUser)
-        .depositTo(perennialUser.address, long.address, utils.parseEther('1000000'))
-      await long.connect(perennialUser).openTake(globalPosition.maker.sub(globalPosition.taker))
-
-      // Redeeming a large amount will revert due to the max leverage check
-      await expect(vault.connect(user).redeem(utils.parseEther('9000'), user.address)).to.be.revertedWithCustomError(
-        vault,
-        'BalancedVaultMaxLeverageExceeded',
-      )
-
-      // Redeeming a smaller amount is fine
-      await expect(vault.connect(user).redeem(utils.parseEther('1000'), user.address)).to.not.be.reverted
-
-      await updateOracle()
-      await vault.sync()
-
-      await vault.connect(user).claim(user.address)
-
-      // the vault's leverage will be slightly above target, but below max
-      const vaultLeverage = (await longPosition()).mul(originalOraclePrice).div(await longCollateralInVault())
-      expect(vaultLeverage).to.be.greaterThan(utils.parseEther('4'))
-      expect(vaultLeverage).to.be.lessThanOrEqual(utils.parseEther('5'))
     })
 
     it('rounds deposits correctly', async () => {

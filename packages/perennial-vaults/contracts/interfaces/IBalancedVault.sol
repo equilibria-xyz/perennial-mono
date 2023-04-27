@@ -37,7 +37,6 @@ interface IBalancedVault is IBalancedVaultDefinition {
 
     error BalancedVaultDepositLimitExceeded();
     error BalancedVaultRedemptionLimitExceeded();
-    error BalancedVaultMaxLeverageExceeded();
 
     function name() external view returns (string memory);
     function initialize(string memory name_) external;
