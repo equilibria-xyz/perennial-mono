@@ -305,6 +305,7 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
      */
     function convertToShares(UFixed18 assets) external view returns (UFixed18) {
         (EpochContext memory context, ) = _loadContextForRead(address(0));
+        // Include pending values in the context to simulate a settlement
         (context.latestAssets, context.latestShares) =
             (_totalAssetsAtEpoch(context), _totalSupplyAtEpoch(context));
         return _convertToSharesAtEpoch(context, assets);
@@ -676,8 +677,10 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
             console.log("finalPosition", UFixed18.unwrap(finalPosition));
 
             if (finalPosition.isZero()) continue;
-            maxAmount = maxAmount.min(_convertToSharesAtEpoch(
-                context, finalPosition.muldiv(currentPrice, maxLeverage)));
+            UFixed18 collateral = finalPosition.muldiv(currentPrice, maxLeverage);
+            console.log("assets", UFixed18.unwrap(_assets()));
+            console.log("collateral", UFixed18.unwrap(collateral), UFixed18.unwrap(context.latestAssets), UFixed18.unwrap(context.latestShares));
+            maxAmount = maxAmount.min(_convertToSharesAtEpoch(context, collateral));
             console.log("maxAmount", UFixed18.unwrap(maxAmount));
         }
         return maxAmount;
