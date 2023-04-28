@@ -11,7 +11,6 @@ interface IBalancedVaultDefinition {
         uint256 weight;
     }
 
-    error BalancedVaultDefinitionInvalidMaxLeverageError();
     error BalancedVaultDefinitionInvalidMarketIdError();
 
     function asset() external view returns (Token18);
@@ -20,7 +19,6 @@ interface IBalancedVaultDefinition {
     function controller() external view returns (IController);
     function collateral() external view returns (ICollateral);
     function targetLeverage() external view returns (UFixed18);
-    function maxLeverage() external view returns (UFixed18);
     function maxCollateral() external view returns (UFixed18);
     function markets(uint256 market) external view returns (MarketDefinition memory);
 }

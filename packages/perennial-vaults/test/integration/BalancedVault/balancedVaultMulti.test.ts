@@ -40,7 +40,6 @@ describe('BalancedVault (Multi-Payoff)', () => {
   let long: IProduct
   let short: IProduct
   let leverage: BigNumber
-  let maxLeverage: BigNumber
   let maxCollateral: BigNumber
   let originalOraclePrice: BigNumber
   let btcOriginalOraclePrice: BigNumber
@@ -156,28 +155,20 @@ describe('BalancedVault (Multi-Payoff)', () => {
     })
     collateral = ICollateral__factory.connect('0x2d264ebdb6632a06a1726193d4d37fef1e5dbdcd', owner)
     leverage = utils.parseEther('4.0')
-    maxLeverage = utils.parseEther('5.0')
     maxCollateral = utils.parseEther('500000')
 
-    vault = await new BalancedVault__factory(owner).deploy(
-      dsu.address,
-      controller.address,
-      leverage,
-      maxLeverage,
-      maxCollateral,
-      [
-        {
-          long: long.address,
-          short: short.address,
-          weight: 4,
-        },
-        {
-          long: btcLong.address,
-          short: btcShort.address,
-          weight: 1,
-        },
-      ],
-    )
+    vault = await new BalancedVault__factory(owner).deploy(dsu.address, controller.address, leverage, maxCollateral, [
+      {
+        long: long.address,
+        short: short.address,
+        weight: 4,
+      },
+      {
+        long: btcLong.address,
+        short: btcShort.address,
+        weight: 1,
+      },
+    ])
     await vault.initialize('Perennial Vault Alpha')
     asset = IERC20Metadata__factory.connect(await vault.asset(), owner)
 

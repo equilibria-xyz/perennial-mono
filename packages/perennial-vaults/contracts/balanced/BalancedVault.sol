@@ -91,11 +91,10 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
         Token18 asset_,
         IController controller_,
         UFixed18 targetLeverage_,
-        UFixed18 maxLeverage_,
         UFixed18 maxCollateral_,
         MarketDefinition[] memory marketDefinitions_
     )
-    BalancedVaultDefinition(asset_, controller_, targetLeverage_, maxLeverage_, maxCollateral_, marketDefinitions_)
+    BalancedVaultDefinition(asset_, controller_, targetLeverage_, maxCollateral_, marketDefinitions_)
     { }
 
     /**
@@ -246,8 +245,6 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
      */
     function maxRedeem(address account) external view returns (UFixed18) {
         (EpochContext memory context, EpochContext memory accountContext) = _loadContextForRead(account);
-        /* (context.latestAssets, context.latestShares) =
-            (_totalAssetsAtEpoch(context), _totalSupplyAtEpoch(context)); */
         return _maxRedeemAtEpoch(context, accountContext, account);
     }
 
