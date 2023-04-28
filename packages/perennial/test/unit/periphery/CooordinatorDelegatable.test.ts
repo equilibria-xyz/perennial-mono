@@ -123,16 +123,10 @@ describe('CoordinatorDelegatable', () => {
       await expect(coordinatorDel.connect(noaccess).updateMaintenance(product.address, 0))
         .to.be.revertedWithCustomError(coordinatorDel, 'CoordinatorDelegatableNotParamAdminError')
         .withArgs(noaccess.address)
-      await expect(coordinatorDel.connect(noaccess).updateFundingFee(product.address, 0))
-        .to.be.revertedWithCustomError(coordinatorDel, 'CoordinatorDelegatableNotParamAdminError')
-        .withArgs(noaccess.address)
       await expect(coordinatorDel.connect(noaccess).updateMakerFee(product.address, 0))
         .to.be.revertedWithCustomError(coordinatorDel, 'CoordinatorDelegatableNotParamAdminError')
         .withArgs(noaccess.address)
       await expect(coordinatorDel.connect(noaccess).updateTakerFee(product.address, 0))
-        .to.be.revertedWithCustomError(coordinatorDel, 'CoordinatorDelegatableNotParamAdminError')
-        .withArgs(noaccess.address)
-      await expect(coordinatorDel.connect(noaccess).updatePositionFee(product.address, 0))
         .to.be.revertedWithCustomError(coordinatorDel, 'CoordinatorDelegatableNotParamAdminError')
         .withArgs(noaccess.address)
       await expect(coordinatorDel.connect(noaccess).updateMakerLimit(product.address, 0))
@@ -200,15 +194,6 @@ function itPerformsProductUpdates(
     expect(product.updateMaintenance).to.have.been.calledWith(newMaintenance)
   })
 
-  it('can call updateFundingFee', async () => {
-    const newFundingFee = utils.parseEther('0.234')
-    product.updateFundingFee.whenCalledWith(newFundingFee).returns()
-
-    await expect(coordinatorDel.connect(signer).updateFundingFee(product.address, newFundingFee)).to.not.be.reverted
-
-    expect(product.updateFundingFee).to.have.been.calledWith(newFundingFee)
-  })
-
   it('can call updateMakerFee', async () => {
     const newMakerFee = utils.parseEther('0.00567')
     product.updateMakerFee.whenCalledWith(newMakerFee).returns()
@@ -225,15 +210,6 @@ function itPerformsProductUpdates(
     await expect(coordinatorDel.connect(signer).updateTakerFee(product.address, newTakerFee)).to.not.be.reverted
 
     expect(product.updateTakerFee).to.have.been.calledWith(newTakerFee)
-  })
-
-  it('can call updatePositionFee', async () => {
-    const newPositionFee = utils.parseEther('0.1')
-    product.updatePositionFee.whenCalledWith(newPositionFee).returns()
-
-    await expect(coordinatorDel.connect(signer).updatePositionFee(product.address, newPositionFee)).to.not.be.reverted
-
-    expect(product.updatePositionFee).to.have.been.calledWith(newPositionFee)
   })
 
   it('can call updateMakerLimit', async () => {

@@ -43,16 +43,6 @@ contract CoordinatorDelegatable is UOwnable {
     }
 
     /**
-     * @notice Updates the funding fee for product `product` to `newFundingFee`
-     * @dev Only callable by owner or paramAdmin
-     * @param product The product to update
-     * @param newFundingFee The new funding fee
-     */
-    function updateFundingFee(IProduct product, UFixed18 newFundingFee) external onlyOwnerOrParamAdmin {
-        product.updateFundingFee(newFundingFee);
-    }
-
-    /**
      * @notice Updates the maker fee for product `product` to `newMakerFee`
      * @dev Only callable by owner or paramAdmin
      * @param product The product to update
@@ -70,16 +60,6 @@ contract CoordinatorDelegatable is UOwnable {
      */
     function updateTakerFee(IProduct product, UFixed18 newTakerFee) external onlyOwnerOrParamAdmin {
         product.updateTakerFee(newTakerFee);
-    }
-
-    /**
-     * @notice Updates the position fee for product `product` to `newPositionFee`
-     * @dev Only callable by owner or paramAdmin
-     * @param product The product to update
-     * @param newPositionFee The new position fee
-     */
-    function updatePositionFee(IProduct product, UFixed18 newPositionFee) external onlyOwnerOrParamAdmin {
-        product.updatePositionFee(newPositionFee);
     }
 
     /**
