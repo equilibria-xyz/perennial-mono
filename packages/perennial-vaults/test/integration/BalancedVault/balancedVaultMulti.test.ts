@@ -837,7 +837,7 @@ describe('BalancedVault (Multi-Payoff)', () => {
       expect(await vault.totalAssets()).to.equal(0)
     })
 
-    it.only('maxRedeem with close limited', async () => {
+    it('maxRedeem with close limited', async () => {
       const largeDeposit = utils.parseEther('10000')
       await vault.connect(user).deposit(largeDeposit, user.address)
       await updateOracle()
