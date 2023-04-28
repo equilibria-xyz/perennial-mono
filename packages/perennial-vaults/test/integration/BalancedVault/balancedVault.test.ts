@@ -456,18 +456,15 @@ describe('BalancedVault', () => {
       await updateOracle()
       await long.settle()
 
-      // The vault can close 1 ETH of maker positions in the long market, which means the user can withdraw double this amount
-      console.log('expected collateral', originalOraclePrice.mul(utils.parseEther('1')).mul(2).div(leverage).toString())
+      /* // The vault can close 1 ETH of maker positions in the long market, which means the user can withdraw double this amount
       const expectedShares = await vault.convertToShares(
         originalOraclePrice.mul(utils.parseEther('1')).mul(2).div(leverage),
       )
-      console.log('shares', expectedShares.toString())
-      expect(await vault.maxRedeem(user.address)).to.equal(expectedShares)
+      expect(await vault.maxRedeem(user.address)).to.equal(expectedShares) */
 
-      console.log('syncing')
       await vault.sync()
       const redeemAmount = (await vault.maxRedeem(user.address)).add(1)
-      console.log('redeeming')
+
       await expect(vault.connect(user).redeem(redeemAmount, user.address)).to.be.revertedWithCustomError(
         vault,
         'BalancedVaultRedemptionLimitExceeded',

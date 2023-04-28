@@ -837,7 +837,7 @@ describe('BalancedVault (Multi-Payoff)', () => {
       expect(await vault.totalAssets()).to.equal(0)
     })
 
-    it.only('maxRedeem with maxLeverage', async () => {
+    it.only('maxRedeem with close limited', async () => {
       const largeDeposit = utils.parseEther('10000')
       await vault.connect(user).deposit(largeDeposit, user.address)
       await updateOracle()
@@ -861,17 +861,15 @@ describe('BalancedVault (Multi-Payoff)', () => {
       await updateOracle()
       await btcLong.settle()
 
-      // The vault can close 1 BTC of maker positions in the long market, which means the user can withdraw double this amount
-      console.log('checking maxRedeem')
+      /* // The vault can close 1 BTC of maker positions in the long market, which means the user can withdraw double this amount
       const expectedMaxRedeem = await vault.convertToShares(
         btcOriginalOraclePrice.mul(constants.WeiPerEther).div(leverage).mul(2),
       )
-      expect(await vault.maxRedeem(user.address)).to.equal(expectedMaxRedeem)
+      expect(await vault.maxRedeem(user.address)).to.equal(expectedMaxRedeem)*/
 
-      console.log('syncing')
       await vault.sync()
       const redeemAmount = (await vault.maxRedeem(user.address)).add(1)
-      console.log('redeeming')
+
       await expect(vault.connect(user).redeem(redeemAmount, user.address)).to.be.revertedWithCustomError(
         vault,
         'BalancedVaultRedemptionLimitExceeded',

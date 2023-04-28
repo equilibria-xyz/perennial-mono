@@ -1,7 +1,6 @@
 //SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.17;
 
-import "hardhat/console.sol";
 import "../interfaces/IBalancedVault.sol";
 import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
@@ -667,11 +666,7 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
 
             UFixed18 collateral = longAvailable.min(shortAvailable).muldiv(currentPrice, targetLeverage);
             collateral = collateral.mul(TWO).muldiv(totalWeight, def.weight);
-            console.log("currentPrice", UFixed18.unwrap(currentPrice), UFixed18.unwrap(longAvailable), UFixed18.unwrap(shortAvailable));
-            console.log("collateral", UFixed18.unwrap(collateral));
-            console.log("shares", UFixed18.unwrap(_convertToSharesAtEpoch(context, collateral)));
             maxAmount = maxAmount.min(_convertToSharesAtEpoch(context, collateral));
-            console.log("maxAmount", UFixed18.unwrap(maxAmount));
         }
         return maxAmount;
     }
