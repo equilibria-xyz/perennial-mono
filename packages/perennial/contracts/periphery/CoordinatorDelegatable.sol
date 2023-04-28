@@ -15,8 +15,10 @@ import "../interfaces/IProduct.sol";
  */
 contract CoordinatorDelegatable is UOwnable {
 
+    /// @dev Event emitted when param admin is updated
     event CoordinatorDelegatableParamAdminUpdated(address indexed newParamAdmin);
 
+    /// @dev Error thrown on unauthorized param update call
     error CoordinatorDelegatableNotParamAdminError(address sender);
 
     /// @dev The owner address

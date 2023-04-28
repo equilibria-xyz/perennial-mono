@@ -96,6 +96,18 @@ describe('CoordinatorDelegatable', () => {
         await coordinatorDel.execute(instanceVars.controller.address, acceptOwnerData, 0)
       })
 
+      it('can transfer coordinator ownership', async () => {
+        const fn = instanceVars.controller.interface.encodeFunctionData('updateCoordinatorPendingOwner', [
+          1,
+          owner.address,
+        ])
+        await coordinatorDel.execute(instanceVars.controller.address, fn, 0)
+
+        await expect(instanceVars.controller.connect(owner).acceptCoordinatorOwner(1)).to.not.be.reverted
+        expect(await instanceVars.controller['owner(uint256)'](1)).to.equal(owner.address)
+        expect(await instanceVars.controller.coordinatorFor(product.address)).to.equal(1)
+      })
+
       itPerformsProductUpdates(() => [coordinatorDel, owner, product])
     })
   })
