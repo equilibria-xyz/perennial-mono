@@ -246,8 +246,8 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
      */
     function maxRedeem(address account) external view returns (UFixed18) {
         (EpochContext memory context, EpochContext memory accountContext) = _loadContextForRead(account);
-        (context.latestAssets, context.latestShares) =
-            (_totalAssetsAtEpoch(context), _totalSupplyAtEpoch(context));
+        /* (context.latestAssets, context.latestShares) =
+            (_totalAssetsAtEpoch(context), _totalSupplyAtEpoch(context)); */
         return _maxRedeemAtEpoch(context, accountContext, account);
     }
 
@@ -655,11 +655,12 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
         // by finding the minimum amount we can close
         for (uint256 marketId; marketId < totalMarkets; marketId++) {
             MarketDefinition memory def = markets(marketId);
-            MarketEpoch memory marketEpoch = _marketAccounts[marketId].epochs[context.epoch];
 
             uint256 longLatestVersion = def.long.latestVersion();
             uint256 shortLatestVersion = def.short.latestVersion();
-            UFixed18 currentPrice = def.long.atVersion(longLatestVersion).price.abs();
+
+            UFixed18 currentPrice = longLatestVersion >= shortLatestVersion ?
+                def.long.atVersion(longLatestVersion).price.abs() : def.short.atVersion(shortLatestVersion).price.abs();
 
             Position memory longGlobalPosition = def.long.positionAtVersion(longLatestVersion).next(def.long.pre());
             Position memory shortGlobalPosition = def.short.positionAtVersion(shortLatestVersion).next(def.short.pre());
@@ -667,19 +668,11 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
             UFixed18 longAvailable = longGlobalPosition.maker.sub(longGlobalPosition.taker.min(longGlobalPosition.maker));
             UFixed18 shortAvailable = shortGlobalPosition.maker.sub(shortGlobalPosition.taker.min(shortGlobalPosition.maker));
 
-            UFixed18 longCloseAmount = longAvailable.min(marketEpoch.longPosition);
-            UFixed18 shortCloseAmount = shortAvailable.min(marketEpoch.shortPosition);
-            console.log("longAvailable", marketId, UFixed18.unwrap(longAvailable), UFixed18.unwrap(longCloseAmount));
-            console.log("shortAvailable", marketId, UFixed18.unwrap(shortAvailable), UFixed18.unwrap(shortCloseAmount));
-
-            UFixed18 finalPosition = longCloseAmount.lt(shortCloseAmount) ?
-                marketEpoch.longPosition.sub(longCloseAmount) : marketEpoch.shortPosition.sub(shortCloseAmount);
-            console.log("finalPosition", UFixed18.unwrap(finalPosition));
-
-            if (finalPosition.isZero()) continue;
-            UFixed18 collateral = finalPosition.muldiv(currentPrice, maxLeverage);
-            console.log("assets", UFixed18.unwrap(_assets()));
-            console.log("collateral", UFixed18.unwrap(collateral), UFixed18.unwrap(context.latestAssets), UFixed18.unwrap(context.latestShares));
+            UFixed18 collateral = longAvailable.min(shortAvailable).muldiv(currentPrice, targetLeverage);
+            collateral = collateral.mul(TWO).muldiv(totalWeight, def.weight);
+            console.log("currentPrice", UFixed18.unwrap(currentPrice), UFixed18.unwrap(longAvailable), UFixed18.unwrap(shortAvailable));
+            console.log("collateral", UFixed18.unwrap(collateral));
+            console.log("shares", UFixed18.unwrap(_convertToSharesAtEpoch(context, collateral)));
             maxAmount = maxAmount.min(_convertToSharesAtEpoch(context, collateral));
             console.log("maxAmount", UFixed18.unwrap(maxAmount));
         }

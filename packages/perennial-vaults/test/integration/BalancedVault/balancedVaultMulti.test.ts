@@ -846,7 +846,7 @@ describe('BalancedVault (Multi-Payoff)', () => {
       expect(await vault.totalAssets()).to.equal(0)
     })
 
-    it('maxRedeem with maxLeverage', async () => {
+    it.only('maxRedeem with maxLeverage', async () => {
       const largeDeposit = utils.parseEther('10000')
       await vault.connect(user).deposit(largeDeposit, user.address)
       await updateOracle()
@@ -858,21 +858,22 @@ describe('BalancedVault (Multi-Payoff)', () => {
         maker: btcGlobalPosition.maker.add(btcGlobalPre.openPosition.maker.sub(btcGlobalPre.closePosition.maker)),
         taker: btcGlobalPosition.taker.add(btcGlobalPre.openPosition.taker.sub(btcGlobalPre.closePosition.taker)),
       }
-      // Open taker position up to 100% utilization
+      // Open taker position up to 100% utilization minus 1 BTC
       await asset.connect(perennialUser).approve(collateral.address, constants.MaxUint256)
       await collateral
         .connect(perennialUser)
         .depositTo(perennialUser.address, btcLong.address, utils.parseEther('1000000'))
-      await btcLong.connect(perennialUser).openTake(btcGlobalNext.maker.sub(btcGlobalNext.taker))
+      await btcLong
+        .connect(perennialUser)
+        .openTake(btcGlobalNext.maker.sub(btcGlobalNext.taker).sub(utils.parseEther('1')))
 
       await updateOracle()
       await btcLong.settle()
 
-      // Since the vault can't close any maker positions in the long market, the vault should only
-      // be able to withdraw enough collateral to bring it to maxLeverage
+      // The vault can close 1 BTC of maker positions in the long market, which means the user can withdraw double this amount
       console.log('checking maxRedeem')
       const expectedMaxRedeem = await vault.convertToShares(
-        (await btcLongPosition()).mul(btcOriginalOraclePrice).div(maxLeverage),
+        btcOriginalOraclePrice.mul(constants.WeiPerEther).div(leverage).mul(2),
       )
       expect(await vault.maxRedeem(user.address)).to.equal(expectedMaxRedeem)
 

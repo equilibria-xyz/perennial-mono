@@ -441,7 +441,7 @@ describe('BalancedVault', () => {
       expect(await vault.totalAssets()).to.equal(0)
     })
 
-    it.only('maxRedeem with maxLeverage', async () => {
+    it.only('maxRedeem with close limited', async () => {
       const largeDeposit = utils.parseEther('10000')
       await vault.connect(user).deposit(largeDeposit, user.address)
       await updateOracle()
@@ -453,23 +453,25 @@ describe('BalancedVault', () => {
         maker: globalPosition.maker.add(globalPre.openPosition.maker.sub(globalPre.closePosition.maker)),
         taker: globalPosition.taker.add(globalPre.openPosition.taker.sub(globalPre.closePosition.taker)),
       }
-      // Open taker position up to 100% utilization
+
+      // Open taker position up to 100% utilization minus 1 ETH
       await asset.connect(perennialUser).approve(collateral.address, constants.MaxUint256)
       await collateral
         .connect(perennialUser)
         .depositTo(perennialUser.address, long.address, utils.parseEther('1000000'))
-      await long.connect(perennialUser).openTake(globalNext.maker.sub(globalNext.taker))
+      await long.connect(perennialUser).openTake(globalNext.maker.sub(globalNext.taker).sub(utils.parseEther('1')))
 
       // Settle the take position
       await updateOracle()
       await long.settle()
 
-      // Since the vault can't close any maker positions in the long market, the vault should only
-      // be able to withdraw enough collateral to bring it to maxLeverage
-      const expectedMaxRedeem = await vault.convertToShares(
-        (await longPosition()).mul(originalOraclePrice).div(maxLeverage),
+      // The vault can close 1 ETH of maker positions in the long market, which means the user can withdraw double this amount
+      console.log('expected collateral', originalOraclePrice.mul(utils.parseEther('1')).mul(2).div(leverage).toString())
+      const expectedShares = await vault.convertToShares(
+        originalOraclePrice.mul(utils.parseEther('1')).mul(2).div(leverage),
       )
-      expect(await vault.maxRedeem(user.address)).to.equal(expectedMaxRedeem)
+      console.log('shares', expectedShares.toString())
+      expect(await vault.maxRedeem(user.address)).to.equal(expectedShares)
 
       console.log('syncing')
       await vault.sync()
