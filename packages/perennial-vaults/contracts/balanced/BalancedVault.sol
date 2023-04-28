@@ -655,8 +655,7 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
             uint256 longLatestVersion = def.long.latestVersion();
             uint256 shortLatestVersion = def.short.latestVersion();
 
-            UFixed18 currentPrice = longLatestVersion >= shortLatestVersion ?
-                def.long.atVersion(longLatestVersion).price.abs() : def.short.atVersion(shortLatestVersion).price.abs();
+            UFixed18 currentPrice = def.long.atVersion(Math.min(longLatestVersion, shortLatestVersion)).price.abs();
 
             Position memory longGlobalPosition = def.long.positionAtVersion(longLatestVersion).next(def.long.pre());
             Position memory shortGlobalPosition = def.short.positionAtVersion(shortLatestVersion).next(def.short.pre());
