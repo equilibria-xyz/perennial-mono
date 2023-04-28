@@ -10,22 +10,20 @@ import './tasks'
 // function call will likely use extra gas.
 // Mostly inspired by Compound Comet's setup: https://github.com/compound-finance/comet/blob/main/hardhat.config.ts#L124
 const MINIMUM_CONTRACT_SIZE_SOLIDITY_OVERRIDES = {
-  version: '0.8.17',
+  version: '0.8.19',
   settings: {
-    viaIR: OPTIMIZER_ENABLED,
-    optimizer: OPTIMIZER_ENABLED
-      ? {
-          enabled: true,
-          runs: 1,
-          details: {
-            yulDetails: {
-              // We checked with the Compound team to confirm that this should be safe to use to other projects
-              optimizerSteps:
-                'dhfoDgvulfnTUtnIf [xa[r]scLM cCTUtTOntnfDIul Lcul Vcul [j] Tpeul xa[rul] xa[r]cL gvif CTUca[r]LsTOtfDnca[r]Iulc] jmul[jul] VcTOcul jmul',
-            },
-          },
-        }
-      : { enabled: false },
+    viaIR: true,
+    optimizer: {
+      enabled: true,
+      runs: 1,
+      details: {
+        yulDetails: {
+          // We checked with the Compound team to confirm that this should be safe to use to other projects
+          optimizerSteps:
+            'dhfoDgvulfnTUtnIf [xa[r]scLM cCTUtTOntnfDIul Lcul Vcul [j] Tpeul xa[rul] xa[r]cL gvif CTUca[r]LsTOtfDnca[r]Iulc] jmul[jul] VcTOcul jmul',
+        },
+      },
+    },
     outputSelection: OPTIMIZER_ENABLED
       ? {
           '*': {
