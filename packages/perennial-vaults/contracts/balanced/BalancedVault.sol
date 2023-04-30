@@ -470,8 +470,7 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
             UFixed18 marketCollateral = targetCollateral.muldiv(markets(marketId).weight, totalWeight);
             if (markets(marketId).long.closed() || markets(marketId).short.closed()) marketCollateral = UFixed18Lib.ZERO;
 
-            uint256 version = _versionAtEpoch(marketId, context.epoch);
-            UFixed18 currentPrice = markets(marketId).long.atVersion(version).price.abs();
+            UFixed18 currentPrice = markets(marketId).long.atVersion(markets(marketId).long.latestVersion()).price.abs();
             UFixed18 targetPosition = marketCollateral.mul(targetLeverage).div(currentPrice);
 
             _updateMakerPosition(markets(marketId).long, targetPosition);
