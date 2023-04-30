@@ -5,7 +5,6 @@ import "../interfaces/IBalancedVault.sol";
 import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "./BalancedVaultDefinition.sol";
-import "hardhat/console.sol";
 
 /**
  * @title BalancedVault
@@ -173,8 +172,6 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
         if (msg.sender != account) _consumeAllowance(account, msg.sender, shares);
 
         (EpochContext memory context, EpochContext memory accountContext) = _settle(account);
-
-        console.log("_maxRedeemAtEpoch: %s", UFixed18.unwrap(_maxRedeemAtEpoch(context, accountContext, account)));
         if (shares.gt(_maxRedeemAtEpoch(context, accountContext, account))) revert BalancedVaultRedemptionLimitExceeded();
 
         if (currentEpochStale()) {
@@ -495,9 +492,6 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
             Position memory position = product.positionAtVersion(product.latestVersion()).next(product.pre());
             UFixed18 makerAvailable = position.maker.gt(position.taker) ?
                 position.maker.sub(position.taker) : UFixed18Lib.ZERO;
-
-            console.log("makerAvailable: %s", UFixed18.unwrap(makerAvailable));
-            console.log("maker delta: %s", UFixed18.unwrap(accountPosition.sub(targetPosition)));
 
             product.closeMake(accountPosition.sub(targetPosition).min(makerAvailable));
         }
