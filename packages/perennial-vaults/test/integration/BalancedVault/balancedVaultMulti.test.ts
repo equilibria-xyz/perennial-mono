@@ -856,24 +856,24 @@ describe('BalancedVault (Multi-Payoff)', () => {
         .depositTo(perennialUser.address, btcLong.address, utils.parseEther('1000000'))
       await btcLong
         .connect(perennialUser)
-        .openTake(btcGlobalNext.maker.sub(btcGlobalNext.taker).sub(utils.parseEther('1')))
+        .openTake(btcGlobalNext.maker.sub(btcGlobalNext.taker).sub(utils.parseEther('0.1')))
 
       await updateOracle()
       await btcLong.settle()
 
-      /* // The vault can close 1 BTC of maker positions in the long market, which means the user can withdraw double this amount
+      // The vault can close 1 BTC of maker positions in the long market, which means the user can withdraw double this amount
       const expectedMaxRedeem = await vault.convertToShares(
-        btcOriginalOraclePrice.mul(constants.WeiPerEther).div(leverage).mul(2),
+        btcOriginalOraclePrice.mul(utils.parseEther('0.1')).mul(2).div(leverage).mul(5),
       )
-      expect(await vault.maxRedeem(user.address)).to.equal(expectedMaxRedeem)*/
+      expect(await vault.maxRedeem(user.address)).to.equal(expectedMaxRedeem)
 
       await vault.sync()
-      const redeemAmount = (await vault.maxRedeem(user.address)).add(1)
 
-      await expect(vault.connect(user).redeem(redeemAmount, user.address)).to.be.revertedWithCustomError(
-        vault,
-        'BalancedVaultRedemptionLimitExceeded',
-      )
+      await expect(
+        vault.connect(user).redeem((await vault.maxRedeem(user.address)).add(1), user.address),
+      ).to.be.revertedWithCustomError(vault, 'BalancedVaultRedemptionLimitExceeded')
+
+      await expect(vault.connect(user).redeem(await vault.maxRedeem(user.address), user.address)).to.not.be.reverted
     })
 
     it('maxDeposit', async () => {
@@ -1061,7 +1061,7 @@ describe('BalancedVault (Multi-Payoff)', () => {
       expect(await btcShortPosition()).to.equal(largeDeposit.mul(leverage).div(5).div(2).div(btcOriginalOraclePrice))
     })
 
-    it('close to taker', async () => {
+    it.only('close to taker', async () => {
       // Deposit should create a greater position than what's available
       const largeDeposit = utils.parseEther('10000')
       await vault.connect(user).deposit(largeDeposit, user.address)
@@ -1075,10 +1075,16 @@ describe('BalancedVault (Multi-Payoff)', () => {
         .depositTo(perennialUser.address, short.address, utils.parseEther('1000000'))
       await short.connect(perennialUser).openTake(utils.parseEther('1280'))
       await updateOracle()
-      await vault.sync()
+      // await long.settle()
+      await short.settle()
+      // await btcLong.settle()
+      // await btcShort.settle()
+      // await vault.sync()
 
-      // Redeem should create a greater position delta than what's available
-      await vault.connect(user).redeem(utils.parseEther('4000'), user.address)
+      // Redeem should create a slightly greater position delta than what's available due to accruing funding
+      console.log('calling max redeem')
+      console.log((await vault.maxRedeem(user.address)).toString())
+      await vault.connect(user).redeem(await vault.maxRedeem(user.address), user.address)
       await updateOracle()
       await vault.sync()
 

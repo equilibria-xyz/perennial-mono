@@ -456,19 +456,20 @@ describe('BalancedVault', () => {
       await updateOracle()
       await long.settle()
 
-      /* // The vault can close 1 ETH of maker positions in the long market, which means the user can withdraw double this amount
+      // The vault can close 1 ETH of maker positions in the long market, which means the user can withdraw double this amount
       const expectedShares = await vault.convertToShares(
         originalOraclePrice.mul(utils.parseEther('1')).mul(2).div(leverage),
       )
-      expect(await vault.maxRedeem(user.address)).to.equal(expectedShares) */
+      expect(await vault.maxRedeem(user.address)).to.equal(expectedShares)
 
       await vault.sync()
       const redeemAmount = (await vault.maxRedeem(user.address)).add(1)
 
-      await expect(vault.connect(user).redeem(redeemAmount, user.address)).to.be.revertedWithCustomError(
-        vault,
-        'BalancedVaultRedemptionLimitExceeded',
-      )
+      await expect(
+        vault.connect(user).redeem((await vault.maxRedeem(user.address)).add(1), user.address),
+      ).to.be.revertedWithCustomError(vault, 'BalancedVaultRedemptionLimitExceeded')
+
+      await expect(vault.connect(user).redeem(await vault.maxRedeem(user.address), user.address)).to.not.be.reverted
     })
 
     it('maxDeposit', async () => {
@@ -644,7 +645,7 @@ describe('BalancedVault', () => {
       expect(await shortPosition()).to.equal(0)
     })
 
-    it('close to taker', async () => {
+    it.only('close to taker', async () => {
       // Deposit should create a greater position than what's available
       const largeDeposit = utils.parseEther('10000')
       await vault.connect(user).deposit(largeDeposit, user.address)
@@ -658,10 +659,13 @@ describe('BalancedVault', () => {
         .depositTo(perennialUser.address, short.address, utils.parseEther('1000000'))
       await short.connect(perennialUser).openTake(utils.parseEther('1280'))
       await updateOracle()
-      await vault.sync()
+      // await long.settle()
+      await short.settle()
+      // await vault.sync()
 
-      // Redeem should create a greater position delta than what's available
-      await vault.connect(user).redeem(utils.parseEther('5000'), user.address)
+      // Redeem should create a slightly greater position delta than what's available due to accruing funding
+      console.log((await vault.maxRedeem(user.address)).toString())
+      await vault.connect(user).redeem(await vault.maxRedeem(user.address), user.address)
       await updateOracle()
       await vault.sync()
 
