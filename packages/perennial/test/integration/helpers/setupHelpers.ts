@@ -226,8 +226,9 @@ export async function createProduct(
     oracle = chainlinkOracle
   }
 
+  const id = await controller.callStatic.createCoordinator()
   await controller.createCoordinator()
-  await controller.updateCoordinatorTreasury(1, treasuryB.address)
+  await controller.updateCoordinatorTreasury(id, treasuryB.address)
 
   const productInfo = {
     name: 'Squeeth',
@@ -247,8 +248,8 @@ export async function createProduct(
       targetUtilization: utils.parseEther('0.80'),
     },
   }
-  const productAddress = await controller.callStatic.createProduct(1, productInfo)
-  await controller.createProduct(1, productInfo)
+  const productAddress = await controller.callStatic.createProduct(id, productInfo)
+  await controller.createProduct(id, productInfo)
 
   return Product__factory.connect(productAddress, owner)
 }
@@ -256,17 +257,15 @@ export async function createProduct(
 export async function createIncentiveProgram(
   instanceVars: InstanceVars,
   product: Product,
-  nonProtocol = false,
+  coordinatorId = 0,
   amount = { maker: utils.parseEther('8000'), taker: utils.parseEther('2000') },
 ): Promise<BigNumber> {
   const { controller, owner, userC, incentivizer, incentiveToken } = instanceVars
   let programOwner = owner
-  let coordinatorId = 0
-  if (nonProtocol) {
+  if (coordinatorId > 0) {
     programOwner = userC
-    coordinatorId = 1
-    await controller.updateCoordinatorPendingOwner(1, userC.address)
-    await controller.connect(userC).acceptCoordinatorOwner(1)
+    await controller.updateCoordinatorPendingOwner(coordinatorId, userC.address)
+    await controller.connect(userC).acceptCoordinatorOwner(coordinatorId)
   }
   await incentiveToken.mint(programOwner.address, amount.maker.add(amount.taker))
   await incentiveToken.connect(programOwner).approve(incentivizer.address, amount.maker.add(amount.taker))

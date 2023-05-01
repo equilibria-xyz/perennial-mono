@@ -258,7 +258,7 @@ describe('Incentivizer', () => {
       product0 = await createProduct(instanceVars)
       product1 = await createProduct(instanceVars)
       program0 = await createIncentiveProgram(instanceVars, product0)
-      program1 = await createIncentiveProgram(instanceVars, product1, true, {
+      program1 = await createIncentiveProgram(instanceVars, product1, 2, {
         maker: utils.parseEther('4000'),
         taker: utils.parseEther('1000'),
       })
