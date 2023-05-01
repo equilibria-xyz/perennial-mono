@@ -8,10 +8,19 @@ import "./IBalancedVaultDefinition.sol";
 
 interface IBalancedVault is IBalancedVaultDefinition {
 
+    struct EpochContextMarket {
+        uint256 longVersion;
+        uint256 shortVersion;
+        UFixed18 price;
+        Position longPosition;
+        Position shortPosition;
+    }
+
     struct EpochContext {
         uint256 epoch;
         UFixed18 latestAssets;
         UFixed18 latestShares;
+        EpochContextMarket[] markets;
     }
 
     struct MarketEpoch {
