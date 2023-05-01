@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.17;
+pragma solidity 0.8.19;
 
 import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@equilibria/root/control/unstructured/UReentrancyGuard.sol";
@@ -223,6 +223,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         UFixed18 positionFee = amount.mul(latestOracleVersion.price.abs()).mul(takerFee());
         if (!positionFee.isZero()) controller().collateral().settleAccount(account, Fixed18Lib.from(-1, positionFee));
 
+        emit PositionFeeCharged(account, latestOracleVersion.version, positionFee);
         emit TakeOpened(account, latestOracleVersion.version, amount);
     }
 
@@ -260,6 +261,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         UFixed18 positionFee = amount.mul(latestOracleVersion.price.abs()).mul(takerFee());
         if (!positionFee.isZero()) controller().collateral().settleAccount(account, Fixed18Lib.from(-1, positionFee));
 
+        emit PositionFeeCharged(account, latestOracleVersion.version, positionFee);
         emit TakeClosed(account, latestOracleVersion.version, amount);
     }
 
@@ -297,6 +299,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         UFixed18 positionFee = amount.mul(latestOracleVersion.price.abs()).mul(makerFee());
         if (!positionFee.isZero()) controller().collateral().settleAccount(account, Fixed18Lib.from(-1, positionFee));
 
+        emit PositionFeeCharged(account, latestOracleVersion.version, positionFee);
         emit MakeOpened(account, latestOracleVersion.version, amount);
     }
 
@@ -335,6 +338,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         UFixed18 positionFee = amount.mul(latestOracleVersion.price.abs()).mul(makerFee());
         if (!positionFee.isZero()) controller().collateral().settleAccount(account, Fixed18Lib.from(-1, positionFee));
 
+        emit PositionFeeCharged(account, latestOracleVersion.version, positionFee);
         emit MakeClosed(account, latestOracleVersion.version, amount);
     }
 
