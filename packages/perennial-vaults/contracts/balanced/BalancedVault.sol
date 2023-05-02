@@ -311,8 +311,6 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
      */
     function convertToShares(UFixed18 assets) external view returns (UFixed18) {
         (EpochContext memory context, ) = _loadContextForRead(address(0));
-        (context.latestAssets, context.latestShares) =
-            (_totalAssetsAtEpoch(context), _totalSupplyAtEpoch(context));
         return _convertToSharesAtEpoch(context, assets);
     }
 
@@ -323,8 +321,6 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
      */
     function convertToAssets(UFixed18 shares) external view returns (UFixed18) {
         (EpochContext memory context, ) = _loadContextForRead(address(0));
-        (context.latestAssets, context.latestShares) =
-            (_totalAssetsAtEpoch(context), _totalSupplyAtEpoch(context));
         return _convertToAssetsAtEpoch(context, shares);
     }
 
@@ -484,8 +480,7 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
             UFixed18 marketCollateral = targetCollateral.muldiv(markets(marketId).weight, totalWeight);
             if (markets(marketId).long.closed() || markets(marketId).short.closed()) marketCollateral = UFixed18Lib.ZERO;
 
-            uint256 version = _versionAtEpoch(marketId, context.epoch);
-            UFixed18 currentPrice = markets(marketId).long.atVersion(version).price.abs();
+            UFixed18 currentPrice = markets(marketId).long.atVersion(markets(marketId).long.latestVersion()).price.abs();
             UFixed18 targetPosition = marketCollateral.mul(targetLeverage).div(currentPrice);
 
             _updateMakerPosition(markets(marketId).long, targetPosition);
@@ -505,8 +500,7 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
             // compute headroom until hitting taker amount
             Position memory position = product.positionAtVersion(product.latestVersion()).next(product.pre());
             UFixed18 makerAvailable = position.maker.gt(position.taker) ?
-            position.maker.sub(position.taker) :
-            UFixed18Lib.ZERO;
+                position.maker.sub(position.taker) : UFixed18Lib.ZERO;
 
             product.closeMake(accountPosition.sub(targetPosition).min(makerAvailable));
         }
@@ -655,7 +649,28 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
         address account
     ) private view returns (UFixed18) {
         if (_unhealthyAtEpoch(context)) return UFixed18Lib.ZERO;
-        return _balanceOfAtEpoch(accountContext, account);
+        UFixed18 maxAmount = _balanceOfAtEpoch(accountContext, account);
+
+        // Calculate the maximum amount we can take out of any supported market by finding the minimum amount we can close
+        for (uint256 marketId; marketId < totalMarkets; marketId++) {
+            MarketDefinition memory marketDefinition = markets(marketId);
+
+            uint256 longLatestVersion = marketDefinition.long.latestVersion();
+            uint256 shortLatestVersion = marketDefinition.short.latestVersion();
+
+            UFixed18 currentPrice = marketDefinition.long.atVersion(Math.min(longLatestVersion, shortLatestVersion)).price.abs();
+
+            Position memory longGlobalPosition = marketDefinition.long.positionAtVersion(longLatestVersion).next(marketDefinition.long.pre());
+            Position memory shortGlobalPosition = marketDefinition.short.positionAtVersion(shortLatestVersion).next(marketDefinition.short.pre());
+
+            UFixed18 longAvailable = longGlobalPosition.maker.sub(longGlobalPosition.taker.min(longGlobalPosition.maker));
+            UFixed18 shortAvailable = shortGlobalPosition.maker.sub(shortGlobalPosition.taker.min(shortGlobalPosition.maker));
+
+            UFixed18 collateral = longAvailable.min(shortAvailable).muldiv(currentPrice, targetLeverage);
+            collateral = collateral.mul(TWO).muldiv(totalWeight, marketDefinition.weight);
+            maxAmount = maxAmount.min(_convertToSharesAtEpoch(context, collateral));
+        }
+        return maxAmount;
     }
 
     /**
@@ -678,7 +693,7 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
      */
     function _totalSupplyAtEpoch(EpochContext memory context) private view returns (UFixed18) {
         if (context.epoch == _latestEpoch) return _totalSupply.add(_pendingRedemption);
-        return _totalSupply.add(_pendingRedemption).add(_convertToSharesAtEpoch(context, _deposit));
+        return _totalSupply.add(_pendingRedemption).add(_convertToShares(context, _deposit));
     }
 
     /**
@@ -689,7 +704,7 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
      */
     function _balanceOfAtEpoch(EpochContext memory accountContext, address account) private view returns (UFixed18) {
         if (accountContext.epoch == _latestEpochs[account]) return _balanceOf[account].add(_pendingRedemptions[account]);
-        return _balanceOf[account].add(_pendingRedemptions[account]).add(_convertToSharesAtEpoch(accountContext, _deposits[account]));
+        return _balanceOf[account].add(_pendingRedemptions[account]).add(_convertToShares(accountContext, _deposits[account]));
     }
 
     /**
@@ -699,7 +714,7 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
      */
     function _totalUnclaimedAtEpoch(EpochContext memory context) private view returns (UFixed18) {
         if (context.epoch == _latestEpoch) return _totalUnclaimed;
-        return _totalUnclaimed.add(_convertToAssetsAtEpoch(context, _redemption));
+        return _totalUnclaimed.add(_convertToAssets(context, _redemption));
     }
 
     /**
@@ -710,7 +725,29 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
      */
     function _unclaimedAtEpoch(EpochContext memory accountContext, address account) private view returns (UFixed18) {
         if (accountContext.epoch == _latestEpochs[account]) return _unclaimed[account];
-        return _unclaimed[account].add(_convertToAssetsAtEpoch(accountContext, _redemptions[account]));
+        return _unclaimed[account].add(_convertToAssets(accountContext, _redemptions[account]));
+    }
+
+    /**
+     * @notice Converts a given amount of shares to assets at epoch
+     * @param context Epoch context to use in calculation
+     * @param shares Number of shares to convert to assets
+     * @return Amount of assets for the given shares
+     */
+    function _convertToAssetsAtEpoch(EpochContext memory context, UFixed18 shares) private view returns (UFixed18) {
+        (context.latestAssets, context.latestShares) = (_totalAssetsAtEpoch(context), _totalSupplyAtEpoch(context));
+        return _convertToAssets(context, shares);
+    }
+
+    /**
+     * @notice Converts a given amount of assets to shares at epoch
+     * @param context Epoch context to use in calculation
+     * @param assets Number of assets to convert to shares
+     * @return Amount of shares for the given assets
+     */
+    function _convertToSharesAtEpoch(EpochContext memory context, UFixed18 assets) private view returns (UFixed18) {
+        (context.latestAssets, context.latestShares) = (_totalAssetsAtEpoch(context), _totalSupplyAtEpoch(context));
+        return _convertToShares(context, assets);
     }
 
     /**
@@ -720,30 +757,30 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
     function _assets() public view returns (UFixed18 value) {
         value = asset.balanceOf();
         for (uint256 marketId; marketId < totalMarkets; marketId++) {
-           value = value
+            value = value
                 .add(collateral.collateral(address(this), markets(marketId).long))
                 .add(collateral.collateral(address(this), markets(marketId).short));
         }
     }
 
     /**
-     * @notice Converts a given amount of assets to shares at epoch
+     * @notice Converts a given amount of assets to shares
      * @param context Epoch context to use in calculation
      * @param assets Number of assets to convert to shares
      * @return Amount of shares for the given assets at epoch
      */
-    function _convertToSharesAtEpoch(EpochContext memory context, UFixed18 assets) private pure returns (UFixed18) {
+    function _convertToShares(EpochContext memory context, UFixed18 assets) private pure returns (UFixed18) {
         if (context.latestAssets.isZero()) return assets;
         return assets.muldiv(context.latestShares, context.latestAssets);
     }
 
     /**
-     * @notice Converts a given amount of shares to assets at epoch
+     * @notice Converts a given amount of shares to assets
      * @param context Epoch context to use in calculation
      * @param shares Number of shares to convert to shares
      * @return Amount of assets for the given shares at epoch
      */
-    function _convertToAssetsAtEpoch(EpochContext memory context, UFixed18 shares) private pure returns (UFixed18) {
+    function _convertToAssets(EpochContext memory context, UFixed18 shares) private pure returns (UFixed18) {
         if (context.latestShares.isZero()) return shares;
         return shares.muldiv(context.latestAssets, context.latestShares);
     }
@@ -798,7 +835,8 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
         longAccumulated = longAccumulated.max(Fixed18Lib.from(marketEpoch.longAssets).mul(Fixed18Lib.NEG_ONE));
         shortAccumulated = shortAccumulated.max(Fixed18Lib.from(marketEpoch.shortAssets).mul(Fixed18Lib.NEG_ONE));
 
-        return longAccumulated.add(shortAccumulated);
+        return (markets(marketId).long.latestVersion() > version ? longAccumulated : Fixed18Lib.ZERO)
+            .add((markets(marketId).short.latestVersion() > version ? shortAccumulated : Fixed18Lib.ZERO));
     }
 
     /**

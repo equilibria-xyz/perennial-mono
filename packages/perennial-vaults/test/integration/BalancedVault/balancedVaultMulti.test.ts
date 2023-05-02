@@ -179,24 +179,20 @@ describe('BalancedVault (Multi-Payoff)', () => {
     asset = IERC20Metadata__factory.connect(await vault.asset(), owner)
 
     const dsuMinter = await impersonate.impersonateWithBalance(DSU_MINTER, utils.parseEther('10'))
-    const setUpWalletWithDSU = async (wallet: SignerWithAddress) => {
+    const setUpWalletWithDSU = async (wallet: SignerWithAddress, amount?: BigNumber) => {
       const dsuIface = new utils.Interface(['function mint(uint256)'])
       await dsuMinter.sendTransaction({
         to: dsu.address,
         value: 0,
-        data: dsuIface.encodeFunctionData('mint', [utils.parseEther('200000')]),
+        data: dsuIface.encodeFunctionData('mint', [amount ?? utils.parseEther('200000')]),
       })
-      await dsu.connect(dsuMinter).transfer(wallet.address, utils.parseEther('200000'))
+      await dsu.connect(dsuMinter).transfer(wallet.address, amount ?? utils.parseEther('200000'))
       await dsu.connect(wallet).approve(vault.address, ethers.constants.MaxUint256)
     }
     await setUpWalletWithDSU(user)
     await setUpWalletWithDSU(user2)
     await setUpWalletWithDSU(liquidator)
-    await setUpWalletWithDSU(perennialUser)
-    await setUpWalletWithDSU(perennialUser)
-    await setUpWalletWithDSU(perennialUser)
-    await setUpWalletWithDSU(perennialUser)
-    await setUpWalletWithDSU(perennialUser)
+    await setUpWalletWithDSU(perennialUser, utils.parseEther('1000000'))
     await setUpWalletWithDSU(btcUser1)
     await setUpWalletWithDSU(btcUser2)
 
@@ -1063,7 +1059,7 @@ describe('BalancedVault (Multi-Payoff)', () => {
       expect(await vault.totalUnclaimed()).to.equal(0)
     })
 
-    it('maxWithdraw', async () => {
+    it('maxRedeem', async () => {
       const smallDeposit = utils.parseEther('1000')
       await vault.connect(user).deposit(smallDeposit, user.address)
       await updateOracle()
@@ -1080,12 +1076,12 @@ describe('BalancedVault (Multi-Payoff)', () => {
       const shareAmount2 = BigNumber.from('9999999163335820361100')
       expect(await vault.maxRedeem(user.address)).to.equal(shareAmount.add(shareAmount2))
 
-      // We shouldn't be able to withdraw more than maxWithdraw.
+      // We shouldn't be able to withdraw more than maxRedeem.
       await expect(
         vault.connect(user).redeem((await vault.maxRedeem(user.address)).add(1), user.address),
       ).to.be.revertedWithCustomError(vault, 'BalancedVaultRedemptionLimitExceeded')
 
-      // But we should be able to withdraw exactly maxWithdraw.
+      // But we should be able to withdraw exactly maxRedeem.
       await vault.connect(user).redeem(await vault.maxRedeem(user.address), user.address)
 
       // The oracle price hasn't changed yet, so we shouldn't be able to withdraw any more.
@@ -1104,6 +1100,45 @@ describe('BalancedVault (Multi-Payoff)', () => {
       await vault.claim(user.address)
       expect(await totalCollateralInVault()).to.eq(0)
       expect(await vault.totalAssets()).to.equal(0)
+    })
+
+    it('maxRedeem with close limited', async () => {
+      const largeDeposit = utils.parseEther('10000')
+      await vault.connect(user).deposit(largeDeposit, user.address)
+      await updateOracle()
+      await vault.sync()
+
+      const btcGlobalPre = await btcLong['pre()']()
+      const btcGlobalPosition = await btcLong.positionAtVersion(await btcLong['latestVersion()']())
+      const btcGlobalNext = {
+        maker: btcGlobalPosition.maker.add(btcGlobalPre.openPosition.maker.sub(btcGlobalPre.closePosition.maker)),
+        taker: btcGlobalPosition.taker.add(btcGlobalPre.openPosition.taker.sub(btcGlobalPre.closePosition.taker)),
+      }
+      // Open taker position up to 100% utilization minus 1 BTC
+      await asset.connect(perennialUser).approve(collateral.address, constants.MaxUint256)
+      await collateral
+        .connect(perennialUser)
+        .depositTo(perennialUser.address, btcLong.address, utils.parseEther('1000000'))
+      await btcLong
+        .connect(perennialUser)
+        .openTake(btcGlobalNext.maker.sub(btcGlobalNext.taker).sub(utils.parseEther('0.1')))
+
+      await updateOracle()
+      await btcLong.settle()
+
+      // The vault can close 1 BTC of maker positions in the long market, which means the user can withdraw double this amount
+      const expectedMaxRedeem = await vault.convertToShares(
+        btcOriginalOraclePrice.mul(utils.parseEther('0.1')).mul(2).div(leverage).mul(5),
+      )
+      expect(await vault.maxRedeem(user.address)).to.equal(expectedMaxRedeem)
+
+      await vault.sync()
+
+      await expect(
+        vault.connect(user).redeem((await vault.maxRedeem(user.address)).add(1), user.address),
+      ).to.be.revertedWithCustomError(vault, 'BalancedVaultRedemptionLimitExceeded')
+
+      await expect(vault.connect(user).redeem(await vault.maxRedeem(user.address), user.address)).to.not.be.reverted
     })
 
     it('maxDeposit', async () => {
@@ -1307,8 +1342,8 @@ describe('BalancedVault (Multi-Payoff)', () => {
       await updateOracle()
       await vault.sync()
 
-      // Redeem should create a greater position delta than what's available
-      await vault.connect(user).redeem(utils.parseEther('4000'), user.address)
+      // Redeem should create a slightly greater position delta than what's available
+      await vault.connect(user).redeem(await vault.maxRedeem(user.address), user.address)
       await updateOracle()
       await vault.sync()
 
