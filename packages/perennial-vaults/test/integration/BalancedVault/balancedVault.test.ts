@@ -85,10 +85,6 @@ describe('BalancedVault', () => {
 
     const dsu = IERC20Metadata__factory.connect('0x605D26FBd5be761089281d5cec2Ce86eeA667109', owner)
     controller = IController__factory.connect('0x9df509186b6d3b7D033359f94c8b1BB5544d51b3', owner)
-    controllerOwner = await impersonate.impersonateWithBalance(
-      await controller.callStatic['owner()'](),
-      utils.parseEther('10'),
-    )
     long = IProduct__factory.connect('0xdB60626FF6cDC9dB07d3625A93d21dDf0f8A688C', owner)
     short = IProduct__factory.connect('0xfeD3E166330341e0305594B8c6e6598F9f4Cbe9B', owner)
     collateral = ICollateral__factory.connect('0x2d264ebdb6632a06a1726193d4d37fef1e5dbdcd', owner)
@@ -106,24 +102,20 @@ describe('BalancedVault', () => {
     asset = IERC20Metadata__factory.connect(await vault.asset(), owner)
 
     const dsuMinter = await impersonate.impersonateWithBalance(DSU_MINTER, utils.parseEther('10'))
-    const setUpWalletWithDSU = async (wallet: SignerWithAddress) => {
+    const setUpWalletWithDSU = async (wallet: SignerWithAddress, amount?: BigNumber) => {
       const dsuIface = new utils.Interface(['function mint(uint256)'])
       await dsuMinter.sendTransaction({
         to: dsu.address,
         value: 0,
-        data: dsuIface.encodeFunctionData('mint', [utils.parseEther('200000')]),
+        data: dsuIface.encodeFunctionData('mint', [amount ?? utils.parseEther('200000')]),
       })
-      await dsu.connect(dsuMinter).transfer(wallet.address, utils.parseEther('200000'))
+      await dsu.connect(dsuMinter).transfer(wallet.address, amount ?? utils.parseEther('200000'))
       await dsu.connect(wallet).approve(vault.address, ethers.constants.MaxUint256)
     }
     await setUpWalletWithDSU(user)
     await setUpWalletWithDSU(user2)
     await setUpWalletWithDSU(liquidator)
-    await setUpWalletWithDSU(perennialUser)
-    await setUpWalletWithDSU(perennialUser)
-    await setUpWalletWithDSU(perennialUser)
-    await setUpWalletWithDSU(perennialUser)
-    await setUpWalletWithDSU(perennialUser)
+    await setUpWalletWithDSU(perennialUser, utils.parseEther('1000000'))
 
     // Unfortunately, we can't make mocks of existing contracts.
     // So, we make a fake and initialize it with the values that the real contract had at this block.
@@ -399,7 +391,7 @@ describe('BalancedVault', () => {
       expect(await vault.totalUnclaimed()).to.equal(0)
     })
 
-    it('maxWithdraw', async () => {
+    it('maxRedeem', async () => {
       const smallDeposit = utils.parseEther('500')
       await vault.connect(user).deposit(smallDeposit, user.address)
       await updateOracle()
@@ -416,12 +408,12 @@ describe('BalancedVault', () => {
       const shareAmount2 = BigNumber.from('9999999998435236774264')
       expect(await vault.maxRedeem(user.address)).to.equal(shareAmount.add(shareAmount2))
 
-      // We shouldn't be able to withdraw more than maxWithdraw.
+      // We shouldn't be able to withdraw more than maxRedeem.
       await expect(
         vault.connect(user).redeem((await vault.maxRedeem(user.address)).add(1), user.address),
       ).to.be.revertedWithCustomError(vault, 'BalancedVaultRedemptionLimitExceeded')
 
-      // But we should be able to withdraw exactly maxWithdraw.
+      // But we should be able to withdraw exactly maxRedeem.
       await vault.connect(user).redeem(await vault.maxRedeem(user.address), user.address)
 
       // The oracle price hasn't changed yet, so we shouldn't be able to withdraw any more.
@@ -438,6 +430,46 @@ describe('BalancedVault', () => {
       await vault.claim(user.address)
       expect(await totalCollateralInVault()).to.eq(0)
       expect(await vault.totalAssets()).to.equal(0)
+    })
+
+    it('maxRedeem with close limited', async () => {
+      const largeDeposit = utils.parseEther('10000')
+      await vault.connect(user).deposit(largeDeposit, user.address)
+      await updateOracle()
+      await vault.sync()
+
+      const globalPre = await long['pre()']()
+      const globalPosition = await long.positionAtVersion(await long['latestVersion()']())
+      const globalNext = {
+        maker: globalPosition.maker.add(globalPre.openPosition.maker.sub(globalPre.closePosition.maker)),
+        taker: globalPosition.taker.add(globalPre.openPosition.taker.sub(globalPre.closePosition.taker)),
+      }
+
+      // Open taker position up to 100% utilization minus 1 ETH
+      await asset.connect(perennialUser).approve(collateral.address, constants.MaxUint256)
+      await collateral
+        .connect(perennialUser)
+        .depositTo(perennialUser.address, long.address, utils.parseEther('1000000'))
+      await long.connect(perennialUser).openTake(globalNext.maker.sub(globalNext.taker).sub(utils.parseEther('1')))
+
+      // Settle the take position
+      await updateOracle()
+      await long.settle()
+
+      // The vault can close 1 ETH of maker positions in the long market, which means the user can withdraw double this amount
+      const expectedShares = await vault.convertToShares(
+        originalOraclePrice.mul(utils.parseEther('1')).mul(2).div(leverage),
+      )
+      expect(await vault.maxRedeem(user.address)).to.equal(expectedShares)
+
+      await vault.sync()
+      const redeemAmount = (await vault.maxRedeem(user.address)).add(1)
+
+      await expect(
+        vault.connect(user).redeem((await vault.maxRedeem(user.address)).add(1), user.address),
+      ).to.be.revertedWithCustomError(vault, 'BalancedVaultRedemptionLimitExceeded')
+
+      await expect(vault.connect(user).redeem(await vault.maxRedeem(user.address), user.address)).to.not.be.reverted
     })
 
     it('maxDeposit', async () => {
@@ -629,8 +661,8 @@ describe('BalancedVault', () => {
       await updateOracle()
       await vault.sync()
 
-      // Redeem should create a greater position delta than what's available
-      await vault.connect(user).redeem(utils.parseEther('5000'), user.address)
+      // Redeem should create a slightly greater position delta than what's available
+      await vault.connect(user).redeem(await vault.maxRedeem(user.address), user.address)
       await updateOracle()
       await vault.sync()
 

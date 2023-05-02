@@ -72,6 +72,7 @@ contract BalancedVaultDefinition is IBalancedVaultDefinition {
         controller = controller_;
         collateral = controller_.collateral();
         targetLeverage = targetLeverage_;
+
         maxCollateral = maxCollateral_;
 
         uint256 totalMarkets_ = Math.min(marketDefinitions_.length, MAX_MARKETS);

@@ -1,0 +1,13 @@
+diff --git a/node_modules/hardhat/console.sol b/node_modules/hardhat/console.sol
+index f38d19a..bbc6045 100644
+--- a/node_modules/hardhat/console.sol
++++ b/node_modules/hardhat/console.sol
+@@ -7,7 +7,7 @@ library console {
+ 	function _sendLogPayload(bytes memory payload) private view {
+ 		uint256 payloadLength = payload.length;
+ 		address consoleAddress = CONSOLE_ADDRESS;
+-		assembly {
++		assembly ("memory-safe") {
+ 			let payloadStart := add(payload, 32)
+ 			let r := staticcall(gas(), consoleAddress, payloadStart, payloadLength, 0, 0)
+ 		}
