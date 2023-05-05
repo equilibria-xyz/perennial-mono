@@ -11,7 +11,6 @@ import "./types/ChainlinkRegistry.sol";
  * @notice Chainlink registry implementation of the IOracle interface.
  * @dev One instance per Chainlink price feed should be deployed. Multiple products may use the same
  *      ChainlinkOracle instance if their payoff functions are based on the same underlying oracle.
- *      This implementation only supports non-negative prices.
  */
 contract ChainlinkOracle is IOracleProvider {
     /// @dev Chainlink registry feed address
