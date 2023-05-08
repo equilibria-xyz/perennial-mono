@@ -386,6 +386,41 @@ describe('MultiInvoker', () => {
         .withArgs(multiInvoker.address, user.address, 10000e6)
     })
 
+    it('performs WITHDRAW_AND_UNWRAP with max uint256', async () => {
+      const { user, multiInvoker, batcher, usdc, collateral, reserve, dsu } = instanceVars
+
+      // Load the Reserve with some USDC
+      await usdc.connect(user).approve(batcher.address, constants.MaxUint256)
+      await batcher.connect(user).wrap(amount, user.address)
+      await batcher.rebalance()
+
+      // Deposit the collateral to withdraw
+      await multiInvoker.connect(user).invoke([actions.DEPOSIT])
+
+      // Ensure this works without a DSU aproval
+      await dsu.connect(user).approve(multiInvoker.address, 0)
+
+      const maxActions = buildInvokerActions({
+        userAddress: user.address,
+        productAddress: product.address,
+        position,
+        amount: constants.MaxUint256,
+        programs,
+        vaultAddress: vault.address,
+        vaultAmount,
+        feeAmount: feeAmount,
+      })
+      await expect(multiInvoker.connect(user).invoke([maxActions.WITHDRAW_AND_UNWRAP]))
+        .to.emit(collateral, 'Withdrawal')
+        .withArgs(user.address, product.address, amount)
+        .to.emit(reserve, 'Redeem')
+        .withArgs(multiInvoker.address, amount, 10000e6)
+        .to.emit(usdc, 'Transfer')
+        .withArgs(reserve.address, multiInvoker.address, 10000e6)
+        .to.emit(usdc, 'Transfer')
+        .withArgs(multiInvoker.address, user.address, 10000e6)
+    })
+
     it('Skips the reserve if batcher has enough USDC deposits', async () => {
       const { user, multiInvoker, batcher, usdc, usdcHolder } = instanceVars
 

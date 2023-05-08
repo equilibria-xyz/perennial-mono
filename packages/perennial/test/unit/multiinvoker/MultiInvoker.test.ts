@@ -263,6 +263,31 @@ describe('MultiInvoker', () => {
       expect(batcher.unwrap).to.have.been.calledWith(amount, user.address)
     })
 
+    it('handles max uint256 amounts in WITHDRAW_AND_UNWRAP action', async () => {
+      const maxActions = buildInvokerActions({
+        userAddress: user.address,
+        productAddress: product.address,
+        position,
+        amount: ethers.constants.MaxUint256,
+        programs,
+        vaultAddress: vault.address,
+        vaultAmount,
+        feeAmount: feeAmount,
+      })
+      collateral['collateral(address,address)'].whenCalledWith(user.address, product.address).returns(amount)
+
+      await expect(multiInvoker.connect(user).invoke([maxActions.WITHDRAW_AND_UNWRAP])).to.not.be.reverted
+
+      expect(collateral.withdrawFrom).to.have.been.calledWith(
+        user.address,
+        multiInvoker.address,
+        product.address,
+        amount,
+      )
+
+      expect(batcher.unwrap).to.have.been.calledWith(amount, user.address)
+    })
+
     it('withdraws then unwraps DSU to USDC using RESERVE on WITHDRAW_AND_UNWRAP action if amount is greater than batcher balance', async () => {
       usdc.balanceOf.whenCalledWith(batcher.address).returns(0)
 

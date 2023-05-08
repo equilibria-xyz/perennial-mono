@@ -276,6 +276,12 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
      * @param amount Amount of DSU to withdraw from the collateral account
      */
     function _withdrawAndUnwrap(address receiver, IProduct product, UFixed18 amount) internal {
+        // If amount is uint256 max, withdraw the entire balance
+        if (amount.eq(UFixed18Lib.MAX)) {
+            product.settleAccount(msg.sender);
+            amount = collateral.collateral(msg.sender, product);
+        }
+
         // Withdraw the amount from the collateral account
         collateral.withdrawFrom(msg.sender, address(this), product, amount);
 
@@ -371,10 +377,10 @@ contract MultiInvoker is IMultiInvoker, UInitializable {
     }
 
     /**
-     * @notice Helper function to include an interface fee 
+     * @notice Helper function to include an interface fee
      * @param receiver The interface receiving the fee
      * @param amount The amount of DSU to credit the interface
-     * @param wrapped Bool to specify is USDC is wrapped to DSU 
+     * @param wrapped Bool to specify is USDC is wrapped to DSU
      */
     function _chargeFee(address receiver, UFixed18 amount, bool wrapped) internal {
         if (wrapped) {
