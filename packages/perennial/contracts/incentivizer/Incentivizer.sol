@@ -109,8 +109,6 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
      */
     function _handleSyncResult(IProduct product, ProductManagerLib.SyncResult memory syncResult) private {
         uint256 programId = syncResult.programId;
-        if (!syncResult.refundAmount.isZero())
-            _products[product].token(programId).push(treasury(product, programId), syncResult.refundAmount);
         if (syncResult.versionStarted != 0)
             emit ProgramStarted(product, programId, syncResult.versionStarted);
         if (syncResult.versionComplete != 0)
@@ -310,6 +308,15 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
      */
     function treasury(IProduct product, uint256 programId) public view returns (address) {
         return controller().treasury(_products[product].programInfos[programId].coordinatorId);
+    }
+
+    /**
+     * @notice Returns the treasury of a specific program
+     * @param coordinatorId Coordinator to get the treasury for to return for
+     * @return The treasury of `programId`
+     */
+    function treasury(uint256 coordinatorId) public view returns (address) {
+        return controller().treasury(coordinatorId);
     }
 
     /// @dev Helper to fully settle an account's state

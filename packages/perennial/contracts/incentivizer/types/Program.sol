@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.13;
 
+import "../../interfaces/IIncentivizer.sol";
 import "../../interfaces/types/ProgramInfo.sol";
 
 /// @dev Program type
@@ -52,13 +53,12 @@ library ProgramLib {
      * @param product The Product to operate on
      * @param programInfo Static program information
      * @return versionComplete The version that the program completed on
-     * @return refundAmount The refund amount from the program
      */
     function complete(
         Program storage self,
         IProduct product,
         ProgramInfo memory programInfo
-    ) internal returns (uint256 versionComplete, UFixed18 refundAmount) {
+    ) internal returns (uint256 versionComplete) {
         uint256 versionStarted = self.versionStarted;
         versionComplete = Math.max(versionStarted, product.latestVersion());
         self.versionComplete = versionComplete;
@@ -67,8 +67,10 @@ library ProgramLib {
         IOracleProvider.OracleVersion memory toOracleVersion = product.atVersion(versionComplete);
 
         uint256 inactiveDuration = programInfo.duration - (toOracleVersion.timestamp - fromOracleVersion.timestamp);
-        refundAmount = programInfo.amount.sum().muldiv(inactiveDuration, programInfo.duration);
+        UFixed18 refundAmount = programInfo.amount.sum().muldiv(inactiveDuration, programInfo.duration);
         self.available = self.available.sub(refundAmount);
+        address treasury = IIncentivizer(address(this)).treasury(programInfo.coordinatorId);
+        self.settled[treasury] = self.settled[treasury].add(refundAmount);
     }
 
     /**

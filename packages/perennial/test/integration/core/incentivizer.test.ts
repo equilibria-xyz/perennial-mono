@@ -75,7 +75,8 @@ describe('Incentivizer', () => {
     expect(await incentivizer.versionComplete(product.address, PROGRAM_ID)).to.equal(0)
 
     expect(await incentivizer.owner(product.address, PROGRAM_ID)).to.equal(owner.address)
-    expect(await incentivizer.treasury(product.address, PROGRAM_ID)).to.equal(treasuryA.address)
+    expect(await incentivizer['treasury(address,uint256)'](product.address, PROGRAM_ID)).to.equal(treasuryA.address)
+    expect(await incentivizer['treasury(uint256)'](0)).to.equal(treasuryA.address)
   })
 
   it('creates a product owned program', async () => {
@@ -115,7 +116,8 @@ describe('Incentivizer', () => {
     expect(await incentivizer.versionComplete(product.address, PROGRAM_ID)).to.equal(0)
 
     expect(await incentivizer.owner(product.address, PROGRAM_ID)).to.equal(userB.address)
-    expect(await incentivizer.treasury(product.address, PROGRAM_ID)).to.equal(treasuryB.address)
+    expect(await incentivizer['treasury(address,uint256)'](product.address, PROGRAM_ID)).to.equal(treasuryB.address)
+    expect(await incentivizer['treasury(uint256)'](1)).to.equal(treasuryB.address)
   })
 
   it('correctly syncs', async () => {
@@ -176,8 +178,6 @@ describe('Incentivizer', () => {
 
     await chainlink.nextWithTimestampModification(ts => ts.add(2 * YEAR))
     await expect(product.settle())
-      .to.emit(incentiveToken, 'Transfer')
-      .withArgs(incentivizer.address, treasuryA.address, '9999662208504801097393') // Refund Amount
       .to.emit(incentivizer, 'ProgramComplete')
       .withArgs(product.address, PROGRAM_ID, INITIAL_VERSION + 3)
 
@@ -195,6 +195,10 @@ describe('Incentivizer', () => {
 
     expect(await incentivizer.available(product.address, PROGRAM_ID)).to.equal('101808984910837662')
     expect(await incentivizer.active(product.address)).to.equal(0)
+    // Refund amount
+    expect(await incentivizer.unclaimed(product.address, treasuryA.address, PROGRAM_ID)).to.equal(
+      '9999662208504801097393',
+    )
   })
 
   it('completes early', async () => {
@@ -220,8 +224,6 @@ describe('Incentivizer', () => {
     await product.settle()
 
     await expect(incentivizer.complete(product.address, PROGRAM_ID))
-      .to.emit(incentiveToken, 'Transfer')
-      .withArgs(incentivizer.address, treasuryA.address, '9999662208504801097393') // Refund Amount
       .to.emit(incentivizer, 'ProgramComplete')
       .withArgs(product.address, PROGRAM_ID, INITIAL_VERSION + 3)
 
@@ -239,6 +241,10 @@ describe('Incentivizer', () => {
 
     expect(await incentivizer.available(product.address, PROGRAM_ID)).to.equal('101808984910837662')
     expect(await incentivizer.active(product.address)).to.equal(0)
+    // Refund amount
+    expect(await incentivizer.unclaimed(product.address, treasuryA.address, PROGRAM_ID)).to.equal(
+      '9999662208504801097393',
+    )
   })
 
   describe('multiple programs on multiple products', async () => {
