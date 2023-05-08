@@ -179,7 +179,7 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
      * @param product Product to claim rewards for
      * @param programIds Programs to claim rewards for
      */
-    function _claimProduct(address account, IProduct product, uint256[] memory programIds)
+    function _claimProduct(address account, IProduct product, uint256[] calldata programIds)
     private
     isProduct(product)
     notPaused
