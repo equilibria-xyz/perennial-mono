@@ -491,7 +491,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
      * @dev only callable by product owner. Settles the product before flipping the flag
      * @param newClosed new closed value
      */
-    function updateClosed(bool newClosed) external nonReentrant onlyProductOwner {
+    function updateClosed(bool newClosed) external nonReentrant notPaused onlyProductOwner {
         IOracleProvider.OracleVersion memory oracleVersion = _settle();
         _closed.store(newClosed);
         emit ClosedUpdated(newClosed, oracleVersion.version);
