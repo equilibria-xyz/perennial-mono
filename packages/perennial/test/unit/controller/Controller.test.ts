@@ -654,4 +654,24 @@ describe('Controller', () => {
         .withArgs(0)
     })
   })
+
+  context('invalid product', () => {
+    describe('#treasury(IProduct product)', () => {
+      it('reverts', async () => {
+        await expect(controller['treasury(address)'](constants.AddressZero)).to.be.revertedWithCustomError(
+          controller,
+          'ControllerNotProductError',
+        )
+      })
+    })
+
+    describe('#owner(IProduct product)', () => {
+      it('reverts', async () => {
+        await expect(controller['owner(address)'](constants.AddressZero)).to.be.revertedWithCustomError(
+          controller,
+          'ControllerNotProductError',
+        )
+      })
+    })
+  })
 })

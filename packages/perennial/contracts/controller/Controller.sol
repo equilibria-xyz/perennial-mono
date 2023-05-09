@@ -299,7 +299,7 @@ contract Controller is IController, UInitializable {
      * @param product Contract address to check
      * @return Whether a contract is a product
      */
-    function isProduct(IProduct product) external view returns (bool) {
+    function isProduct(IProduct product) public view returns (bool) {
         return coordinatorFor[product] != 0;
     }
 
@@ -352,6 +352,7 @@ contract Controller is IController, UInitializable {
      * @return Owner of the product
      */
     function owner(IProduct product) external view returns (address) {
+        if (!isProduct(product)) revert ControllerNotProductError();
         return owner(coordinatorFor[product]);
     }
 
@@ -382,6 +383,7 @@ contract Controller is IController, UInitializable {
      * @return Treasury of the product
      */
     function treasury(IProduct product) external view returns (address) {
+        if (!isProduct(product)) revert ControllerNotProductError();
         return treasury(coordinatorFor[product]);
     }
 
