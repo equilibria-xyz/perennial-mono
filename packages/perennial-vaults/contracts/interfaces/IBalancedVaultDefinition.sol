@@ -12,6 +12,12 @@ interface IBalancedVaultDefinition {
     }
 
     error BalancedVaultDefinitionInvalidMarketIdError();
+    error BalancedVaultDefinitionZeroTargetLeverageError();
+    error BalancedVaultDefinitionNoMarketsError();
+    error BalancedVaultDefinitionLongAndShortAreSameProductError();
+    error BalancedVaultInvalidProductError(IProduct product);
+    error BalancedVaultDefinitionOracleMismatchError();
+    error BalancedVaultDefinitionZeroWeightError();
 
     function asset() external view returns (Token18);
     function totalMarkets() external view returns (uint256);

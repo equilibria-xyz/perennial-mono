@@ -47,7 +47,6 @@ describe('Vault - Perennial Vaults - Multi-Asset Upgrade', () => {
     ])
 
     const newImpl = await new BalancedVault__factory(signer).deploy(
-      await vault.asset(),
       await vault.controller(),
       await vault.targetLeverage(),
       await vault.maxCollateral(),
@@ -74,7 +73,6 @@ describe('Vault - Perennial Vaults - Multi-Asset Upgrade', () => {
       const [long, short] = await Promise.all([prevVault.long(), prevVault.short()])
 
       const newImpl = await new BalancedVault__factory(signer).deploy(
-        await vault.asset(),
         await vault.controller(),
         await vault.targetLeverage(),
         await vault.maxCollateral(),
@@ -103,7 +101,6 @@ describe('Vault - Perennial Vaults - Multi-Asset Upgrade', () => {
       ])
 
       const newImplMulti = await new BalancedVault__factory(signer).deploy(
-        await vault.asset(),
         await vault.controller(),
         await vault.targetLeverage(),
         await vault.maxCollateral(),
@@ -135,7 +132,6 @@ describe('Vault - Perennial Vaults - Multi-Asset Upgrade', () => {
         const arbShort = deployments['Product_ShortArbitrum'].address
         const market0 = await vault.markets(0)
         const newImplMulti = await new BalancedVault__factory(signer).deploy(
-          await vault.asset(),
           await vault.controller(),
           await vault.targetLeverage(),
           await vault.maxCollateral(),

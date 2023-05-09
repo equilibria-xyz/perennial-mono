@@ -11,7 +11,7 @@ import "./BalancedVaultDefinition.sol";
  * @notice ERC4626 vault that manages a 50-50 position between long-short markets of the same payoff on Perennial.
  * @dev Vault deploys and rebalances collateral between the corresponding long and short markets, while attempting to
  *      maintain `targetLeverage` with its open positions at any given time. Deposits are only gated in so much as to cap
- *      the maximum amount of assets in the vault.
+ *      the maximum amount of assets in the vault. The long and short markets are expected o have the same oracle.
  *
  *      The vault has a "delayed mint" mechanism for shares on deposit. After depositing to the vault, a user must wait
  *      until the next settlement of the underlying products in order for shares to be reflected in the getters.
@@ -87,13 +87,12 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
     mapping(address => uint256) private _pendingEpochs;
 
     constructor(
-        Token18 asset_,
         IController controller_,
         UFixed18 targetLeverage_,
         UFixed18 maxCollateral_,
         MarketDefinition[] memory marketDefinitions_
     )
-    BalancedVaultDefinition(asset_, controller_, targetLeverage_, maxCollateral_, marketDefinitions_)
+    BalancedVaultDefinition(controller_, targetLeverage_, maxCollateral_, marketDefinitions_)
     { }
 
     /**

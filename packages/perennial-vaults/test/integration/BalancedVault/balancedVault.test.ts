@@ -95,7 +95,7 @@ describe('BalancedVault', () => {
     leverage = utils.parseEther('4.0')
     maxCollateral = utils.parseEther('500000')
 
-    vault = await new BalancedVault__factory(owner).deploy(dsu.address, controller.address, leverage, maxCollateral, [
+    vault = await new BalancedVault__factory(owner).deploy(controller.address, leverage, maxCollateral, [
       {
         long: long.address,
         short: short.address,
@@ -137,6 +137,78 @@ describe('BalancedVault', () => {
     oracle.sync.returns(currentVersion)
     oracle.currentVersion.returns(currentVersion)
     oracle.atVersion.whenCalledWith(currentVersion[0]).returns(currentVersion)
+  })
+
+  describe('#constructor', () => {
+    it('checks that there is at least one market', async () => {
+      await expect(
+        new BalancedVault__factory(owner).deploy(controller.address, leverage, maxCollateral, []),
+      ).to.revertedWithCustomError(vault, 'BalancedVaultDefinitionNoMarketsError')
+    })
+
+    it('checks that all weights are greater than zero', async () => {
+      await expect(
+        new BalancedVault__factory(owner).deploy(controller.address, leverage, maxCollateral, [
+          {
+            long: long.address,
+            short: short.address,
+            weight: 0,
+          },
+        ]),
+      ).to.revertedWithCustomError(vault, 'BalancedVaultDefinitionZeroWeightError')
+
+      // At least one of the weights can be zero as long as not all of them are.
+      await expect(
+        new BalancedVault__factory(owner).deploy(controller.address, leverage, maxCollateral, [
+          {
+            long: long.address,
+            short: short.address,
+            weight: 0,
+          },
+          {
+            long: long.address,
+            short: short.address,
+            weight: 1,
+          },
+        ]),
+      ).to.not.be.reverted
+    })
+
+    it('checks that all products are valid', async () => {
+      await expect(
+        new BalancedVault__factory(owner).deploy(controller.address, leverage, maxCollateral, [
+          {
+            long: '0x0000000000000000000000000000000000000000',
+            short: short.address,
+            weight: 1,
+          },
+        ]),
+      ).to.revertedWithCustomError(vault, 'BalancedVaultInvalidProductError')
+    })
+
+    it('checks that target leverage is positive', async () => {
+      await expect(
+        new BalancedVault__factory(owner).deploy(controller.address, 0, maxCollateral, [
+          {
+            long: long.address,
+            short: short.address,
+            weight: 1,
+          },
+        ]),
+      ).to.revertedWithCustomError(vault, 'BalancedVaultDefinitionZeroTargetLeverageError')
+    })
+
+    it('checks that the long and short are not identical', async () => {
+      await expect(
+        new BalancedVault__factory(owner).deploy(controller.address, leverage, maxCollateral, [
+          {
+            long: long.address,
+            short: long.address,
+            weight: 1,
+          },
+        ]),
+      ).to.revertedWithCustomError(vault, 'BalancedVaultDefinitionLongAndShortAreSameProductError')
+    })
   })
 
   describe('#initialize', () => {
