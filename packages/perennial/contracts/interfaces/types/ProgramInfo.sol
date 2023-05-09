@@ -54,17 +54,17 @@ library ProgramInfoLib {
 
     /**
      * @notice Computes a new program info with the fee taken out of the amount
-     * @param programInfo Original program info
+     * @dev Modifies the passed in programInfo
+     * @param programInfo Program info
      * @param incentivizationFee The incentivization fee
-     * @return New program info
      * @return Fee amount
      */
     function deductFee(ProgramInfo memory programInfo, UFixed18 incentivizationFee)
-    internal pure returns (ProgramInfo memory, UFixed18) {
+    internal pure returns (UFixed18)  {
         Position memory newProgramAmount = programInfo.amount.mul(UFixed18Lib.ONE.sub(incentivizationFee));
         UFixed18 programFeeAmount = programInfo.amount.sub(newProgramAmount).sum();
         programInfo.amount = newProgramAmount;
-        return (programInfo, programFeeAmount);
+        return programFeeAmount;
     }
 
     /**

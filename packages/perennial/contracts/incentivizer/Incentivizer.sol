@@ -37,7 +37,7 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
      * @param programInfo Parameters for the new program
      * @return programId New program's ID
      */
-    function create(IProduct product, ProgramInfo calldata programInfo)
+    function create(IProduct product, ProgramInfo memory programInfo)
     external
     nonReentrant
     isProduct(product)
@@ -45,6 +45,7 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
     onlyOwner(programInfo.coordinatorId)
     returns (uint256 programId) {
         IController _controller = controller();
+        UFixed18 programTotal = programInfo.amount.sum();
 
         // Validate
         if (programInfo.coordinatorId != 0 && programInfo.coordinatorId != _controller.coordinatorFor(product))
@@ -54,19 +55,19 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
         ProgramInfoLib.validate(programInfo);
 
         // Take fee
-        (ProgramInfo memory newProgramInfo, UFixed18 programFeeAmount) = ProgramInfoLib.deductFee(programInfo, _controller.incentivizationFee());
-        fees[newProgramInfo.token] = fees[newProgramInfo.token].add(programFeeAmount);
+        UFixed18 programFeeAmount = programInfo.deductFee(_controller.incentivizationFee());
+        fees[programInfo.token] = fees[programInfo.token].add(programFeeAmount);
 
         // Register program
-        programId = _products[product].register(newProgramInfo);
+        programId = _products[product].register(programInfo);
 
         // Charge creator
-        newProgramInfo.token.pull(msg.sender, programInfo.amount.sum());
+        programInfo.token.pull(msg.sender, programTotal);
 
         emit ProgramCreated(
             product,
             programId,
-            newProgramInfo,
+            programInfo,
             programFeeAmount
         );
     }
