@@ -298,7 +298,7 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
      * @param programId Program to return for
      * @return The owner of `programId`
      */
-    function owner(IProduct product, uint256 programId) public view returns (address) {
+    function owner(IProduct product, uint256 programId) isProgram(product, programId) public view returns (address) {
         return controller().owner(_products[product].programInfos[programId].coordinatorId);
     }
 
@@ -308,7 +308,7 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
      * @param programId Program to return for
      * @return The treasury of `programId`
      */
-    function treasury(IProduct product, uint256 programId) public view returns (address) {
+    function treasury(IProduct product, uint256 programId) isProgram(product, programId) public view returns (address) {
         return controller().treasury(_products[product].programInfos[programId].coordinatorId);
     }
 
