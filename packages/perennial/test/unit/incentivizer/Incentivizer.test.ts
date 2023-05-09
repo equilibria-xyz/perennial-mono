@@ -2464,4 +2464,24 @@ describe('Incentivizer', () => {
       )
     })
   })
+
+  context('invalid program', () => {
+    describe('#owner', () => {
+      it('reverts', async () => {
+        await expect(incentivizer.owner(product.address, 0)).to.be.revertedWithCustomError(
+          incentivizer,
+          'IncentivizerInvalidProgramError',
+        )
+      })
+    })
+
+    describe('#treasury', () => {
+      it('reverts', async () => {
+        await expect(incentivizer.treasury(product.address, 0)).to.be.revertedWithCustomError(
+          incentivizer,
+          'IncentivizerInvalidProgramError',
+        )
+      })
+    })
+  })
 })
