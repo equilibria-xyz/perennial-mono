@@ -248,7 +248,7 @@ describe('BalancedVault (Multi-Payoff)', () => {
       ).to.revertedWithCustomError(vault, 'BalancedVaultDefinitionNoMarketsError')
     })
 
-    it('checks that all weights are greater than zero', async () => {
+    it('checks that at least one weight is greater than zero', async () => {
       await expect(
         new BalancedVault__factory(owner).deploy(controller.address, leverage, maxCollateral, [
           {
@@ -257,7 +257,7 @@ describe('BalancedVault (Multi-Payoff)', () => {
             weight: 0,
           },
         ]),
-      ).to.revertedWithCustomError(vault, 'BalancedVaultDefinitionZeroWeightError')
+      ).to.revertedWithCustomError(vault, 'BalancedVaultDefinitionAllZeroWeightError')
 
       // At least one of the weights can be zero as long as not all of them are.
       await expect(

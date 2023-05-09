@@ -98,7 +98,7 @@ contract BalancedVaultDefinition is IBalancedVaultDefinition {
             if (minWeight_ > marketDefinitions_[marketId].weight) minWeight_ = marketDefinitions_[marketId].weight;
         }
 
-        if (totalWeight_ == 0) revert BalancedVaultDefinitionZeroWeightError();
+        if (totalWeight_ == 0) revert BalancedVaultDefinitionAllZeroWeightError();
 
         totalMarkets = totalMarkets_;
         totalWeight = totalWeight_;

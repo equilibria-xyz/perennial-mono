@@ -17,7 +17,7 @@ interface IBalancedVaultDefinition {
     error BalancedVaultDefinitionLongAndShortAreSameProductError();
     error BalancedVaultInvalidProductError(IProduct product);
     error BalancedVaultDefinitionOracleMismatchError();
-    error BalancedVaultDefinitionZeroWeightError();
+    error BalancedVaultDefinitionAllZeroWeightError();
 
     function asset() external view returns (Token18);
     function totalMarkets() external view returns (uint256);
