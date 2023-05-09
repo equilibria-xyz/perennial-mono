@@ -370,6 +370,18 @@ describe('Product', () => {
         'ParamProviderInvalidParamValue',
       )
     })
+
+    describe('closed state', () => {
+      it('closes the product', async () => {
+        await product.updateClosed(true)
+        expect(await product.closed()).to.be.true
+      })
+
+      it('reverts if paused', async () => {
+        await controller.mock.paused.withArgs().returns(true)
+        await expect(product.updateClosed(true)).to.be.revertedWithCustomError(product, 'PausedError')
+      })
+    })
   })
 
   describe('positive price market', async () => {
