@@ -65,8 +65,8 @@ contract ChainlinkFeedOracle is IOracleProvider {
         // Fetch latest round
         ChainlinkRound memory round = aggregator.getLatestRound();
 
-        // Revert if the aggregator round id is 0 which is an invalid round.
-        if (round.aggregatorRoundId() == 0) revert InvalidOracleRound();
+        // Revert if the aggregator round id or timestamp is 0 which is an invalid round.
+        if (round.aggregatorRoundId() == 0 || round.timestamp == 0) revert InvalidOracleRound();
 
         // Update phase annotation when new phase detected
         // `_lastSyncedRoundId` is the last round we have seen
