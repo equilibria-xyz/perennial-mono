@@ -41,6 +41,11 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
     /// @dev Index lookup of above array for constructing calldata
     mapping(address => uint256) public addressLookup;
 
+    // @todo add next commit
+    /// @dev magic byte to append to calldata for the fallback. 
+    /// Prevents public fns from being called by arbitrary fallback data
+    // bytes8 public constant INVOKE_ID = hex'45';
+
     /**
      * @notice Constructs the contract
      * @param usdc_ The USDC token contract address
@@ -76,7 +81,7 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
      * @param input Packed data to pass to invoke logic
      */
     function _decodeFallbackAndInvoke(bytes calldata input) internal {
-        PTR memory ptr;
+        PTR memory ptr; 
 
         while (ptr.pos < input.length) {
             PerennialAction action = PerennialAction(_readUint8(input, ptr));
@@ -184,7 +189,7 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
 
             _cacheAddress(result);
         } else {
-            uint256 idx = _bytesToUint256(input[ptr.pos:ptr.pos + len]);
+            uint256 idx = _bytesToUint256(input, ptr.pos, len);
             ptr.pos += len;
 
             result = _lookupAddress(idx);
@@ -245,7 +250,7 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
      * @return result The decoded uint8 length
      */
     function _readUint8(bytes calldata input, PTR memory ptr) private pure returns (uint8 result) {
-        result = _bytesToUint8(input[ptr.pos:ptr.pos + UINT8_LENGTH]);
+        result = _bytesToUint8(input, ptr.pos);
         ptr.pos += UINT8_LENGTH;
     }
 
@@ -259,7 +264,7 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
         uint8 len = _readUint8(input, ptr);
         if (len > UINT256_LENGTH) revert MultiInvokerRollupInvalidUint256LengthError();
 
-        result = _bytesToUint256(input[ptr.pos:ptr.pos + len]);
+        result = _bytesToUint256(input, ptr.pos, len);
         ptr.pos += len;
     }
 
@@ -268,9 +273,12 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
      * @param input 1 byte slice to convert to uint8 to decode lengths
      * @return result The uint8 representation of input
      */
-    function _bytesToUint8(bytes memory input) private pure returns (uint8 result) {
+    function _bytesToUint8(bytes calldata input, uint256 pos) private pure returns (uint8 result) {
         assembly {
-            result := mload(add(input, UINT8_LENGTH))
+            // 1) load calldata into temp starting at ptr position 
+            let temp := calldataload(add(input.offset, pos))
+            // 2) shifts the calldata such that only the first byte (length) is stored in result
+            result := shr(248, temp)
         }
     }
 
@@ -292,14 +300,12 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
      * @param input The bytes to convert to uint256
      * @return result The resulting uint256
      */
-    function _bytesToUint256(bytes memory input) private pure returns (uint256 result) {
-        uint256 len = input.length;
-
+    function _bytesToUint256(bytes calldata input, uint256 pos, uint256 len) private pure returns (uint256 result) {
         assembly {
-            result := mload(add(input, UINT256_LENGTH))
+            // 1) load the calldata into result starting at the ptr position
+            result := calldataload(add(input.offset, pos))
+            // 2) shifts the calldata such that only the next length of bytes specified by `len` popualtes the uint256 result
+            result := shr(mul(8, sub(UINT256_LENGTH, len)), result) 
         }
-
-        // readable right shift to change right padding of mload to left padding
-        result >>= (UINT256_LENGTH - len) * 8;
     }
 }
