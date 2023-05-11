@@ -11,7 +11,8 @@ import "./BalancedVaultDefinition.sol";
  * @notice ERC4626 vault that manages a 50-50 position between long-short markets of the same payoff on Perennial.
  * @dev Vault deploys and rebalances collateral between the corresponding long and short markets, while attempting to
  *      maintain `targetLeverage` with its open positions at any given time. Deposits are only gated in so much as to cap
- *      the maximum amount of assets in the vault.
+ *      the maximum amount of assets in the vault. The long and short markets are expected to have the same oracle and
+ *      opposing payoff functions.
  *
  *      The vault has a "delayed mint" mechanism for shares on deposit. After depositing to the vault, a user must wait
  *      until the next settlement of the underlying products in order for shares to be reflected in the getters.
@@ -86,14 +87,23 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
     /// @dev Mapping of the latest epoch for any queued deposit / redemption per user
     mapping(address => uint256) private _pendingEpochs;
 
+    /**
+     * @notice Constructor for BalancedVaultDefinition
+     * @dev previousImplementation_ is an optional feature that gives extra protections against parameter errors during the upgrade process
+     * @param controller_ The controller contract
+     * @param targetLeverage_ The target leverage for the vault
+     * @param maxCollateral_ The maximum amount of collateral that can be held in the vault
+     * @param marketDefinitions_ The market definitions for the vault
+     * @param previousImplementation_ The previous implementation of the vault. Set to address(0) if there is none
+     */
     constructor(
-        Token18 asset_,
         IController controller_,
         UFixed18 targetLeverage_,
         UFixed18 maxCollateral_,
-        MarketDefinition[] memory marketDefinitions_
+        MarketDefinition[] memory marketDefinitions_,
+        IBalancedVaultDefinition previousImplementation_
     )
-    BalancedVaultDefinition(asset_, controller_, targetLeverage_, maxCollateral_, marketDefinitions_)
+    BalancedVaultDefinition(controller_, targetLeverage_, maxCollateral_, marketDefinitions_, previousImplementation_)
     { }
 
     /**

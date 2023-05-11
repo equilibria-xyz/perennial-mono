@@ -95,13 +95,19 @@ describe('BalancedVault', () => {
     leverage = utils.parseEther('4.0')
     maxCollateral = utils.parseEther('500000')
 
-    vault = await new BalancedVault__factory(owner).deploy(dsu.address, controller.address, leverage, maxCollateral, [
-      {
-        long: long.address,
-        short: short.address,
-        weight: 1,
-      },
-    ])
+    vault = await new BalancedVault__factory(owner).deploy(
+      controller.address,
+      leverage,
+      maxCollateral,
+      [
+        {
+          long: long.address,
+          short: short.address,
+          weight: 1,
+        },
+      ],
+      ethers.constants.AddressZero,
+    )
     await vault.initialize('Perennial Vault Alpha')
     asset = IERC20Metadata__factory.connect(await vault.asset(), owner)
 
@@ -137,6 +143,114 @@ describe('BalancedVault', () => {
     oracle.sync.returns(currentVersion)
     oracle.currentVersion.returns(currentVersion)
     oracle.atVersion.whenCalledWith(currentVersion[0]).returns(currentVersion)
+  })
+
+  describe('#constructor', () => {
+    it('checks that there is at least one market', async () => {
+      await expect(
+        new BalancedVault__factory(owner).deploy(
+          controller.address,
+          leverage,
+          maxCollateral,
+          [],
+          ethers.constants.AddressZero,
+        ),
+      ).to.revertedWithCustomError(vault, 'BalancedVaultDefinitionNoMarketsError')
+    })
+
+    it('checks that at least one weight is greater than zero', async () => {
+      await expect(
+        new BalancedVault__factory(owner).deploy(
+          controller.address,
+          leverage,
+          maxCollateral,
+          [
+            {
+              long: long.address,
+              short: short.address,
+              weight: 0,
+            },
+          ],
+          ethers.constants.AddressZero,
+        ),
+      ).to.revertedWithCustomError(vault, 'BalancedVaultDefinitionAllZeroWeightError')
+
+      // At least one of the weights can be zero as long as not all of them are.
+      await expect(
+        new BalancedVault__factory(owner).deploy(
+          controller.address,
+          leverage,
+          maxCollateral,
+          [
+            {
+              long: long.address,
+              short: short.address,
+              weight: 0,
+            },
+            {
+              long: long.address,
+              short: short.address,
+              weight: 1,
+            },
+          ],
+          ethers.constants.AddressZero,
+        ),
+      ).to.not.be.reverted
+    })
+
+    it('checks that all products are valid', async () => {
+      await expect(
+        new BalancedVault__factory(owner).deploy(
+          controller.address,
+          leverage,
+          maxCollateral,
+          [
+            {
+              long: '0x0000000000000000000000000000000000000000',
+              short: short.address,
+              weight: 1,
+            },
+          ],
+          ethers.constants.AddressZero,
+        ),
+      ).to.revertedWithCustomError(vault, 'BalancedVaultInvalidProductError')
+    })
+
+    it('checks that target leverage is positive', async () => {
+      await expect(
+        new BalancedVault__factory(owner).deploy(
+          controller.address,
+          0,
+          maxCollateral,
+          [
+            {
+              long: long.address,
+              short: short.address,
+              weight: 1,
+            },
+          ],
+          ethers.constants.AddressZero,
+        ),
+      ).to.revertedWithCustomError(vault, 'BalancedVaultDefinitionZeroTargetLeverageError')
+    })
+
+    it('checks that the long and short are not identical', async () => {
+      await expect(
+        new BalancedVault__factory(owner).deploy(
+          controller.address,
+          leverage,
+          maxCollateral,
+          [
+            {
+              long: long.address,
+              short: long.address,
+              weight: 1,
+            },
+          ],
+          ethers.constants.AddressZero,
+        ),
+      ).to.revertedWithCustomError(vault, 'BalancedVaultDefinitionLongAndShortAreSameProductError')
+    })
   })
 
   describe('#initialize', () => {

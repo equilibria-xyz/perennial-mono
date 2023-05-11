@@ -47,11 +47,11 @@ describe('Vault - Perennial Vaults - Multi-Asset Upgrade', () => {
     ])
 
     const newImpl = await new BalancedVault__factory(signer).deploy(
-      await vault.asset(),
       await vault.controller(),
       await vault.targetLeverage(),
       await vault.maxCollateral(),
       [{ long, short, weight: utils.parseEther('1') }],
+      ethers.constants.AddressZero,
     )
 
     await proxyAdmin.connect(adminOwner).upgrade(vault.address, newImpl.address)
@@ -74,11 +74,11 @@ describe('Vault - Perennial Vaults - Multi-Asset Upgrade', () => {
       const [long, short] = await Promise.all([prevVault.long(), prevVault.short()])
 
       const newImpl = await new BalancedVault__factory(signer).deploy(
-        await vault.asset(),
         await vault.controller(),
         await vault.targetLeverage(),
         await vault.maxCollateral(),
         [{ long, short, weight: utils.parseEther('1') }],
+        ethers.constants.AddressZero,
       )
       await proxyAdmin.connect(adminOwner).upgrade(vault.address, newImpl.address)
     })
@@ -103,7 +103,6 @@ describe('Vault - Perennial Vaults - Multi-Asset Upgrade', () => {
       ])
 
       const newImplMulti = await new BalancedVault__factory(signer).deploy(
-        await vault.asset(),
         await vault.controller(),
         await vault.targetLeverage(),
         await vault.maxCollateral(),
@@ -111,6 +110,7 @@ describe('Vault - Perennial Vaults - Multi-Asset Upgrade', () => {
           { long: market0.long, short: market0.short, weight: utils.parseEther('1') },
           { long: arbLong, short: arbShort, weight: utils.parseEther('0.1') },
         ],
+        ethers.constants.AddressZero,
       )
       await proxyAdmin.connect(adminOwner).upgrade(vault.address, newImplMulti.address)
       await vault.initialize('PerennialVaultAlpha')
@@ -135,7 +135,6 @@ describe('Vault - Perennial Vaults - Multi-Asset Upgrade', () => {
         const arbShort = deployments['Product_ShortArbitrum'].address
         const market0 = await vault.markets(0)
         const newImplMulti = await new BalancedVault__factory(signer).deploy(
-          await vault.asset(),
           await vault.controller(),
           await vault.targetLeverage(),
           await vault.maxCollateral(),
@@ -143,6 +142,7 @@ describe('Vault - Perennial Vaults - Multi-Asset Upgrade', () => {
             { long: market0.long, short: market0.short, weight: utils.parseEther('0.5') },
             { long: arbLong, short: arbShort, weight: utils.parseEther('0.5') },
           ],
+          ethers.constants.AddressZero,
         )
         await proxyAdmin.connect(adminOwner).upgrade(vault.address, newImplMulti.address)
         await vault.initialize('PerennialVaultAlpha')
