@@ -85,76 +85,107 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
         while (ptr.pos < input.length) {
             PerennialAction action = PerennialAction(_readUint8(input, ptr));
 
-            if (action == PerennialAction.DEPOSIT) { // DEPOSIT
-                (address account, address product, UFixed18 amount) =
-                    (_readAndCacheAddress(input, ptr), _readAndCacheAddress(input, ptr), _readUFixed18(input, ptr));
+            if (action == PerennialAction.DEPOSIT) {
+                address account = _readAndCacheAddress(input, ptr);
+                address product = _readAndCacheAddress(input, ptr);
+                UFixed18 amount = _readUFixed18(input, ptr);
+
                 _deposit(account, IProduct(product), amount);
 
-            } else if (action == PerennialAction.WITHDRAW) { // WITHDRAW
-                (address receiver, address product, UFixed18 amount)  =
-                    (_readAndCacheAddress(input, ptr), _readAndCacheAddress(input, ptr), _readUFixed18(input, ptr));
+            } else if (action == PerennialAction.WITHDRAW) {
+                address receiver = _readAndCacheAddress(input, ptr);
+                address product = _readAndCacheAddress(input, ptr);
+                UFixed18 amount = _readUFixed18(input, ptr);
+
                 _withdraw(receiver, IProduct(product), amount);
 
-            } else if (action == PerennialAction.OPEN_TAKE) { // OPEN_TAKE
-                (address product, UFixed18 amount) = (_readAndCacheAddress(input, ptr), _readUFixed18(input, ptr));
+            } else if (action == PerennialAction.OPEN_TAKE) {
+                address product = _readAndCacheAddress(input, ptr);
+                UFixed18 amount = _readUFixed18(input, ptr);
+
                 _openTake(IProduct(product), amount);
 
-            } else if (action == PerennialAction.CLOSE_TAKE) { // CLOSE_TAKE
-                (address product, UFixed18 amount) = (_readAndCacheAddress(input, ptr), _readUFixed18(input, ptr));
+            } else if (action == PerennialAction.CLOSE_TAKE) {
+                address product = _readAndCacheAddress(input, ptr);
+                UFixed18 amount = _readUFixed18(input, ptr);
+
                 _closeTake(IProduct(product), amount);
 
-            } else if (action == PerennialAction.OPEN_MAKE) { // OPEN_MAKE
-                (address product, UFixed18 amount) = (_readAndCacheAddress(input, ptr), _readUFixed18(input, ptr));
+            } else if (action == PerennialAction.OPEN_MAKE) {
+                address product = _readAndCacheAddress(input, ptr);
+                UFixed18 amount = _readUFixed18(input, ptr);
+                
                 _openMake(IProduct(product), amount);
 
-            } else if (action == PerennialAction.CLOSE_MAKE) { // CLOSE_MAKE
-                (address product, UFixed18 amount) = (_readAndCacheAddress(input, ptr), _readUFixed18(input, ptr));
+            } else if (action == PerennialAction.CLOSE_MAKE) {
+                address product = _readAndCacheAddress(input, ptr);
+                UFixed18 amount = _readUFixed18(input, ptr);
+                
                 _closeMake(IProduct(product), amount);
 
-            } else if (action == PerennialAction.CLAIM) { // CLAIM
-                (address product, uint256[] memory programIds) =
-                    (_readAndCacheAddress(input, ptr), _readUint256Array(input, ptr));
+            } else if (action == PerennialAction.CLAIM) {
+                address product = _readAndCacheAddress(input, ptr);
+                uint256[] memory programIds = _readUint256Array(input, ptr);
+
                 _claim(IProduct(product), programIds);
 
-            } else if (action == PerennialAction.WRAP) { // WRAP
-                (address receiver, UFixed18 amount) = (_readAndCacheAddress(input, ptr), _readUFixed18(input, ptr));
+            } else if (action == PerennialAction.WRAP) {
+                address receiver = _readAndCacheAddress(input, ptr);
+                UFixed18 amount = _readUFixed18(input, ptr);
+
                 _wrap(receiver, amount);
 
-            } else if (action == PerennialAction.UNWRAP) { // UNWRAP
-                (address receiver, UFixed18 amount) = (_readAndCacheAddress(input, ptr), _readUFixed18(input, ptr));
+            } else if (action == PerennialAction.UNWRAP) {
+                address receiver = _readAndCacheAddress(input, ptr);
+                UFixed18 amount = _readUFixed18(input, ptr);
+
                 _unwrap(receiver, amount);
 
-            } else if (action == PerennialAction.WRAP_AND_DEPOSIT) { // WRAP_AND_DEPOSIT
-                (address account, address product, UFixed18 amount) =
-                    (_readAndCacheAddress(input, ptr), _readAndCacheAddress(input, ptr), _readUFixed18(input, ptr));
+            } else if (action == PerennialAction.WRAP_AND_DEPOSIT) {
+                address account = _readAndCacheAddress(input, ptr);
+                address product = _readAndCacheAddress(input, ptr);
+                UFixed18 amount = _readUFixed18(input, ptr);
+
                 _wrapAndDeposit(account, IProduct(product), amount);
 
-            } else if (action == PerennialAction.WITHDRAW_AND_UNWRAP) { // WITHDRAW_AND_UNWRAP
-                (address receiver, address product, UFixed18 amount) =
-                    (_readAndCacheAddress(input, ptr), _readAndCacheAddress(input, ptr), _readUFixed18(input, ptr));
+            } else if (action == PerennialAction.WITHDRAW_AND_UNWRAP) {
+                address receiver = _readAndCacheAddress(input, ptr);
+                address product = _readAndCacheAddress(input, ptr);
+                UFixed18 amount = _readUFixed18(input, ptr);
+
                 _withdrawAndUnwrap(receiver, IProduct(product), amount);
 
-            } else if (action == PerennialAction.VAULT_DEPOSIT) { // VAULT_DEPOSIT
-                (address depositer, address vault, UFixed18 amount) =
-                    (_readAndCacheAddress(input, ptr), _readAndCacheAddress(input, ptr), _readUFixed18(input, ptr));
+            } else if (action == PerennialAction.VAULT_DEPOSIT) {
+                address depositer = _readAndCacheAddress(input, ptr);
+                address vault = _readAndCacheAddress(input, ptr);
+                UFixed18 amount = _readUFixed18(input, ptr);
+
                 _vaultDeposit(depositer, IPerennialVault(vault), amount);
 
-            } else if (action == PerennialAction.VAULT_REDEEM) { // VAULT_REDEEM
-                (address vault, UFixed18 shares) = (_readAndCacheAddress(input, ptr), _readUFixed18(input, ptr));
+            } else if (action == PerennialAction.VAULT_REDEEM) {
+                address vault = _readAndCacheAddress(input, ptr);
+                UFixed18 shares = _readUFixed18(input, ptr);
+
                 _vaultRedeem(IPerennialVault(vault), shares);
 
-            } else if (action == PerennialAction.VAULT_CLAIM) { // VAULT_CLAIM
-                (address owner, address vault) = (_readAndCacheAddress(input, ptr), _readAndCacheAddress(input, ptr));
+            } else if (action == PerennialAction.VAULT_CLAIM) {
+                address owner = _readAndCacheAddress(input, ptr);
+                address vault = _readAndCacheAddress(input, ptr);
+
                 _vaultClaim(IPerennialVault(vault), owner);
 
-            } else if (action == PerennialAction.VAULT_WRAP_AND_DEPOSIT) { // VAULT_WRAP_AND_DEPOSIT
-                (address account, address vault, UFixed18 amount) =
-                    (_readAndCacheAddress(input, ptr), _readAndCacheAddress(input, ptr), _readUFixed18(input, ptr));
+            } else if (action == PerennialAction.VAULT_WRAP_AND_DEPOSIT) {
+                address account = _readAndCacheAddress(input, ptr);
+                address vault = _readAndCacheAddress(input, ptr);
+                UFixed18 amount = _readUFixed18(input, ptr);
+
                 _vaultWrapAndDeposit(account, IPerennialVault(vault), amount);
 
-            } else if (action == PerennialAction.CHARGE_FEE) { // CHARGE_FEE
-                (address receiver, UFixed18 amount, bool wrapped) =
-                    (_readAndCacheAddress(input, ptr), _readUFixed18(input, ptr), _readBool(input, ptr));
+            } else if (action == PerennialAction.CHARGE_FEE) {
+                address receiver = _readAndCacheAddress(input, ptr);
+                UFixed18 amount = _readUFixed18(input, ptr);
+                bool wrapped = _readBool(input, ptr);
+                
                 _chargeFee(receiver, amount, wrapped);
             }
         }
