@@ -41,10 +41,9 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
     /// @dev Index lookup of above array for constructing calldata
     mapping(address => uint256) public addressLookup;
 
-    // @todo add next commit
     /// @dev magic byte to append to calldata for the fallback. 
     /// Prevents public fns from being called by arbitrary fallback data
-    // bytes8 public constant INVOKE_ID = hex'45';
+    bytes8 public constant INVOKE_ID = hex'45';
 
     /**
      * @notice Constructs the contract
@@ -81,7 +80,7 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
      * @param input Packed data to pass to invoke logic
      */
     function _decodeFallbackAndInvoke(bytes calldata input) internal {
-        PTR memory ptr; 
+        PTR memory ptr = PTR({pos: 1}); // INVOKE_ID must be first byte to prevent collisions
 
         while (ptr.pos < input.length) {
             PerennialAction action = PerennialAction(_readUint8(input, ptr));

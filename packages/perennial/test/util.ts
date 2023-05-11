@@ -130,13 +130,12 @@ export const buildAllActionsRollup = (
   //   programs?: number[]
   // }[]
 ): string => {
-  let pld = ''
+  let pld = '0x45'
 
   for (const a of actions) {
-    if (a.action == 'NOOP') {
+    if (a.payload == '0x') {
       continue
     }
-
     pld += a.payload
   }
 
