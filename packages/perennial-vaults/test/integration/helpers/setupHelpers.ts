@@ -10,6 +10,7 @@ export interface DeployProductParams extends Partial<Omit<IProduct.ProductInfoSt
   baseCurrency: string
   quoteCurrency: string
   short: boolean
+  payoffOracle?: string
 }
 
 // Deploys a product that uses an oracle based on an oracle in the Chainlink feed registry.
@@ -20,6 +21,7 @@ export async function deployProductOnMainnetFork({
   owner,
   oracle,
   short,
+  payoffOracle,
   maintenance,
   fundingFee,
   makerFee,
@@ -31,7 +33,7 @@ export async function deployProductOnMainnetFork({
   const productInfo: IProduct.ProductInfoStruct = {
     name: name,
     symbol: symbol,
-    payoffDefinition: createPayoffDefinition({ short: short }),
+    payoffDefinition: createPayoffDefinition({ contractAddress: payoffOracle, short: short }),
     oracle: oracle ?? constants.AddressZero,
     maintenance: maintenance ?? utils.parseEther('0.10'),
     fundingFee: fundingFee ?? utils.parseEther('0.00'),

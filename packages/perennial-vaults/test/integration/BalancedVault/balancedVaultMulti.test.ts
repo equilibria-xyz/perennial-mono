@@ -323,6 +323,80 @@ describe('BalancedVault (Multi-Payoff)', () => {
         ]),
       ).to.revertedWithCustomError(vault, 'BalancedVaultDefinitionOracleMismatchError')
     })
+
+    it('checks that the products have the right direction payoff', async () => {
+      const incorrectBtcLong = await deployProductOnMainnetFork({
+        owner: owner,
+        name: 'Bitcoin',
+        symbol: 'BTC',
+        baseCurrency: '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB',
+        quoteCurrency: '0x0000000000000000000000000000000000000348',
+        oracle: btcOracle.address,
+        short: true,
+      })
+      await expect(
+        new BalancedVault__factory(owner).deploy(controller.address, leverage, maxCollateral, [
+          {
+            long: incorrectBtcLong.address,
+            short: btcShort.address,
+            weight: 1,
+          },
+        ]),
+      ).to.revertedWithCustomError(vault, 'BalancedVaultDefinitionWrongPayoffDirectionError')
+
+      const incorrectBtcShort = await deployProductOnMainnetFork({
+        owner: owner,
+        name: 'Bitcoin',
+        symbol: 'BTC',
+        baseCurrency: '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB',
+        quoteCurrency: '0x0000000000000000000000000000000000000348',
+        oracle: btcOracle.address,
+        short: false,
+      })
+      await expect(
+        new BalancedVault__factory(owner).deploy(controller.address, leverage, maxCollateral, [
+          {
+            long: btcLong.address,
+            short: incorrectBtcShort.address,
+            weight: 1,
+          },
+        ]),
+      ).to.revertedWithCustomError(vault, 'BalancedVaultDefinitionWrongPayoffDirectionError')
+    })
+
+    it('checks that the products have the same payoff data', async () => {
+      const btcLongWithPayoffData = await deployProductOnMainnetFork({
+        owner: owner,
+        name: 'Bitcoin',
+        symbol: 'BTC',
+        baseCurrency: '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB',
+        quoteCurrency: '0x0000000000000000000000000000000000000348',
+        oracle: btcOracle.address,
+        short: false,
+        payoffOracle: btcOracle.address,
+      })
+
+      const btcShortWithPayoffData = await deployProductOnMainnetFork({
+        owner: owner,
+        name: 'Bitcoin',
+        symbol: 'BTC',
+        baseCurrency: '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB',
+        quoteCurrency: '0x0000000000000000000000000000000000000348',
+        oracle: btcOracle.address,
+        short: true,
+        payoffOracle: controller.address,
+      })
+
+      await expect(
+        new BalancedVault__factory(owner).deploy(controller.address, leverage, maxCollateral, [
+          {
+            long: btcLongWithPayoffData.address,
+            short: btcShortWithPayoffData.address,
+            weight: 1,
+          },
+        ]),
+      ).to.revertedWithCustomError(vault, 'BalancedVaultDefinitionMismatchedPayoffDataError')
+    })
   })
 
   describe('#initialize', () => {

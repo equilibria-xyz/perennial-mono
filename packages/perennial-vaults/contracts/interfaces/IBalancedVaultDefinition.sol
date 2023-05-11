@@ -17,6 +17,8 @@ interface IBalancedVaultDefinition {
     error BalancedVaultDefinitionLongAndShortAreSameProductError();
     error BalancedVaultInvalidProductError(IProduct product);
     error BalancedVaultDefinitionOracleMismatchError();
+    error BalancedVaultDefinitionWrongPayoffDirectionError(IProduct product);
+    error BalancedVaultDefinitionMismatchedPayoffDataError();
     error BalancedVaultDefinitionAllZeroWeightError();
 
     function asset() external view returns (Token18);

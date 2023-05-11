@@ -8,7 +8,8 @@ import "../interfaces/IBalancedVaultDefinition.sol";
  * @notice ERC4626 vault that manages a 50-50 position between long-short markets of the same payoff on Perennial.
  * @dev Vault deploys and rebalances collateral between the corresponding long and short markets, while attempting to
  *      maintain `targetLeverage` with its open positions at any given time. Deposits are only gated in so much as to cap
- *      the maximum amount of assets in the vault. The long and short markets are expected o have the same oracle.
+ *      the maximum amount of assets in the vault. The long and short markets are expected to have the same oracle and
+ *      opposing payoff functions.
  *
  *      The vault has a "delayed mint" mechanism for shares on deposit. After depositing to the vault, a user must wait
  *      until the next settlement of the underlying products in order for shares to be reflected in the getters.
@@ -89,10 +90,16 @@ contract BalancedVaultDefinition is IBalancedVaultDefinition {
         weight1 = (totalMarkets_ > 1) ? marketDefinitions_[1].weight : DEFAULT_WEIGHT;
 
         for (uint256 marketId; marketId < totalMarkets_; marketId++) {
-            if (marketDefinitions_[marketId].long == marketDefinitions_[marketId].short) revert BalancedVaultDefinitionLongAndShortAreSameProductError();
             if (!controller.isProduct(marketDefinitions_[marketId].long)) revert BalancedVaultInvalidProductError(marketDefinitions_[marketId].long);
             if (!controller.isProduct(marketDefinitions_[marketId].short)) revert BalancedVaultInvalidProductError(marketDefinitions_[marketId].short);
+            if (marketDefinitions_[marketId].long == marketDefinitions_[marketId].short) revert BalancedVaultDefinitionLongAndShortAreSameProductError();
             if (marketDefinitions_[marketId].long.oracle() != marketDefinitions_[marketId].short.oracle()) revert BalancedVaultDefinitionOracleMismatchError();
+
+            PayoffDefinition memory longPayoff = marketDefinitions_[marketId].long.payoffDefinition();
+            PayoffDefinition memory shortPayoff = marketDefinitions_[marketId].short.payoffDefinition();
+            if (longPayoff.payoffDirection != PayoffDefinitionLib.PayoffDirection.LONG) revert BalancedVaultDefinitionWrongPayoffDirectionError(marketDefinitions_[marketId].long);
+            if (shortPayoff.payoffDirection != PayoffDefinitionLib.PayoffDirection.SHORT) revert BalancedVaultDefinitionWrongPayoffDirectionError(marketDefinitions_[marketId].short);
+            if (longPayoff.data != shortPayoff.data) revert BalancedVaultDefinitionMismatchedPayoffDataError();
 
             totalWeight_ += marketDefinitions_[marketId].weight;
             if (minWeight_ > marketDefinitions_[marketId].weight) minWeight_ = marketDefinitions_[marketId].weight;
