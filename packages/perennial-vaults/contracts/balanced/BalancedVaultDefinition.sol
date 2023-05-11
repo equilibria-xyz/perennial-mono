@@ -63,6 +63,8 @@ contract BalancedVaultDefinition is IBalancedVaultDefinition {
     uint256 private immutable weight1;
 
     /**
+     * @notice Constructor for BalancedVaultDefinition
+     * @dev previousImplementation_ is an optional feature that gives extra protections against parameter errors during the upgrade process
      * @param controller_ The controller contract
      * @param targetLeverage_ The target leverage for the vault
      * @param maxCollateral_ The maximum amount of collateral that can be held in the vault
