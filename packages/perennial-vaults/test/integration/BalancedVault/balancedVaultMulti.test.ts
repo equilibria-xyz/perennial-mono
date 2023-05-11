@@ -163,18 +163,24 @@ describe('BalancedVault (Multi-Payoff)', () => {
     leverage = utils.parseEther('4.0')
     maxCollateral = utils.parseEther('500000')
 
-    vault = await new BalancedVault__factory(owner).deploy(controller.address, leverage, maxCollateral, [
-      {
-        long: long.address,
-        short: short.address,
-        weight: 4,
-      },
-      {
-        long: btcLong.address,
-        short: btcShort.address,
-        weight: 1,
-      },
-    ])
+    vault = await new BalancedVault__factory(owner).deploy(
+      controller.address,
+      leverage,
+      maxCollateral,
+      [
+        {
+          long: long.address,
+          short: short.address,
+          weight: 4,
+        },
+        {
+          long: btcLong.address,
+          short: btcShort.address,
+          weight: 1,
+        },
+      ],
+      ethers.constants.AddressZero,
+    )
     await vault.initialize('Perennial Vault Alpha')
     asset = IERC20Metadata__factory.connect(await vault.asset(), owner)
 
@@ -244,83 +250,125 @@ describe('BalancedVault (Multi-Payoff)', () => {
   describe('#constructor', () => {
     it('checks that there is at least one market', async () => {
       await expect(
-        new BalancedVault__factory(owner).deploy(controller.address, leverage, maxCollateral, []),
+        new BalancedVault__factory(owner).deploy(
+          controller.address,
+          leverage,
+          maxCollateral,
+          [],
+          ethers.constants.AddressZero,
+        ),
       ).to.revertedWithCustomError(vault, 'BalancedVaultDefinitionNoMarketsError')
     })
 
     it('checks that at least one weight is greater than zero', async () => {
       await expect(
-        new BalancedVault__factory(owner).deploy(controller.address, leverage, maxCollateral, [
-          {
-            long: long.address,
-            short: short.address,
-            weight: 0,
-          },
-        ]),
+        new BalancedVault__factory(owner).deploy(
+          controller.address,
+          leverage,
+          maxCollateral,
+          [
+            {
+              long: long.address,
+              short: short.address,
+              weight: 0,
+            },
+          ],
+          ethers.constants.AddressZero,
+        ),
       ).to.revertedWithCustomError(vault, 'BalancedVaultDefinitionAllZeroWeightError')
 
       // At least one of the weights can be zero as long as not all of them are.
       await expect(
-        new BalancedVault__factory(owner).deploy(controller.address, leverage, maxCollateral, [
-          {
-            long: long.address,
-            short: short.address,
-            weight: 0,
-          },
-          {
-            long: long.address,
-            short: short.address,
-            weight: 1,
-          },
-        ]),
+        new BalancedVault__factory(owner).deploy(
+          controller.address,
+          leverage,
+          maxCollateral,
+          [
+            {
+              long: long.address,
+              short: short.address,
+              weight: 0,
+            },
+            {
+              long: long.address,
+              short: short.address,
+              weight: 1,
+            },
+          ],
+          ethers.constants.AddressZero,
+        ),
       ).to.not.be.reverted
     })
 
     it('checks that all products are valid', async () => {
       await expect(
-        new BalancedVault__factory(owner).deploy(controller.address, leverage, maxCollateral, [
-          {
-            long: '0x0000000000000000000000000000000000000000',
-            short: short.address,
-            weight: 1,
-          },
-        ]),
+        new BalancedVault__factory(owner).deploy(
+          controller.address,
+          leverage,
+          maxCollateral,
+          [
+            {
+              long: '0x0000000000000000000000000000000000000000',
+              short: short.address,
+              weight: 1,
+            },
+          ],
+          ethers.constants.AddressZero,
+        ),
       ).to.revertedWithCustomError(vault, 'BalancedVaultInvalidProductError')
     })
 
     it('checks that target leverage is positive', async () => {
       await expect(
-        new BalancedVault__factory(owner).deploy(controller.address, 0, maxCollateral, [
-          {
-            long: long.address,
-            short: short.address,
-            weight: 1,
-          },
-        ]),
+        new BalancedVault__factory(owner).deploy(
+          controller.address,
+          0,
+          maxCollateral,
+          [
+            {
+              long: long.address,
+              short: short.address,
+              weight: 1,
+            },
+          ],
+          ethers.constants.AddressZero,
+        ),
       ).to.revertedWithCustomError(vault, 'BalancedVaultDefinitionZeroTargetLeverageError')
     })
 
     it('checks that the long and short are not identical', async () => {
       await expect(
-        new BalancedVault__factory(owner).deploy(controller.address, leverage, maxCollateral, [
-          {
-            long: long.address,
-            short: long.address,
-            weight: 1,
-          },
-        ]),
+        new BalancedVault__factory(owner).deploy(
+          controller.address,
+          leverage,
+          maxCollateral,
+          [
+            {
+              long: long.address,
+              short: long.address,
+              weight: 1,
+            },
+          ],
+          ethers.constants.AddressZero,
+        ),
       ).to.revertedWithCustomError(vault, 'BalancedVaultDefinitionLongAndShortAreSameProductError')
     })
 
     it('checks that the long and short oracles match', async () => {
       await expect(
-        new BalancedVault__factory(owner).deploy(controller.address, leverage, maxCollateral, [
-          {
-            long: long.address,
-            short: btcShort.address,
-            weight: 1,
-          },
-        ]),
+        new BalancedVault__factory(owner).deploy(
+          controller.address,
+          leverage,
+          maxCollateral,
+          [
+            {
+              long: long.address,
+              short: btcShort.address,
+              weight: 1,
+            },
+          ],
+          ethers.constants.AddressZero,
+        ),
       ).to.revertedWithCustomError(vault, 'BalancedVaultDefinitionOracleMismatchError')
     })
 
@@ -335,13 +383,19 @@ describe('BalancedVault (Multi-Payoff)', () => {
         short: true,
       })
       await expect(
-        new BalancedVault__factory(owner).deploy(controller.address, leverage, maxCollateral, [
-          {
-            long: incorrectBtcLong.address,
-            short: btcShort.address,
-            weight: 1,
-          },
-        ]),
+        new BalancedVault__factory(owner).deploy(
+          controller.address,
+          leverage,
+          maxCollateral,
+          [
+            {
+              long: incorrectBtcLong.address,
+              short: btcShort.address,
+              weight: 1,
+            },
+          ],
+          ethers.constants.AddressZero,
+        ),
       ).to.revertedWithCustomError(vault, 'BalancedVaultDefinitionWrongPayoffDirectionError')
 
       const incorrectBtcShort = await deployProductOnMainnetFork({
@@ -354,13 +408,19 @@ describe('BalancedVault (Multi-Payoff)', () => {
         short: false,
       })
       await expect(
-        new BalancedVault__factory(owner).deploy(controller.address, leverage, maxCollateral, [
-          {
-            long: btcLong.address,
-            short: incorrectBtcShort.address,
-            weight: 1,
-          },
-        ]),
+        new BalancedVault__factory(owner).deploy(
+          controller.address,
+          leverage,
+          maxCollateral,
+          [
+            {
+              long: btcLong.address,
+              short: incorrectBtcShort.address,
+              weight: 1,
+            },
+          ],
+          ethers.constants.AddressZero,
+        ),
       ).to.revertedWithCustomError(vault, 'BalancedVaultDefinitionWrongPayoffDirectionError')
     })
 
@@ -388,14 +448,61 @@ describe('BalancedVault (Multi-Payoff)', () => {
       })
 
       await expect(
-        new BalancedVault__factory(owner).deploy(controller.address, leverage, maxCollateral, [
-          {
-            long: btcLongWithPayoffData.address,
-            short: btcShortWithPayoffData.address,
-            weight: 1,
-          },
-        ]),
+        new BalancedVault__factory(owner).deploy(
+          controller.address,
+          leverage,
+          maxCollateral,
+          [
+            {
+              long: btcLongWithPayoffData.address,
+              short: btcShortWithPayoffData.address,
+              weight: 1,
+            },
+          ],
+          ethers.constants.AddressZero,
+        ),
       ).to.revertedWithCustomError(vault, 'BalancedVaultDefinitionMismatchedPayoffDataError')
+    })
+
+    it('checks that there are at least the markets of the previous implementation is a prefix of that of the new implementation ', async () => {
+      // New implementation has fewer products than the previous implementation.
+      await expect(
+        new BalancedVault__factory(owner).deploy(
+          controller.address,
+          leverage,
+          maxCollateral,
+          [
+            {
+              long: long.address,
+              short: short.address,
+              weight: 4,
+            },
+          ],
+          vault.address,
+        ),
+      ).to.revertedWithCustomError(vault, 'BalancedVaultDefinitionMarketsMismatchedWithPreviousImplementationError')
+
+      // Markets are switched around in the new implementation.
+      await expect(
+        new BalancedVault__factory(owner).deploy(
+          controller.address,
+          leverage,
+          maxCollateral,
+          [
+            {
+              long: btcLong.address,
+              short: btcShort.address,
+              weight: 1,
+            },
+            {
+              long: long.address,
+              short: short.address,
+              weight: 4,
+            },
+          ],
+          vault.address,
+        ),
+      ).to.revertedWithCustomError(vault, 'BalancedVaultDefinitionMarketsMismatchedWithPreviousImplementationError')
     })
   })
 

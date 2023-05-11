@@ -20,6 +20,7 @@ interface IBalancedVaultDefinition {
     error BalancedVaultDefinitionWrongPayoffDirectionError(IProduct product);
     error BalancedVaultDefinitionMismatchedPayoffDataError();
     error BalancedVaultDefinitionAllZeroWeightError();
+    error BalancedVaultDefinitionMarketsMismatchedWithPreviousImplementationError();
 
     function asset() external view returns (Token18);
     function totalMarkets() external view returns (uint256);

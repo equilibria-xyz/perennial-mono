@@ -62,11 +62,19 @@ contract BalancedVaultDefinition is IBalancedVaultDefinition {
     uint256 private immutable weight0;
     uint256 private immutable weight1;
 
+    /**
+     * @param controller_ The controller contract
+     * @param targetLeverage_ The target leverage for the vault
+     * @param maxCollateral_ The maximum amount of collateral that can be held in the vault
+     * @param marketDefinitions_ The market definitions for the vault
+     * @param previousImplementation_ The previous implementation of the vault. Set to address(0) if there is none
+     */
     constructor(
         IController controller_,
         UFixed18 targetLeverage_,
         UFixed18 maxCollateral_,
-        MarketDefinition[] memory marketDefinitions_
+        MarketDefinition[] memory marketDefinitions_,
+        IBalancedVaultDefinition previousImplementation_
     ) {
         if (targetLeverage_.eq(UFixed18Lib.ZERO)) revert BalancedVaultDefinitionZeroTargetLeverageError();
 
@@ -110,6 +118,17 @@ contract BalancedVaultDefinition is IBalancedVaultDefinition {
         totalMarkets = totalMarkets_;
         totalWeight = totalWeight_;
         minWeight = minWeight_;
+
+        if (address(previousImplementation_) != address(0)) {
+            // Check that the previous implementation's markets match up to this one.
+            uint256 previousTotalMarkets_ = previousImplementation_.totalMarkets();
+            if (previousTotalMarkets_ > totalMarkets_) revert BalancedVaultDefinitionMarketsMismatchedWithPreviousImplementationError();
+            for (uint256 marketId; marketId < previousTotalMarkets_; marketId++) {
+                MarketDefinition memory previousMarket_ = previousImplementation_.markets(marketId);
+                if (previousMarket_.long != marketDefinitions_[marketId].long) revert BalancedVaultDefinitionMarketsMismatchedWithPreviousImplementationError();
+                if (previousMarket_.short != marketDefinitions_[marketId].short) revert BalancedVaultDefinitionMarketsMismatchedWithPreviousImplementationError();
+            }
+        }
     }
 
     /**

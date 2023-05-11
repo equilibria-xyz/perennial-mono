@@ -51,6 +51,7 @@ describe('Vault - Perennial Vaults - Multi-Asset Upgrade', () => {
       await vault.targetLeverage(),
       await vault.maxCollateral(),
       [{ long, short, weight: utils.parseEther('1') }],
+      ethers.constants.AddressZero,
     )
 
     await proxyAdmin.connect(adminOwner).upgrade(vault.address, newImpl.address)
@@ -77,6 +78,7 @@ describe('Vault - Perennial Vaults - Multi-Asset Upgrade', () => {
         await vault.targetLeverage(),
         await vault.maxCollateral(),
         [{ long, short, weight: utils.parseEther('1') }],
+        ethers.constants.AddressZero,
       )
       await proxyAdmin.connect(adminOwner).upgrade(vault.address, newImpl.address)
     })
@@ -108,6 +110,7 @@ describe('Vault - Perennial Vaults - Multi-Asset Upgrade', () => {
           { long: market0.long, short: market0.short, weight: utils.parseEther('1') },
           { long: arbLong, short: arbShort, weight: utils.parseEther('0.1') },
         ],
+        ethers.constants.AddressZero,
       )
       await proxyAdmin.connect(adminOwner).upgrade(vault.address, newImplMulti.address)
       await vault.initialize('PerennialVaultAlpha')
@@ -139,6 +142,7 @@ describe('Vault - Perennial Vaults - Multi-Asset Upgrade', () => {
             { long: market0.long, short: market0.short, weight: utils.parseEther('0.5') },
             { long: arbLong, short: arbShort, weight: utils.parseEther('0.5') },
           ],
+          ethers.constants.AddressZero,
         )
         await proxyAdmin.connect(adminOwner).upgrade(vault.address, newImplMulti.address)
         await vault.initialize('PerennialVaultAlpha')

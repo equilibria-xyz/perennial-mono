@@ -87,13 +87,21 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
     /// @dev Mapping of the latest epoch for any queued deposit / redemption per user
     mapping(address => uint256) private _pendingEpochs;
 
+    /**
+     * @param controller_ The controller contract
+     * @param targetLeverage_ The target leverage for the vault
+     * @param maxCollateral_ The maximum amount of collateral that can be held in the vault
+     * @param marketDefinitions_ The market definitions for the vault
+     * @param previousImplementation_ The previous implementation of the vault. Set to address(0) if there is none
+     */
     constructor(
         IController controller_,
         UFixed18 targetLeverage_,
         UFixed18 maxCollateral_,
-        MarketDefinition[] memory marketDefinitions_
+        MarketDefinition[] memory marketDefinitions_,
+        IBalancedVaultDefinition previousImplementation_
     )
-    BalancedVaultDefinition(controller_, targetLeverage_, maxCollateral_, marketDefinitions_)
+    BalancedVaultDefinition(controller_, targetLeverage_, maxCollateral_, marketDefinitions_, previousImplementation_)
     { }
 
     /**
