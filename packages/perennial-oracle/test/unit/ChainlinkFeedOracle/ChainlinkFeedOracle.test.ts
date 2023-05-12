@@ -361,6 +361,18 @@ describe('ChainlinkFeedOracle', () => {
           .returns([roundId, ethers.BigNumber.from(133300000000), TIMESTAMP_START, TIMESTAMP_START + HOUR, roundId])
 
         await expect(oracle.connect(user).sync()).to.be.revertedWithCustomError(oracle, 'InvalidOracleRound')
+
+        aggregatorProxy.latestRoundData
+          .whenCalledWith()
+          .returns([
+            buildChainlinkRoundId(1, 1),
+            ethers.BigNumber.from(133300000000),
+            0,
+            0,
+            buildChainlinkRoundId(1, 1),
+          ])
+
+        await expect(oracle.connect(user).sync()).to.be.revertedWithCustomError(oracle, 'InvalidOracleRound')
       })
     })
   })
