@@ -4,6 +4,7 @@ pragma solidity 0.8.15;
 import "./MultiInvoker.sol";
 import "../interfaces/IMultiInvokerRollup.sol";
 
+
 /**
  * @title MultiInvokerRollup
  * @notice A calldata-optimized implementation of the Perennial MultiInvoker
@@ -66,8 +67,10 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
      * @return required no-op
      */
     fallback (bytes calldata input) external returns (bytes memory) {
-        if(input[0:1] != 0x45) revert("must prepend magic byte 0x45, prevents sig collisions");
-        _decodeFallbackAndInvoke(input);
+        PTR memory ptr;
+        if(_readUint8(input, ptr) != 69) revert("must prepend magic byte 0x45, prevents sig collisions");
+
+        _decodeFallbackAndInvoke(input, ptr);
         return "";
     }
 
@@ -80,8 +83,8 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
      *   [2:length] => current encoded type (see individual type decoding functions)
      * @param input Packed data to pass to invoke logic
      */
-    function _decodeFallbackAndInvoke(bytes calldata input) internal {
-        PTR memory ptr = PTR({pos: 1}); // INVOKE_ID must be first byte to prevent collisions
+    function _decodeFallbackAndInvoke(bytes calldata input, PTR memory ptr) internal {
+        // PTR memory ptr = PTR({pos: 1}); // INVOKE_ID must be first byte to prevent collisions
 
         while (ptr.pos < input.length) {
             PerennialAction action = PerennialAction(_readUint8(input, ptr));
@@ -309,7 +312,7 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
             // 1) load calldata into temp starting at ptr position 
             let temp := calldataload(add(input.offset, pos))
             // 2) shifts the calldata such that only the first byte (length) is stored in result
-            result := shr(sub(UINT256_LENGTH, UINT8_LENGTH), temp)
+            result := shr(mul(8, sub(UINT256_LENGTH, UINT8_LENGTH)), temp)
         }
     }
 
