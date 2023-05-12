@@ -41,7 +41,7 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
     /// @dev Index lookup of above array for constructing calldata
     mapping(address => uint256) public addressLookup;
 
-    /// @dev magic byte to append to calldata for the fallback. 
+    /// @dev magic byte to prepend to calldata for the fallback. 
     /// Prevents public fns from being called by arbitrary fallback data
     bytes8 public constant INVOKE_ID = hex'45';
 
@@ -61,11 +61,12 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
     /**
      * @notice This function serves exactly the same as invoke(Invocation[] memory invocations),
      *         but includes logic to handle the highly packed calldata
-     * @dev Fallback eliminates the need to include function sig in calldata
+     * @dev   Fallback eliminates need for 4 byte sig. MUST prepend just 0x45 to calldata 
      * @param input Packed data to pass to invoke logic
      * @return required no-op
      */
     fallback (bytes calldata input) external returns (bytes memory) {
+        if(input[0:1] != 0x45) revert("must prepend magic byte 0x45, prevents sig collisions");
         _decodeFallbackAndInvoke(input);
         return "";
     }
@@ -185,7 +186,7 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
                 address receiver = _readAndCacheAddress(input, ptr);
                 UFixed18 amount = _readUFixed18(input, ptr);
                 bool wrapped = _readBool(input, ptr);
-                
+
                 _chargeFee(receiver, amount, wrapped);
             }
         }
@@ -308,7 +309,7 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
             // 1) load calldata into temp starting at ptr position 
             let temp := calldataload(add(input.offset, pos))
             // 2) shifts the calldata such that only the first byte (length) is stored in result
-            result := shr(248, temp)
+            result := shr(sub(UINT256_LENGTH, UINT8_LENGTH), temp)
         }
     }
 
@@ -334,7 +335,7 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
         assembly {
             // 1) load the calldata into result starting at the ptr position
             result := calldataload(add(input.offset, pos))
-            // 2) shifts the calldata such that only the next length of bytes specified by `len` popualtes the uint256 result
+            // 2) shifts the calldata such that only the next length of bytes specified by `len` populates the uint256 result
             result := shr(mul(8, sub(UINT256_LENGTH, len)), result) 
         }
     }
