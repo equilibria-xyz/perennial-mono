@@ -30,7 +30,6 @@ describe('BalancedVault', () => {
   let oracle: FakeContract<IOracleProvider>
   let collateral: ICollateral
   let controller: IController
-  let controllerOwner: SignerWithAddress
   let owner: SignerWithAddress
   let user: SignerWithAddress
   let user2: SignerWithAddress
@@ -85,10 +84,6 @@ describe('BalancedVault', () => {
 
     const dsu = IERC20Metadata__factory.connect('0x605D26FBd5be761089281d5cec2Ce86eeA667109', owner)
     controller = IController__factory.connect('0x9df509186b6d3b7D033359f94c8b1BB5544d51b3', owner)
-    controllerOwner = await impersonate.impersonateWithBalance(
-      await controller.callStatic['owner()'](),
-      utils.parseEther('10'),
-    )
     long = IProduct__factory.connect('0xdB60626FF6cDC9dB07d3625A93d21dDf0f8A688C', owner)
     short = IProduct__factory.connect('0xfeD3E166330341e0305594B8c6e6598F9f4Cbe9B', owner)
     collateral = ICollateral__factory.connect('0x2d264ebdb6632a06a1726193d4d37fef1e5dbdcd', owner)
