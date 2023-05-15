@@ -68,7 +68,7 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
      */
     fallback (bytes calldata input) external returns (bytes memory) {
         PTR memory ptr;
-        if(_readUint8(input, ptr) != 69) revert("must prepend magic byte 0x45, prevents sig collisions");
+        if(_readUint8(input, ptr) != 69) revert MultiInvokerRollupMissingMagicByteError();
 
         _decodeFallbackAndInvoke(input, ptr);
         return "";
