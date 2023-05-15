@@ -44,7 +44,7 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
 
     /// @dev magic byte to prepend to calldata for the fallback. 
     /// Prevents public fns from being called by arbitrary fallback data
-    bytes8 public constant INVOKE_ID = hex'45';
+    uint8 public constant INVOKE_ID = 73;
 
     /**
      * @notice Constructs the contract
@@ -62,13 +62,13 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
     /**
      * @notice This function serves exactly the same as invoke(Invocation[] memory invocations),
      *         but includes logic to handle the highly packed calldata
-     * @dev   Fallback eliminates need for 4 byte sig. MUST prepend just 0x45 to calldata 
+     * @dev   Fallback eliminates need for 4 byte sig. MUST prepend INVOKE_ID to calldata 
      * @param input Packed data to pass to invoke logic
      * @return required no-op
      */
     fallback (bytes calldata input) external returns (bytes memory) {
         PTR memory ptr;
-        if(_readUint8(input, ptr) != 73) revert MultiInvokerRollupMissingMagicByteError();
+        if (_readUint8(input, ptr) != INVOKE_ID) revert MultiInvokerRollupMissingMagicByteError();
 
         _decodeFallbackAndInvoke(input, ptr);
         return "";

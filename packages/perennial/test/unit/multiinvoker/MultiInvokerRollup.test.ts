@@ -88,7 +88,7 @@ describe('MultiInvokerRollup', () => {
     await multiInvokerRollup.initialize()
   })
 
-  describe('#collisions', () => {
+  describe('#invoke_id', () => {
     it(`magic byte header ${MAGIC_BYTE} does not collide with existing fns`, () => {
       const sigs: string[] = Object.keys(multiInvokerRollup.functions)
         .filter(i => i.endsWith(')'))
@@ -96,6 +96,10 @@ describe('MultiInvokerRollup', () => {
       sigs.forEach(v => {
         expect(v.startsWith(MAGIC_BYTE)).to.eq(false)
       })
+    })
+
+    it(`magic byte invoke id publicly accessible`, async () => {
+      expect(await multiInvokerRollup.connect(user).callStatic.INVOKE_ID()).to.eq(73)
     })
   })
 
