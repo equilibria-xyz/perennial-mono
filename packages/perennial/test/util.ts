@@ -2,6 +2,8 @@ import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { constants, utils, BigNumberish, BigNumber } from 'ethers'
 import { IMultiInvoker, MultiInvokerRollup } from '../types/generated'
 
+export const MAGIC_BYTE = '0x49'
+
 export type InvokerAction =
   | 'NOOP'
   | 'DEPOSIT'
@@ -130,13 +132,14 @@ export const buildAllActionsRollup = (
   //   programs?: number[]
   // }[]
 ): string => {
-  let pld = '0x45'
+  let pld = MAGIC_BYTE
 
   for (const a of actions) {
-    if (a.payload == '0x') {
+    if (a.payload == MAGIC_BYTE) {
       continue
     }
-    pld += a.payload
+    // remove magic byte from each action when multiple actions
+    pld += a.payload.substring(4)
   }
 
   return pld
@@ -159,12 +162,13 @@ export const buildInvokerActionRollup = (
   return {
     NOOP: {
       action: 0,
-      payload: '0x',
+      payload: MAGIC_BYTE,
     },
     DEPOSIT: {
       action: 1,
       // [userAddress productAddress amount]
       payload:
+        MAGIC_BYTE +
         '01' +
         encodeAddressOrCacheIndex(userCache, userAddress) +
         encodeAddressOrCacheIndex(productCache, productAddress) +
@@ -174,6 +178,7 @@ export const buildInvokerActionRollup = (
       action: 2,
       // [userAddress productAddress amount]
       payload:
+        MAGIC_BYTE +
         '02' +
         encodeAddressOrCacheIndex(userCache, userAddress) +
         encodeAddressOrCacheIndex(productCache, productAddress) +
@@ -182,42 +187,62 @@ export const buildInvokerActionRollup = (
     OPEN_TAKE: {
       action: 3,
       // [productAddress position]
-      payload: '03' + encodeAddressOrCacheIndex(productCache, productAddress) + encodeUint(BigNumber.from(position)),
+      payload:
+        MAGIC_BYTE +
+        '03' +
+        encodeAddressOrCacheIndex(productCache, productAddress) +
+        encodeUint(BigNumber.from(position)),
     },
     CLOSE_TAKE: {
       action: 4,
       // [productAddress position]
-      payload: '04' + encodeAddressOrCacheIndex(productCache, productAddress) + encodeUint(BigNumber.from(position)),
+      payload:
+        MAGIC_BYTE +
+        '04' +
+        encodeAddressOrCacheIndex(productCache, productAddress) +
+        encodeUint(BigNumber.from(position)),
     },
     OPEN_MAKE: {
       action: 5,
       // [productAddress position]
-      payload: '05' + encodeAddressOrCacheIndex(productCache, productAddress) + encodeUint(BigNumber.from(position)),
+      payload:
+        MAGIC_BYTE +
+        '05' +
+        encodeAddressOrCacheIndex(productCache, productAddress) +
+        encodeUint(BigNumber.from(position)),
     },
     CLOSE_MAKE: {
       action: 6,
       // [productAddress position]
-      payload: '06' + encodeAddressOrCacheIndex(productCache, productAddress) + encodeUint(BigNumber.from(position)),
+      payload:
+        MAGIC_BYTE +
+        '06' +
+        encodeAddressOrCacheIndex(productCache, productAddress) +
+        encodeUint(BigNumber.from(position)),
     },
     CLAIM: {
       action: 7,
       // [productAddress programs]
-      payload: '07' + encodeAddressOrCacheIndex(productCache, productAddress) + encodeProgramIds(programs!),
+      payload:
+        MAGIC_BYTE + '07' + encodeAddressOrCacheIndex(productCache, productAddress) + encodeProgramIds(programs!),
     },
     WRAP: {
       action: 8,
       // [userAddress amount]
-      payload: '08' + encodeAddressOrCacheIndex(userCache, userAddress) + encodeUint(BigNumber.from(amount)),
+      payload:
+        MAGIC_BYTE + '08' + encodeAddressOrCacheIndex(userCache, userAddress) + encodeUint(BigNumber.from(amount)),
     },
     UNWRAP: {
       action: 9,
       // [userAddress amount]
-      payload: '09' + encodeAddressOrCacheIndex(userCache, userAddress) + encodeUint(BigNumber.from(amount)),
+      payload:
+        MAGIC_BYTE + '09' + encodeAddressOrCacheIndex(userCache, userAddress) + encodeUint(BigNumber.from(amount)),
     },
     WRAP_AND_DEPOSIT: {
       action: 10,
       // [userAddress, productAddress, amount]
       payload:
+        MAGIC_BYTE +
         '0A' +
         encodeAddressOrCacheIndex(userCache, userAddress) +
         encodeAddressOrCacheIndex(productCache, productAddress) +
@@ -227,6 +252,7 @@ export const buildInvokerActionRollup = (
       action: 11,
       // [userAddress, productAddress, amount]
       payload:
+        MAGIC_BYTE +
         '0B' +
         encodeAddressOrCacheIndex(userCache, userAddress) +
         encodeAddressOrCacheIndex(productCache, productAddress) +
@@ -235,6 +261,7 @@ export const buildInvokerActionRollup = (
     VAULT_DEPOSIT: {
       action: 12,
       payload:
+        MAGIC_BYTE +
         '0C' +
         encodeAddressOrCacheIndex(userCache, userAddress) +
         encodeAddressOrCacheIndex(vaultCache, vaultAddress) +
@@ -242,16 +269,24 @@ export const buildInvokerActionRollup = (
     },
     VAULT_REDEEM: {
       action: 13,
-      payload: '0D' + encodeAddressOrCacheIndex(vaultCache, vaultAddress) + encodeUint(BigNumber.from(vaultAmount)),
+      payload:
+        MAGIC_BYTE +
+        '0D' +
+        encodeAddressOrCacheIndex(vaultCache, vaultAddress) +
+        encodeUint(BigNumber.from(vaultAmount)),
     },
     VAULT_CLAIM: {
       action: 14,
       payload:
-        '0E' + encodeAddressOrCacheIndex(userCache, userAddress) + encodeAddressOrCacheIndex(vaultCache, vaultAddress),
+        MAGIC_BYTE +
+        '0E' +
+        encodeAddressOrCacheIndex(userCache, userAddress) +
+        encodeAddressOrCacheIndex(vaultCache, vaultAddress),
     },
     VAULT_WRAP_AND_DEPOSIT: {
       action: 15,
       payload:
+        MAGIC_BYTE +
         '0F' +
         encodeAddressOrCacheIndex(userCache, userAddress) +
         encodeAddressOrCacheIndex(vaultCache, vaultAddress) +
@@ -260,6 +295,7 @@ export const buildInvokerActionRollup = (
     CHARGE_FEE: {
       action: 16,
       payload:
+        MAGIC_BYTE +
         `10` +
         encodeAddressOrCacheIndex(vaultCache, vaultAddress) +
         encodeUint(BigNumber.from(feeAmount)) +

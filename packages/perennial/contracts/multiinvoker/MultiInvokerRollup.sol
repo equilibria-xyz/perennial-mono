@@ -68,7 +68,7 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
      */
     fallback (bytes calldata input) external returns (bytes memory) {
         PTR memory ptr;
-        if(_readUint8(input, ptr) != 69) revert MultiInvokerRollupMissingMagicByteError();
+        if(_readUint8(input, ptr) != 73) revert MultiInvokerRollupMissingMagicByteError();
 
         _decodeFallbackAndInvoke(input, ptr);
         return "";
@@ -84,7 +84,6 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
      * @param input Packed data to pass to invoke logic
      */
     function _decodeFallbackAndInvoke(bytes calldata input, PTR memory ptr) internal {
-        // PTR memory ptr = PTR({pos: 1}); // INVOKE_ID must be first byte to prevent collisions
 
         while (ptr.pos < input.length) {
             PerennialAction action = PerennialAction(_readUint8(input, ptr));
@@ -311,7 +310,7 @@ contract MultiInvokerRollup is IMultiInvokerRollup, MultiInvoker {
         assembly {
             // 1) load calldata into temp starting at ptr position 
             let temp := calldataload(add(input.offset, pos))
-            // 2) shifts the calldata such that only the first byte (length) is stored in result
+            // 2) shifts the calldata such that only the first byte is stored in result
             result := shr(mul(8, sub(UINT256_LENGTH, UINT8_LENGTH)), temp)
         }
     }

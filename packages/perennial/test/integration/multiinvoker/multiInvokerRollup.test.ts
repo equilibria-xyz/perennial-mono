@@ -148,9 +148,7 @@ describe('MultiInvokerRollup', () => {
       await usdc.connect(usdcHolder).transfer(user.address, 1_000_000e6)
 
       await expect(
-        await user.sendTransaction(
-          buildTransactionRequest(user, multiInvokerRollup, '0x45' + customActions.WRAP.payload),
-        ),
+        await user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, customActions.WRAP.payload)),
       )
         .to.emit(usdc, 'Transfer')
         .withArgs(user.address, multiInvokerRollup.address, 2_000_000e6)
@@ -372,7 +370,7 @@ describe('MultiInvokerRollup', () => {
       await batcher.rebalance()
 
       // Deposit the collateral to withdraw
-      await user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, '0x45' + actions.DEPOSIT.payload))
+      await user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, actions.DEPOSIT.payload))
 
       const payload = buildAllActionsRollup(Object.values([actions.WITHDRAW, actions.UNWRAP]))
       await expect(user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, payload)))
@@ -395,7 +393,7 @@ describe('MultiInvokerRollup', () => {
         buildTransactionRequest(
           user,
           multiInvokerRollup,
-          `0x45` + actions.WRAP.payload + customActions.CHARGE_FEE.payload,
+          actions.WRAP.payload + customActions.CHARGE_FEE.payload.substring(4),
         ),
       )
 
@@ -407,9 +405,7 @@ describe('MultiInvokerRollup', () => {
     it(`wraps USDC to DSU on WRAP action and invokes CHARGE_FEE to interface `, async () => {
       const { user, multiInvokerRollup, usdc, dsu } = instanceVars
 
-      const res = user.sendTransaction(
-        buildTransactionRequest(user, multiInvokerRollup, '0x45' + actions.CHARGE_FEE.payload),
-      )
+      const res = user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, actions.CHARGE_FEE.payload))
 
       await expect(res).to.not.be.reverted
       expect(await dsu.balanceOf(vault.address)).to.eq(utils.parseEther('10'))
@@ -424,12 +420,10 @@ describe('MultiInvokerRollup', () => {
       await batcher.rebalance()
 
       // Deposit the collateral to withdraw
-      await user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, '0x45' + actions.DEPOSIT.payload))
+      await user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, actions.DEPOSIT.payload))
 
       await expect(
-        user.sendTransaction(
-          buildTransactionRequest(user, multiInvokerRollup, '0x45' + actions.WITHDRAW_AND_UNWRAP.payload),
-        ),
+        user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, actions.WITHDRAW_AND_UNWRAP.payload)),
       )
         .to.emit(collateral, 'Withdrawal')
         .withArgs(user.address, product.address, amount)
@@ -453,9 +447,7 @@ describe('MultiInvokerRollup', () => {
         data: twowayiface.encodeFunctionData('deposit', [utils.parseEther('20000')]),
       })
 
-      await expect(
-        user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, '0x45' + actions.UNWRAP.payload)),
-      )
+      await expect(user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, actions.UNWRAP.payload)))
         .to.emit(batcher, 'Unwrap')
         .withArgs(user.address, amount)
         .to.emit(usdc, 'Transfer')
@@ -517,9 +509,7 @@ describe('MultiInvokerRollup', () => {
       const { user, multiInvokerRollup, dsu, usdc, batcher } = instanceVars
 
       await expect(
-        user.sendTransaction(
-          buildTransactionRequest(user, multiInvokerRollup, '0x45' + actions.VAULT_WRAP_AND_DEPOSIT.payload),
-        ),
+        user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, actions.VAULT_WRAP_AND_DEPOSIT.payload)),
       )
         .to.emit(usdc, 'Transfer')
         .withArgs(user.address, multiInvokerRollup.address, 10000e6)
@@ -553,7 +543,7 @@ describe('MultiInvokerRollup', () => {
         await usdc.connect(usdcHolder).transfer(user.address, 1_000_000e6)
 
         await expect(
-          user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, '0x45' + customActions.WRAP.payload)),
+          user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, customActions.WRAP.payload)),
         )
           .to.emit(usdc, 'Transfer')
           .withArgs(user.address, multiInvokerRollup.address, 2_000_000e6)
@@ -573,9 +563,7 @@ describe('MultiInvokerRollup', () => {
         await batcher.connect(user).wrap(amount, user.address)
         await batcher.rebalance()
 
-        await expect(
-          user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, '0x45' + actions.UNWRAP.payload)),
-        )
+        await expect(user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, actions.UNWRAP.payload)))
           .to.emit(reserve, 'Redeem')
           .withArgs(multiInvokerRollup.address, amount, 10000e6)
           .to.emit(usdc, 'Transfer')

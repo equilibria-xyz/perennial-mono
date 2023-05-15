@@ -17,8 +17,9 @@ import {
   TestnetVault,
 } from '../../../types/generated'
 import { IMultiInvokerRollup } from '../../../types/generated/contracts/interfaces/IMultiInvokerRollup'
-import { InvokerAction, buildInvokerActionRollup, buildAllActionsRollup } from '../../util'
+import { InvokerAction, buildInvokerActionRollup, buildAllActionsRollup, MAGIC_BYTE } from '../../util'
 import { TransactionRequest } from '@ethersproject/abstract-provider'
+import { multiinvoker } from '../../../types/generated/contracts'
 
 const { ethers } = HRE
 use(smock.matchers)
@@ -85,6 +86,17 @@ describe('MultiInvokerRollup', () => {
     usdc.balanceOf.whenCalledWith(batcher.address).returns(1_000_000e6)
 
     await multiInvokerRollup.initialize()
+  })
+
+  describe('#collisions', () => {
+    it(`magic byte header ${MAGIC_BYTE} does not collide with existing fns`, () => {
+      const sigs: string[] = Object.keys(multiInvokerRollup.functions)
+        .filter(i => i.endsWith(')'))
+        .map(v => ethers.utils.id(v))
+      sigs.forEach(v => {
+        expect(v.startsWith(MAGIC_BYTE)).to.eq(false)
+      })
+    })
   })
 
   describe('#constructor', () => {
@@ -169,37 +181,38 @@ describe('MultiInvokerRollup', () => {
       // store product in cache
 
       await expect(
-        user.sendTransaction(
-          buildTransactionRequest(user, multiInvokerRollup, '0x45' + actions.WRAP_AND_DEPOSIT.payload),
-        ),
+        user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, actions.WRAP_AND_DEPOSIT.payload)),
       ).to.not.be.reverted
 
       // cache index 3 is out of bounds, expect panic
-      const badAddressCachePld = '0x45030103'
+      const badAddressCachePld = '0x49030103'
       await expect(
         user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, badAddressCachePld)),
       ).to.be.revertedWithPanic()
 
       // length > 32 (33) for uint error
-      const badAmountPld = '0x45030101213452434344'
+      const badAmountPld = '0x49030101213452434344'
       await expect(
         user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, badAmountPld)),
       ).to.be.revertedWithCustomError(multiInvokerRollup, 'MultiInvokerRollupInvalidUint256LengthError')
+
+      await expect(
+        user.sendTransaction(
+          buildTransactionRequest(user, multiInvokerRollup, '0x' + actions.DEPOSIT.payload.substring(4)),
+        ),
+      ).to.be.revertedWithCustomError(multiInvokerRollup, 'MultiInvokerRollupMissingMagicByteError')
     })
 
     it(`decodes 0 as a value on any action`, async () => {
       usdc.transferFrom.whenCalledWith(user.address, multiInvokerRollup.address, 0).returns(true)
 
-      await expect(
-        user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, '0x45' + zeroAction.WRAP.payload)),
-      ).to.not.be.reverted
+      await expect(user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, zeroAction.WRAP.payload))).to
+        .not.be.reverted
       expect(batcher.wrap).to.have.been.calledWith(BigNumber.from(0), user.address)
     })
 
     it('deposits on DEPOSIT action', async () => {
-      const res = user.sendTransaction(
-        buildTransactionRequest(user, multiInvokerRollup, '0x45' + actions.DEPOSIT.payload),
-      )
+      const res = user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, actions.DEPOSIT.payload))
 
       await expect(res).to.not.be.reverted
       expect(dsu.transferFrom).to.have.been.calledWith(user.address, multiInvokerRollup.address, amount)
@@ -207,61 +220,49 @@ describe('MultiInvokerRollup', () => {
     })
 
     it('withdraws on WITHDRAW action', async () => {
-      const res = user.sendTransaction(
-        buildTransactionRequest(user, multiInvokerRollup, '0x45' + actions.WITHDRAW.payload),
-      )
+      const res = user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, actions.WITHDRAW.payload))
 
       await expect(res).to.not.be.reverted
       expect(collateral.withdrawFrom).to.have.been.calledWith(user.address, user.address, product.address, amount)
     })
 
     it('opens a take position on OPEN_TAKE action', async () => {
-      const res = user.sendTransaction(
-        buildTransactionRequest(user, multiInvokerRollup, '0x45' + actions.OPEN_TAKE.payload),
-      )
+      const res = user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, actions.OPEN_TAKE.payload))
 
       await expect(res).to.not.be.reverted
       expect(product.openTakeFor).to.have.been.calledWith(user.address, position)
     })
 
     it('closes a take position on CLOSE_TAKE action', async () => {
-      const res = user.sendTransaction(
-        buildTransactionRequest(user, multiInvokerRollup, '0x45' + actions.CLOSE_TAKE.payload),
-      )
+      const res = user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, actions.CLOSE_TAKE.payload))
 
       await expect(res).to.not.be.reverted
       expect(product.closeTakeFor).to.have.been.calledWith(user.address, position)
     })
 
     it('opens a make position on OPEN_MAKE action', async () => {
-      const res = user.sendTransaction(
-        buildTransactionRequest(user, multiInvokerRollup, '0x45' + actions.OPEN_MAKE.payload),
-      )
+      const res = user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, actions.OPEN_MAKE.payload))
 
       await expect(res).to.not.be.reverted
       expect(product.openMakeFor).to.have.been.calledWith(user.address, position)
     })
 
     it('closes a make position on CLOSE_MAKE action', async () => {
-      const res = user.sendTransaction(
-        buildTransactionRequest(user, multiInvokerRollup, '0x45' + actions.CLOSE_MAKE.payload),
-      )
+      const res = user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, actions.CLOSE_MAKE.payload))
 
       await expect(res).to.not.be.reverted
       expect(product.closeMakeFor).to.have.been.calledWith(user.address, position)
     })
 
     it('claims incentive rewards on CLAIM action', async () => {
-      const res = user.sendTransaction(
-        buildTransactionRequest(user, multiInvokerRollup, '0x45' + actions.CLAIM.payload),
-      )
+      const res = user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, actions.CLAIM.payload))
 
       await expect(res).to.not.be.reverted
       expect(incentivizer.claimFor).to.have.been.calledWith(user.address, product.address, programs)
     })
 
     it('wraps USDC to DSU on WRAP action', async () => {
-      const res = user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, '0x45' + actions.WRAP.payload))
+      const res = user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, actions.WRAP.payload))
 
       await expect(res).to.not.be.reverted
       expect(usdc.transferFrom).to.have.been.calledWith(user.address, multiInvokerRollup.address, usdcAmount)
@@ -272,7 +273,7 @@ describe('MultiInvokerRollup', () => {
       dsu.balanceOf.whenCalledWith(batcher.address).returns(0)
       dsu.transfer.whenCalledWith(user.address, amount).returns(true)
 
-      const res = user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, '0x45' + actions.WRAP.payload))
+      const res = user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, actions.WRAP.payload))
 
       await expect(res).to.not.be.reverted
       expect(usdc.transferFrom).to.have.been.calledWith(user.address, multiInvokerRollup.address, usdcAmount)
@@ -281,9 +282,7 @@ describe('MultiInvokerRollup', () => {
     })
 
     it('unwraps DSU to USDC on UNWRAP action', async () => {
-      const res = user.sendTransaction(
-        buildTransactionRequest(user, multiInvokerRollup, '0x45' + actions.UNWRAP.payload),
-      )
+      const res = user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, actions.UNWRAP.payload))
 
       await expect(res).to.not.be.reverted
       expect(dsu.transferFrom).to.have.been.calledWith(user.address, multiInvokerRollup.address, amount)
@@ -294,9 +293,7 @@ describe('MultiInvokerRollup', () => {
       usdc.balanceOf.whenCalledWith(batcher.address).returns(0)
       usdc.transfer.whenCalledWith(user.address, amount).returns(true)
 
-      const res = user.sendTransaction(
-        buildTransactionRequest(user, multiInvokerRollup, '0x45' + actions.UNWRAP.payload),
-      )
+      const res = user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, actions.UNWRAP.payload))
 
       await expect(res).to.not.be.reverted
       expect(dsu.transferFrom).to.have.been.calledWith(user.address, multiInvokerRollup.address, amount)
@@ -306,7 +303,7 @@ describe('MultiInvokerRollup', () => {
 
     it('wraps USDC to DSU then deposits DSU on WRAP_AND_DEPOSIT action', async () => {
       const res = user.sendTransaction(
-        buildTransactionRequest(user, multiInvokerRollup, '0x45' + actions.WRAP_AND_DEPOSIT.payload),
+        buildTransactionRequest(user, multiInvokerRollup, actions.WRAP_AND_DEPOSIT.payload),
       )
 
       await expect(res).to.not.be.reverted
@@ -320,7 +317,7 @@ describe('MultiInvokerRollup', () => {
       dsu.transfer.whenCalledWith(multiInvokerRollup.address, amount).returns(true)
 
       const res = user.sendTransaction(
-        buildTransactionRequest(user, multiInvokerRollup, '0x45' + actions.WRAP_AND_DEPOSIT.payload),
+        buildTransactionRequest(user, multiInvokerRollup, actions.WRAP_AND_DEPOSIT.payload),
       )
 
       await expect(res).to.not.be.reverted
@@ -331,7 +328,7 @@ describe('MultiInvokerRollup', () => {
 
     it('withdraws then unwraps DSU to USDC on WITHDRAW_AND_UNWRAP action', async () => {
       const res = user.sendTransaction(
-        buildTransactionRequest(user, multiInvokerRollup, '0x45' + actions.WITHDRAW_AND_UNWRAP.payload),
+        buildTransactionRequest(user, multiInvokerRollup, actions.WITHDRAW_AND_UNWRAP.payload),
       )
 
       await expect(res).to.not.be.reverted
@@ -349,7 +346,7 @@ describe('MultiInvokerRollup', () => {
       usdc.balanceOf.whenCalledWith(batcher.address).returns(0)
 
       const res = user.sendTransaction(
-        buildTransactionRequest(user, multiInvokerRollup, '0x45' + actions.WITHDRAW_AND_UNWRAP.payload),
+        buildTransactionRequest(user, multiInvokerRollup, actions.WITHDRAW_AND_UNWRAP.payload),
       )
 
       await expect(res).to.not.be.reverted
@@ -364,9 +361,7 @@ describe('MultiInvokerRollup', () => {
     })
 
     it('deposits to vault on VAULT_DEPOSIT action', async () => {
-      const res = user.sendTransaction(
-        buildTransactionRequest(user, multiInvokerRollup, '0x45' + actions.VAULT_DEPOSIT.payload),
-      )
+      const res = user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, actions.VAULT_DEPOSIT.payload))
 
       await expect(res).to.not.be.reverted
       expect(dsu.transferFrom).to.have.been.calledWith(user.address, multiInvokerRollup.address, vaultAmount)
@@ -375,18 +370,14 @@ describe('MultiInvokerRollup', () => {
     })
 
     it('redeems from vault on VAULT_REDEEM action', async () => {
-      const res = user.sendTransaction(
-        buildTransactionRequest(user, multiInvokerRollup, '0x45' + actions.VAULT_REDEEM.payload),
-      )
+      const res = user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, actions.VAULT_REDEEM.payload))
 
       await expect(res).to.not.be.reverted
       expect(vault.redeem).to.have.been.calledWith(vaultAmount, user.address)
     })
 
     it('claims from vault on VAULT_CLAIM action', async () => {
-      const res = user.sendTransaction(
-        buildTransactionRequest(user, multiInvokerRollup, '0x45' + actions.VAULT_CLAIM.payload),
-      )
+      const res = user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, actions.VAULT_CLAIM.payload))
 
       await expect(res).to.not.be.reverted
       expect(vault.claim).to.have.been.calledWith(user.address)
@@ -394,7 +385,7 @@ describe('MultiInvokerRollup', () => {
 
     it('wraps USDC to DSU then deposits DSU to the vault on VAULT_WRAP_AND_DEPOSIT action', async () => {
       const res = user.sendTransaction(
-        buildTransactionRequest(user, multiInvokerRollup, '0x45' + actions.VAULT_WRAP_AND_DEPOSIT.payload),
+        buildTransactionRequest(user, multiInvokerRollup, actions.VAULT_WRAP_AND_DEPOSIT.payload),
       )
 
       await expect(res).to.not.be.reverted
@@ -522,9 +513,7 @@ describe('MultiInvokerRollup', () => {
       it('wraps USDC to DSU using RESERVE on WRAP action', async () => {
         dsu.transfer.whenCalledWith(user.address, amount).returns(true)
 
-        const res = user.sendTransaction(
-          buildTransactionRequest(user, multiInvokerRollup, '0x45' + actions.WRAP.payload),
-        )
+        const res = user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, actions.WRAP.payload))
 
         await expect(res).to.not.be.reverted
         // multiInvokerRollup.connect(user).invoke([actions.WRAP])
@@ -536,9 +525,7 @@ describe('MultiInvokerRollup', () => {
       it('unwraps DSU to USDC using RESERVE on UNWRAP action', async () => {
         usdc.transfer.whenCalledWith(user.address, amount).returns(true)
 
-        const res = user.sendTransaction(
-          buildTransactionRequest(user, multiInvokerRollup, '0x45' + actions.UNWRAP.payload),
-        )
+        const res = user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, actions.UNWRAP.payload))
 
         await expect(res).to.not.be.reverted
 
@@ -619,9 +606,8 @@ describe('MultiInvokerRollup', () => {
       it('performs cached invoke on DEPOSIT', async () => {
         // 1) set state caching
 
-        await expect(
-          user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, '0x45' + actions.DEPOSIT.payload)),
-        ).to.not.be.reverted
+        await expect(user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, actions.DEPOSIT.payload)))
+          .to.not.be.reverted
         expect(dsu.transferFrom).to.have.been.calledWith(user.address, multiInvokerRollup.address, amount)
         expect(collateral.depositTo).to.have.been.calledWith(user.address, product.address, amount)
 
@@ -632,9 +618,7 @@ describe('MultiInvokerRollup', () => {
         // 2) call contract with cached payload
 
         await expect(
-          user.sendTransaction(
-            buildTransactionRequest(user, multiInvokerRollup, '0x45' + actionsCached.DEPOSIT.payload),
-          ),
+          user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, actionsCached.DEPOSIT.payload)),
         ).to.not.be.reverted
         expect(dsu.transferFrom).to.have.been.calledWith(user.address, multiInvokerRollup.address, amount)
         expect(collateral.depositTo).to.have.been.calledWith(user.address, product.address, amount)
