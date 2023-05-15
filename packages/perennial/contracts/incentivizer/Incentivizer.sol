@@ -45,7 +45,6 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
     onlyOwner(programInfo.coordinatorId)
     returns (uint256 programId) {
         IController _controller = controller();
-        UFixed18 programTotal = programInfo.amount.sum();
 
         // Validate
         if (programInfo.coordinatorId != 0 && programInfo.coordinatorId != _controller.coordinatorFor(product))
@@ -55,6 +54,7 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
         ProgramInfoLib.validate(programInfo);
 
         // Take fee
+        UFixed18 programTotal = programInfo.amount.sum();
         UFixed18 programFeeAmount = programInfo.deductFee(_controller.incentivizationFee());
         fees[programInfo.token] = fees[programInfo.token].add(programFeeAmount);
 
