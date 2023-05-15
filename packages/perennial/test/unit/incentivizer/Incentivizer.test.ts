@@ -2496,7 +2496,7 @@ describe('Incentivizer', () => {
 
     describe('#treasury', () => {
       it('reverts', async () => {
-        await expect(incentivizer.treasury(product.address, 0)).to.be.revertedWithCustomError(
+        await expect(incentivizer['treasury(address,uint256)'](product.address, 0)).to.be.revertedWithCustomError(
           incentivizer,
           'IncentivizerInvalidProgramError',
         )
