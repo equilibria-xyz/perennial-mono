@@ -1,6 +1,6 @@
 import { expect } from 'chai'
 import 'hardhat'
-import { utils } from 'ethers'
+import { constants, utils } from 'ethers'
 
 import { InstanceVars, deployProtocol, createProduct, depositTo, INITIAL_VERSION } from '../helpers/setupHelpers'
 import {
@@ -452,7 +452,7 @@ describe('Happy Path', () => {
 
     await expect(product.connect(userB).openTake(OPEN_TAKE_POSITION))
       .to.be.revertedWithCustomError(product, 'ProductInsufficientLiquidityError')
-      .withArgs(0)
+      .withArgs(constants.MaxUint256)
     await product.connect(user).openMake(OPEN_MAKE_POSITION)
     await product.connect(userB).openTake(OPEN_TAKE_POSITION)
 
@@ -522,7 +522,7 @@ describe('Happy Path', () => {
 
     await expect(product.connect(userB).openTake(OPEN_TAKE_POSITION))
       .to.be.revertedWithCustomError(product, 'ProductInsufficientLiquidityError')
-      .withArgs(0)
+      .withArgs(constants.MaxUint256)
     await product.connect(user).openMake(OPEN_MAKE_POSITION)
     await product.connect(userB).openTake(OPEN_TAKE_POSITION)
     await product.connect(userB).closeTake(CLOSE_TAKE_POSITION.div(2))

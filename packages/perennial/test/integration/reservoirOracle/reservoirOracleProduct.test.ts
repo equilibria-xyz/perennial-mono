@@ -1,6 +1,6 @@
 import { expect } from 'chai'
 import 'hardhat'
-import { BigNumber, utils } from 'ethers'
+import { BigNumber, constants, utils } from 'ethers'
 
 import { InstanceVars, deployProtocol, createProduct, depositTo } from '../helpers/setupHelpers'
 import { createPayoffDefinition, expectPositionEq, expectPrePositionEq } from '../../../../common/testutil/types'
@@ -455,7 +455,7 @@ describe('Reservoir Oracle Product', () => {
 
     await expect(product.connect(userB).openTake(OPEN_TAKE_POSITION))
       .to.be.revertedWithCustomError(product, 'ProductInsufficientLiquidityError')
-      .withArgs(0)
+      .withArgs(constants.MaxUint256)
     await product.connect(user).openMake(OPEN_MAKE_POSITION)
     await product.connect(userB).openTake(OPEN_TAKE_POSITION)
 
@@ -523,7 +523,7 @@ describe('Reservoir Oracle Product', () => {
 
     await expect(product.connect(userB).openTake(OPEN_TAKE_POSITION))
       .to.be.revertedWithCustomError(product, 'ProductInsufficientLiquidityError')
-      .withArgs(0)
+      .withArgs(constants.MaxUint256)
     await product.connect(user).openMake(OPEN_MAKE_POSITION)
     await product.connect(userB).openTake(OPEN_TAKE_POSITION)
     await product.connect(userB).closeTake(CLOSE_TAKE_POSITION.div(2))

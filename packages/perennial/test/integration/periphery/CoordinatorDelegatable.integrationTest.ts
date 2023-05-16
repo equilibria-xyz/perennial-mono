@@ -244,6 +244,14 @@ function itPerformsProductUpdates(getParams: () => [CoordinatorDelegatable, Sign
     expect(await product.makerLimit()).to.equal(newMakerLimit)
   })
 
+  it('can call updateUtilizationBuffer', async () => {
+    const newBuffer = utils.parseEther('0.1')
+
+    await expect(coordinatorDel.connect(signer).updateUtilizationBuffer(product.address, newBuffer)).to.not.be.reverted
+
+    expect(await product.utilizationBuffer()).to.equal(newBuffer)
+  })
+
   it('can call updateUtilizationCurve', async () => {
     const newCurve = {
       minRate: utils.parseEther('0.01'),

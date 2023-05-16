@@ -67,6 +67,10 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
     UFixed18Storage private constant _makerLimit = UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.makerLimit"));
     function makerLimit() public view returns (UFixed18) { return _makerLimit.read(); }
 
+    /// @dev The utilization buffer value
+    UFixed18Storage private constant _utilizationBuffer = UFixed18Storage.wrap(keccak256("equilibria.perennial.UParamProvider.utilizationBuffer"));
+    function utilizationBuffer() public view returns (UFixed18) { return _utilizationBuffer.read(); }
+
     /// @dev The JumpRateUtilizationCurve params
     JumpRateUtilizationCurveStorage private constant _utilizationCurve =
         JumpRateUtilizationCurveStorage.wrap(keccak256("equilibria.perennial.UParamProvider.jumpRateUtilizationCurve"));
@@ -235,6 +239,17 @@ abstract contract UParamProvider is IParamProvider, UControllerProvider {
      */
     function updateMakerLimit(UFixed18 newMakerLimit) external onlyProductOwner settleProduct {
         _updateMakerLimit(newMakerLimit);
+    }
+
+    /**
+     * @notice Updates the utilization buffer to `newUtilizationBuffer`
+     * @dev only callable by product owner
+     * @param newUtilizationBuffer new utilization buffer value
+     */
+    function updateUtilizationBuffer(UFixed18 newUtilizationBuffer) external onlyProductOwner settleProduct {
+        if (newUtilizationBuffer.gt(UFixed18Lib.ONE)) revert ParamProviderInvalidParamValue();
+        _utilizationBuffer.store(newUtilizationBuffer);
+        emit UtilizationBufferUpdated(newUtilizationBuffer, _productVersion());
     }
 
     /**
