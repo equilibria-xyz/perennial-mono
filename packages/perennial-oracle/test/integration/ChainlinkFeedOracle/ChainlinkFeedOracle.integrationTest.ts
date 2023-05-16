@@ -61,7 +61,8 @@ describe('ChainlinkFeedOracle', () => {
           { startingVersion: 0, startingRoundId: 0 },
           { startingVersion: 0, startingRoundId: 0 },
           { startingVersion: 0, startingRoundId: buildChainlinkRoundId(3, 123) },
-          { startingVersion: 12, startingRoundId: buildChainlinkRoundId(4, 21) },
+          { startingVersion: 4, startingRoundId: buildChainlinkRoundId(4, 21) },
+          { startingVersion: 12, startingRoundId: buildChainlinkRoundId(5, 20000) },
         ]
         oracle = await new ChainlinkFeedOracle__factory(owner).deploy(aggregatorProxy.address, initialPhases)
       })
@@ -82,7 +83,7 @@ describe('ChainlinkFeedOracle', () => {
 
       it('returns a version from a passed in phase', async () => {
         // Round from Phase 4
-        const version12Round = buildChainlinkRoundId(4, 21)
+        const version12Round = buildChainlinkRoundId(5, 20000)
         const expectedData = await aggregatorProxy.getRoundData(version12Round)
 
         const atVersion = await oracle.atVersion(12)
@@ -112,6 +113,16 @@ describe('ChainlinkFeedOracle', () => {
         const initialPhases = [
           { startingVersion: 0, startingRoundId: 0 },
           { startingVersion: 1, startingRoundId: 0 },
+        ]
+        await expect(
+          new ChainlinkFeedOracle__factory(owner).deploy(aggregatorProxy.address, initialPhases),
+        ).to.be.revertedWithCustomError(oracle, 'InvalidPhaseInitialization')
+      })
+
+      it('reverts if phases array does not reach current phase', async () => {
+        const initialPhases = [
+          { startingVersion: 0, startingRoundId: 0 },
+          { startingVersion: 0, startingRoundId: buildChainlinkRoundId(1, 5) },
         ]
         await expect(
           new ChainlinkFeedOracle__factory(owner).deploy(aggregatorProxy.address, initialPhases),

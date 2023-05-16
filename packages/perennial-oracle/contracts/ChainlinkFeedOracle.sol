@@ -54,12 +54,18 @@ contract ChainlinkFeedOracle is IOracleProvider {
             // Phases[1] should start at version 0
             if (phases_[1].startingVersion != 0) revert InvalidPhaseInitialization();
 
+            // Set the lastSyncedRoundId to the starting round of the latest phase
+            ChainlinkRound memory latestRound = aggregator.getLatestRound();
+
+            // The phases array should be initialized up to the latest phase
+            if (phases_.length - 1 != latestRound.phaseId()) revert InvalidPhaseInitialization();
+
             // Load phases array with the provided phases
             for (uint i = 0; i < phases_.length; i++) {
                 _phases.push(phases_[i]);
             }
-            // Set the lastSyncedRoundId to the starting round of the latest phase
-            _lastSyncedRoundId = phases_[phases_.length - 1].startingRoundId;
+
+            _lastSyncedRoundId = latestRound.roundId;
         } else {
             ChainlinkRound memory firstSeenRound = aggregator.getLatestRound();
 
