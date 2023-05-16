@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.15;
+pragma solidity ^0.8.15;
 
 import "@chainlink/contracts/src/v0.8/interfaces/FeedRegistryInterface.sol";
 import "@openzeppelin/contracts/utils/math/SafeCast.sol";
