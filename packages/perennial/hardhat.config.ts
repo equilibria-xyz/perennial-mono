@@ -69,7 +69,6 @@ const config = defaultConfig({
     '@openzeppelin/contracts/governance/TimelockController.sol',
     '@openzeppelin/contracts/token/ERC20/presets/ERC20PresetMinterPauser.sol',
     '@equilibria/perennial-oracle/contracts/ChainlinkOracle.sol',
-    '@equilibria/perennial-oracle/contracts/ReservoirFeedOracle.sol',
     '@equilibria/perennial-oracle/contracts/test/TestnetChainlinkFeedRegistry.sol',
     '@equilibria/perennial-oracle/contracts/test/PassthroughDataFeed.sol',
     '@equilibria/perennial-oracle/contracts/test/PassthroughChainlinkFeed.sol',

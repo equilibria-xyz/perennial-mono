@@ -30,7 +30,6 @@ import {
   ProxyAdmin,
   ProxyAdmin__factory,
   TransparentUpgradeableProxy__factory,
-  ReservoirFeedOracle,
   MultiInvoker,
   MultiInvoker__factory,
   IEmptySetReserve,
@@ -217,7 +216,7 @@ export async function deployProtocol(): Promise<InstanceVars> {
 export async function createProduct(
   instanceVars: InstanceVars,
   payoffProvider?: TestnetContractPayoffProvider,
-  oracle?: ChainlinkOracle | ReservoirFeedOracle,
+  oracle?: ChainlinkOracle,
 ): Promise<Product> {
   const { owner, controller, treasuryB, chainlinkOracle } = instanceVars
   if (!payoffProvider) {
