@@ -148,9 +148,7 @@ describe('MultiInvokerRollup', () => {
       await usdc.connect(usdcHolder).transfer(user.address, 1_000_000e6)
 
       await expect(
-        await user.sendTransaction(
-          buildTransactionRequest(user, multiInvokerRollup, '0x' + customActions.WRAP.payload),
-        ),
+        await user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, customActions.WRAP.payload)),
       )
         .to.emit(usdc, 'Transfer')
         .withArgs(user.address, multiInvokerRollup.address, 2_000_000e6)
@@ -167,7 +165,7 @@ describe('MultiInvokerRollup', () => {
 
       const payload = buildAllActionsRollup(Object.values([actions.WRAP, actions.DEPOSIT, actions.OPEN_MAKE]))
 
-      await expect(user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, '0x' + payload)))
+      await expect(user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, payload)))
         .to.emit(usdc, 'Transfer')
         .withArgs(user.address, multiInvokerRollup.address, 10000e6)
         .to.emit(batcher, 'Wrap')
@@ -183,7 +181,7 @@ describe('MultiInvokerRollup', () => {
 
       const payload = buildAllActionsRollup(Object.values([actions.WRAP_AND_DEPOSIT, actions.OPEN_MAKE]))
 
-      await expect(user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, '0x' + payload)))
+      await expect(user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, payload)))
         .to.emit(usdc, 'Transfer')
         .withArgs(user.address, multiInvokerRollup.address, 10000e6)
         .to.emit(batcher, 'Wrap')
@@ -199,7 +197,7 @@ describe('MultiInvokerRollup', () => {
 
       const payload = buildAllActionsRollup(Object.values([actions.DEPOSIT, actions.OPEN_MAKE]))
 
-      const res = user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, '0x' + payload))
+      const res = user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, payload))
 
       await expect(res)
         .to.emit(collateral, 'Deposit')
@@ -213,7 +211,7 @@ describe('MultiInvokerRollup', () => {
 
       const payload1 = buildAllActionsRollup(Object.values([actions.WRAP, actions.DEPOSIT, actions.OPEN_MAKE]))
 
-      const res1 = user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, '0x' + payload1))
+      const res1 = user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, payload1))
 
       await expect(res1).to.not.be.reverted
       await depositTo(instanceVars, userB, product, amount)
@@ -233,7 +231,7 @@ describe('MultiInvokerRollup', () => {
         Object.values([partialActions.CLOSE_MAKE, partialActions.WITHDRAW, actions.CLAIM]),
       )
 
-      await expect(user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, '0x' + payload2)))
+      await expect(user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, payload2)))
         .to.emit(product, 'MakeClosed')
         .withArgs(user.address, INITIAL_VERSION + 4, position.div(2))
         .to.emit(collateral, 'Withdrawal')
@@ -247,13 +245,13 @@ describe('MultiInvokerRollup', () => {
 
       const payload = buildAllActionsRollup(Object.values([actions.WRAP, actions.DEPOSIT, actions.OPEN_MAKE]))
 
-      await user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, '0x' + payload))
+      await user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, payload))
 
       await chainlink.next()
 
       const payload2 = buildAllActionsRollup(Object.values([partialActions.CLOSE_MAKE, partialActions.DEPOSIT]))
 
-      await expect(user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, '0x' + payload2)))
+      await expect(user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, payload2)))
         .to.emit(product, 'MakeClosed')
         .withArgs(user.address, INITIAL_VERSION + 1, position.div(2))
         .to.emit(collateral, 'Deposit')
@@ -268,7 +266,7 @@ describe('MultiInvokerRollup', () => {
 
       const payload = buildAllActionsRollup(Object.values([actions.WRAP, actions.DEPOSIT, actions.OPEN_TAKE]))
 
-      await expect(user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, '0x' + payload)))
+      await expect(user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, payload)))
         .to.emit(usdc, 'Transfer')
         .withArgs(user.address, multiInvokerRollup.address, 10000e6)
         .to.emit(batcher, 'Wrap')
@@ -287,7 +285,7 @@ describe('MultiInvokerRollup', () => {
 
       const payload = buildAllActionsRollup(Object.values([actions.WRAP_AND_DEPOSIT, actions.OPEN_TAKE]))
 
-      await expect(user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, '0x' + payload)))
+      await expect(user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, payload)))
         .to.emit(usdc, 'Transfer')
         .withArgs(user.address, multiInvokerRollup.address, 10000e6)
         .to.emit(batcher, 'Wrap')
@@ -306,7 +304,7 @@ describe('MultiInvokerRollup', () => {
 
       const payload = buildAllActionsRollup(Object.values([actions.DEPOSIT, actions.OPEN_TAKE]))
 
-      await expect(user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, '0x' + payload)))
+      await expect(user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, payload)))
         .to.emit(collateral, 'Deposit')
         .withArgs(user.address, product.address, amount)
         .to.emit(product, 'TakeOpened')
@@ -320,13 +318,13 @@ describe('MultiInvokerRollup', () => {
       await product.connect(userB).openMake(position)
 
       const payload = buildAllActionsRollup(Object.values([actions.WRAP, actions.DEPOSIT, actions.OPEN_TAKE]))
-      await user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, '0x' + payload))
+      await user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, payload))
 
       await chainlink.next()
 
       const payload2 = buildAllActionsRollup(Object.values([partialActions.CLOSE_TAKE, partialActions.DEPOSIT]))
 
-      await expect(user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, '0x' + payload2)))
+      await expect(user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, payload2)))
         .to.emit(product, 'TakeClosed')
         .withArgs(user.address, INITIAL_VERSION + 1, position.div(2))
         .to.emit(collateral, 'Deposit')
@@ -340,7 +338,7 @@ describe('MultiInvokerRollup', () => {
       await product.connect(userB).openMake(position)
 
       const payload = buildAllActionsRollup(Object.values([actions.WRAP, actions.DEPOSIT, actions.OPEN_TAKE]))
-      await user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, '0x' + payload))
+      await user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, payload))
 
       await chainlink.next()
       await product.settle()
@@ -354,7 +352,7 @@ describe('MultiInvokerRollup', () => {
         Object.values([partialActions.CLOSE_TAKE, partialActions.WITHDRAW, actions.CLAIM]),
       )
 
-      await expect(user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, '0x' + payload2)))
+      await expect(user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, payload2)))
         .to.emit(product, 'TakeClosed')
         .withArgs(user.address, INITIAL_VERSION + 4, position.div(2))
         .to.emit(collateral, 'Withdrawal')
@@ -372,10 +370,10 @@ describe('MultiInvokerRollup', () => {
       await batcher.rebalance()
 
       // Deposit the collateral to withdraw
-      await user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, '0x' + actions.DEPOSIT.payload))
+      await user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, actions.DEPOSIT.payload))
 
       const payload = buildAllActionsRollup(Object.values([actions.WITHDRAW, actions.UNWRAP]))
-      await expect(user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, '0x' + payload)))
+      await expect(user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, payload)))
         .to.emit(collateral, 'Withdrawal')
         .withArgs(user.address, product.address, amount)
         .to.emit(reserve, 'Redeem')
@@ -395,7 +393,7 @@ describe('MultiInvokerRollup', () => {
         buildTransactionRequest(
           user,
           multiInvokerRollup,
-          `0x` + actions.WRAP.payload + customActions.CHARGE_FEE.payload,
+          actions.WRAP.payload + customActions.CHARGE_FEE.payload.substring(4),
         ),
       )
 
@@ -407,9 +405,7 @@ describe('MultiInvokerRollup', () => {
     it(`wraps USDC to DSU on WRAP action and invokes CHARGE_FEE to interface `, async () => {
       const { user, multiInvokerRollup, usdc, dsu } = instanceVars
 
-      const res = user.sendTransaction(
-        buildTransactionRequest(user, multiInvokerRollup, '0x' + actions.CHARGE_FEE.payload),
-      )
+      const res = user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, actions.CHARGE_FEE.payload))
 
       await expect(res).to.not.be.reverted
       expect(await dsu.balanceOf(vault.address)).to.eq(utils.parseEther('10'))
@@ -424,12 +420,10 @@ describe('MultiInvokerRollup', () => {
       await batcher.rebalance()
 
       // Deposit the collateral to withdraw
-      await user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, '0x' + actions.DEPOSIT.payload))
+      await user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, actions.DEPOSIT.payload))
 
       await expect(
-        user.sendTransaction(
-          buildTransactionRequest(user, multiInvokerRollup, '0x' + actions.WITHDRAW_AND_UNWRAP.payload),
-        ),
+        user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, actions.WITHDRAW_AND_UNWRAP.payload)),
       )
         .to.emit(collateral, 'Withdrawal')
         .withArgs(user.address, product.address, amount)
@@ -453,9 +447,7 @@ describe('MultiInvokerRollup', () => {
         data: twowayiface.encodeFunctionData('deposit', [utils.parseEther('20000')]),
       })
 
-      await expect(
-        user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, '0x' + actions.UNWRAP.payload)),
-      )
+      await expect(user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, actions.UNWRAP.payload)))
         .to.emit(batcher, 'Unwrap')
         .withArgs(user.address, amount)
         .to.emit(usdc, 'Transfer')
@@ -467,7 +459,7 @@ describe('MultiInvokerRollup', () => {
 
       const payload = buildAllActionsRollup(Object.values([actions.WRAP, actions.VAULT_DEPOSIT]))
 
-      await expect(user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, '0x' + payload)))
+      await expect(user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, payload)))
         .to.emit(batcher, 'Wrap')
         .withArgs(user.address, amount)
         .to.emit(dsu, 'Transfer')
@@ -486,7 +478,7 @@ describe('MultiInvokerRollup', () => {
 
       const payload = buildAllActionsRollup(Object.values([actions.VAULT_DEPOSIT, actions.VAULT_REDEEM]))
 
-      await expect(user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, '0x' + payload)))
+      await expect(user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, payload)))
         .to.emit(vault, 'Redemption')
         .withArgs(multiInvokerRollup.address, user.address, 1, vaultAmount)
 
@@ -501,7 +493,7 @@ describe('MultiInvokerRollup', () => {
         Object.values([actions.VAULT_DEPOSIT, actions.VAULT_REDEEM, actions.VAULT_CLAIM, actions.UNWRAP]),
       )
 
-      await expect(user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, '0x' + payload)))
+      await expect(user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, payload)))
         .to.emit(dsu, 'Transfer')
         .withArgs(vault.address, user.address, vaultAmount)
         .to.emit(vault, 'Claim')
@@ -517,9 +509,7 @@ describe('MultiInvokerRollup', () => {
       const { user, multiInvokerRollup, dsu, usdc, batcher } = instanceVars
 
       await expect(
-        user.sendTransaction(
-          buildTransactionRequest(user, multiInvokerRollup, '0x' + actions.VAULT_WRAP_AND_DEPOSIT.payload),
-        ),
+        user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, actions.VAULT_WRAP_AND_DEPOSIT.payload)),
       )
         .to.emit(usdc, 'Transfer')
         .withArgs(user.address, multiInvokerRollup.address, 10000e6)
@@ -553,7 +543,7 @@ describe('MultiInvokerRollup', () => {
         await usdc.connect(usdcHolder).transfer(user.address, 1_000_000e6)
 
         await expect(
-          user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, '0x' + customActions.WRAP.payload)),
+          user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, customActions.WRAP.payload)),
         )
           .to.emit(usdc, 'Transfer')
           .withArgs(user.address, multiInvokerRollup.address, 2_000_000e6)
@@ -573,9 +563,7 @@ describe('MultiInvokerRollup', () => {
         await batcher.connect(user).wrap(amount, user.address)
         await batcher.rebalance()
 
-        await expect(
-          user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, '0x' + actions.UNWRAP.payload)),
-        )
+        await expect(user.sendTransaction(buildTransactionRequest(user, multiInvokerRollup, actions.UNWRAP.payload)))
           .to.emit(reserve, 'Redeem')
           .withArgs(multiInvokerRollup.address, amount, 10000e6)
           .to.emit(usdc, 'Transfer')

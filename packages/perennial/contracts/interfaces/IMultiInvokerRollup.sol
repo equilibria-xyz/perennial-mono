@@ -12,6 +12,7 @@ interface IMultiInvokerRollup is IMultiInvoker {
 
     error MultiInvokerRollupAddressIndexOutOfBoundsError();
     error MultiInvokerRollupInvalidUint256LengthError();
+    error MultiInvokerRollupMissingMagicByteError();
 
     function addressCache(uint256 index) external view returns(address);
     function addressLookup(address value) external view returns(uint256 index);
