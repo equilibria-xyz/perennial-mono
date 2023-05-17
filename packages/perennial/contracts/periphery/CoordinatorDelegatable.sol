@@ -75,6 +75,16 @@ contract CoordinatorDelegatable is UOwnable {
     }
 
     /**
+     * @notice Updates the utilization buffer for product `product` to `newUtilizationBuffer`
+     * @dev Only callable by owner or paramAdmin
+     * @param product The product to update
+     * @param newUtilizationBuffer The new utilization buffer
+     */
+    function updateUtilizationBuffer(IProduct product, UFixed18 newUtilizationBuffer) external onlyOwnerOrParamAdmin {
+        product.updateUtilizationBuffer(newUtilizationBuffer);
+    }
+
+    /**
      * @notice Updates the utilization curve for product `product` to `newUtilizationCurve`
      * @dev Only callable by owner or paramAdmin
      * @param product The product to update

@@ -221,6 +221,15 @@ function itPerformsProductUpdates(
     expect(product.updateMakerLimit).to.have.been.calledWith(newMakerLimit)
   })
 
+  it('can call updateUtilizationBuffer', async () => {
+    const newBuffer = utils.parseEther('0.1')
+    product.updateUtilizationBuffer.whenCalledWith(newBuffer).returns()
+
+    await expect(coordinatorDel.connect(signer).updateUtilizationBuffer(product.address, newBuffer)).to.not.be.reverted
+
+    expect(product.updateUtilizationBuffer).to.have.been.calledWith(newBuffer)
+  })
+
   it('can call updateUtilizationCurve', async () => {
     const newCurve = {
       minRate: utils.parseEther('0.01'),

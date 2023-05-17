@@ -210,7 +210,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         notClosed
         onlyAccountOrMultiInvoker(account)
         settleForAccount(account)
-        takerInvariant
+        maxUtilizationInvariant
         positionInvariant(account)
         liquidationInvariant(account)
         maintenanceInvariant(account)
@@ -541,6 +541,18 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         UFixed18 socializationFactor = next.socializationFactor();
 
         if (socializationFactor.lt(UFixed18Lib.ONE)) revert ProductInsufficientLiquidityError(socializationFactor);
+    }
+
+    /// @dev Limit utilization to (1 - utilizationBuffer)
+    modifier maxUtilizationInvariant() {
+        _;
+
+        if (closed()) return;
+
+        Position memory next = positionAtVersion(latestVersion()).next(_position.pre);
+        UFixed18 utilization = next.taker.unsafeDiv(next.maker);
+        if (utilization.gt(UFixed18Lib.ONE.sub(utilizationBuffer())))
+            revert ProductInsufficientLiquidityError(utilization);
     }
 
     /// @dev Ensure that the user has only taken a maker or taker position, but not both

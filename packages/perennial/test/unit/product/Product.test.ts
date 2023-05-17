@@ -188,6 +188,9 @@ describe('Product', () => {
       await expect(product.updateMakerLimit(utils.parseEther('0.5')))
         .to.emit(product, 'MakerLimitUpdated')
         .withArgs(utils.parseEther('0.5'), 0)
+      await expect(product.updateUtilizationBuffer(utils.parseEther('0.6')))
+        .to.emit(product, 'UtilizationBufferUpdated')
+        .withArgs(utils.parseEther('0.6'), 0)
       const newCurve = {
         minRate: utils.parseEther('0.10'),
         maxRate: utils.parseEther('0.20'),
@@ -203,7 +206,7 @@ describe('Product', () => {
         .to.emit(product, 'OracleUpdated')
         .withArgs(newOracle.address, 0)
 
-      expect(product.settle).to.have.callCount(7)
+      expect(product.settle).to.have.callCount(8)
 
       expect(await product['maintenance()']()).to.equal(utils.parseEther('0.1'))
       expect(await product.fundingFee()).to.equal(utils.parseEther('0.2'))
@@ -347,12 +350,15 @@ describe('Product', () => {
       await expect(product.connect(user).updateMakerLimit(utils.parseEther('0.5')))
         .to.be.be.revertedWithCustomError(product, 'NotOwnerError')
         .withArgs(1)
+      await expect(product.connect(user).updateUtilizationBuffer(utils.parseEther('0.6')))
+        .to.be.be.revertedWithCustomError(product, 'NotOwnerError')
+        .withArgs(1)
       await expect(product.connect(user).updateOracle(user.address))
         .to.be.revertedWithCustomError(product, 'NotOwnerError')
         .withArgs(1)
     })
 
-    it('reverts if fees are too high', async () => {
+    it('reverts if fees/buffers are too high', async () => {
       await expect(product.updateFundingFee(utils.parseEther('1.01'))).to.be.be.revertedWithCustomError(
         product,
         'ParamProviderInvalidParamValue',
@@ -366,6 +372,10 @@ describe('Product', () => {
         'ParamProviderInvalidParamValue',
       )
       await expect(product.updatePositionFee(utils.parseEther('1.01'))).to.be.be.revertedWithCustomError(
+        product,
+        'ParamProviderInvalidParamValue',
+      )
+      await expect(product.updateUtilizationBuffer(utils.parseEther('1.01'))).to.be.be.revertedWithCustomError(
         product,
         'ParamProviderInvalidParamValue',
       )
@@ -1322,6 +1332,14 @@ describe('Product', () => {
           await expect(product.connect(user).closeMake(POSITION)).to.be.revertedWithCustomError(product, 'PausedError')
         })
       })
+
+      it('reverts if taker > maker', async () => {
+        const socialization = utils.parseEther('0.5')
+        await product.connect(userB).openTake(POSITION)
+        await expect(product.connect(user).closeMake(POSITION.div(2)))
+          .to.be.revertedWithCustomError(product, `ProductInsufficientLiquidityError`)
+          .withArgs(socialization)
+      })
     })
 
     context('#openTake', async () => {
@@ -1650,11 +1668,17 @@ describe('Product', () => {
           .withArgs(user.address, 3, POSITION)
       })
 
-      it('reverts if taker > maker', async () => {
-        const socialization = utils.parseEther('0.5')
+      it('reverts if utilization > 1', async () => {
         await expect(product.connect(user).openTake(POSITION.mul(4)))
           .to.be.revertedWithCustomError(product, 'ProductInsufficientLiquidityError')
-          .withArgs(socialization)
+          .withArgs(utils.parseEther('2'))
+      })
+
+      it('reverts if utilization > (1 - buffer)', async () => {
+        await product.updateUtilizationBuffer(utils.parseEther('0.51'))
+        await expect(product.connect(user).openTake(POSITION.mul(1)))
+          .to.be.revertedWithCustomError(product, 'ProductInsufficientLiquidityError')
+          .withArgs(utils.parseEther('0.5'))
       })
 
       it('reverts if double sided position', async () => {
@@ -4528,6 +4552,14 @@ describe('Product', () => {
           await expect(product.connect(user).closeMake(POSITION)).to.be.revertedWithCustomError(product, 'PausedError')
         })
       })
+
+      it('reverts if taker > maker', async () => {
+        const socialization = utils.parseEther('0.5')
+        await product.connect(userB).openTake(POSITION)
+        await expect(product.connect(user).closeMake(POSITION.div(2)))
+          .to.be.revertedWithCustomError(product, `ProductInsufficientLiquidityError`)
+          .withArgs(socialization)
+      })
     })
 
     context('#openTake', async () => {
@@ -4865,11 +4897,17 @@ describe('Product', () => {
         )
       })
 
-      it('reverts if taker > maker', async () => {
-        const socialization = utils.parseEther('0.5')
+      it('reverts if utilization > 1', async () => {
         await expect(product.connect(user).openTake(POSITION.mul(4)))
-          .to.be.revertedWithCustomError(product, `ProductInsufficientLiquidityError`)
-          .withArgs(socialization)
+          .to.be.revertedWithCustomError(product, 'ProductInsufficientLiquidityError')
+          .withArgs(utils.parseEther('2'))
+      })
+
+      it('reverts if utilization > (1 - buffer)', async () => {
+        await product.updateUtilizationBuffer(utils.parseEther('0.51'))
+        await expect(product.connect(user).openTake(POSITION.mul(1)))
+          .to.be.revertedWithCustomError(product, 'ProductInsufficientLiquidityError')
+          .withArgs(utils.parseEther('0.5'))
       })
 
       it('reverts if double sided position', async () => {
