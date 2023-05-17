@@ -6,6 +6,7 @@ import { InstanceVars, deployProtocol, createProduct } from '../helpers/setupHel
 import {
   CoordinatorDelegatable,
   CoordinatorDelegatable__factory,
+  IProduct,
   Product,
   ProxyAdmin,
   TransparentUpgradeableProxy,
@@ -13,6 +14,25 @@ import {
 } from '../../../types/generated'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { impersonateWithBalance } from '../../../../common/testutil/impersonate'
+
+const initArgs = [
+  constants.AddressZero,
+  { min: 0, max: constants.MaxUint256 },
+  { min: 0, max: constants.MaxUint256 },
+  { min: 0, max: constants.MaxUint256 },
+  { min: 0, max: constants.MaxUint256 },
+  { min: 0, max: constants.MaxUint256 },
+  {
+    minMinRate: 0,
+    maxMinRate: constants.MaxInt256,
+    minMaxRate: 0,
+    maxMaxRate: constants.MaxInt256,
+    minTargetRate: 0,
+    maxTargetRate: constants.MaxInt256,
+    minTargetUtilization: 0,
+    maxTargetUtilization: constants.MaxUint256,
+  },
+] as const
 
 describe('CoordinatorDelegatable', () => {
   let instanceVars: InstanceVars
@@ -34,7 +54,7 @@ describe('CoordinatorDelegatable', () => {
     noaccess = instanceVars.userB
     proxyAdmin = instanceVars.proxyAdmin
     product = await createProduct(instanceVars)
-    impl = await new CoordinatorDelegatable__factory(owner).deploy()
+    impl = await new CoordinatorDelegatable__factory(owner).deploy(product.address)
     proxy = await new TransparentUpgradeableProxy__factory(proxyAdmin.signer).deploy(
       impl.address,
       proxyAdmin.address,
@@ -53,15 +73,15 @@ describe('CoordinatorDelegatable', () => {
 
   describe('#initialize', () => {
     it('initializes correctly', async () => {
-      await coordinatorDel.initialize()
+      await coordinatorDel.initialize(...initArgs)
 
       expect(await coordinatorDel.owner()).to.equal(owner.address)
       expect(await coordinatorDel.paramAdmin()).to.equal(constants.AddressZero)
     })
 
     it('reverts if already initialized', async () => {
-      await coordinatorDel.initialize()
-      await expect(coordinatorDel.initialize())
+      await coordinatorDel.initialize(...initArgs)
+      await expect(coordinatorDel.initialize(...initArgs))
         .to.be.revertedWithCustomError(coordinatorDel, 'UInitializableAlreadyInitializedError')
         .withArgs(1)
     })
@@ -69,7 +89,7 @@ describe('CoordinatorDelegatable', () => {
 
   describe('owner', () => {
     beforeEach(async () => {
-      await coordinatorDel.initialize()
+      await coordinatorDel.initialize(...initArgs)
     })
 
     it('can call execute', async () => {
@@ -114,7 +134,7 @@ describe('CoordinatorDelegatable', () => {
 
   describe('paramAdmin', () => {
     beforeEach(async () => {
-      await coordinatorDel.initialize()
+      await coordinatorDel.initialize(...initArgs)
 
       const acceptOwnerData = instanceVars.controller.interface.encodeFunctionData('acceptCoordinatorOwner', [1])
       await coordinatorDel.execute(instanceVars.controller.address, acceptOwnerData, 0)
@@ -147,20 +167,20 @@ describe('CoordinatorDelegatable', () => {
     })
 
     it('cannot call any param admin functions', async () => {
-      await expect(coordinatorDel.connect(noaccess).updateMaintenance(product.address, 0))
+      await expect(coordinatorDel.connect(noaccess).updateMaintenance(0))
         .to.be.revertedWithCustomError(coordinatorDel, 'CoordinatorDelegatableNotParamAdminError')
         .withArgs(noaccess.address)
-      await expect(coordinatorDel.connect(noaccess).updateMakerFee(product.address, 0))
+      await expect(coordinatorDel.connect(noaccess).updateMakerFee(0))
         .to.be.revertedWithCustomError(coordinatorDel, 'CoordinatorDelegatableNotParamAdminError')
         .withArgs(noaccess.address)
-      await expect(coordinatorDel.connect(noaccess).updateTakerFee(product.address, 0))
+      await expect(coordinatorDel.connect(noaccess).updateTakerFee(0))
         .to.be.revertedWithCustomError(coordinatorDel, 'CoordinatorDelegatableNotParamAdminError')
         .withArgs(noaccess.address)
-      await expect(coordinatorDel.connect(noaccess).updateMakerLimit(product.address, 0))
+      await expect(coordinatorDel.connect(noaccess).updateMakerLimit(0))
         .to.be.revertedWithCustomError(coordinatorDel, 'CoordinatorDelegatableNotParamAdminError')
         .withArgs(noaccess.address)
       await expect(
-        coordinatorDel.connect(noaccess).updateUtilizationCurve(product.address, {
+        coordinatorDel.connect(noaccess).updateUtilizationCurve({
           minRate: 0,
           maxRate: 0,
           targetRate: 0,
@@ -174,13 +194,13 @@ describe('CoordinatorDelegatable', () => {
 
   describe('upgradability', () => {
     beforeEach(async () => {
-      await coordinatorDel.initialize()
+      await coordinatorDel.initialize(...initArgs)
       const proxyAdminSigner = await impersonateWithBalance(proxyAdmin.address, utils.parseEther('1'))
       proxy = proxy.connect(proxyAdminSigner)
     })
 
     it('can upgrade to a new impl', async () => {
-      const newImpl = await new CoordinatorDelegatable__factory(owner).deploy()
+      const newImpl = await new CoordinatorDelegatable__factory(owner).deploy(product.address)
       await expect(proxy.upgradeTo(newImpl.address)).to.not.be.reverted
       expect(await proxy.callStatic.implementation()).to.equal(newImpl.address)
     })
@@ -188,12 +208,12 @@ describe('CoordinatorDelegatable', () => {
     context('after upgrade', () => {
       beforeEach(async () => {
         await coordinatorDel.updateParamAdmin(delegate.address)
-        const newImpl = await new CoordinatorDelegatable__factory(owner).deploy()
+        const newImpl = await new CoordinatorDelegatable__factory(owner).deploy(product.address)
         await proxy.upgradeTo(newImpl.address)
       })
 
       it('maintains correct state', async () => {
-        await expect(coordinatorDel.initialize())
+        await expect(coordinatorDel.initialize(...initArgs))
           .to.be.revertedWithCustomError(coordinatorDel, 'UInitializableAlreadyInitializedError')
           .withArgs(1)
         expect(await coordinatorDel.owner()).to.equal(owner.address)
@@ -203,69 +223,208 @@ describe('CoordinatorDelegatable', () => {
   })
 })
 
-function itPerformsProductUpdates(getParams: () => [CoordinatorDelegatable, SignerWithAddress, Product]) {
+function itPerformsProductUpdates(getParams: () => [CoordinatorDelegatable, SignerWithAddress, IProduct]) {
   let coordinatorDel: CoordinatorDelegatable
   let signer: SignerWithAddress
-  let product: Product
+  let product: IProduct
 
   beforeEach(() => {
     ;[coordinatorDel, signer, product] = getParams()
   })
 
-  it('can call updateMaintenance', async () => {
-    const newMaintenance = utils.parseEther('0.025')
+  describe('#updateMaintenance', async () => {
+    it('updates the value', async () => {
+      const newMaintenance = utils.parseEther('0.025')
 
-    await expect(coordinatorDel.connect(signer).updateMaintenance(product.address, newMaintenance)).to.not.be.reverted
+      await expect(coordinatorDel.connect(signer).updateMaintenance(newMaintenance)).to.not.be.reverted
 
-    expect(await product['maintenance()']()).to.equal(newMaintenance)
+      expect(await product['maintenance()']()).to.equal(newMaintenance)
+    })
+
+    it('reverts if values exceed limits', async () => {
+      await coordinatorDel.updateMaintenanceLimits({ min: utils.parseEther('0.5'), max: utils.parseEther('0.6') })
+      await expect(coordinatorDel.connect(signer).updateMaintenance(utils.parseEther('0.4')))
+        .to.be.revertedWithCustomError(coordinatorDel, 'CoordinatorDelegatableInvalidUFixed18UpdateError')
+        .withArgs(utils.parseEther('0.4'))
+      await expect(coordinatorDel.connect(signer).updateMaintenance(utils.parseEther('0.7')))
+        .to.be.revertedWithCustomError(coordinatorDel, 'CoordinatorDelegatableInvalidUFixed18UpdateError')
+        .withArgs(utils.parseEther('0.7'))
+    })
   })
 
-  it('can call updateMakerFee', async () => {
-    const newMakerFee = utils.parseEther('0.00567')
+  describe('#updateMakerFee', async () => {
+    it('updates the value', async () => {
+      const newMakerFee = utils.parseEther('0.00567')
 
-    await expect(coordinatorDel.connect(signer).updateMakerFee(product.address, newMakerFee)).to.not.be.reverted
+      await expect(coordinatorDel.connect(signer).updateMakerFee(newMakerFee)).to.not.be.reverted
 
-    expect(await product.makerFee()).to.equal(newMakerFee)
+      expect(await product.makerFee()).to.equal(newMakerFee)
+    })
+
+    it('reverts if values exceed limits', async () => {
+      await coordinatorDel.updateMakerFeeLimits({ min: utils.parseEther('0.5'), max: utils.parseEther('0.6') })
+      await expect(coordinatorDel.connect(signer).updateMakerFee(utils.parseEther('0.4')))
+        .to.be.revertedWithCustomError(coordinatorDel, 'CoordinatorDelegatableInvalidUFixed18UpdateError')
+        .withArgs(utils.parseEther('0.4'))
+      await expect(coordinatorDel.connect(signer).updateMakerFee(utils.parseEther('0.7')))
+        .to.be.revertedWithCustomError(coordinatorDel, 'CoordinatorDelegatableInvalidUFixed18UpdateError')
+        .withArgs(utils.parseEther('0.7'))
+    })
   })
 
-  it('can call updateTakerFee', async () => {
-    const newTakerFee = utils.parseEther('0.012')
+  describe('#updateTakerFee', async () => {
+    it('updates the value', async () => {
+      const newTakerFee = utils.parseEther('0.012')
 
-    await expect(coordinatorDel.connect(signer).updateTakerFee(product.address, newTakerFee)).to.not.be.reverted
+      await expect(coordinatorDel.connect(signer).updateTakerFee(newTakerFee)).to.not.be.reverted
 
-    expect(await product.takerFee()).to.equal(newTakerFee)
+      expect(await product.takerFee()).to.equal(newTakerFee)
+    })
+
+    it('reverts if values exceed limits', async () => {
+      await coordinatorDel.updateTakerFeeLimits({ min: utils.parseEther('0.5'), max: utils.parseEther('0.6') })
+      await expect(coordinatorDel.connect(signer).updateTakerFee(utils.parseEther('0.4')))
+        .to.be.revertedWithCustomError(coordinatorDel, 'CoordinatorDelegatableInvalidUFixed18UpdateError')
+        .withArgs(utils.parseEther('0.4'))
+      await expect(coordinatorDel.connect(signer).updateTakerFee(utils.parseEther('0.7')))
+        .to.be.revertedWithCustomError(coordinatorDel, 'CoordinatorDelegatableInvalidUFixed18UpdateError')
+        .withArgs(utils.parseEther('0.7'))
+    })
   })
 
-  it('can call updateMakerLimit', async () => {
-    const newMakerLimit = utils.parseEther('12345')
+  describe('#updateMakerLimit', async () => {
+    it('updates the value', async () => {
+      const newMakerLimit = utils.parseEther('12345')
 
-    await expect(coordinatorDel.connect(signer).updateMakerLimit(product.address, newMakerLimit)).to.not.be.reverted
+      await expect(coordinatorDel.connect(signer).updateMakerLimit(newMakerLimit)).to.not.be.reverted
 
-    expect(await product.makerLimit()).to.equal(newMakerLimit)
+      expect(await product.makerLimit()).to.equal(newMakerLimit)
+    })
+
+    it('reverts if values exceed limits', async () => {
+      await coordinatorDel.updateMakerLimitLimits({ min: utils.parseEther('0.5'), max: utils.parseEther('0.6') })
+      await expect(coordinatorDel.connect(signer).updateMakerLimit(utils.parseEther('0.4')))
+        .to.be.revertedWithCustomError(coordinatorDel, 'CoordinatorDelegatableInvalidUFixed18UpdateError')
+        .withArgs(utils.parseEther('0.4'))
+      await expect(coordinatorDel.connect(signer).updateMakerLimit(utils.parseEther('0.7')))
+        .to.be.revertedWithCustomError(coordinatorDel, 'CoordinatorDelegatableInvalidUFixed18UpdateError')
+        .withArgs(utils.parseEther('0.7'))
+    })
   })
 
-  it('can call updateUtilizationBuffer', async () => {
-    const newBuffer = utils.parseEther('0.1')
+  describe('#updateUtilizationBuffer', async () => {
+    it('updates the value', async () => {
+      const newBuffer = utils.parseEther('0.1')
 
-    await expect(coordinatorDel.connect(signer).updateUtilizationBuffer(product.address, newBuffer)).to.not.be.reverted
+      await expect(coordinatorDel.connect(signer).updateUtilizationBuffer(newBuffer)).to.not.be.reverted
 
-    expect(await product.utilizationBuffer()).to.equal(newBuffer)
+      expect(await product.utilizationBuffer()).to.equal(newBuffer)
+    })
+
+    it('reverts if values exceed limits', async () => {
+      await coordinatorDel.updateUtilizationBufferLimits({ min: utils.parseEther('0.5'), max: utils.parseEther('0.6') })
+      await expect(coordinatorDel.connect(signer).updateUtilizationBuffer(utils.parseEther('0.4')))
+        .to.be.revertedWithCustomError(coordinatorDel, 'CoordinatorDelegatableInvalidUFixed18UpdateError')
+        .withArgs(utils.parseEther('0.4'))
+      await expect(coordinatorDel.connect(signer).updateUtilizationBuffer(utils.parseEther('0.7')))
+        .to.be.revertedWithCustomError(coordinatorDel, 'CoordinatorDelegatableInvalidUFixed18UpdateError')
+        .withArgs(utils.parseEther('0.7'))
+    })
   })
 
-  it('can call updateUtilizationCurve', async () => {
-    const newCurve = {
-      minRate: utils.parseEther('0.01'),
-      maxRate: utils.parseEther('1'),
-      targetRate: utils.parseEther('0.5'),
-      targetUtilization: utils.parseEther('0.8'),
-    }
+  describe('#updateUtilizationCurve', async () => {
+    it('updates the value', async () => {
+      const newCurve = {
+        minRate: utils.parseEther('0.01'),
+        maxRate: utils.parseEther('1'),
+        targetRate: utils.parseEther('0.5'),
+        targetUtilization: utils.parseEther('0.8'),
+      }
 
-    await expect(coordinatorDel.connect(signer).updateUtilizationCurve(product.address, newCurve)).to.not.be.reverted
+      await expect(coordinatorDel.connect(signer).updateUtilizationCurve(newCurve)).to.not.be.reverted
 
-    const updatedCurve = await product.utilizationCurve()
-    expect(updatedCurve.minRate).to.equal(newCurve.minRate)
-    expect(updatedCurve.maxRate).to.equal(newCurve.maxRate)
-    expect(updatedCurve.targetRate).to.equal(newCurve.targetRate)
-    expect(updatedCurve.targetUtilization).to.equal(newCurve.targetUtilization)
+      const updatedCurve = await product.utilizationCurve()
+      expect(updatedCurve.minRate).to.equal(newCurve.minRate)
+      expect(updatedCurve.maxRate).to.equal(newCurve.maxRate)
+      expect(updatedCurve.targetRate).to.equal(newCurve.targetRate)
+      expect(updatedCurve.targetUtilization).to.equal(newCurve.targetUtilization)
+    })
+
+    it('reverts if values exceed limits', async () => {
+      await coordinatorDel.updateUtilizationCurveLimits({
+        minMinRate: utils.parseEther('0.1'),
+        maxMinRate: utils.parseEther('0.2'),
+        minMaxRate: utils.parseEther('0.5'),
+        maxMaxRate: utils.parseEther('0.6'),
+        minTargetRate: utils.parseEther('0.3'),
+        maxTargetRate: utils.parseEther('0.4'),
+        minTargetUtilization: utils.parseEther('0.7'),
+        maxTargetUtilization: utils.parseEther('0.8'),
+      })
+      await expect(
+        coordinatorDel.connect(signer).updateUtilizationCurve({
+          minRate: utils.parseEther('0.05'),
+          maxRate: utils.parseEther('0.5'),
+          targetRate: utils.parseEther('0.3'),
+          targetUtilization: utils.parseEther('0.8'),
+        }),
+      ).to.be.revertedWithCustomError(coordinatorDel, 'CoordinatorDelegatableInvalidUtilizationCurveUpdateError')
+      await expect(
+        coordinatorDel.connect(signer).updateUtilizationCurve({
+          minRate: utils.parseEther('0.21'),
+          maxRate: utils.parseEther('0.5'),
+          targetRate: utils.parseEther('0.3'),
+          targetUtilization: utils.parseEther('0.8'),
+        }),
+      ).to.be.revertedWithCustomError(coordinatorDel, 'CoordinatorDelegatableInvalidUtilizationCurveUpdateError')
+      await expect(
+        coordinatorDel.connect(signer).updateUtilizationCurve({
+          minRate: utils.parseEther('0.1'),
+          maxRate: utils.parseEther('0.49'),
+          targetRate: utils.parseEther('0.3'),
+          targetUtilization: utils.parseEther('0.8'),
+        }),
+      ).to.be.revertedWithCustomError(coordinatorDel, 'CoordinatorDelegatableInvalidUtilizationCurveUpdateError')
+      await expect(
+        coordinatorDel.connect(signer).updateUtilizationCurve({
+          minRate: utils.parseEther('0.1'),
+          maxRate: utils.parseEther('0.61'),
+          targetRate: utils.parseEther('0.3'),
+          targetUtilization: utils.parseEther('0.8'),
+        }),
+      ).to.be.revertedWithCustomError(coordinatorDel, 'CoordinatorDelegatableInvalidUtilizationCurveUpdateError')
+      await expect(
+        coordinatorDel.connect(signer).updateUtilizationCurve({
+          minRate: utils.parseEther('0.1'),
+          maxRate: utils.parseEther('0.5'),
+          targetRate: utils.parseEther('0.29'),
+          targetUtilization: utils.parseEther('0.8'),
+        }),
+      ).to.be.revertedWithCustomError(coordinatorDel, 'CoordinatorDelegatableInvalidUtilizationCurveUpdateError')
+      await expect(
+        coordinatorDel.connect(signer).updateUtilizationCurve({
+          minRate: utils.parseEther('0.1'),
+          maxRate: utils.parseEther('0.5'),
+          targetRate: utils.parseEther('0.41'),
+          targetUtilization: utils.parseEther('0.8'),
+        }),
+      ).to.be.revertedWithCustomError(coordinatorDel, 'CoordinatorDelegatableInvalidUtilizationCurveUpdateError')
+      await expect(
+        coordinatorDel.connect(signer).updateUtilizationCurve({
+          minRate: utils.parseEther('0.1'),
+          maxRate: utils.parseEther('0.5'),
+          targetRate: utils.parseEther('0.3'),
+          targetUtilization: utils.parseEther('0.69'),
+        }),
+      ).to.be.revertedWithCustomError(coordinatorDel, 'CoordinatorDelegatableInvalidUtilizationCurveUpdateError')
+      await expect(
+        coordinatorDel.connect(signer).updateUtilizationCurve({
+          minRate: utils.parseEther('0.1'),
+          maxRate: utils.parseEther('0.5'),
+          targetRate: utils.parseEther('0.3'),
+          targetUtilization: utils.parseEther('0.81'),
+        }),
+      ).to.be.revertedWithCustomError(coordinatorDel, 'CoordinatorDelegatableInvalidUtilizationCurveUpdateError')
+    })
   })
 }
