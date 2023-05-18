@@ -118,12 +118,15 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
         asset.approve(address(collateral), UFixed18Lib.ZERO);
         asset.approve(address(collateral));
 
-        // Stamp new market's data for first epoch
+        // settle the state of the vault
+        /// @dev records the market data for all markets up to the latest epoch
         (EpochContext memory context, )  = _settle(address(0));
-        for (uint256 marketId = 1; marketId < totalMarkets; marketId++) {
-            if (_marketAccounts[marketId].versionOf[context.epoch] == 0) {
+
+        // stamp latest epoch data for new markets
+        /// @dev required to register new markets in the case of an upgrade when the vault was already fully settled
+        for (uint256 marketId; marketId < totalMarkets; marketId++) {
+            if (_marketAccounts[marketId].versionOf[context.epoch] == 0)
                 _marketAccounts[marketId].versionOf[context.epoch] = markets(marketId).long.latestVersion();
-            }
         }
     }
 
