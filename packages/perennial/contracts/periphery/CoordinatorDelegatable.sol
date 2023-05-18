@@ -15,11 +15,23 @@ import "../interfaces/IProduct.sol";
  */
 contract CoordinatorDelegatable is UOwnable {
 
+    /// @dev The minimum maintenance value (1%)
+    UFixed18 constant public MIN_MAINTENANCE = UFixed18.wrap(0.01e18);
+
+    /// @dev The maximum fee value (1%)
+    UFixed18 constant public MAX_FEE = UFixed18.wrap(0.01e18);
+
+    /// @dev The max utilization curve rate (1000%)
+    UFixed18 constant public MAX_CURVE_RATE = UFixed18.wrap(10e18);
+
     /// @dev Event emitted when param admin is updated
     event CoordinatorDelegatableParamAdminUpdated(address indexed newParamAdmin);
 
     /// @dev Error thrown on unauthorized param update call
     error CoordinatorDelegatableNotParamAdminError(address sender);
+
+    /// @dev Error thrown on invalid param value
+    error CoordinatorDelegatableInvalidParamValueError();
 
     /// @dev The owner address
     AddressStorage private constant _paramAdmin =
@@ -41,6 +53,8 @@ contract CoordinatorDelegatable is UOwnable {
      * @param newMaintenance The new maintenance parameter
      */
     function updateMaintenance(IProduct product, UFixed18 newMaintenance) external onlyOwnerOrParamAdmin {
+        // Maintenance must be at least 1%
+        if (newMaintenance.lt(MIN_MAINTENANCE)) revert CoordinatorDelegatableInvalidParamValueError();
         product.updateMaintenance(newMaintenance);
     }
 
@@ -51,6 +65,7 @@ contract CoordinatorDelegatable is UOwnable {
      * @param newMakerFee The new maker fee
      */
     function updateMakerFee(IProduct product, UFixed18 newMakerFee) external onlyOwnerOrParamAdmin {
+        if (newMakerFee.gt(MAX_FEE)) revert CoordinatorDelegatableInvalidParamValueError();
         product.updateMakerFee(newMakerFee);
     }
 
@@ -61,6 +76,7 @@ contract CoordinatorDelegatable is UOwnable {
      * @param newTakerFee The new taker fee
      */
     function updateTakerFee(IProduct product, UFixed18 newTakerFee) external onlyOwnerOrParamAdmin {
+        if (newTakerFee.gt(MAX_FEE)) revert CoordinatorDelegatableInvalidParamValueError();
         product.updateTakerFee(newTakerFee);
     }
 
@@ -91,6 +107,11 @@ contract CoordinatorDelegatable is UOwnable {
      * @param newUtilizationCurve The new utilization curve
      */
     function updateUtilizationCurve(IProduct product, JumpRateUtilizationCurve memory newUtilizationCurve) external onlyOwnerOrParamAdmin {
+        if (newUtilizationCurve.minRate.unpack().abs().gt(MAX_CURVE_RATE)
+            || newUtilizationCurve.maxRate.unpack().abs().gt(MAX_CURVE_RATE)
+            || newUtilizationCurve.targetRate.unpack().abs().gt(MAX_CURVE_RATE)
+        )
+            revert CoordinatorDelegatableInvalidParamValueError();
         product.updateUtilizationCurve(newUtilizationCurve);
     }
 
