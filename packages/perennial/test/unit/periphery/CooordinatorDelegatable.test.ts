@@ -194,6 +194,15 @@ function itPerformsProductUpdates(
     expect(product.updateMaintenance).to.have.been.calledWith(newMaintenance)
   })
 
+  it('reverts if maintenance is less than MIN_MAINTENANCE', async () => {
+    const minMaintenance = await coordinatorDel.MIN_MAINTENANCE()
+    expect(minMaintenance).to.equal(utils.parseEther('0.01'))
+
+    await expect(
+      coordinatorDel.connect(signer).updateMaintenance(product.address, minMaintenance.sub(1)),
+    ).to.be.revertedWithCustomError(coordinatorDel, 'CoordinatorDelegatableInvalidParamValueError')
+  })
+
   it('can call updateMakerFee', async () => {
     const newMakerFee = utils.parseEther('0.00567')
     product.updateMakerFee.whenCalledWith(newMakerFee).returns()
@@ -203,13 +212,31 @@ function itPerformsProductUpdates(
     expect(product.updateMakerFee).to.have.been.calledWith(newMakerFee)
   })
 
+  it('reverts if makerFee is greater than MAX_FEE', async () => {
+    const maxFee = await coordinatorDel.MAX_FEE()
+    expect(maxFee).to.equal(utils.parseEther('0.01'))
+
+    await expect(
+      coordinatorDel.connect(signer).updateMakerFee(product.address, maxFee.add(1)),
+    ).to.be.revertedWithCustomError(coordinatorDel, 'CoordinatorDelegatableInvalidParamValueError')
+  })
+
   it('can call updateTakerFee', async () => {
-    const newTakerFee = utils.parseEther('0.012')
+    const newTakerFee = utils.parseEther('0.0012')
     product.updateTakerFee.whenCalledWith(newTakerFee).returns()
 
     await expect(coordinatorDel.connect(signer).updateTakerFee(product.address, newTakerFee)).to.not.be.reverted
 
     expect(product.updateTakerFee).to.have.been.calledWith(newTakerFee)
+  })
+
+  it('reverts if takerFee is greater than MAX_FEE', async () => {
+    const maxFee = await coordinatorDel.MAX_FEE()
+    expect(maxFee).to.equal(utils.parseEther('0.01'))
+
+    await expect(
+      coordinatorDel.connect(signer).updateTakerFee(product.address, maxFee.add(1)),
+    ).to.be.revertedWithCustomError(coordinatorDel, 'CoordinatorDelegatableInvalidParamValueError')
   })
 
   it('can call updateMakerLimit', async () => {
@@ -242,5 +269,37 @@ function itPerformsProductUpdates(
     await expect(coordinatorDel.connect(signer).updateUtilizationCurve(product.address, newCurve)).to.not.be.reverted
 
     expect(product.updateUtilizationCurve).to.have.been.calledWith(newCurve)
+  })
+
+  it('reverts if any part of the curve rate is greater than MAX_CURVE_RATE', async () => {
+    const maxRate = await coordinatorDel.MAX_CURVE_RATE()
+    expect(maxRate).to.equal(utils.parseEther('10')) // 100%
+
+    await expect(
+      coordinatorDel.connect(signer).updateUtilizationCurve(product.address, {
+        minRate: maxRate.add(1),
+        maxRate: maxRate,
+        targetRate: maxRate,
+        targetUtilization: utils.parseEther('0.8'),
+      }),
+    ).to.be.revertedWithCustomError(coordinatorDel, 'CoordinatorDelegatableInvalidParamValueError')
+
+    await expect(
+      coordinatorDel.connect(signer).updateUtilizationCurve(product.address, {
+        minRate: maxRate,
+        maxRate: maxRate.add(1),
+        targetRate: maxRate,
+        targetUtilization: utils.parseEther('0.8'),
+      }),
+    ).to.be.revertedWithCustomError(coordinatorDel, 'CoordinatorDelegatableInvalidParamValueError')
+
+    await expect(
+      coordinatorDel.connect(signer).updateUtilizationCurve(product.address, {
+        minRate: maxRate,
+        maxRate: maxRate,
+        targetRate: maxRate.add(1),
+        targetUtilization: utils.parseEther('0.8'),
+      }),
+    ).to.be.revertedWithCustomError(coordinatorDel, 'CoordinatorDelegatableInvalidParamValueError')
   })
 }
