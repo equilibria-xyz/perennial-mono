@@ -221,10 +221,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         _position.pre.openTake(latestOracleVersion.version, amount);
 
         UFixed18 positionFee = amount.mul(latestOracleVersion.price.abs()).mul(takerFee());
-        if (!positionFee.isZero()) {
-            controller().collateral().settleAccount(account, Fixed18Lib.from(-1, positionFee));
-            emit PositionFeeCharged(account, latestOracleVersion.version, positionFee);
-        }
+        if (!positionFee.isZero()) controller().collateral().settleAccount(account, Fixed18Lib.from(-1, positionFee));
 
         emit PositionFeeCharged(account, latestOracleVersion.version, positionFee);
         emit TakeOpened(account, latestOracleVersion.version, amount);
@@ -262,10 +259,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         _position.pre.closeTake(latestOracleVersion.version, amount);
 
         UFixed18 positionFee = amount.mul(latestOracleVersion.price.abs()).mul(takerFee());
-        if (!positionFee.isZero()) {
-            controller().collateral().settleAccount(account, Fixed18Lib.from(-1, positionFee));
-            emit PositionFeeCharged(account, latestOracleVersion.version, positionFee);
-        }
+        if (!positionFee.isZero()) controller().collateral().settleAccount(account, Fixed18Lib.from(-1, positionFee));
 
         emit PositionFeeCharged(account, latestOracleVersion.version, positionFee);
         emit TakeClosed(account, latestOracleVersion.version, amount);
@@ -303,10 +297,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         _position.pre.openMake(latestOracleVersion.version, amount);
 
         UFixed18 positionFee = amount.mul(latestOracleVersion.price.abs()).mul(makerFee());
-        if (!positionFee.isZero()) {
-            controller().collateral().settleAccount(account, Fixed18Lib.from(-1, positionFee));
-            emit PositionFeeCharged(account, latestOracleVersion.version, positionFee);
-        }
+        if (!positionFee.isZero()) controller().collateral().settleAccount(account, Fixed18Lib.from(-1, positionFee));
 
         emit PositionFeeCharged(account, latestOracleVersion.version, positionFee);
         emit MakeOpened(account, latestOracleVersion.version, amount);
@@ -345,10 +336,7 @@ contract Product is IProduct, UInitializable, UParamProvider, UPayoffProvider, U
         _position.pre.closeMake(latestOracleVersion.version, amount);
 
         UFixed18 positionFee = amount.mul(latestOracleVersion.price.abs()).mul(makerFee());
-        if (!positionFee.isZero()) {
-            controller().collateral().settleAccount(account, Fixed18Lib.from(-1, positionFee));
-            emit PositionFeeCharged(account, latestOracleVersion.version, positionFee);
-        }
+        if (!positionFee.isZero()) controller().collateral().settleAccount(account, Fixed18Lib.from(-1, positionFee));
 
         emit PositionFeeCharged(account, latestOracleVersion.version, positionFee);
         emit MakeClosed(account, latestOracleVersion.version, amount);
