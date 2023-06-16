@@ -7,9 +7,11 @@ import { providers } from '@0xsequence/multicall'
 import { request, gql } from 'graphql-request'
 import { isArbitrum } from '../../common/testutil/network'
 import { BigNumber, utils } from 'ethers'
+import { chunk } from './checkLiquidatable'
 
 const { formatEther } = utils
 const QUERY_PAGE_SIZE = 1000
+const QUERY_DATA_POINTS = 100
 
 type QueryResult = {
   bucketedVolumes: {
@@ -19,6 +21,7 @@ type QueryResult = {
     takerNotional: string
     takerFees: string
   }[]
+  firstSettle: { blockNumber: string }[]
   lastSettle: { blockNumber: string }[]
 }
 
@@ -76,6 +79,14 @@ export default task('collectDailyMetrics', 'Collects metrics for a given day')
           takerNotional
           takerFees
         }
+        firstSettle: settles(
+          where: { product_in: $markets, blockTimestamp_gte: $fromTs, blockTimestamp_lt: $toTs }
+          orderBy: blockTimestamp
+          orderDirection: asc
+          first: 1
+        ) {
+          blockNumber
+        }
         lastSettle: settles(
           where: { product_in: $markets, blockTimestamp_gte: $fromTs, blockTimestamp_lt: $toTs }
           orderBy: blockTimestamp
@@ -108,48 +119,95 @@ export default task('collectDailyMetrics', 'Collects metrics for a given day')
       rawData.bucketedVolumes = [...rawData.bucketedVolumes, ...res.bucketedVolumes]
     }
 
-    const hourlyVolumes = rawData.bucketedVolumes.map(
-      ({ product, makerNotional, makerFees, takerNotional, takerFees }) => ({
-        product: product.toLowerCase(),
-        makerNotional: BigNumber.from(makerNotional),
-        makerFees: BigNumber.from(makerFees),
-        takerNotional: BigNumber.from(takerNotional),
-        takerFees: BigNumber.from(takerFees),
-      }),
-    )
+    const volumes = rawData.bucketedVolumes.map(({ product, makerNotional, makerFees, takerNotional, takerFees }) => ({
+      product: product.toLowerCase(),
+      makerNotional: BigNumber.from(makerNotional),
+      makerFees: BigNumber.from(makerFees),
+      takerNotional: BigNumber.from(takerNotional),
+      takerFees: BigNumber.from(takerFees),
+    }))
 
-    const totalVolume = hourlyVolumes.reduce((acc, { takerNotional }) => acc.add(takerNotional), BigNumber.from(0))
-    const longFees = hourlyVolumes
+    const totalVolume = volumes.reduce((acc, { takerNotional }) => acc.add(takerNotional), BigNumber.from(0))
+    const longFees = volumes
       .filter(({ product }) => product.toLowerCase() === longProduct.toLowerCase())
       .reduce((acc, { takerFees }) => acc.add(takerFees), BigNumber.from(0))
-    const shortFees = hourlyVolumes
+    const shortFees = volumes
       .filter(({ product }) => product.toLowerCase() === shortProduct.toLowerCase())
       .reduce((acc, { takerFees }) => acc.add(takerFees), BigNumber.from(0))
 
+    const startBlock = BigNumber.from(rawData.firstSettle[0].blockNumber)
     const endBlock = BigNumber.from(rawData.lastSettle[0].blockNumber)
-    const [longSnapshot, shortSnapshot, vaultLongSnapshot, vaultShortSnapshot] = await Promise.all([
-      lens.callStatic['snapshot(address)'](longProduct, { blockTag: endBlock.toHexString() }),
-      lens.callStatic['snapshot(address)'](shortProduct, { blockTag: endBlock.toHexString() }),
-      lens.callStatic['snapshot(address,address)'](vault, longProduct, { blockTag: endBlock.toHexString() }),
-      lens.callStatic['snapshot(address,address)'](vault, shortProduct, { blockTag: endBlock.toHexString() }),
-    ])
+    const settleBlocks = endBlock.sub(startBlock).add(1)
+    const queryBlocks = chunk(
+      new Array(settleBlocks.toNumber()).fill(0).map((_, i) => endBlock.sub(i)),
+      settleBlocks.div(QUERY_DATA_POINTS).toNumber(),
+    ).map(c => c[0]) // Query 100 datapoints and take average
+
+    const snapshotData = await Promise.all(
+      queryBlocks.map(b => {
+        return Promise.all([
+          lens.callStatic['snapshot(address)'](longProduct, { blockTag: b.toHexString() }),
+          lens.callStatic['snapshot(address)'](shortProduct, { blockTag: b.toHexString() }),
+          lens.callStatic['snapshot(address,address)'](vault, longProduct, { blockTag: b.toHexString() }),
+          lens.callStatic['snapshot(address,address)'](vault, shortProduct, { blockTag: b.toHexString() }),
+        ])
+      }),
+    )
+
+    const {
+      longMakerOI,
+      shortMakerOI,
+      longTakerOI,
+      shortTakerOI,
+      vaultLongOI,
+      vaultShortOI,
+      vaultAssets,
+      longAvgRate,
+      shortAvgRate,
+    } = snapshotData.reduce(
+      (acc, [longSnapshot, shortSnapshot, vaultLongSnapshot, vaultShortSnapshot]) => {
+        return {
+          longMakerOI: acc.longMakerOI.add(longSnapshot.openInterest.maker),
+          shortMakerOI: acc.shortMakerOI.add(shortSnapshot.openInterest.maker),
+          longTakerOI: acc.longTakerOI.add(longSnapshot.openInterest.taker),
+          shortTakerOI: acc.shortTakerOI.add(shortSnapshot.openInterest.taker),
+          vaultLongOI: acc.vaultLongOI.add(vaultLongSnapshot.openInterest.maker),
+          vaultShortOI: acc.vaultShortOI.add(vaultShortSnapshot.openInterest.maker),
+          vaultAssets: acc.vaultAssets.add(vaultLongSnapshot.collateral.add(vaultShortSnapshot.collateral)),
+          longAvgRate: acc.longAvgRate.add(longSnapshot.rate),
+          shortAvgRate: acc.shortAvgRate.add(shortSnapshot.rate),
+        }
+      },
+      {
+        longMakerOI: BigNumber.from(0),
+        shortMakerOI: BigNumber.from(0),
+        longTakerOI: BigNumber.from(0),
+        shortTakerOI: BigNumber.from(0),
+        vaultLongOI: BigNumber.from(0),
+        vaultShortOI: BigNumber.from(0),
+        vaultAssets: BigNumber.from(0),
+        longAvgRate: BigNumber.from(0),
+        shortAvgRate: BigNumber.from(0),
+      },
+    )
 
     const data = {
       market: market,
       date: args.dateString,
-      longMakerOI: formatEther(longSnapshot.openInterest.maker),
-      shortMakerOI: formatEther(shortSnapshot.openInterest.maker),
-      longTakerOI: formatEther(longSnapshot.openInterest.taker),
-      shortTakerOI: formatEther(shortSnapshot.openInterest.taker),
-      vaultAssets: formatEther(vaultLongSnapshot.collateral.add(vaultShortSnapshot.collateral)),
-      vaultLongOI: formatEther(vaultLongSnapshot.openInterest.maker),
-      vaultShortOI: formatEther(vaultShortSnapshot.openInterest.maker),
+      longMakerOI: formatEther(longMakerOI.div(queryBlocks.length)),
+      shortMakerOI: formatEther(shortMakerOI.div(queryBlocks.length)),
+      longTakerOI: formatEther(longTakerOI.div(queryBlocks.length)),
+      shortTakerOI: formatEther(shortTakerOI.div(queryBlocks.length)),
+      vaultAssets: formatEther(vaultAssets.div(queryBlocks.length)),
+      vaultLongOI: formatEther(vaultLongOI.div(queryBlocks.length)),
+      vaultShortOI: formatEther(vaultShortOI.div(queryBlocks.length)),
       totalVolume: formatEther(totalVolume),
       longFees: formatEther(longFees),
       shortFees: formatEther(shortFees),
       avgHourlyRate: formatEther(
-        longSnapshot.rate
-          .add(shortSnapshot.rate)
+        longAvgRate
+          .add(shortAvgRate)
+          .div(queryBlocks.length)
           .mul(60 * 60)
           .mul(100)
           .div(2),
