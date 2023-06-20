@@ -8,7 +8,7 @@ import "./BalancedVaultDefinition.sol";
 
 /**
  * @title BalancedVault
- * @notice ERC4626 vault that manages a 50-50 position between long-short markets of the same payoff on Perennial.
+ * @notice Vault that manages a 50-50 position between long-short markets of the same payoff on Perennial.
  * @dev Vault deploys and rebalances collateral between the corresponding long and short markets, while attempting to
  *      maintain `targetLeverage` with its open positions at any given time. Deposits are only gated in so much as to cap
  *      the maximum amount of assets in the vault. The long and short markets are expected to have the same oracle and
@@ -26,6 +26,12 @@ import "./BalancedVaultDefinition.sol";
  *
  *      This implementation is designed to be upgrade-compatible with instances of the previous single-payoff
  *      BalancedVault, here: https://github.com/equilibria-xyz/perennial-mono/blob/d970debe95e41598228e8c4ae52fb816797820fb/packages/perennial-vaults/contracts/BalancedVault.sol.
+ *
+ *      [CAUTION]
+ *      In empty (or nearly empty) vaults, deposits are at high risk of being stolen through frontrunning
+ *      with a "donation" to the vault that inflates the price of a share. This is variously known as a donation or inflation
+ *      attack and is essentially a problem of slippage. Vault deployers can protect against this attack by making an initial
+ *      deposit of a non-trivial amount of the asset, such that price manipulation becomes infeasible.
  */
 contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializable {
     UFixed18 constant private TWO = UFixed18.wrap(2e18);
