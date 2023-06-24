@@ -439,7 +439,7 @@ contract BalancedVault is IBalancedVault, UInitializable {
 
         if (targetPosition.lt(currentPosition))
             product.closeMake(currentPosition.sub(targetPosition));
-        if (targetPosition.gt(currentPosition))
+        if (targetPosition.gte(currentPosition))
             product.openMake(targetPosition.sub(currentPosition).min(makerAvailable));
 
         emit PositionUpdated(product, targetPosition);

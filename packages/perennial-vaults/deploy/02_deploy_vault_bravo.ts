@@ -27,7 +27,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     contract: 'BalancedVault',
     args: [dsu, controller, long, short, targetLeverage, maxCollateral],
     from: deployer,
-    skipIfAlreadyDeployed: true,
+    skipIfAlreadyDeployed: false,
     log: true,
     autoMine: true,
   })
