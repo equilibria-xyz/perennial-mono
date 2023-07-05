@@ -20,7 +20,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const controller = (await get('Controller_Proxy')).address
   const long = (await get('Product_LongArbitrum')).address
   const short = (await get('Product_ShortArbitrum')).address
-  const targetLeverage = ethers.utils.parseEther('2')
+  const targetLeverage = ethers.utils.parseEther('1')
   const maxCollateral = ethers.utils.parseEther('500000')
 
   const vaultImpl = await deploy('PerennialVaultBravo_Impl', {
