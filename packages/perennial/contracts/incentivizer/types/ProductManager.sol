@@ -40,9 +40,6 @@ library ProductManagerLib {
 
         /// @dev If non-zero, the new versionComplete value of the program
         uint256 versionComplete;
-
-        /// @dev If non-zero, the amount to refund due to completion
-        UFixed18 refundAmount;
     }
 
     /**
@@ -90,13 +87,12 @@ library ProductManagerLib {
 
             // If timestamp-completed, grab previous version (last version before completion)
             uint256 versionComplete;
-            UFixed18 refundAmount;
             if (program.versionComplete == 0 && programInfo.isComplete(currentOracleVersion.timestamp)) {
-                (versionComplete, refundAmount) = _complete(self, product, programId);
+                versionComplete = _complete(self, product, programId);
             }
 
             // Save result
-            results[i] = SyncResult(programId, versionStarted, versionComplete, refundAmount);
+            results[i] = SyncResult(programId, versionStarted, versionComplete);
         }
     }
 
@@ -165,7 +161,7 @@ library ProductManagerLib {
 
         // If not completed already, complete
         if (program.versionComplete == 0) {
-            (result.versionComplete, result.refundAmount) = _complete(self, product, programId);
+            result.versionComplete = _complete(self, product, programId);
         }
     }
 
@@ -195,14 +191,13 @@ library ProductManagerLib {
      * @param product The Product to operate on
      * @param programId The Program to complete
      * @return versionComplete The version that the program complete
-     * @return refundAmount The refunded token amount
      */
     function _complete(
         ProductManager storage self,
         IProduct product,
         uint256 programId
-    ) internal returns (uint256 versionComplete, UFixed18 refundAmount) {
-        (versionComplete, refundAmount) = self.programs[programId].complete(product, self.programInfos[programId]);
+    ) internal returns (uint256 versionComplete) {
+        versionComplete = self.programs[programId].complete(product, self.programInfos[programId]);
         self.activePrograms.remove(programId);
     }
 

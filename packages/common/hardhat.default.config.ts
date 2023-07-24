@@ -17,7 +17,7 @@ import 'hardhat-deploy'
 import 'hardhat-dependency-compiler'
 import { getChainId, isArbitrum, isBase, isOptimism, SupportedChain } from './testutil/network'
 
-export const SOLIDITY_VERSION = '0.8.15'
+export const SOLIDITY_VERSION = '0.8.17'
 const PRIVATE_KEY_MAINNET = process.env.PRIVATE_KEY || ''
 const PRIVATE_KEY_TESTNET = process.env.PRIVATE_KEY_TESTNET || ''
 
@@ -188,7 +188,7 @@ export default function defaultConfig({
       parallel: MOCHA_PARALLEL,
       reporter: MOCHA_REPORTER,
       slow: 1000,
-      timeout: 180000,
+      timeout: 2400000,
     },
     contractSizer: {
       alphaSort: true,

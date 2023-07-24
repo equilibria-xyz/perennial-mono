@@ -1,7 +1,7 @@
 import { expect } from 'chai'
 import { BigNumber, constants, utils } from 'ethers'
 import { MultiInvoker__factory, Product, TestnetVault, TestnetVault__factory } from '../../../types/generated'
-import { IMultiInvoker } from '../../../types/generated/contracts/interfaces/IMultiInvoker'
+import { IMultiInvoker } from '../../../types/generated/contracts/interfaces/IMultiInvoker.sol/IMultiInvoker'
 import { buildInvokerActions, InvokerAction } from '../../util'
 
 import {
@@ -53,11 +53,13 @@ describe('MultiInvoker', () => {
     let product: Product
     let actions: { [action in InvokerAction]: IMultiInvoker.InvocationStruct }
     let partialActions: { [action in InvokerAction]: IMultiInvoker.InvocationStruct }
+    let actionsUnwrapped: { [action in InvokerAction]: IMultiInvoker.InvocationStruct }
     let position: BigNumber
     let amount: BigNumber
     let programs: number[]
     let vault: TestnetVault
     let vaultAmount: BigNumber
+    let feeAmount: BigNumber
 
     beforeEach(async () => {
       const { owner, user, dsu, usdc, usdcHolder, multiInvoker } = instanceVars
@@ -75,6 +77,8 @@ describe('MultiInvoker', () => {
       amount = utils.parseEther('10000')
       programs = [PROGRAM_ID.toNumber()]
       vaultAmount = amount
+      feeAmount = utils.parseEther('10')
+
       actions = buildInvokerActions({
         userAddress: user.address,
         productAddress: product.address,
@@ -83,13 +87,29 @@ describe('MultiInvoker', () => {
         programs,
         vaultAddress: vault.address,
         vaultAmount,
+        feeAmount: feeAmount,
+        wrappedFee: true,
       })
+
       partialActions = buildInvokerActions({
         userAddress: user.address,
         productAddress: product.address,
         position: position.div(2),
         amount: amount.div(2),
         programs,
+        feeAmount: feeAmount,
+      })
+
+      actionsUnwrapped = buildInvokerActions({
+        userAddress: user.address,
+        productAddress: product.address,
+        position,
+        amount,
+        programs,
+        vaultAddress: vault.address,
+        vaultAmount,
+        feeAmount: feeAmount,
+        wrappedFee: false,
       })
     })
 
@@ -138,7 +158,10 @@ describe('MultiInvoker', () => {
     })
 
     it('performs a WRAP_AND_DEPOSIT and OPEN_MAKE chain', async () => {
-      const { user, multiInvoker, batcher, collateral, usdc } = instanceVars
+      const { user, multiInvoker, batcher, collateral, usdc, dsu } = instanceVars
+
+      // Ensure this works without a DSU aproval
+      await dsu.connect(user).approve(multiInvoker.address, 0)
 
       await expect(multiInvoker.connect(user).invoke([actions.WRAP_AND_DEPOSIT, actions.OPEN_MAKE]))
         .to.emit(usdc, 'Transfer')
@@ -221,7 +244,10 @@ describe('MultiInvoker', () => {
     })
 
     it('performs a WRAP_AND_DEPOSIT and OPEN_TAKE chain', async () => {
-      const { user, userB, multiInvoker, batcher, collateral, usdc } = instanceVars
+      const { user, userB, multiInvoker, batcher, collateral, usdc, dsu } = instanceVars
+
+      // Ensure this works without a DSU aproval
+      await dsu.connect(user).approve(multiInvoker.address, 0)
 
       await depositTo(instanceVars, userB, product, amount.mul(2))
       await product.connect(userB).openMake(position.mul(2))
@@ -314,8 +340,29 @@ describe('MultiInvoker', () => {
         .withArgs(multiInvoker.address, user.address, 10000e6)
     })
 
+    it(`sends unwrapped USDC in CHARGE_FEE action`, async () => {
+      const { user, multiInvoker, dsu, usdc } = instanceVars
+
+      expect(await usdc.balanceOf(vault.address)).to.eq('0')
+
+      await expect(multiInvoker.connect(user).invoke([actions.WRAP, actionsUnwrapped.CHARGE_FEE])).to.not.be.reverted
+
+      expect(await usdc.balanceOf(vault.address)).to.eq(10e6)
+    })
+
+    it(`wraps USDC to DSU on WRAP action and invokes CHARGE_FEE to interface`, async () => {
+      const { user, multiInvoker, usdc, dsu } = instanceVars
+
+      // // set
+      // await multiInvoker.connect(user).invoke([actionsUnwrapped.WRAP, actionsUnwrapped.UNWRAP])
+
+      await expect(multiInvoker.connect(user).invoke([actions.CHARGE_FEE])).to.not.be.reverted
+
+      expect(await dsu.balanceOf(vault.address)).to.eq(utils.parseEther('10'))
+    })
+
     it('performs WITHDRAW_AND_UNWRAP', async () => {
-      const { user, multiInvoker, batcher, usdc, collateral, reserve } = instanceVars
+      const { user, multiInvoker, batcher, usdc, collateral, reserve, dsu } = instanceVars
 
       // Load the Reserve with some USDC
       await usdc.connect(user).approve(batcher.address, constants.MaxUint256)
@@ -325,7 +372,45 @@ describe('MultiInvoker', () => {
       // Deposit the collateral to withdraw
       await multiInvoker.connect(user).invoke([actions.DEPOSIT])
 
+      // Ensure this works without a DSU aproval
+      await dsu.connect(user).approve(multiInvoker.address, 0)
+
       await expect(multiInvoker.connect(user).invoke([actions.WITHDRAW_AND_UNWRAP]))
+        .to.emit(collateral, 'Withdrawal')
+        .withArgs(user.address, product.address, amount)
+        .to.emit(reserve, 'Redeem')
+        .withArgs(multiInvoker.address, amount, 10000e6)
+        .to.emit(usdc, 'Transfer')
+        .withArgs(reserve.address, multiInvoker.address, 10000e6)
+        .to.emit(usdc, 'Transfer')
+        .withArgs(multiInvoker.address, user.address, 10000e6)
+    })
+
+    it('performs WITHDRAW_AND_UNWRAP with max uint256', async () => {
+      const { user, multiInvoker, batcher, usdc, collateral, reserve, dsu } = instanceVars
+
+      // Load the Reserve with some USDC
+      await usdc.connect(user).approve(batcher.address, constants.MaxUint256)
+      await batcher.connect(user).wrap(amount, user.address)
+      await batcher.rebalance()
+
+      // Deposit the collateral to withdraw
+      await multiInvoker.connect(user).invoke([actions.DEPOSIT])
+
+      // Ensure this works without a DSU aproval
+      await dsu.connect(user).approve(multiInvoker.address, 0)
+
+      const maxActions = buildInvokerActions({
+        userAddress: user.address,
+        productAddress: product.address,
+        position,
+        amount: constants.MaxUint256,
+        programs,
+        vaultAddress: vault.address,
+        vaultAmount,
+        feeAmount: feeAmount,
+      })
+      await expect(multiInvoker.connect(user).invoke([maxActions.WITHDRAW_AND_UNWRAP]))
         .to.emit(collateral, 'Withdrawal')
         .withArgs(user.address, product.address, amount)
         .to.emit(reserve, 'Redeem')
@@ -404,6 +489,9 @@ describe('MultiInvoker', () => {
 
     it('performs a VAULT_WRAP_AND_DEPOSIT action', async () => {
       const { user, multiInvoker, dsu, usdc, batcher } = instanceVars
+
+      // Ensure this works without a DSU aproval
+      await dsu.connect(user).approve(multiInvoker.address, 0)
 
       await expect(multiInvoker.connect(user).invoke([actions.VAULT_WRAP_AND_DEPOSIT]))
         .to.emit(usdc, 'Transfer')

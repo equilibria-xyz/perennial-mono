@@ -30,7 +30,7 @@ describe('Vault - Perennial Vault Bravo - Arbitrum Verification', () => {
   })
 
   it('is already initialized', async () => {
-    await expect(vault.callStatic.initialize('PerennialVaultBravo', 'PVB')).to.be.revertedWithCustomError(
+    await expect(vault.callStatic.initialize('PerennialVaultBravo')).to.be.revertedWithCustomError(
       vault,
       'UInitializableAlreadyInitializedError',
     )
@@ -41,7 +41,6 @@ describe('Vault - Perennial Vault Bravo - Arbitrum Verification', () => {
     expect(await vault.collateral()).to.equal(await controller.collateral())
 
     expect(await vault.name()).to.equal('Perennial Vault Bravo')
-    expect(await vault.symbol()).to.equal('PVB')
     expect(await vault.maxCollateral()).to.equal(utils.parseEther('500000'))
     expect(await vault.targetLeverage()).to.equal(utils.parseEther('2'))
     expect(await vault.asset()).to.equal(deployments['DSU'].address)

@@ -143,7 +143,10 @@ describe('Incentivizer', () => {
       expect(await incentivizer.versionComplete(product.address, EXPECTED_PROGRAM_ID)).to.equal(0)
 
       expect(await incentivizer.owner(product.address, EXPECTED_PROGRAM_ID)).to.equal(productOwner.address)
-      expect(await incentivizer.treasury(product.address, EXPECTED_PROGRAM_ID)).to.equal(productTreasury.address)
+      expect(await incentivizer['treasury(address,uint256)'](product.address, EXPECTED_PROGRAM_ID)).to.equal(
+        productTreasury.address,
+      )
+      expect(await incentivizer['treasury(uint256)'](PRODUCT_COORDINATOR_ID)).to.equal(productTreasury.address)
     })
 
     it('protocol owner can create program', async () => {
@@ -180,7 +183,10 @@ describe('Incentivizer', () => {
       expect(await incentivizer.versionComplete(product.address, EXPECTED_PROGRAM_ID)).to.equal(0)
 
       expect(await incentivizer.owner(product.address, EXPECTED_PROGRAM_ID)).to.equal(owner.address)
-      expect(await incentivizer.treasury(product.address, EXPECTED_PROGRAM_ID)).to.equal(treasury.address)
+      expect(await incentivizer['treasury(address,uint256)'](product.address, EXPECTED_PROGRAM_ID)).to.equal(
+        treasury.address,
+      )
+      expect(await incentivizer['treasury(uint256)'](PRODUCT_COORDINATOR_ID)).to.equal(productTreasury.address)
     })
 
     it('can create program with fee', async () => {
@@ -230,7 +236,10 @@ describe('Incentivizer', () => {
       expect(await incentivizer.versionComplete(product.address, EXPECTED_PROGRAM_ID)).to.equal(0)
 
       expect(await incentivizer.owner(product.address, EXPECTED_PROGRAM_ID)).to.equal(owner.address)
-      expect(await incentivizer.treasury(product.address, EXPECTED_PROGRAM_ID)).to.equal(treasury.address)
+      expect(await incentivizer['treasury(address,uint256)'](product.address, EXPECTED_PROGRAM_ID)).to.equal(
+        treasury.address,
+      )
+      expect(await incentivizer['treasury(uint256)'](PRODUCT_COORDINATOR_ID)).to.equal(productTreasury.address)
 
       expect(await incentivizer.fees(token.address)).to.equal(utils.parseEther('100'))
     })
@@ -590,8 +599,6 @@ describe('Incentivizer', () => {
 
         await product.mock.latestVersion.withArgs().returns(LATEST_ORACLE_VERSION.version)
 
-        await token.mock.transfer.withArgs(productTreasury.address, utils.parseEther('10000')).returns(true)
-
         await product.mock.atVersion.withArgs(CURRENT_ORACLE_VERSION.version).returns(CURRENT_ORACLE_VERSION)
 
         await expect(incentivizer.connect(productSigner).sync(CURRENT_ORACLE_VERSION))
@@ -606,6 +613,9 @@ describe('Incentivizer', () => {
         expect(await incentivizer.active(product.address)).to.equal(1)
         expect(await incentivizer.versionStarted(product.address, 0)).to.equal(CURRENT_ORACLE_VERSION.version)
         expect(await incentivizer.versionComplete(product.address, 0)).to.equal(CURRENT_ORACLE_VERSION.version)
+        expect(await incentivizer.unclaimed(product.address, productTreasury.address, 0)).to.equal(
+          utils.parseEther('10000'),
+        )
         expect(await incentivizer.versionStarted(product.address, 1)).to.equal(CURRENT_ORACLE_VERSION.version)
         expect(await incentivizer.versionComplete(product.address, 1)).to.equal(0)
       })
@@ -628,8 +638,6 @@ describe('Incentivizer', () => {
 
         await product.mock.latestVersion.withArgs().returns(LATEST_ORACLE_VERSION.version)
 
-        await token.mock.transfer.withArgs(productTreasury.address, utils.parseEther('10000')).returns(true)
-
         await product.mock.atVersion.withArgs(CURRENT_ORACLE_VERSION.version).returns(CURRENT_ORACLE_VERSION)
 
         await expect(incentivizer.connect(productSigner).sync(CURRENT_ORACLE_VERSION))
@@ -644,6 +652,9 @@ describe('Incentivizer', () => {
         expect(await incentivizer.active(product.address)).to.equal(1)
         expect(await incentivizer.versionStarted(product.address, 0)).to.equal(CURRENT_ORACLE_VERSION.version)
         expect(await incentivizer.versionComplete(product.address, 0)).to.equal(CURRENT_ORACLE_VERSION.version)
+        expect(await incentivizer.unclaimed(product.address, productTreasury.address, 0)).to.equal(
+          utils.parseEther('10000'),
+        )
         expect(await incentivizer.versionStarted(product.address, 1)).to.equal(CURRENT_ORACLE_VERSION.version)
         expect(await incentivizer.versionComplete(product.address, 1)).to.equal(0)
       })
@@ -666,9 +677,6 @@ describe('Incentivizer', () => {
 
         await product.mock.latestVersion.withArgs().returns(LATEST_ORACLE_VERSION.version)
 
-        await token.mock.transfer.withArgs(productTreasury.address, utils.parseEther('10000')).returns(true)
-        await token.mock.transfer.withArgs(productTreasury.address, utils.parseEther('20000')).returns(true)
-
         await product.mock.atVersion.withArgs(CURRENT_ORACLE_VERSION.version).returns(CURRENT_ORACLE_VERSION)
 
         await expect(incentivizer.connect(productSigner).sync(CURRENT_ORACLE_VERSION))
@@ -685,8 +693,14 @@ describe('Incentivizer', () => {
         expect(await incentivizer.active(product.address)).to.equal(0)
         expect(await incentivizer.versionStarted(product.address, 0)).to.equal(CURRENT_ORACLE_VERSION.version)
         expect(await incentivizer.versionComplete(product.address, 0)).to.equal(CURRENT_ORACLE_VERSION.version)
+        expect(await incentivizer.unclaimed(product.address, productTreasury.address, 0)).to.equal(
+          utils.parseEther('10000'),
+        )
         expect(await incentivizer.versionStarted(product.address, 1)).to.equal(CURRENT_ORACLE_VERSION.version)
         expect(await incentivizer.versionComplete(product.address, 1)).to.equal(CURRENT_ORACLE_VERSION.version)
+        expect(await incentivizer.unclaimed(product.address, productTreasury.address, 1)).to.equal(
+          utils.parseEther('20000'),
+        )
       })
 
       it('doesnt recomplete program', async () => {
@@ -706,8 +720,6 @@ describe('Incentivizer', () => {
         }
 
         await product.mock.latestVersion.withArgs().returns(PRE_ORACLE_VERSION.version)
-
-        await token.mock.transfer.withArgs(productTreasury.address, utils.parseEther('10000')).returns(true)
 
         await product.mock.atVersion.withArgs(STARTED_ORACLE_VERSION.version).returns(STARTED_ORACLE_VERSION)
 
@@ -735,8 +747,6 @@ describe('Incentivizer', () => {
           .mul(60 * DAY - (LATEST_ORACLE_VERSION.timestamp - STARTED_ORACLE_VERSION.timestamp))
           .div(60 * DAY)
 
-        await token.mock.transfer.withArgs(productTreasury.address, EXPECTED_REFUND_AMOUNT).returns(true)
-
         await product.mock.atVersion.withArgs(LATEST_ORACLE_VERSION.version).returns(LATEST_ORACLE_VERSION)
 
         await expect(incentivizer.connect(productSigner).sync(CURRENT_ORACLE_VERSION))
@@ -747,8 +757,14 @@ describe('Incentivizer', () => {
         expect(await incentivizer.active(product.address)).to.equal(0)
         expect(await incentivizer.versionStarted(product.address, 0)).to.equal(STARTED_ORACLE_VERSION.version)
         expect(await incentivizer.versionComplete(product.address, 0)).to.equal(STARTED_ORACLE_VERSION.version)
+        expect(await incentivizer.unclaimed(product.address, productTreasury.address, 0)).to.equal(
+          utils.parseEther('10000'),
+        )
         expect(await incentivizer.versionStarted(product.address, 1)).to.equal(STARTED_ORACLE_VERSION.version)
         expect(await incentivizer.versionComplete(product.address, 1)).to.equal(LATEST_ORACLE_VERSION.version)
+        expect(await incentivizer.unclaimed(product.address, productTreasury.address, 1)).to.equal(
+          EXPECTED_REFUND_AMOUNT,
+        )
       })
     })
 
@@ -825,8 +841,6 @@ describe('Incentivizer', () => {
           .mul(30 * DAY - (LATEST_ORACLE_VERSION.timestamp - STARTED_ORACLE_VERSION.timestamp))
           .div(30 * DAY)
 
-        await token.mock.transfer.withArgs(productTreasury.address, EXPECTED_REFUND_AMOUNT).returns(true)
-
         await product.mock.atVersion.withArgs(STARTED_ORACLE_VERSION.version).returns(STARTED_ORACLE_VERSION)
         await product.mock.atVersion.withArgs(LATEST_ORACLE_VERSION.version).returns(LATEST_ORACLE_VERSION)
 
@@ -838,6 +852,9 @@ describe('Incentivizer', () => {
         expect(await incentivizer.active(product.address)).to.equal(1)
         expect(await incentivizer.versionStarted(product.address, 0)).to.equal(STARTED_ORACLE_VERSION.version)
         expect(await incentivizer.versionComplete(product.address, 0)).to.equal(LATEST_ORACLE_VERSION.version)
+        expect(await incentivizer.unclaimed(product.address, productTreasury.address, 0)).to.equal(
+          EXPECTED_REFUND_AMOUNT,
+        )
         expect(await incentivizer.versionStarted(product.address, 1)).to.equal(STARTED_ORACLE_VERSION.version)
         expect(await incentivizer.versionComplete(product.address, 1)).to.equal(0)
       })
@@ -865,8 +882,6 @@ describe('Incentivizer', () => {
           .mul(30 * DAY - (LATEST_ORACLE_VERSION.timestamp - STARTED_ORACLE_VERSION.timestamp))
           .div(30 * DAY)
 
-        await token.mock.transfer.withArgs(productTreasury.address, EXPECTED_REFUND_AMOUNT).returns(true)
-
         await product.mock.atVersion.withArgs(STARTED_ORACLE_VERSION.version).returns(STARTED_ORACLE_VERSION)
         await product.mock.atVersion.withArgs(LATEST_ORACLE_VERSION.version).returns(LATEST_ORACLE_VERSION)
 
@@ -878,6 +893,9 @@ describe('Incentivizer', () => {
         expect(await incentivizer.active(product.address)).to.equal(1)
         expect(await incentivizer.versionStarted(product.address, 0)).to.equal(STARTED_ORACLE_VERSION.version)
         expect(await incentivizer.versionComplete(product.address, 0)).to.equal(LATEST_ORACLE_VERSION.version)
+        expect(await incentivizer.unclaimed(product.address, productTreasury.address, 0)).to.equal(
+          EXPECTED_REFUND_AMOUNT,
+        )
         expect(await incentivizer.versionStarted(product.address, 1)).to.equal(STARTED_ORACLE_VERSION.version)
         expect(await incentivizer.versionComplete(product.address, 1)).to.equal(0)
       })
@@ -909,9 +927,6 @@ describe('Incentivizer', () => {
           .mul(60 * DAY - (LATEST_ORACLE_VERSION.timestamp - STARTED_ORACLE_VERSION.timestamp))
           .div(60 * DAY)
 
-        await token.mock.transfer.withArgs(productTreasury.address, EXPECTED_REFUND_AMOUNT).returns(true)
-        await token.mock.transfer.withArgs(productTreasury.address, EXPECTED_REFUND_AMOUNT_2).returns(true)
-
         await product.mock.atVersion.withArgs(STARTED_ORACLE_VERSION.version).returns(STARTED_ORACLE_VERSION)
         await product.mock.atVersion.withArgs(LATEST_ORACLE_VERSION.version).returns(LATEST_ORACLE_VERSION)
 
@@ -925,8 +940,14 @@ describe('Incentivizer', () => {
         expect(await incentivizer.active(product.address)).to.equal(0)
         expect(await incentivizer.versionStarted(product.address, 0)).to.equal(STARTED_ORACLE_VERSION.version)
         expect(await incentivizer.versionComplete(product.address, 0)).to.equal(LATEST_ORACLE_VERSION.version)
+        expect(await incentivizer.unclaimed(product.address, productTreasury.address, 0)).to.equal(
+          EXPECTED_REFUND_AMOUNT,
+        )
         expect(await incentivizer.versionStarted(product.address, 1)).to.equal(STARTED_ORACLE_VERSION.version)
         expect(await incentivizer.versionComplete(product.address, 1)).to.equal(LATEST_ORACLE_VERSION.version)
+        expect(await incentivizer.unclaimed(product.address, productTreasury.address, 1)).to.equal(
+          EXPECTED_REFUND_AMOUNT_2,
+        )
       })
 
       it('doesnt recomplete program', async () => {
@@ -952,12 +973,13 @@ describe('Incentivizer', () => {
           .mul(30 * DAY - (LATEST_ORACLE_VERSION.timestamp - STARTED_ORACLE_VERSION.timestamp))
           .div(30 * DAY)
 
-        await token.mock.transfer.withArgs(productTreasury.address, EXPECTED_REFUND_AMOUNT).returns(true)
-
         await product.mock.atVersion.withArgs(STARTED_ORACLE_VERSION.version).returns(STARTED_ORACLE_VERSION)
         await product.mock.atVersion.withArgs(LATEST_ORACLE_VERSION.version).returns(LATEST_ORACLE_VERSION)
 
         await incentivizer.connect(productSigner).sync(CURRENT_ORACLE_VERSION)
+        expect(await incentivizer.unclaimed(product.address, productTreasury.address, 0)).to.equal(
+          EXPECTED_REFUND_AMOUNT,
+        )
 
         await increase(30 * DAY)
 
@@ -981,8 +1003,6 @@ describe('Incentivizer', () => {
           .mul(60 * DAY - (LATEST_ORACLE_VERSION.timestamp - STARTED_ORACLE_VERSION.timestamp))
           .div(60 * DAY)
 
-        await token.mock.transfer.withArgs(productTreasury.address, EXPECTED_REFUND_AMOUNT).returns(true)
-
         await product.mock.atVersion.withArgs(LATEST_ORACLE_VERSION.version).returns(LATEST_ORACLE_VERSION)
 
         await expect(incentivizer.connect(productSigner).sync(CURRENT_ORACLE_VERSION))
@@ -995,6 +1015,9 @@ describe('Incentivizer', () => {
         expect(await incentivizer.versionComplete(product.address, 0)).to.equal(23)
         expect(await incentivizer.versionStarted(product.address, 1)).to.equal(STARTED_ORACLE_VERSION.version)
         expect(await incentivizer.versionComplete(product.address, 1)).to.equal(LATEST_ORACLE_VERSION.version)
+        expect(await incentivizer.unclaimed(product.address, productTreasury.address, 1)).to.equal(
+          EXPECTED_REFUND_AMOUNT,
+        )
       })
     })
 
@@ -1369,8 +1392,6 @@ describe('Incentivizer', () => {
         await product.mock['latestVersion()'].withArgs().returns(COMPLETE_ORACLE_VERSION.version)
         await product.mock.atVersion.withArgs(START_ORACLE_VERSION.version).returns(START_ORACLE_VERSION)
         await product.mock.atVersion.withArgs(COMPLETE_ORACLE_VERSION.version).returns(COMPLETE_ORACLE_VERSION)
-        await token.mock.transfer.withArgs(productTreasury.address, REFUND_AMOUNT_0).returns(true)
-        await token.mock.transfer.withArgs(productTreasury.address, REFUND_AMOUNT_1).returns(true)
         const POST_COMPLETE_ORACLE_VERSION = {
           price: utils.parseEther('1'),
           timestamp: await currentBlockTimestamp(),
@@ -1509,8 +1530,6 @@ describe('Incentivizer', () => {
         await product.mock['latestVersion()'].withArgs().returns(COMPLETE_ORACLE_VERSION.version)
         await product.mock.atVersion.withArgs(START_ORACLE_VERSION.version).returns(START_ORACLE_VERSION)
         await product.mock.atVersion.withArgs(COMPLETE_ORACLE_VERSION.version).returns(COMPLETE_ORACLE_VERSION)
-        await token.mock.transfer.withArgs(productTreasury.address, REFUND_AMOUNT_0).returns(true)
-        await token.mock.transfer.withArgs(productTreasury.address, REFUND_AMOUNT_1).returns(true)
         const POST_COMPLETE_ORACLE_VERSION = {
           price: utils.parseEther('1'),
           timestamp: await currentBlockTimestamp(),
@@ -1629,8 +1648,6 @@ describe('Incentivizer', () => {
         await product.mock['latestVersion()'].withArgs().returns(COMPLETE_ORACLE_VERSION.version)
         await product.mock.atVersion.withArgs(START_ORACLE_VERSION.version).returns(START_ORACLE_VERSION)
         await product.mock.atVersion.withArgs(COMPLETE_ORACLE_VERSION.version).returns(COMPLETE_ORACLE_VERSION)
-        await token.mock.transfer.withArgs(productTreasury.address, REFUND_AMOUNT_0).returns(true)
-        await token.mock.transfer.withArgs(productTreasury.address, REFUND_AMOUNT_1).returns(true)
         const POST_COMPLETE_ORACLE_VERSION = {
           price: utils.parseEther('1'),
           timestamp: await currentBlockTimestamp(),
@@ -1836,8 +1853,6 @@ describe('Incentivizer', () => {
         await product.mock.latestVersion.withArgs().returns(LATEST_ORACLE_VERSION.version)
         await product.mock.currentVersion.withArgs().returns(CURRENT_ORACLE_VERSION)
 
-        await token.mock.transfer.withArgs(productTreasury.address, utils.parseEther('10000')).returns(true)
-
         await product.mock.atVersion.withArgs(CURRENT_ORACLE_VERSION.version).returns(CURRENT_ORACLE_VERSION)
 
         await expect(incentivizer.connect(productOwner).complete(product.address, 0))
@@ -1850,6 +1865,9 @@ describe('Incentivizer', () => {
         expect(await incentivizer.active(product.address)).to.equal(0)
         expect(await incentivizer.versionStarted(product.address, 0)).to.equal(CURRENT_ORACLE_VERSION.version)
         expect(await incentivizer.versionComplete(product.address, 0)).to.equal(CURRENT_ORACLE_VERSION.version)
+        expect(await incentivizer.unclaimed(product.address, productTreasury.address, 0)).to.equal(
+          utils.parseEther('10000'),
+        )
       })
 
       it('completes correctly after start time', async () => {
@@ -1871,8 +1889,6 @@ describe('Incentivizer', () => {
         await product.mock.latestVersion.withArgs().returns(LATEST_ORACLE_VERSION.version)
         await product.mock.currentVersion.withArgs().returns(CURRENT_ORACLE_VERSION)
 
-        await token.mock.transfer.withArgs(productTreasury.address, utils.parseEther('10000')).returns(true)
-
         await product.mock.atVersion.withArgs(CURRENT_ORACLE_VERSION.version).returns(CURRENT_ORACLE_VERSION)
 
         await expect(incentivizer.connect(productOwner).complete(product.address, 0))
@@ -1885,6 +1901,9 @@ describe('Incentivizer', () => {
         expect(await incentivizer.active(product.address)).to.equal(0)
         expect(await incentivizer.versionStarted(product.address, 0)).to.equal(CURRENT_ORACLE_VERSION.version)
         expect(await incentivizer.versionComplete(product.address, 0)).to.equal(CURRENT_ORACLE_VERSION.version)
+        expect(await incentivizer.unclaimed(product.address, productTreasury.address, 0)).to.equal(
+          utils.parseEther('10000'),
+        )
       })
     })
 
@@ -1938,8 +1957,6 @@ describe('Incentivizer', () => {
           .mul(30 * DAY - (LATEST_ORACLE_VERSION.timestamp - STARTED_ORACLE_VERSION.timestamp))
           .div(30 * DAY)
 
-        await token.mock.transfer.withArgs(productTreasury.address, EXPECTED_REFUND_AMOUNT).returns(true)
-
         await product.mock.atVersion.withArgs(STARTED_ORACLE_VERSION.version).returns(STARTED_ORACLE_VERSION)
         await product.mock.atVersion.withArgs(LATEST_ORACLE_VERSION.version).returns(LATEST_ORACLE_VERSION)
 
@@ -1951,6 +1968,9 @@ describe('Incentivizer', () => {
         expect(await incentivizer.active(product.address)).to.equal(0)
         expect(await incentivizer.versionStarted(product.address, 0)).to.equal(STARTED_ORACLE_VERSION.version)
         expect(await incentivizer.versionComplete(product.address, 0)).to.equal(LATEST_ORACLE_VERSION.version)
+        expect(await incentivizer.unclaimed(product.address, productTreasury.address, 0)).to.equal(
+          EXPECTED_REFUND_AMOUNT,
+        )
       })
     })
 
@@ -1989,8 +2009,6 @@ describe('Incentivizer', () => {
         .mul(30 * DAY - (LATEST_ORACLE_VERSION.timestamp - STARTED_ORACLE_VERSION.timestamp))
         .div(30 * DAY)
 
-      await token.mock.transfer.withArgs(productTreasury.address, EXPECTED_REFUND_AMOUNT).returns(true)
-
       await product.mock.atVersion.withArgs(STARTED_ORACLE_VERSION.version).returns(STARTED_ORACLE_VERSION)
       await product.mock.atVersion.withArgs(LATEST_ORACLE_VERSION.version).returns(LATEST_ORACLE_VERSION)
 
@@ -2014,6 +2032,7 @@ describe('Incentivizer', () => {
       expect(await incentivizer.active(product.address)).to.equal(0)
       expect(await incentivizer.versionStarted(product.address, 0)).to.equal(STARTED_ORACLE_VERSION.version)
       expect(await incentivizer.versionComplete(product.address, 0)).to.equal(LATEST_ORACLE_VERSION.version)
+      expect(await incentivizer.unclaimed(product.address, productTreasury.address, 0)).to.equal(EXPECTED_REFUND_AMOUNT)
     })
 
     it('reverts if not valid program', async () => {
@@ -2462,6 +2481,26 @@ describe('Incentivizer', () => {
         incentivizer,
         `PausedError`,
       )
+    })
+  })
+
+  context('invalid program', () => {
+    describe('#owner', () => {
+      it('reverts', async () => {
+        await expect(incentivizer.owner(product.address, 0)).to.be.revertedWithCustomError(
+          incentivizer,
+          'IncentivizerInvalidProgramError',
+        )
+      })
+    })
+
+    describe('#treasury', () => {
+      it('reverts', async () => {
+        await expect(incentivizer['treasury(address,uint256)'](product.address, 0)).to.be.revertedWithCustomError(
+          incentivizer,
+          'IncentivizerInvalidProgramError',
+        )
+      })
     })
   })
 })

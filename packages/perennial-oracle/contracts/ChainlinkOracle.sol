@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.15;
+pragma solidity ^0.8.15;
 
 import "@chainlink/contracts/src/v0.8/interfaces/FeedRegistryInterface.sol";
 import "@openzeppelin/contracts/utils/math/SafeCast.sol";
@@ -8,10 +8,9 @@ import "./types/ChainlinkRegistry.sol";
 
 /**
  * @title ChainlinkOracle
- * @notice Chainlink implementation of the IOracle interface.
+ * @notice Chainlink registry implementation of the IOracle interface.
  * @dev One instance per Chainlink price feed should be deployed. Multiple products may use the same
  *      ChainlinkOracle instance if their payoff functions are based on the same underlying oracle.
- *      This implementation only support non-negative prices.
  */
 contract ChainlinkOracle is IOracleProvider {
     /// @dev Chainlink registry feed address
@@ -61,8 +60,8 @@ contract ChainlinkOracle is IOracleProvider {
         // Fetch latest round
         ChainlinkRound memory round = registry.getLatestRound(base, quote);
 
-        // Revert if the round id is 0
-        if (uint64(round.roundId) == 0) revert InvalidOracleRound();
+        // Revert if the round id or timestamp is 0
+        if (uint64(round.roundId) == 0 || round.timestamp == 0) revert InvalidOracleRound();
 
         // Update phase annotation when new phase detected
         while (round.phaseId() > _latestPhaseId()) {

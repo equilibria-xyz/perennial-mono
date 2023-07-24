@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity 0.8.15;
+pragma solidity 0.8.17;
 
 import "@equilibria/root/control/unstructured/UInitializable.sol";
 import "@equilibria/root/control/unstructured/UReentrancyGuard.sol";
@@ -37,7 +37,7 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
      * @param programInfo Parameters for the new program
      * @return programId New program's ID
      */
-    function create(IProduct product, ProgramInfo calldata programInfo)
+    function create(IProduct product, ProgramInfo memory programInfo)
     external
     nonReentrant
     isProduct(product)
@@ -54,19 +54,20 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
         ProgramInfoLib.validate(programInfo);
 
         // Take fee
-        (ProgramInfo memory newProgramInfo, UFixed18 programFeeAmount) = ProgramInfoLib.deductFee(programInfo, _controller.incentivizationFee());
-        fees[newProgramInfo.token] = fees[newProgramInfo.token].add(programFeeAmount);
+        UFixed18 programTotal = programInfo.amount.sum();
+        UFixed18 programFeeAmount = programInfo.deductFee(_controller.incentivizationFee());
+        fees[programInfo.token] = fees[programInfo.token].add(programFeeAmount);
 
         // Register program
-        programId = _products[product].register(newProgramInfo);
+        programId = _products[product].register(programInfo);
 
         // Charge creator
-        newProgramInfo.token.pull(msg.sender, programInfo.amount.sum());
+        programInfo.token.pull(msg.sender, programTotal);
 
         emit ProgramCreated(
             product,
             programId,
-            newProgramInfo,
+            programInfo,
             programFeeAmount
         );
     }
@@ -109,8 +110,6 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
      */
     function _handleSyncResult(IProduct product, ProductManagerLib.SyncResult memory syncResult) private {
         uint256 programId = syncResult.programId;
-        if (!syncResult.refundAmount.isZero())
-            _products[product].token(programId).push(treasury(product, programId), syncResult.refundAmount);
         if (syncResult.versionStarted != 0)
             emit ProgramStarted(product, programId, syncResult.versionStarted);
         if (syncResult.versionComplete != 0)
@@ -179,7 +178,7 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
      * @param product Product to claim rewards for
      * @param programIds Programs to claim rewards for
      */
-    function _claimProduct(address account, IProduct product, uint256[] memory programIds)
+    function _claimProduct(address account, IProduct product, uint256[] calldata programIds)
     private
     isProduct(product)
     notPaused
@@ -298,7 +297,7 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
      * @param programId Program to return for
      * @return The owner of `programId`
      */
-    function owner(IProduct product, uint256 programId) public view returns (address) {
+    function owner(IProduct product, uint256 programId) isProgram(product, programId) public view returns (address) {
         return controller().owner(_products[product].programInfos[programId].coordinatorId);
     }
 
@@ -308,8 +307,17 @@ contract Incentivizer is IIncentivizer, UInitializable, UControllerProvider, URe
      * @param programId Program to return for
      * @return The treasury of `programId`
      */
-    function treasury(IProduct product, uint256 programId) public view returns (address) {
+    function treasury(IProduct product, uint256 programId) isProgram(product, programId) public view returns (address) {
         return controller().treasury(_products[product].programInfos[programId].coordinatorId);
+    }
+
+    /**
+     * @notice Returns the treasury of a specific program
+     * @param coordinatorId Coordinator to get the treasury for to return for
+     * @return The treasury of `programId`
+     */
+    function treasury(uint256 coordinatorId) public view returns (address) {
+        return controller().treasury(coordinatorId);
     }
 
     /// @dev Helper to fully settle an account's state

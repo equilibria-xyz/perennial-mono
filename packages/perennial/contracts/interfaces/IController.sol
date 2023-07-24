@@ -40,6 +40,7 @@ interface IController {
     event CoordinatorCreated(uint256 indexed coordinatorId, address owner);
     event ProductCreated(IProduct indexed product, IProduct.ProductInfo productInfo);
 
+    error ControllerNotProductError();
     error ControllerNoZeroCoordinatorError();
     error ControllerNotPauserError();
     error ControllerNotOwnerError(uint256 controllerId);

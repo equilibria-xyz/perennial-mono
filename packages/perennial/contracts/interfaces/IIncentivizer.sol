@@ -40,4 +40,5 @@ interface IIncentivizer {
     function versionComplete(IProduct product, uint256 programId) external view returns (uint256);
     function owner(IProduct product, uint256 programId) external view returns (address);
     function treasury(IProduct product, uint256 programId) external view returns (address);
+    function treasury(uint256 coordinatorId) external view returns (address);
 }

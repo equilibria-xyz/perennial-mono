@@ -38,7 +38,8 @@ interface IMultiInvoker {
         VAULT_DEPOSIT,
         VAULT_REDEEM,
         VAULT_CLAIM,
-        VAULT_WRAP_AND_DEPOSIT
+        VAULT_WRAP_AND_DEPOSIT,
+        CHARGE_FEE
     }
 
     /// @dev Struct for action invocation
