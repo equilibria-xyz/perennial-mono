@@ -12,6 +12,7 @@ import "../interfaces/types/PayoffDefinition.sol";
  * @notice Library for manage storing, surfacing, and upgrading a payoff provider.
  * @dev Uses an unstructured storage pattern to store the oracle address and payoff definition which allows this
         provider to be safely used with upgradeable contracts.
+        Perennial does not support 0-value payoffs.
  */
 abstract contract UPayoffProvider is IPayoffProvider, UInitializable {
     /// @dev The oracle contract address
