@@ -1696,6 +1696,40 @@ describe('BalancedVault (Multi-Payoff)', () => {
           'BalancedVaultDepositLimitExceeded',
         )
       })
+
+      it('handles pro-rata claims after insolvency', async () => {
+        // 1. Deposit initial amount into the vault
+        await vault.connect(user).deposit(utils.parseEther('50000'), user.address)
+        await vault.connect(user2).deposit(utils.parseEther('50000'), user2.address)
+        await updateOracle()
+        await vault.sync()
+
+        // 2. Redeem most of the amount, but leave it unclaimed
+        await vault.connect(user).redeem(utils.parseEther('40000'), user.address)
+        await vault.connect(user2).redeem(utils.parseEther('20000'), user2.address)
+        await updateOracle()
+        await vault.sync()
+
+        // 3. An oracle update makes the long position liquidatable, initiate take close
+        await updateOracle(utils.parseEther('20000'))
+        await long.connect(user).settleAccount(vault.address)
+        await short.connect(user).settleAccount(vault.address)
+        await long.connect(perennialUser).closeTake(utils.parseEther('700'))
+        await collateral.connect(liquidator).liquidate(vault.address, long.address)
+
+        // // 4. Settle the vault to recover and rebalance
+        await updateOracle() // let take settle at high price
+        await updateOracle(utils.parseEther('1500')) // return to normal price to let vault rebalance
+        await vault.sync()
+        await updateOracle()
+        await vault.sync()
+
+        // 6. Claim should be pro-rated
+        const initialBalanceOf = await asset.balanceOf(user2.address)
+        await vault.claim(user2.address)
+        expect(await vault.unclaimed(user2.address)).to.equal(0)
+        expect(await asset.balanceOf(user2.address)).to.equal(initialBalanceOf.add('19933982058344428779975'))
+      })
     })
   })
 })

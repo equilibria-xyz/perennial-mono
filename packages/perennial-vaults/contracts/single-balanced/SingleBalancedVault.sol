@@ -398,7 +398,7 @@ contract SingleBalancedVault is ISingleBalancedVault, UInitializable {
      * @notice Rebalances the position of the vault
      */
     function _rebalancePosition(VersionContext memory context, UFixed18 claimAmount) private {
-        UFixed18 currentAssets = _totalAssetsAtVersion(context).sub(claimAmount);
+        UFixed18 currentAssets = _totalAssetsAtVersion(context).max(claimAmount).sub(claimAmount);
         UFixed18 currentUtilized = _totalSupply.add(_redemption).isZero() ?
             _deposit.add(currentAssets) :
             _deposit.add(currentAssets.muldiv(_totalSupply, _totalSupply.add(_redemption)));
