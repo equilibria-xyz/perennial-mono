@@ -294,7 +294,7 @@ describe('ChainlinkFeedOracle', () => {
         // Next round comes from phase 4.
         // We check if there is another round in phase 3
         // There is, but it is after phase4Data[1] so we ignore it and perform a search
-        // The search will phase 4 starts at round 2 (version 4), so this is version 4 + (544 - 2) = 546
+        // The search will phase 4 starts at round 1 (version 4), so this is version 4 + (544 - 1) = 547
         await aggregatorMock._setLatestRoundData(...p4r544)
 
         const expectedPrice = p4r544.answer.mul(10 ** 10)
@@ -303,22 +303,22 @@ describe('ChainlinkFeedOracle', () => {
 
         expect(returnValue.price).to.equal(expectedPrice)
         expect(returnValue.timestamp).to.equal(p4r544.updatedAt)
-        expect(returnValue.version).to.equal(546)
+        expect(returnValue.version).to.equal(547)
 
         const currentVersion = await oracle.currentVersion()
         expect(currentVersion.price).to.equal(expectedPrice)
         expect(currentVersion.timestamp).to.equal(p4r544.updatedAt)
-        expect(currentVersion.version).to.equal(546)
+        expect(currentVersion.version).to.equal(547)
 
-        const atVersion5 = await oracle.atVersion(546)
+        const atVersion5 = await oracle.atVersion(547)
         expect(atVersion5.price).to.equal(expectedPrice)
         expect(atVersion5.timestamp).to.equal(p4r544.updatedAt)
-        expect(atVersion5.version).to.equal(546)
+        expect(atVersion5.version).to.equal(547)
 
-        const p4r2 = await aggregatorProxy.getRoundData(buildChainlinkRoundId(4, 2))
+        const p4r1 = await aggregatorProxy.getRoundData(buildChainlinkRoundId(4, 1))
         const atVersion4 = await oracle.atVersion(4)
-        expect(atVersion4.price).to.equal(p4r2.answer.mul(10 ** 10))
-        expect(atVersion4.timestamp).to.equal(p4r2.updatedAt)
+        expect(atVersion4.price).to.equal(p4r1.answer.mul(10 ** 10))
+        expect(atVersion4.timestamp).to.equal(p4r1.updatedAt)
         expect(atVersion4.version).to.equal(4)
 
         const atVersion3 = await oracle.atVersion(3)
@@ -340,7 +340,7 @@ describe('ChainlinkFeedOracle', () => {
         // Next round comes from phase 4.
         // We check if there is another round in phase 3
         // There is not
-        // The search will find phase 4 starts at round 2 (version 4), so this is version 4 + (544 - 2) = 546
+        // The search will find phase 4 starts at round 1 (version 4), so this is version 4 + (544 - 1) = 547
         await aggregatorMock._setLatestRoundData(...p4r544)
 
         const expectedPrice = p4r544.answer.mul(10 ** 10)
@@ -349,22 +349,22 @@ describe('ChainlinkFeedOracle', () => {
 
         expect(returnValue.price).to.equal(expectedPrice)
         expect(returnValue.timestamp).to.equal(p4r544.updatedAt)
-        expect(returnValue.version).to.equal(546)
+        expect(returnValue.version).to.equal(547)
 
         const currentVersion = await oracle.currentVersion()
         expect(currentVersion.price).to.equal(expectedPrice)
         expect(currentVersion.timestamp).to.equal(p4r544.updatedAt)
-        expect(currentVersion.version).to.equal(546)
+        expect(currentVersion.version).to.equal(547)
 
-        const atVersion5 = await oracle.atVersion(546)
+        const atVersion5 = await oracle.atVersion(547)
         expect(atVersion5.price).to.equal(expectedPrice)
         expect(atVersion5.timestamp).to.equal(p4r544.updatedAt)
-        expect(atVersion5.version).to.equal(546)
+        expect(atVersion5.version).to.equal(547)
 
-        const p4r2 = await aggregatorProxy.getRoundData(buildChainlinkRoundId(4, 2))
+        const p4r1 = await aggregatorProxy.getRoundData(buildChainlinkRoundId(4, 1))
         const atVersion4 = await oracle.atVersion(4)
-        expect(atVersion4.price).to.equal(p4r2.answer.mul(10 ** 10))
-        expect(atVersion4.timestamp).to.equal(p4r2.updatedAt)
+        expect(atVersion4.price).to.equal(p4r1.answer.mul(10 ** 10))
+        expect(atVersion4.timestamp).to.equal(p4r1.updatedAt)
         expect(atVersion4.version).to.equal(4)
 
         const atVersion3 = await oracle.atVersion(3)
