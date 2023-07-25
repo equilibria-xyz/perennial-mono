@@ -187,7 +187,11 @@ contract SingleBalancedVault is ISingleBalancedVault, UInitializable {
         UFixed18 claimAmount = unclaimedAmount;
         (UFixed18 longCollateral, UFixed18 shortCollateral, UFixed18 idleCollateral) = _collateral();
         UFixed18 totalCollateral = longCollateral.add(shortCollateral).add(idleCollateral);
-        if (totalCollateral.lt(unclaimedTotal)) claimAmount = claimAmount.muldiv(totalCollateral, unclaimedTotal);
+        // Pro-rate claim if vault has less collateral than unclaimed
+        if (totalCollateral.lt(unclaimedTotal)) {
+            claimAmount = claimAmount.muldiv(totalCollateral, unclaimedTotal);
+            if (account != msg.sender) revert BalancedVaultOnlySelfClaimAllowed();
+        }
 
         _rebalance(context, claimAmount);
 

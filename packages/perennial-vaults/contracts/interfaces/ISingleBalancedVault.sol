@@ -32,6 +32,7 @@ interface ISingleBalancedVault {
 
     error BalancedVaultDepositLimitExceeded();
     error BalancedVaultRedemptionLimitExceeded();
+    error BalancedVaultOnlySelfClaimAllowed();
 
     function initialize(string memory name_, string memory symbol_) external;
     function sync() external;
