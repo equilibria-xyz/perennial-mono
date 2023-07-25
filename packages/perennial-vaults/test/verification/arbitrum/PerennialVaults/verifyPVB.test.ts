@@ -4,8 +4,8 @@ import { utils } from 'ethers'
 import { Deployment } from 'hardhat-deploy/types'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import {
-  BalancedVault,
-  BalancedVault__factory,
+  SingleBalancedVault,
+  SingleBalancedVault__factory,
   IController,
   IController__factory,
   ProxyAdmin,
@@ -19,18 +19,18 @@ describe('Vault - Perennial Vault Bravo - Arbitrum Verification', () => {
   let deployments: { [name: string]: Deployment }
   let controller: IController
   let proxyAdmin: ProxyAdmin
-  let vault: BalancedVault
+  let vault: SingleBalancedVault
 
   beforeEach(async () => {
     ;[signer] = await ethers.getSigners()
     deployments = await HRE.deployments.all()
     controller = IController__factory.connect(deployments['Controller_Proxy'].address, signer)
     proxyAdmin = ProxyAdmin__factory.connect(deployments['ProxyAdmin'].address, signer)
-    vault = BalancedVault__factory.connect(deployments['PerennialVaultBravo_Proxy'].address, signer)
+    vault = SingleBalancedVault__factory.connect(deployments['PerennialVaultBravo_Proxy'].address, signer)
   })
 
   it('is already initialized', async () => {
-    await expect(vault.callStatic.initialize('PerennialVaultBravo')).to.be.revertedWithCustomError(
+    await expect(vault.callStatic.initialize('PerennialVaultBravo', 'PVB')).to.be.revertedWithCustomError(
       vault,
       'UInitializableAlreadyInitializedError',
     )
