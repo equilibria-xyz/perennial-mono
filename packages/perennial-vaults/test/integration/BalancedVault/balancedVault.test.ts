@@ -862,11 +862,7 @@ describe('BalancedVault', () => {
 
       expect(await longPosition()).to.be.greaterThan(0)
       expect(await shortPosition()).to.be.greaterThan(0)
-      const productOwner = await impersonate.impersonateWithBalance(
-        await controller['owner(address)'](long.address),
-        utils.parseEther('10'),
-      )
-      await long.connect(productOwner).updateClosed(true)
+      await long.connect(marketOwner).updateClosed(true)
       await updateOracleAndSync()
       await updateOracleAndSync()
 
@@ -874,7 +870,7 @@ describe('BalancedVault', () => {
       expect(await longPosition()).to.equal(0)
       expect(await shortPosition()).to.equal(0)
 
-      await long.connect(productOwner).updateClosed(false)
+      await long.connect(marketOwner).updateClosed(false)
       await updateOracleAndSync()
       await updateOracleAndSync()
 

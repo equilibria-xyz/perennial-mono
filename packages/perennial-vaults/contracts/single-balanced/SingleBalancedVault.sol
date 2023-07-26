@@ -451,9 +451,10 @@ contract SingleBalancedVault is ISingleBalancedVault, UInitializable {
             UFixed18 makerLimit = product.makerLimit();
             UFixed18 makerAvailable = makerLimit.gt(currentMaker) ? makerLimit.sub(currentMaker) : UFixed18Lib.ZERO;
 
-            // If there is no maker available, we still need a settlement but opening 0-value will revert,
-            // so instead close a 0 value instead
-            if (makerAvailable.isZero()) product.closeMake(makerAvailable);
+            // If there is no maker available (maker limit), we still need a settlement but opening 0 value will revert,
+            // so instead close 0 value instead
+            if (makerAvailable.isZero() || (targetPosition.isZero() && currentPosition.isZero()))
+                product.closeMake(UFixed18Lib.ZERO);
             else product.openMake(targetPosition.sub(currentPosition).min(makerAvailable));
         }
 
