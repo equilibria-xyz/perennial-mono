@@ -511,16 +511,22 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
             UFixed18 makerAvailable = position.maker.gt(position.taker) ?
                 position.maker.sub(position.taker) : UFixed18Lib.ZERO;
 
-            product.closeMake(accountPosition.sub(targetPosition).min(makerAvailable));
+            // If there is no maker available (socialization), we still need a settlement but closing 0 value will revert,
+            // so instead open 0 value instead
+            if (makerAvailable.isZero()) product.openMake(makerAvailable);
+            else product.closeMake(accountPosition.sub(targetPosition).min(makerAvailable));
         }
 
-        if (targetPosition.gt(accountPosition)) {
+        if (targetPosition.gte(accountPosition)) {
             // compute headroom until hitting makerLimit
             UFixed18 currentMaker = product.positionAtVersion(product.latestVersion()).next(product.pre()).maker;
             UFixed18 makerLimit = product.makerLimit();
             UFixed18 makerAvailable = makerLimit.gt(currentMaker) ? makerLimit.sub(currentMaker) : UFixed18Lib.ZERO;
 
-            product.openMake(targetPosition.sub(accountPosition).min(makerAvailable));
+            // If there is no maker available (maker limit), we still need a settlement but opening 0 value will revert,
+            // so instead close 0 value instead
+            if (makerAvailable.isZero()) product.closeMake(makerAvailable);
+            else product.openMake(targetPosition.sub(accountPosition).min(makerAvailable));
         }
     }
 

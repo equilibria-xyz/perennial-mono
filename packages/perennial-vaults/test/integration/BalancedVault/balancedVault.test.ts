@@ -1,6 +1,7 @@
 import HRE from 'hardhat'
 import { time, impersonate } from '../../../../common/testutil'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
+import { anyUint } from '@nomicfoundation/hardhat-chai-matchers/withArgs'
 import { FakeContract, smock } from '@defi-wonderland/smock'
 import { expect, use } from 'chai'
 import {
@@ -18,6 +19,7 @@ import {
   ICollateral__factory,
 } from '../../../types/generated'
 import { BigNumber, constants, utils } from 'ethers'
+import { impersonateWithBalance } from '../../../../common/testutil/impersonate'
 
 const { config, ethers } = HRE
 use(smock.matchers)
@@ -35,6 +37,7 @@ describe('BalancedVault', () => {
   let user2: SignerWithAddress
   let perennialUser: SignerWithAddress
   let liquidator: SignerWithAddress
+  let marketOwner: SignerWithAddress
   let long: IProduct
   let short: IProduct
   let leverage: BigNumber
@@ -120,7 +123,7 @@ describe('BalancedVault', () => {
     await setUpWalletWithDSU(user)
     await setUpWalletWithDSU(user2)
     await setUpWalletWithDSU(liquidator)
-    await setUpWalletWithDSU(perennialUser, utils.parseEther('1000000'))
+    await setUpWalletWithDSU(perennialUser, utils.parseEther('10000000'))
 
     // Unfortunately, we can't make mocks of existing contracts.
     // So, we make a fake and initialize it with the values that the real contract had at this block.
@@ -134,6 +137,8 @@ describe('BalancedVault', () => {
     oracle.sync.returns(currentVersion)
     oracle.currentVersion.returns(currentVersion)
     oracle.atVersion.whenCalledWith(currentVersion[0]).returns(currentVersion)
+
+    marketOwner = await impersonateWithBalance(await controller['owner(address)'](long.address), utils.parseEther('10'))
   })
 
   describe('#constructor', () => {
@@ -758,6 +763,42 @@ describe('BalancedVault', () => {
       expect(await shortPosition()).to.equal(0)
     })
 
+    it('closes 0 value position if above maker limit', async () => {
+      // Get maker product very close to the makerLimit
+      await asset.connect(perennialUser).approve(collateral.address, constants.MaxUint256)
+      await collateral
+        .connect(perennialUser)
+        .depositTo(perennialUser.address, short.address, utils.parseEther('400000'))
+      const shortMakerAvailable = (await short.makerLimit()).sub(
+        (await short.positionAtVersion(await short['latestVersion()']())).maker,
+      )
+      await collateral.connect(perennialUser).depositTo(perennialUser.address, long.address, utils.parseEther('400000'))
+      const longMakerAvailable = (await long.makerLimit()).sub(
+        (await long.positionAtVersion(await long['latestVersion()']())).maker,
+      )
+
+      await short.connect(perennialUser).openMake(shortMakerAvailable)
+      await long.connect(perennialUser).openMake(longMakerAvailable)
+      await updateOracle()
+      await vault.sync()
+
+      await short.connect(marketOwner).updateMakerLimit(0)
+      await long.connect(marketOwner).updateMakerLimit(0)
+
+      // Deposit should create a greater position than what's available
+      const largeDeposit = utils.parseEther('10000')
+      await vault.connect(user).deposit(largeDeposit, user.address)
+      await updateOracle()
+      await expect(vault.sync())
+        .to.emit(short, 'MakeClosed')
+        .withArgs(vault.address, anyUint, 0)
+        .to.emit(long, 'MakeClosed')
+        .withArgs(vault.address, anyUint, 0)
+
+      expect(await longPosition()).to.equal(0)
+      expect(await shortPosition()).to.equal(0)
+    })
+
     it('close to taker', async () => {
       // Deposit should create a greater position than what's available
       const largeDeposit = utils.parseEther('10000')
@@ -786,6 +827,34 @@ describe('BalancedVault', () => {
       )
     })
 
+    it('opens 0 value position if in >=100% utilization', async () => {
+      // Deposit should create a greater position than what's available
+      const largeDeposit = utils.parseEther('10000')
+      await vault.connect(user).deposit(largeDeposit, user.address)
+      await updateOracle()
+      await vault.sync()
+
+      // Get taker product very close to the maker
+      await asset.connect(perennialUser).approve(collateral.address, constants.MaxUint256)
+      await collateral
+        .connect(perennialUser)
+        .depositTo(perennialUser.address, short.address, utils.parseEther('1000000'))
+
+      await short.settle()
+      const globalShort = await short.positionAtVersion(await short['latestVersion()']())
+      const shortAvailable = globalShort.maker.sub(globalShort.taker)
+      await short.connect(perennialUser).openTake(shortAvailable)
+      await updateOracle()
+      await short.settle()
+
+      // Increase the price to result in a profit for the vault on the short side, resulting in a close attempt on the next
+      // update
+      await updateOracle(originalOraclePrice.add(utils.parseEther('10')))
+      await vault.sync()
+      await vault.connect(user).redeem(await vault.maxRedeem(user.address), user.address)
+      await expect(vault.sync()).to.emit(short, 'MakeOpened').withArgs(vault.address, anyUint, 0)
+    })
+
     it('product closing closes all positions', async () => {
       const largeDeposit = utils.parseEther('10000')
       await vault.connect(user).deposit(largeDeposit, user.address)
@@ -812,6 +881,18 @@ describe('BalancedVault', () => {
       // Positions should be opened back up again
       expect(await longPosition()).to.be.greaterThan(0)
       expect(await shortPosition()).to.be.greaterThan(0)
+    })
+
+    it('opens a 0 value position if account position is at target', async () => {
+      // Deposit should create a greater position than what's available
+      const largeDeposit = utils.parseEther('10000')
+      await vault.connect(user).deposit(largeDeposit, user.address)
+      await updateOracle()
+      await vault.sync()
+
+      await updateOracle()
+      await vault.connect(user).deposit(0, user.address)
+      await expect(vault.sync()).to.emit(short, 'MakeOpened').withArgs(vault.address, anyUint, 0)
     })
 
     context('liquidation', () => {
