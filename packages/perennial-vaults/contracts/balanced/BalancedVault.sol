@@ -226,7 +226,11 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
         // pro-rate if vault has less collateral than unclaimed
         UFixed18 claimAmount = unclaimedAmount;
         UFixed18 totalCollateral = _assets();
-        if (totalCollateral.lt(unclaimedTotal)) claimAmount = claimAmount.muldiv(totalCollateral, unclaimedTotal);
+        // Pro-rate claim if vault has less collateral than unclaimed
+        if (totalCollateral.lt(unclaimedTotal)) {
+            claimAmount = claimAmount.muldiv(totalCollateral, unclaimedTotal);
+            if (account != msg.sender) revert BalancedVaultOnlySelfClaimAllowed();
+        }
 
         _rebalance(context, claimAmount);
 

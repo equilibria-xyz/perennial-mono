@@ -1085,7 +1085,11 @@ describe('BalancedVault', () => {
 
         // 6. Claim should be pro-rated
         const initialBalanceOf = await asset.balanceOf(user.address)
-        await vault.claim(user.address)
+        await expect(vault.claim(user.address)).to.be.revertedWithCustomError(
+          vault,
+          'BalancedVaultOnlySelfClaimAllowed',
+        )
+        await expect(vault.connect(user).claim(user.address)).to.not.be.reverted
         expect(await longCollateralInVault()).to.equal(0)
         expect(await shortCollateralInVault()).to.equal(0)
         expect(await vault.unclaimed(user.address)).to.equal(0)
