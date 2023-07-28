@@ -434,17 +434,8 @@ contract SingleBalancedVault is ISingleBalancedVault, UInitializable {
     function _updateMakerPosition(IProduct product, UFixed18 targetPosition) private {
         UFixed18 currentPosition = product.position(address(this)).next(product.pre(address(this))).maker;
 
-        if (targetPosition.lt(currentPosition)) {
-            // compute headroom until hitting taker amount
-            Position memory position = product.positionAtVersion(product.latestVersion()).next(product.pre());
-            UFixed18 makerAvailable = position.maker.gt(position.taker) ?
-                position.maker.sub(position.taker) : UFixed18Lib.ZERO;
-
-            // If there is no maker available (socialization), we still need a settlement but closing 0 value will revert,
-            // so instead open 0 value instead
-            if (makerAvailable.isZero()) product.openMake(makerAvailable);
-            else product.closeMake(currentPosition.sub(targetPosition).min(makerAvailable));
-        }
+        if (targetPosition.lt(currentPosition))
+            product.closeMake(currentPosition.sub(targetPosition));
         if (targetPosition.gte(currentPosition)) {
             // compute headroom until hitting makerLimit
             UFixed18 currentMaker = product.positionAtVersion(product.latestVersion()).next(product.pre()).maker;

@@ -513,7 +513,7 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
 
             // If there is no maker available (socialization), we still need a settlement but closing 0 value will revert,
             // so instead open 0 value instead
-            if (makerAvailable.isZero()) product.openMake(makerAvailable);
+            if (makerAvailable.isZero()) product.openMake(UFixed18Lib.ZERO);
             else product.closeMake(accountPosition.sub(targetPosition).min(makerAvailable));
         }
 

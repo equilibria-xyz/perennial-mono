@@ -883,34 +883,6 @@ describe('SingleBalancedVault', () => {
       expect(await shortPosition()).to.equal(0)
     })
 
-    it('opens 0 value position if in >=100% utilization', async () => {
-      // Deposit should create a greater position than what's available
-      const largeDeposit = utils.parseEther('10000')
-      await vault.connect(user).deposit(largeDeposit, user.address)
-      await updateOracle()
-      await vault.sync()
-
-      // Get taker product very close to the maker
-      await asset.connect(perennialUser).approve(collateral.address, constants.MaxUint256)
-      await collateral
-        .connect(perennialUser)
-        .depositTo(perennialUser.address, short.address, utils.parseEther('1000000'))
-
-      await short.settle()
-      const globalShort = await short.positionAtVersion(await short['latestVersion()']())
-      const shortAvailable = globalShort.maker.sub(globalShort.taker)
-      await short.connect(perennialUser).openTake(shortAvailable)
-      await updateOracle()
-      await short.settle()
-
-      // Increase the price to result in a profit for the vault on the short side, resulting in a close attempt on the next
-      // update
-      await updateOracle(originalOraclePrice.add(utils.parseEther('10')))
-      await vault.sync()
-      await vault.connect(user).redeem(await vault.maxRedeem(user.address), user.address)
-      await expect(vault.sync()).to.emit(short, 'MakeOpened').withArgs(vault.address, anyUint, 0)
-    })
-
     it('opens a 0 value position if account position is at target', async () => {
       // Deposit should create a greater position than what's available
       const largeDeposit = utils.parseEther('10000')
