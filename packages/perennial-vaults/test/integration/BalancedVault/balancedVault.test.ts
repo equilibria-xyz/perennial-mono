@@ -879,7 +879,7 @@ describe('BalancedVault', () => {
       expect(await shortPosition()).to.be.greaterThan(0)
     })
 
-    it('opens a 0 value position if account position is at target', async () => {
+    it('closes a 0 value position if account position is at target', async () => {
       // Deposit should create a greater position than what's available
       const largeDeposit = utils.parseEther('10000')
       await vault.connect(user).deposit(largeDeposit, user.address)
@@ -888,7 +888,7 @@ describe('BalancedVault', () => {
 
       await updateOracle()
       await vault.connect(user).deposit(0, user.address)
-      await expect(vault.sync()).to.emit(short, 'MakeOpened').withArgs(vault.address, anyUint, 0)
+      await expect(vault.sync()).to.emit(short, 'MakeClosed').withArgs(vault.address, anyUint, 0)
     })
 
     context('liquidation', () => {
