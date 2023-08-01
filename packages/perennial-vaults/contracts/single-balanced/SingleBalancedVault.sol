@@ -436,7 +436,7 @@ contract SingleBalancedVault is ISingleBalancedVault, UInitializable {
 
         if (targetPosition.lt(currentPosition))
             product.closeMake(currentPosition.sub(targetPosition));
-        if (targetPosition.gte(currentPosition)) {
+        else if (targetPosition.gt(currentPosition)) {
             // compute headroom until hitting makerLimit
             UFixed18 currentMaker = product.positionAtVersion(product.latestVersion()).next(product.pre()).maker;
             UFixed18 makerLimit = product.makerLimit();
@@ -444,9 +444,10 @@ contract SingleBalancedVault is ISingleBalancedVault, UInitializable {
 
             // If there is no maker available (maker limit), we still need a settlement but opening 0 value will revert,
             // so instead close 0 value instead
-            if (makerAvailable.isZero() || (targetPosition.isZero() && currentPosition.isZero()))
-                product.closeMake(UFixed18Lib.ZERO);
+            if (makerAvailable.isZero()) product.closeMake(UFixed18Lib.ZERO);
             else product.openMake(targetPosition.sub(currentPosition).min(makerAvailable));
+        } else {
+            product.closeMake(UFixed18Lib.ZERO);
         }
 
         emit PositionUpdated(product, targetPosition);
