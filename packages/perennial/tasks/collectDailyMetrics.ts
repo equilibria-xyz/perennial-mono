@@ -140,7 +140,7 @@ export default task('collectDailyMetrics', 'Collects metrics for a given day')
     const settleBlocks = endBlock.sub(startBlock).add(1)
     const queryBlocks = chunk(
       new Array(settleBlocks.toNumber()).fill(0).map((_, i) => endBlock.sub(i)),
-      settleBlocks.div(QUERY_DATA_POINTS).toNumber(),
+      settleBlocks.div(QUERY_DATA_POINTS).toNumber() || 1,
     ).map(c => c[0]) // Query 100 datapoints and take average
 
     const snapshotData = await Promise.all(

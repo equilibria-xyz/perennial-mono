@@ -134,7 +134,7 @@ export default function defaultConfig({
       mainnet: createNetworkConfig('mainnet'),
       arbitrum: createNetworkConfig('arbitrum'),
       optimism: createNetworkConfig('optimism'),
-      // base: createNetworkConfig('base'),
+      base: createNetworkConfig('base'),
     },
     solidity: {
       compilers: [

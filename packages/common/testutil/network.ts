@@ -35,6 +35,8 @@ export function getChainId(networkName: string): number {
       return 42161
     case 'optimism':
       return 10
+    case 'base':
+      return 8453
     case 'goerli':
       return 5
     case 'optimismGoerli':
