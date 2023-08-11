@@ -3,14 +3,16 @@ import 'hardhat-deploy'
 import { HardhatRuntimeEnvironment } from 'hardhat/types'
 import { DeployFunction } from 'hardhat-deploy/types'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
-import { BalancedVault__factory } from '../types/generated'
+import { SingleBalancedVault__factory, IERC20__factory } from '../types/generated'
+import { utils } from 'ethers'
 
 const VAULT_TOKEN_NAME = 'Perennial Vault Bravo'
 const VAULT_TOKEN_SYMBOL = 'PVB'
+const SHARE_INFLATION_PREVENTION_DEPOSIT_AMOUNT = utils.parseEther('1')
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployments, getNamedAccounts, ethers } = hre
-  const { deploy, get } = deployments
+  const { deploy, get, getOrNull } = deployments
   const { deployer } = await getNamedAccounts()
   const deployerSigner: SignerWithAddress = await ethers.getSigner(deployer)
 
@@ -22,6 +24,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const short = (await get('Product_ShortArbitrum')).address
   const targetLeverage = ethers.utils.parseEther('1')
   const maxCollateral = ethers.utils.parseEther('500000')
+  const dsuERC20 = IERC20__factory.connect(dsu, deployerSigner)
 
   const vaultImpl = await deploy('PerennialVaultBravo_Impl', {
     contract: 'BalancedVault',
@@ -31,6 +34,17 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     log: true,
     autoMine: true,
   })
+
+  // If no deployment detected
+  const newProxyDeployment = (await getOrNull('PerennialVaultBravo_Proxy')) === null
+  if (newProxyDeployment) {
+    if ((await dsuERC20.balanceOf(deployer)).lt(SHARE_INFLATION_PREVENTION_DEPOSIT_AMOUNT))
+      throw new Error(
+        `Insufficient DSU balance to prevent inflation attack. Please deposit at least ${utils.formatEther(
+          SHARE_INFLATION_PREVENTION_DEPOSIT_AMOUNT,
+        )} DSU to your deployer account.`,
+      )
+  }
 
   await deploy('PerennialVaultBravo_Proxy', {
     contract: 'TransparentUpgradeableProxy',
@@ -42,13 +56,26 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   })
 
   // Initialize
-  const vault = new BalancedVault__factory(deployerSigner).attach((await get('PerennialVaultBravo_Proxy')).address)
+  const vault = new SingleBalancedVault__factory(deployerSigner).attach(
+    (await get('PerennialVaultBravo_Proxy')).address,
+  )
   if ((await vault.name()) === VAULT_TOKEN_NAME) {
     console.log('PerennialVaultBravo already initialized.')
   } else {
     process.stdout.write('initializing PerennialVaultBravo...')
     await (await vault.initialize(VAULT_TOKEN_NAME, VAULT_TOKEN_SYMBOL)).wait(2)
     process.stdout.write('complete.\n')
+  }
+
+  if (newProxyDeployment) {
+    process.stdout.write('checking if inflation attack has occurred...')
+    const currentDSUBalance = dsuERC20.balanceOf(vault.address)
+    if ((await currentDSUBalance).gt(0)) throw new Error('WARNING: Share inflation attack detected!')
+    process.stdout.write('complete.\n')
+
+    process.stdout.write('depositing DSU to prevent inflation attack...')
+    await vault.deposit(SHARE_INFLATION_PREVENTION_DEPOSIT_AMOUNT, deployer)
+    process.stdout.write('checking if inflation attack has occurred...')
   }
 }
 
