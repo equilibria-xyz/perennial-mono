@@ -12,6 +12,7 @@ import "./types/ChainlinkAggregator.sol";
  *      ChainlinkOracle instance if their payoff functions are based on the same underlying oracle.
  */
 contract ChainlinkFeedOracle is IOracleProvider {
+    error InvalidPhaseInitialization();
 
     struct Phase {
         uint128 startingVersion;
@@ -33,22 +34,49 @@ contract ChainlinkFeedOracle is IOracleProvider {
     /**
      * @notice Initializes the contract state
      * @param aggregator_ Chainlink price feed aggregator
+     * @param phases_ Array of phases to initialize the oracle with
+     * @dev If `phases_` is empty, the oracle will be initialized with the latest round from the aggregator as the
+     *      starting round
      */
-    constructor(ChainlinkAggregator aggregator_) {
+    constructor(ChainlinkAggregator aggregator_, Phase[] memory phases_) {
         aggregator = aggregator_;
 
         _decimalOffset = SafeCast.toInt256(10 ** aggregator.decimals());
 
-        ChainlinkRound memory firstSeenRound = aggregator.getLatestRound();
+        if (phases_.length > 0) {
+            // Phases should be initialized with at least 2 values
+            if (phases_.length < 2) revert InvalidPhaseInitialization();
 
-        // Load the phases array with empty phase values. these phases will be invalid if requested
-        while (firstSeenRound.phaseId() > _phases.length) {
-            _phases.push(Phase(0, 0));
+            // Phases[0] should always be empty, since phases are 1-indexed
+            if (phases_[0].startingVersion != 0 || phases_[0].startingRoundId != 0) revert InvalidPhaseInitialization();
+
+            // Phases[1] should start at version 0
+            if (phases_[1].startingVersion != 0) revert InvalidPhaseInitialization();
+
+            // Set the lastSyncedRoundId to the starting round of the latest phase
+            ChainlinkRound memory latestRound = aggregator.getLatestRound();
+
+            // The phases array should be initialized up to the latest phase
+            if (phases_.length - 1 != latestRound.phaseId()) revert InvalidPhaseInitialization();
+
+            // Load phases array with the provided phases
+            for (uint i = 0; i < phases_.length; i++) {
+                _phases.push(phases_[i]);
+            }
+
+            _lastSyncedRoundId = latestRound.roundId;
+        } else {
+            ChainlinkRound memory firstSeenRound = aggregator.getLatestRound();
+
+            // Load the phases array with empty phase values. these phases will be invalid if requested
+            while (firstSeenRound.phaseId() > _phases.length) {
+                _phases.push(Phase(0, 0));
+            }
+
+            // first seen round starts as version 0 at current phase
+            _phases.push(Phase(0, uint128(firstSeenRound.roundId)));
+            _lastSyncedRoundId = firstSeenRound.roundId;
         }
-
-        // first seen round starts as version 0 at current phase
-        _phases.push(Phase(0, uint128(firstSeenRound.roundId)));
-        _lastSyncedRoundId = firstSeenRound.roundId;
     }
 
     /**

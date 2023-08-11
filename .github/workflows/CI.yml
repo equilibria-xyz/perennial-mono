@@ -7,6 +7,7 @@ on:
     branches:
       - master
       - dev
+      - dev2
 
 env:
   CI: true

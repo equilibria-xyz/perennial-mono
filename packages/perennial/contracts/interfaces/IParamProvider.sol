@@ -15,6 +15,7 @@ interface IParamProvider {
     event PositionFeeUpdated(UFixed18 newPositionFee, uint256 version);
     event PendingPositionFeeUpdated(UFixed18 newPositionFee);
     event MakerLimitUpdated(UFixed18 newMakerLimit, uint256 version);
+    event UtilizationBufferUpdated(UFixed18 newUtilizationBuffer, uint256 version);
     event JumpRateUtilizationCurveUpdated(
         JumpRateUtilizationCurve,
         uint256 version
@@ -34,6 +35,8 @@ interface IParamProvider {
     function updatePositionFee(UFixed18 newPositionFee) external;
     function makerLimit() external view returns (UFixed18);
     function updateMakerLimit(UFixed18 newMakerLimit) external;
+    function utilizationBuffer() external view returns (UFixed18);
+    function updateUtilizationBuffer(UFixed18 newUtilizationBuffer) external;
     function utilizationCurve() external view returns (JumpRateUtilizationCurve memory);
     function updateUtilizationCurve(JumpRateUtilizationCurve memory newUtilizationCurve) external;
     function pendingFeeUpdates() external view returns (PendingFeeUpdates memory);

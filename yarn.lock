@@ -12808,11 +12808,6 @@ undici@^5.14.0:
   dependencies:
     busboy "^1.6.0"
 
-undici@^5.4.0:
-  version "5.8.0"
-  resolved "https://registry.npmjs.org/undici/-/undici-5.8.0.tgz"
-  integrity sha512-1F7Vtcez5w/LwH2G2tGnFIihuWUlc58YidwLiCv+jR2Z50x0tNXpRRw7eOIJ+GvqCqIkg9SB7NWAJ/T9TLfv8Q==
-
 union-value@^1.0.0:
   version "1.0.1"
   resolved "https://registry.npmjs.org/union-value/-/union-value-1.0.1.tgz"

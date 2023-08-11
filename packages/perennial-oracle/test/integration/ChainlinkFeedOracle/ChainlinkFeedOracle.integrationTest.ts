@@ -38,7 +38,7 @@ describe('ChainlinkFeedOracle', () => {
     // This is necessary because smock's mocking is buggy for some reason, likely due to naming collisions
     await aggregatorMock._setLatestRoundData(...latestData3)
 
-    oracle = await new ChainlinkFeedOracle__factory(owner).deploy(aggregatorMock.address)
+    oracle = await new ChainlinkFeedOracle__factory(owner).deploy(aggregatorMock.address, [])
   })
 
   describe('#constructor', () => {
@@ -52,6 +52,82 @@ describe('ChainlinkFeedOracle', () => {
       expect(atVersion.price).to.equal(expectedData.answer.mul(10 ** 10))
       expect(atVersion.timestamp).to.equal(expectedData.updatedAt)
       expect(atVersion.version).to.equal(0)
+    })
+
+    context('with phases passed in', () => {
+      beforeEach(async () => {
+        const initialPhases = [
+          { startingVersion: 0, startingRoundId: 0 },
+          { startingVersion: 0, startingRoundId: 0 },
+          { startingVersion: 0, startingRoundId: 0 },
+          { startingVersion: 0, startingRoundId: buildChainlinkRoundId(3, 123) },
+          { startingVersion: 4, startingRoundId: buildChainlinkRoundId(4, 21) },
+          { startingVersion: 12, startingRoundId: buildChainlinkRoundId(5, 20000) },
+        ]
+        oracle = await new ChainlinkFeedOracle__factory(owner).deploy(aggregatorProxy.address, initialPhases)
+      })
+
+      it('sets initial params', async () => {
+        expect(await oracle.aggregator()).to.equal(aggregatorProxy.address)
+      })
+
+      it('returns version 0', async () => {
+        const version0Round = buildChainlinkRoundId(3, 123)
+        const expectedData = await aggregatorProxy.getRoundData(version0Round)
+
+        const atVersion = await oracle.atVersion(0)
+        expect(atVersion.price).to.equal(expectedData.answer.mul(10 ** 10))
+        expect(atVersion.timestamp).to.equal(expectedData.updatedAt)
+        expect(atVersion.version).to.equal(0)
+      })
+
+      it('returns a version from a passed in phase', async () => {
+        // Round from Phase 4
+        const version12Round = buildChainlinkRoundId(5, 20000)
+        const expectedData = await aggregatorProxy.getRoundData(version12Round)
+
+        const atVersion = await oracle.atVersion(12)
+        expect(atVersion.price).to.equal(expectedData.answer.mul(10 ** 10))
+        expect(atVersion.timestamp).to.equal(expectedData.updatedAt)
+        expect(atVersion.version).to.equal(12)
+      })
+
+      it('reverts if phases array has less than 2 items', async () => {
+        const initialPhases = [{ startingVersion: 0, startingRoundId: 0 }]
+        await expect(
+          new ChainlinkFeedOracle__factory(owner).deploy(aggregatorProxy.address, initialPhases),
+        ).to.be.revertedWithCustomError(oracle, 'InvalidPhaseInitialization')
+      })
+
+      it('reverts if phases[0] is non-empty', async () => {
+        const initialPhases = [
+          { startingVersion: 1, startingRoundId: 0 },
+          { startingVersion: 0, startingRoundId: 0 },
+        ]
+        await expect(
+          new ChainlinkFeedOracle__factory(owner).deploy(aggregatorProxy.address, initialPhases),
+        ).to.be.revertedWithCustomError(oracle, 'InvalidPhaseInitialization')
+      })
+
+      it('reverts if phases[1] does not start at version 0', async () => {
+        const initialPhases = [
+          { startingVersion: 0, startingRoundId: 0 },
+          { startingVersion: 1, startingRoundId: 0 },
+        ]
+        await expect(
+          new ChainlinkFeedOracle__factory(owner).deploy(aggregatorProxy.address, initialPhases),
+        ).to.be.revertedWithCustomError(oracle, 'InvalidPhaseInitialization')
+      })
+
+      it('reverts if phases array does not reach current phase', async () => {
+        const initialPhases = [
+          { startingVersion: 0, startingRoundId: 0 },
+          { startingVersion: 0, startingRoundId: buildChainlinkRoundId(1, 5) },
+        ]
+        await expect(
+          new ChainlinkFeedOracle__factory(owner).deploy(aggregatorProxy.address, initialPhases),
+        ).to.be.revertedWithCustomError(oracle, 'InvalidPhaseInitialization')
+      })
     })
   })
 

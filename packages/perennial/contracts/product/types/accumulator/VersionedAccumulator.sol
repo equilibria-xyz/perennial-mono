@@ -30,6 +30,10 @@ using VersionedAccumulatorLib for VersionedAccumulator global;
  *      only versions when a settlement occurred are needed for this historical computation.
  */
 library VersionedAccumulatorLib {
+    event FundingAccumulated(uint256 latestVersion, uint256 toVersion, Accumulator value, UFixed18 fee);
+    event PositionAccumulated(uint256 latestVersion, uint256 toVersion, Accumulator value);
+    event PositionFeeAccumulated(uint256 latestVersion, uint256 toVersion, Accumulator value, UFixed18 fee);
+
     /**
      * @notice Returns the stamped value accumulator at `oracleVersion`
      * @param self The struct to operate on
@@ -70,18 +74,21 @@ library VersionedAccumulatorLib {
 
         // accumulate funding
         Accumulator memory accumulatedPosition;
-        (accumulatedPosition, accumulatedFee) =
+        (Accumulator memory accumulatedFunding, UFixed18 protocolFundingFee) =
             _accumulateFunding(fundingFee, latestPosition, latestOracleVersion, toOracleVersion);
+        (accumulatedPosition, accumulatedFee) =
+            (accumulatedPosition.add(accumulatedFunding), accumulatedFee.add(protocolFundingFee));
 
         // accumulate position
-        accumulatedPosition = accumulatedPosition.add(
-            _accumulatePosition(latestPosition, latestOracleVersion, toOracleVersion));
+        Accumulator memory accumulatedPositionPnl = _accumulatePosition(latestPosition, latestOracleVersion, toOracleVersion);
+        accumulatedPosition = accumulatedPosition.add(accumulatedPositionPnl);
+
 
         // accumulate position fee
         (Accumulator memory accumulatedPositionFee, UFixed18 protocolPositionFee) =
             _accumulatePositionFee(latestPosition, position.pre, latestOracleVersion);
-        accumulatedPosition = accumulatedPosition.add(accumulatedPositionFee);
-        accumulatedFee = accumulatedFee.add(protocolPositionFee);
+        (accumulatedPosition, accumulatedFee) =
+            (accumulatedPosition.add(accumulatedPositionFee), accumulatedFee.add(protocolPositionFee));
 
         // accumulate share
         Accumulator memory accumulatedShare =
@@ -95,6 +102,10 @@ library VersionedAccumulatorLib {
             .add(accumulatedShare)
             .pack();
         self.latestVersion = toOracleVersion.version;
+
+        emit FundingAccumulated(latestOracleVersion.version, toOracleVersion.version, accumulatedFunding, protocolFundingFee);
+        emit PositionAccumulated(latestOracleVersion.version, toOracleVersion.version, accumulatedPositionPnl);
+        emit PositionFeeAccumulated(latestOracleVersion.version, toOracleVersion.version, accumulatedPositionFee, protocolPositionFee);
     }
 
     /**
@@ -115,13 +126,12 @@ library VersionedAccumulatorLib {
         IOracleProvider.OracleVersion memory latestOracleVersion,
         IOracleProvider.OracleVersion memory toOracleVersion
     ) private view returns (Accumulator memory accumulatedFunding, UFixed18 accumulatedFee) {
-        if (_product().closed()) return (Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO), UFixed18Lib.ZERO);
-        if (latestPosition.taker.isZero()) return (Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO), UFixed18Lib.ZERO);
-        if (latestPosition.maker.isZero()) return (Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO), UFixed18Lib.ZERO);
+        if (_product().closed() || latestPosition.taker.isZero() || latestPosition.maker.isZero())
+            return (accumulatedFunding, accumulatedFee);
 
         uint256 elapsed = toOracleVersion.timestamp - latestOracleVersion.timestamp;
 
-        UFixed18 takerNotional = Fixed18Lib.from(latestPosition.taker).mul(latestOracleVersion.price).abs();
+        UFixed18 takerNotional = latestPosition.taker.mul(latestOracleVersion.price.abs());
         UFixed18 socializedNotional = takerNotional.mul(latestPosition.socializationFactor());
 
         Fixed18 rateAccumulated = _product().rate(latestPosition)
@@ -153,9 +163,8 @@ library VersionedAccumulatorLib {
         IOracleProvider.OracleVersion memory latestOracleVersion,
         IOracleProvider.OracleVersion memory toOracleVersion
     ) private view returns (Accumulator memory accumulatedPosition) {
-        if (_product().closed()) return Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO);
-        if (latestPosition.taker.isZero()) return Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO);
-        if (latestPosition.maker.isZero()) return Accumulator(Fixed18Lib.ZERO, Fixed18Lib.ZERO);
+        if (_product().closed() || latestPosition.taker.isZero() || latestPosition.maker.isZero())
+            return accumulatedPosition;
 
         Fixed18 oracleDelta = toOracleVersion.price.sub(latestOracleVersion.price);
         Fixed18 totalTakerDelta = oracleDelta.mul(Fixed18Lib.from(latestPosition.taker));
@@ -189,18 +198,11 @@ library VersionedAccumulatorLib {
         positionFee = positionFee.sub(protocolFee);
         fee = protocolFee.sum();
 
-        // If there are makers to distribute the taker's position fee to, distribute. Otherwise give it to the protocol
+        // If there are makers to distribute the position fee to, distribute. Otherwise give it to the protocol
         if (!latestPosition.maker.isZero()) {
-            accumulatedPosition.maker = Fixed18Lib.from(positionFee.taker.div(latestPosition.maker));
+            accumulatedPosition.maker = Fixed18Lib.from(positionFee.sum().div(latestPosition.maker));
         } else {
-            fee = fee.add(positionFee.taker);
-        }
-
-        // If there are takers to distribute the maker's position fee to, distribute. Otherwise give it to the protocol
-        if (!latestPosition.taker.isZero()) {
-            accumulatedPosition.taker = Fixed18Lib.from(positionFee.maker.div(latestPosition.taker));
-        } else {
-            fee = fee.add(positionFee.maker);
+            fee = fee.add(positionFee.sum());
         }
     }
 

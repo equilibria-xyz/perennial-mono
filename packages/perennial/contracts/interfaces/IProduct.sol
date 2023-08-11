@@ -54,6 +54,12 @@ interface IProduct is IPayoffProvider, IParamProvider {
     event MakeClosed(address indexed account, uint256 version, UFixed18 amount);
     event TakeClosed(address indexed account, uint256 version, UFixed18 amount);
     event ClosedUpdated(bool indexed newClosed, uint256 version);
+    event PositionFeeCharged(address indexed account, uint256 version, UFixed18 fee);
+    // Redeclare these events from VersionedAccumulator due to library events not being included in the generated ABI
+    // This is expected to be fixed in Solidity v0.9.x (https://github.com/ethereum/solidity/issues/9765#issuecomment-689396725)
+    event FundingAccumulated(uint256 latestVersion, uint256 toVersion, Accumulator value, UFixed18 fee);
+    event PositionAccumulated(uint256 latestVersion, uint256 toVersion, Accumulator value);
+    event PositionFeeAccumulated(uint256 latestVersion, uint256 toVersion, Accumulator value, UFixed18 fee);
 
     error ProductInsufficientLiquidityError(UFixed18 socializationFactor);
     error ProductDoubleSidedError();
