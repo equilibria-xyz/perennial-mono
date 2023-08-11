@@ -1,6 +1,7 @@
 import HRE from 'hardhat'
 import { time, impersonate } from '../../../../common/testutil'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
+import { anyUint } from '@nomicfoundation/hardhat-chai-matchers/withArgs'
 import { FakeContract, smock } from '@defi-wonderland/smock'
 import { expect, use } from 'chai'
 import {
@@ -17,11 +18,12 @@ import {
   ICollateral__factory,
 } from '../../../types/generated'
 import { BigNumber, constants, utils } from 'ethers'
+import { impersonateWithBalance } from '../../../../common/testutil/impersonate'
 
 const { config, ethers } = HRE
 use(smock.matchers)
 
-const DSU_HOLDER = '0xaef566ca7e84d1e736f999765a804687f39d9094'
+const DSU_MINTER = '0xD05aCe63789cCb35B9cE71d01e4d632a0486Da4B'
 
 describe('SingleBalancedVault', () => {
   let vault: SingleBalancedVault
@@ -33,6 +35,7 @@ describe('SingleBalancedVault', () => {
   let user2: SignerWithAddress
   let perennialUser: SignerWithAddress
   let liquidator: SignerWithAddress
+  let marketOwner: SignerWithAddress
   let long: IProduct
   let short: IProduct
   let leverage: BigNumber
@@ -94,16 +97,21 @@ describe('SingleBalancedVault', () => {
     await vault.initialize('Perennial Vault Alpha', 'PVA')
     asset = IERC20Metadata__factory.connect(await vault.asset(), owner)
 
-    const dsuHolder = await impersonate.impersonateWithBalance(DSU_HOLDER, utils.parseEther('10'))
-    const setUpWalletWithDSU = async (wallet: SignerWithAddress) => {
-      await dsu.connect(dsuHolder).transfer(wallet.address, utils.parseEther('200000'))
+    const dsuMinter = await impersonate.impersonateWithBalance(DSU_MINTER, utils.parseEther('10'))
+    const setUpWalletWithDSU = async (wallet: SignerWithAddress, amount?: BigNumber) => {
+      const dsuIface = new utils.Interface(['function mint(uint256)'])
+      await dsuMinter.sendTransaction({
+        to: dsu.address,
+        value: 0,
+        data: dsuIface.encodeFunctionData('mint', [amount ?? utils.parseEther('200000')]),
+      })
+      await dsu.connect(dsuMinter).transfer(wallet.address, amount ?? utils.parseEther('200000'))
       await dsu.connect(wallet).approve(vault.address, ethers.constants.MaxUint256)
     }
     await setUpWalletWithDSU(user)
     await setUpWalletWithDSU(user2)
     await setUpWalletWithDSU(liquidator)
-    await setUpWalletWithDSU(perennialUser)
-    await setUpWalletWithDSU(perennialUser)
+    await setUpWalletWithDSU(perennialUser, utils.parseEther('2000000'))
 
     // Unfortunately, we can't make mocks of existing contracts.
     // So, we make a fake and initialize it with the values that the real contract had at this block.
@@ -117,6 +125,8 @@ describe('SingleBalancedVault', () => {
     oracle.sync.returns(currentVersion)
     oracle.currentVersion.returns(currentVersion)
     oracle.atVersion.whenCalledWith(currentVersion[0]).returns(currentVersion)
+
+    marketOwner = await impersonateWithBalance(await controller['owner(address)'](long.address), utils.parseEther('10'))
   })
 
   describe('#initialize', () => {
@@ -835,6 +845,54 @@ describe('SingleBalancedVault', () => {
       // The positions should be equal to (smallDeposit + largeDeposit) * leverage / 2 / originalOraclePrice.
       expect(await longPosition()).to.equal(largeDeposit.mul(leverage).div(2).div(originalOraclePrice))
       expect(await shortPosition()).to.equal(0)
+    })
+
+    it('closes 0 value position if above maker limit', async () => {
+      // Get maker product very close to the makerLimit
+      await asset.connect(perennialUser).approve(collateral.address, constants.MaxUint256)
+      await collateral
+        .connect(perennialUser)
+        .depositTo(perennialUser.address, short.address, utils.parseEther('400000'))
+      const shortMakerAvailable = (await short.makerLimit()).sub(
+        (await short.positionAtVersion(await short['latestVersion()']())).maker,
+      )
+      await collateral.connect(perennialUser).depositTo(perennialUser.address, long.address, utils.parseEther('400000'))
+      const longMakerAvailable = (await long.makerLimit()).sub(
+        (await long.positionAtVersion(await long['latestVersion()']())).maker,
+      )
+
+      await short.connect(perennialUser).openMake(shortMakerAvailable)
+      await long.connect(perennialUser).openMake(longMakerAvailable)
+      await updateOracle()
+      await vault.sync()
+
+      await short.connect(marketOwner).updateMakerLimit(0)
+      await long.connect(marketOwner).updateMakerLimit(0)
+
+      // Deposit should create a greater position than what's available
+      const largeDeposit = utils.parseEther('10000')
+      await vault.connect(user).deposit(largeDeposit, user.address)
+      await updateOracle()
+      await expect(vault.sync())
+        .to.emit(short, 'MakeClosed')
+        .withArgs(vault.address, anyUint, 0)
+        .to.emit(long, 'MakeClosed')
+        .withArgs(vault.address, anyUint, 0)
+
+      expect(await longPosition()).to.equal(0)
+      expect(await shortPosition()).to.equal(0)
+    })
+
+    it('closes a 0 value position if account position is at target', async () => {
+      // Deposit should create a greater position than what's available
+      const largeDeposit = utils.parseEther('10000')
+      await vault.connect(user).deposit(largeDeposit, user.address)
+      await updateOracle()
+      await vault.sync()
+
+      await updateOracle()
+      await vault.connect(user).deposit(0, user.address)
+      await expect(vault.sync()).to.emit(short, 'MakeClosed').withArgs(vault.address, anyUint, 0)
     })
 
     context('liquidation', () => {

@@ -433,14 +433,22 @@ contract SingleBalancedVault is ISingleBalancedVault, UInitializable {
      */
     function _updateMakerPosition(IProduct product, UFixed18 targetPosition) private {
         UFixed18 currentPosition = product.position(address(this)).next(product.pre(address(this))).maker;
-        UFixed18 currentMaker = product.positionAtVersion(product.latestVersion()).next(product.pre()).maker;
-        UFixed18 makerLimit = product.makerLimit();
-        UFixed18 makerAvailable = makerLimit.gt(currentMaker) ? makerLimit.sub(currentMaker) : UFixed18Lib.ZERO;
 
         if (targetPosition.lt(currentPosition))
             product.closeMake(currentPosition.sub(targetPosition));
-        if (targetPosition.gte(currentPosition))
-            product.openMake(targetPosition.sub(currentPosition).min(makerAvailable));
+        else if (targetPosition.gt(currentPosition)) {
+            // compute headroom until hitting makerLimit
+            UFixed18 currentMaker = product.positionAtVersion(product.latestVersion()).next(product.pre()).maker;
+            UFixed18 makerLimit = product.makerLimit();
+            UFixed18 makerAvailable = makerLimit.gt(currentMaker) ? makerLimit.sub(currentMaker) : UFixed18Lib.ZERO;
+
+            // If there is no maker available (maker limit), we still need a settlement but opening 0 value will revert,
+            // so instead close 0 value instead
+            if (makerAvailable.isZero()) product.closeMake(UFixed18Lib.ZERO);
+            else product.openMake(targetPosition.sub(currentPosition).min(makerAvailable));
+        } else {
+            product.closeMake(UFixed18Lib.ZERO);
+        }
 
         emit PositionUpdated(product, targetPosition);
     }
