@@ -122,6 +122,9 @@ contract Collateral is ICollateral, UInitializable, UControllerProvider, UReentr
 
         product.closeAll(account);
 
+        // Update after closing positions to account for position fees
+        totalCollateral = collateral(account, product);
+
         // claim fee
         UFixed18 liquidationFee = controller().liquidationFee();
         // If maintenance is less than minCollateral, use minCollateral for fee amount

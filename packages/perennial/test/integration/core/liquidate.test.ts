@@ -93,6 +93,52 @@ describe('Liquidate', () => {
       .reverted
   })
 
+  it('liquidates a user total collateral after fees', async () => {
+    const POSITION = utils.parseEther('0.0001')
+    const { user, userB, collateral, dsu, chainlink } = instanceVars
+
+    const product = await createProduct(instanceVars)
+    await depositTo(instanceVars, user, product, utils.parseEther('1000'))
+    await product.connect(user).openMake(POSITION)
+
+    expect(await collateral.liquidatable(user.address, product.address)).to.be.false
+
+    // Settle the product with a new oracle version
+    await chainlink.nextWithPriceModification(price => price.mul(10))
+    await product.settle()
+
+    await product.settleAccount(user.address)
+
+    expect(await collateral.liquidatableNext(user.address, product.address)).to.be.true
+    expect(await collateral.liquidatable(user.address, product.address)).to.be.true
+
+    await product.updateMakerFee(utils.parseEther('0.001'))
+    await expect(collateral.connect(userB).liquidate(user.address, product.address))
+      .to.emit(collateral, 'Liquidation')
+      .withArgs(user.address, product.address, userB.address, BigNumber.from('886203501804460347929'))
+
+    expect(await product.isLiquidating(user.address)).to.be.true
+    await expect(collateral.connect(userB).liquidate(user.address, product.address))
+      .to.be.revertedWithCustomError(collateral, 'CollateralAccountLiquidatingError')
+      .withArgs(user.address)
+    await expect(
+      collateral.connect(user).withdrawTo(user.address, product.address, constants.MaxUint256),
+    ).to.be.revertedWithCustomError(collateral, 'CollateralInsufficientCollateralError')
+
+    expect(await collateral['collateral(address,address)'](user.address, product.address)).to.equal(0)
+    expect(await collateral['collateral(address)'](product.address)).to.equal(
+      utils.parseEther('1000').sub('886203501804460347929'),
+    )
+    expect(await dsu.balanceOf(userB.address)).to.equal(utils.parseEther('20000').add('886203501804460347929')) // Original 20000 + fee
+
+    await chainlink.next()
+    await product.settleAccount(user.address)
+
+    expect(await product.isLiquidating(user.address)).to.be.false
+    await expect(collateral.connect(user).withdrawTo(user.address, product.address, constants.MaxUint256)).to.not.be
+      .reverted
+  })
+
   it('liquidates a user with minCollateral', async () => {
     const POSITION = utils.parseEther('0.0001')
     const { user, userB, collateral, controller, dsu, chainlink } = instanceVars
