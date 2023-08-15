@@ -477,10 +477,11 @@ contract BalancedVault is IBalancedVault, BalancedVaultDefinition, UInitializabl
      */
     function _rebalancePosition(EpochContext memory context, UFixed18 claimAmount) private {
         // Compute target collateral
-        UFixed18 targetCollateral = _totalAssetsAtEpoch(context).sub(claimAmount)
+        UFixed18 targetCollateral = _totalAssetsAtEpoch(context).max(claimAmount).sub(claimAmount)
             .mul(_totalSupplyAtEpoch(context).unsafeDiv(_totalSupplyAtEpoch(context).add(_redemption)))
             .add(_deposit)
             .div(TWO);
+
         if (targetCollateral.muldiv(minWeight, totalWeight).lt(controller.minCollateral()))
             targetCollateral = UFixed18Lib.ZERO;
 
