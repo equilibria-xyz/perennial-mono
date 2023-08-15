@@ -150,7 +150,12 @@ library ChainlinkAggregatorLib {
 
         // If the found timestamp is not greater than target timestamp or no max was found, then the desired round does
         // not exist in this phase
-        if (maxTimestamp <= targetTimestamp || maxTimestamp == type(uint256).max) return 0;
+        if ((minTimestamp <= targetTimestamp || minTimestamp == type(uint256).max)
+            && (maxTimestamp <= targetTimestamp || maxTimestamp == type(uint256).max)) return 0;
+
+        // If minTimestamp is greater than targetTimestamp then return it, since it is closer to
+        // the target than maxTimestamp
+        if (minTimestamp > targetTimestamp) return _aggregatorRoundIdToProxyRoundId(phaseId, uint80(minRoundId));
 
         return _aggregatorRoundIdToProxyRoundId(phaseId, uint80(maxRoundId));
     }
