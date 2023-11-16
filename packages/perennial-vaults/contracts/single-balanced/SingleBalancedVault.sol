@@ -439,8 +439,10 @@ contract SingleBalancedVault is ISingleBalancedVault, UInitializable {
 
         if (targetPosition.lt(currentPosition))
             product.closeMake(currentPosition.sub(targetPosition));
-        if (targetPosition.gte(currentPosition))
+        if (targetPosition.gt(currentPosition))
             product.openMake(targetPosition.sub(currentPosition).min(makerAvailable));
+        if (targetPosition.eq(currentPosition))
+            product.closeMake(UFixed18Lib.ZERO);
 
         emit PositionUpdated(product, targetPosition);
     }
