@@ -36,6 +36,8 @@ const config = defaultConfig({
   solidityOverrides: {
     'contracts/balanced/BalancedVault.sol': MINIMUM_CONTRACT_SIZE_SOLIDITY_OVERRIDES,
     'contracts/balanced/BalancedVaultDefinition.sol': MINIMUM_CONTRACT_SIZE_SOLIDITY_OVERRIDES,
+    'contracts/balanced/SingleBalancedVault.sol': MINIMUM_CONTRACT_SIZE_SOLIDITY_OVERRIDES,
+    'contracts/balanced/SingleBalancedVaultDefinition.sol': MINIMUM_CONTRACT_SIZE_SOLIDITY_OVERRIDES,
     'contracts/balanced/types/MarketAccount.sol': MINIMUM_CONTRACT_SIZE_SOLIDITY_OVERRIDES,
     'contracts/balanced/types/MarketDefinition.sol': MINIMUM_CONTRACT_SIZE_SOLIDITY_OVERRIDES,
     'contracts/PerennialLib.sol': MINIMUM_CONTRACT_SIZE_SOLIDITY_OVERRIDES,
